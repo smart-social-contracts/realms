@@ -58,11 +58,17 @@ AUTOSCALE_STEP_CODE = (
 # the autoscale trigger this is NOT gated on scale_in_flight — counts drift
 # whenever members join a quarter — but it self-disables when no sub-quarter
 # exists and is re-seeded the moment one is registered/provisioned.
+#
+# The shim imports the tick from THIS module (not ``main``): the canister entry
+# is registered as ``__main__`` with a basilisk lazy-loader that re-execs on any
+# attribute access, so ``from main import …`` inside a codex step traps with
+# "Database instance already exists". Recurring task entrypoints must therefore
+# live in a normal package module like this one (mirrors ``advance_bootstrap``).
 POP_SYNC_TASK_NAME = "quarter_population_sync"
 POP_SYNC_INTERVAL_S = 60
 POP_SYNC_STEP_CODE = (
     "def async_task():\n"
-    "    from main import run_population_sync_tick\n"
+    "    from core.quarter_bootstrap import run_population_sync_tick\n"
     "    res = yield from run_population_sync_tick()\n"
     "    return res\n"
 )
@@ -416,6 +422,137 @@ def advance_bootstrap():
     }
 
 
+# ── Capital-side population sync (capital ← quarters) ───────────────────────
+
+def sync_one_peer(peer_canister_id):
+    """Generator: pull one peer quarter's coarse directory and merge it into
+    ours (un-gated). Adds ``Quarter`` entities for peers we did not know about
+    and refreshes known populations (monotonic: takes the larger count, per
+    ``merge_quarter_directory``). Shared by the ``sync_quarters`` endpoint and
+    the recurring population-sync task. Returns a JSON-able dict.
+
+    Lives here (not in ``main``) because the recurring task's codex shim can only
+    import from a normal package module — see ``POP_SYNC_STEP_CODE``.
+    """
+    try:
+        from _cdk import ic
+        from api.cross_quarter import fetch_peer_directory
+        from core.cross_quarter import merge_quarter_directory
+        from ggg import Quarter, Realm
+
+        fetched = yield from fetch_peer_directory(peer_canister_id)
+        if not fetched.get("success"):
+            return {"success": False, "error": fetched.get("error", "fetch failed")}
+
+        peer_quarters = fetched.get("quarters", [])
+        self_id = ic.id().to_str()
+        realm = Realm.load("1")
+
+        local = []
+        for q in Quarter.instances():
+            local.append({
+                "name": q.name or "",
+                "canister_id": q.canister_id or "",
+                "population": int(q.population or 0),
+                "status": q.status or "active",
+            })
+
+        merged, changed = merge_quarter_directory(local, peer_quarters)
+
+        existing_ids = {q.canister_id for q in Quarter.instances()}
+        added = 0
+        for entry in merged:
+            cid = entry.get("canister_id")
+            if not cid or cid == self_id or cid in existing_ids:
+                # Update population on a known quarter.
+                for q in Quarter.instances():
+                    if q.canister_id == cid:
+                        new_pop = int(entry.get("population", 0) or 0)
+                        if new_pop > int(q.population or 0):
+                            q.population = new_pop
+                        break
+                continue
+            new_q = Quarter(
+                name=entry.get("name") or cid[:8],
+                canister_id=cid,
+                population=int(entry.get("population", 0) or 0),
+                status=entry.get("status") or "active",
+            )
+            if realm is not None:
+                new_q.federation = realm
+            existing_ids.add(cid)
+            added += 1
+
+        return {
+            "success": True,
+            "peer": peer_canister_id,
+            "added": added,
+            "known_quarters": len(existing_ids),
+            "changed": bool(changed),
+        }
+    except Exception as e:
+        import traceback as _tb
+
+        logger.error(f"Error in sync_one_peer: {e}\n{_tb.format_exc()}")
+        return {"success": False, "error": str(e)}
+
+
+def run_population_sync_tick():
+    """Recurring population-refresh step, one pass over all sub-quarters (#156).
+
+    Polls every known sub-quarter's coarse directory so the capital's stored
+    populations — and therefore the member counts ``get_join_targets`` feeds to
+    the /join page — stay fresh without any external poker. Closes the stale-count
+    gap where a quarter kept gaining members but the capital advertised its old
+    (often 0) population.
+
+    Self-regulating: disables its own schedule when there are no sub-quarters to
+    poll (so a lone capital never busy-loops), and is re-seeded by
+    ``register_quarter`` / auto-scale provisioning the moment a quarter appears.
+    Invoked by the ``POP_SYNC_TASK_NAME`` TaskManager task via the codex shim in
+    ``POP_SYNC_STEP_CODE``.
+    """
+    try:
+        from _cdk import ic
+        from ggg import Quarter
+
+        self_id = ic.id().to_str()
+        peers = []
+        for q in Quarter.instances():
+            cid = q.canister_id or ""
+            if cid and cid != self_id and cid not in peers:
+                peers.append(cid)
+
+        if not peers:
+            disable_recurring_task(POP_SYNC_TASK_NAME)
+            return json.dumps({"success": True, "status": "idle", "peers": 0})
+
+        synced = 0
+        errors = []
+        for cid in peers:
+            try:
+                res = yield from sync_one_peer(cid)
+                if isinstance(res, dict) and res.get("success"):
+                    synced += 1
+                else:
+                    errors.append({"peer": cid, "error": (res or {}).get("error")})
+            except Exception as e:
+                errors.append({"peer": cid, "error": str(e)})
+
+        return json.dumps({
+            "success": True,
+            "status": "synced",
+            "peers": len(peers),
+            "synced": synced,
+            "errors": errors,
+        })
+    except Exception as e:
+        import traceback as _tb
+
+        logger.error(f"run_population_sync_tick failed: {e}\n{_tb.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 # ── TaskManager seeding / teardown (canister only) ──────────────────────────
 
 def seed_recurring_codex_task(name, code, interval_s):
@@ -438,6 +575,29 @@ def seed_recurring_codex_task(name, code, interval_s):
         existing = None
 
     if existing is not None:
+        # Refresh the persisted shim. The Codex ``code`` is stored as an entity
+        # from the first seeding, so a corrected/updated step shim (e.g. the
+        # from-main → from-core fix, issue #156) only takes effect if we rewrite
+        # it here — otherwise re-seeding silently keeps running the stale code.
+        try:
+            for step in existing.steps:
+                if step.call is not None and step.call.codex is not None:
+                    step.call.codex.code = code
+        except Exception as e:
+            logger.error(f"seed_recurring_codex_task: codex refresh failed for {name}: {e}")
+
+        # A task left in a terminal state ("failed"/"completed") is never
+        # rescheduled by TaskManager._update_timers (which only acts on
+        # pending/running tasks), so a re-seed would no-op. Reset it back to a
+        # schedulable state so re-seeding genuinely recovers it (issue #156).
+        if str(existing.status) in ("failed", "completed"):
+            existing.status = "pending"
+            existing.step_to_execute = 0
+            for step in existing.steps:
+                step.status = "pending"
+            for s in existing.schedules:
+                s.last_run_at = 0  # fire promptly on the next _update_timers pass
+
         for s in existing.schedules:
             s.disabled = False
             s.repeat_every = interval_s

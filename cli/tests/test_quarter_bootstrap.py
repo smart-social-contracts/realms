@@ -260,6 +260,19 @@ class TestRecurringTaskShims:
         assert "yield from" in code
         assert "run_population_sync_tick" in code
 
+    def test_population_sync_shim_imports_from_core_not_main(self):
+        # Regression guard (issue #156): the canister entry is registered as
+        # ``__main__`` with a lazy-loader that re-execs on attribute access, so a
+        # codex shim doing ``from main import …`` traps with "Database instance
+        # already exists" and the recurring task never runs. The entrypoint MUST
+        # live in this module and be imported from ``core.quarter_bootstrap``.
+        code = qb.POP_SYNC_STEP_CODE
+        assert "from core.quarter_bootstrap import run_population_sync_tick" in code
+        assert "from main import" not in code
+        # And the function it targets must actually exist here.
+        assert callable(getattr(qb, "run_population_sync_tick", None))
+        assert callable(getattr(qb, "sync_one_peer", None))
+
     def test_recurring_task_names_are_distinct(self):
         names = {qb.BOOTSTRAP_TASK_NAME, qb.AUTOSCALE_TASK_NAME, qb.POP_SYNC_TASK_NAME}
         assert len(names) == 3

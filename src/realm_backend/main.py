@@ -53,7 +53,6 @@ from api.ggg_entities import (
     list_objects_paginated,
     search_objects,
 )
-from api.cross_quarter import fetch_peer_directory as _fetch_peer_directory
 from api.quarter_provisioning import (
     request_provision_quarter as _request_provision_quarter,
     request_casals_create_canister as _request_casals_create_canister,
@@ -81,7 +80,6 @@ from core.access import _check_access, require, require_controller, set_controll
 from core.cross_quarter import (
     ResolutionStatus,
     classify_ref,
-    merge_quarter_directory,
     walk_chain,
 )
 from core.realm_ref import RealmRef
@@ -1640,75 +1638,14 @@ def sync_quarters(peer_canister_id: text) -> Async[text]:
 
     Adds Quarter entities for peers we did not know about and updates known
     populations. Carries only container-level data (see issue #156).
+
+    Delegates to ``core.quarter_bootstrap.sync_one_peer`` — the same un-gated
+    merge the recurring population-sync task uses, so both paths stay identical.
     """
-    res = yield from _sync_one_peer(peer_canister_id)
+    from core.quarter_bootstrap import sync_one_peer
+
+    res = yield from sync_one_peer(peer_canister_id)
     return json.dumps(res)
-
-
-def _sync_one_peer(peer_canister_id) -> Async[dict]:
-    """Pull one peer quarter's coarse directory and merge it into ours (un-gated).
-
-    Adds Quarter entities for peers we did not know about and refreshes known
-    populations (monotonic: takes the larger count, per ``merge_quarter_directory``).
-    Shared by the ``sync_quarters`` endpoint and the recurring population-sync
-    task (``run_population_sync_tick``). Returns a JSON-able dict.
-    """
-    try:
-        from ggg import Quarter, Realm
-
-        fetched = yield from _fetch_peer_directory(peer_canister_id)
-        if not fetched.get("success"):
-            return {"success": False, "error": fetched.get("error", "fetch failed")}
-
-        peer_quarters = fetched.get("quarters", [])
-        self_id = ic.id().to_str()
-        realm = Realm.load("1")
-
-        local = []
-        for q in Quarter.instances():
-            local.append({
-                "name": q.name or "",
-                "canister_id": q.canister_id or "",
-                "population": int(q.population or 0),
-                "status": q.status or "active",
-            })
-
-        merged, changed = merge_quarter_directory(local, peer_quarters)
-
-        existing_ids = {q.canister_id for q in Quarter.instances()}
-        added = 0
-        for entry in merged:
-            cid = entry.get("canister_id")
-            if not cid or cid == self_id or cid in existing_ids:
-                # Update population on a known quarter.
-                for q in Quarter.instances():
-                    if q.canister_id == cid:
-                        new_pop = int(entry.get("population", 0) or 0)
-                        if new_pop > int(q.population or 0):
-                            q.population = new_pop
-                        break
-                continue
-            new_q = Quarter(
-                name=entry.get("name") or cid[:8],
-                canister_id=cid,
-                population=int(entry.get("population", 0) or 0),
-                status=entry.get("status") or "active",
-            )
-            if realm is not None:
-                new_q.federation = realm
-            existing_ids.add(cid)
-            added += 1
-
-        return {
-            "success": True,
-            "peer": peer_canister_id,
-            "added": added,
-            "known_quarters": len(existing_ids),
-            "changed": bool(changed),
-        }
-    except Exception as e:
-        logger.error(f"Error in _sync_one_peer: {e}\n{traceback.format_exc()}")
-        return {"success": False, "error": str(e)}
 
 
 @query
@@ -2094,60 +2031,6 @@ def ensure_autoscale_task() -> bool:
     except Exception as e:
         logger.error(f"ensure_autoscale_task failed: {e}\n{traceback.format_exc()}")
         return False
-
-
-def run_population_sync_tick() -> Async[text]:
-    """Recurring population-refresh step (issue #156).
-
-    Polls every known sub-quarter's coarse directory so the capital's stored
-    populations — and therefore the member counts ``get_join_targets`` feeds to
-    the /join page — stay fresh without any external poker. This closes the
-    stale-count gap where a quarter kept gaining members but the capital still
-    advertised its old (often 0) population.
-
-    Self-regulating: disables its own schedule when there are no sub-quarters to
-    poll (so a lone capital never busy-loops), and is re-seeded by
-    ``register_quarter`` / auto-scale provisioning the moment a quarter appears.
-    Invoked by the ``POP_SYNC_TASK_NAME`` TaskManager task via a tiny codex shim
-    (``from main import run_population_sync_tick``).
-    """
-    try:
-        from ggg import Quarter
-        from core.quarter_bootstrap import POP_SYNC_TASK_NAME, disable_recurring_task
-
-        self_id = ic.id().to_str()
-        peers = []
-        for q in Quarter.instances():
-            cid = q.canister_id or ""
-            if cid and cid != self_id and cid not in peers:
-                peers.append(cid)
-
-        if not peers:
-            disable_recurring_task(POP_SYNC_TASK_NAME)
-            return json.dumps({"success": True, "status": "idle", "peers": 0})
-
-        synced = 0
-        errors = []
-        for cid in peers:
-            try:
-                res = yield from _sync_one_peer(cid)
-                if isinstance(res, dict) and res.get("success"):
-                    synced += 1
-                else:
-                    errors.append({"peer": cid, "error": (res or {}).get("error")})
-            except Exception as e:
-                errors.append({"peer": cid, "error": str(e)})
-
-        return json.dumps({
-            "success": True,
-            "status": "synced",
-            "peers": len(peers),
-            "synced": synced,
-            "errors": errors,
-        })
-    except Exception as e:
-        logger.error(f"run_population_sync_tick failed: {e}\n{traceback.format_exc()}")
-        return json.dumps({"success": False, "error": str(e)})
 
 
 def ensure_population_sync_task() -> bool:
@@ -3793,18 +3676,29 @@ def initialize() -> void:
             f"❌ Error starting TaskManager: {str(e)}\n{traceback.format_exc()}"
         )
 
-    # Re-arm the recurring population-sync task for federations that already have
+    # Seed the recurring population-sync task for federations that already have
     # sub-quarters (issue #156). New quarters seed it via register_quarter /
     # auto-scale, but a capital that gained its quarters before this code existed
-    # (e.g. staging Agora) would otherwise never refresh their counts. Gated on a
-    # sub-quarter existing so a lone capital doesn't schedule a no-op task.
+    # (e.g. staging Agora) would otherwise never refresh their counts.
+    #
+    # Only seed when the task is ABSENT: the TaskManager().run() above already
+    # recovers an *existing* recurring task (RUNNING->PENDING + reschedule), so
+    # re-seeding it here would call run() a second time and leave the schedule
+    # un-armed (the just-set last_run_at makes the interval check fail). Gated on
+    # a sub-quarter existing so a lone capital doesn't schedule a no-op task.
     try:
-        from ggg import Quarter
+        from ggg import Quarter, Task
+        from core.quarter_bootstrap import POP_SYNC_TASK_NAME
 
         self_id = ic.id().to_str()
-        if any((q.canister_id or "") and q.canister_id != self_id for q in Quarter.instances()):
+        has_quarters = any(
+            (q.canister_id or "") and q.canister_id != self_id
+            for q in Quarter.instances()
+        )
+        has_task = any(t.name == POP_SYNC_TASK_NAME for t in Task.instances())
+        if has_quarters and not has_task:
             ensure_population_sync_task()
-            logger.info("✅ Population-sync task ensured (sub-quarters present)")
+            logger.info("✅ Population-sync task seeded (sub-quarters present)")
     except Exception as e:
         logger.error(f"❌ Error ensuring population-sync task: {str(e)}")
 
