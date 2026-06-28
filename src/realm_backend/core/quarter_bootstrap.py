@@ -52,6 +52,21 @@ AUTOSCALE_STEP_CODE = (
     "    return res\n"
 )
 
+# Capital-side refresh task: periodically pulls each known sub-quarter's coarse
+# directory so the capital's stored populations (and thus the join-page counts
+# in get_join_targets) stay fresh with no external poker (issue #156). Unlike
+# the autoscale trigger this is NOT gated on scale_in_flight — counts drift
+# whenever members join a quarter — but it self-disables when no sub-quarter
+# exists and is re-seeded the moment one is registered/provisioned.
+POP_SYNC_TASK_NAME = "quarter_population_sync"
+POP_SYNC_INTERVAL_S = 60
+POP_SYNC_STEP_CODE = (
+    "def async_task():\n"
+    "    from main import run_population_sync_tick\n"
+    "    res = yield from run_population_sync_tick()\n"
+    "    return res\n"
+)
+
 
 # ── Pure plan construction + state machine (unit-testable, no canister) ──────
 

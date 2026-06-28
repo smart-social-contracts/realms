@@ -985,6 +985,14 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
             f"Registered quarter '{quarter_name}' (canister: {quarter_canister_id}, index: {next_index})"
         )
 
+        # Keep the capital's view of quarter populations fresh now that a
+        # sub-quarter exists (issue #156). Best-effort: registration must not
+        # fail if task seeding hiccups.
+        try:
+            ensure_population_sync_task()
+        except Exception as e:
+            logger.error(f"ensure_population_sync_task (register_quarter) failed: {e}")
+
         return RealmResponse(
             success=True,
             data=RealmResponseData(
@@ -1633,12 +1641,24 @@ def sync_quarters(peer_canister_id: text) -> Async[text]:
     Adds Quarter entities for peers we did not know about and updates known
     populations. Carries only container-level data (see issue #156).
     """
+    res = yield from _sync_one_peer(peer_canister_id)
+    return json.dumps(res)
+
+
+def _sync_one_peer(peer_canister_id) -> Async[dict]:
+    """Pull one peer quarter's coarse directory and merge it into ours (un-gated).
+
+    Adds Quarter entities for peers we did not know about and refreshes known
+    populations (monotonic: takes the larger count, per ``merge_quarter_directory``).
+    Shared by the ``sync_quarters`` endpoint and the recurring population-sync
+    task (``run_population_sync_tick``). Returns a JSON-able dict.
+    """
     try:
         from ggg import Quarter, Realm
 
         fetched = yield from _fetch_peer_directory(peer_canister_id)
         if not fetched.get("success"):
-            return json.dumps({"success": False, "error": fetched.get("error", "fetch failed")})
+            return {"success": False, "error": fetched.get("error", "fetch failed")}
 
         peer_quarters = fetched.get("quarters", [])
         self_id = ic.id().to_str()
@@ -1679,16 +1699,16 @@ def sync_quarters(peer_canister_id: text) -> Async[text]:
             existing_ids.add(cid)
             added += 1
 
-        return json.dumps({
+        return {
             "success": True,
             "peer": peer_canister_id,
             "added": added,
             "known_quarters": len(existing_ids),
             "changed": bool(changed),
-        })
+        }
     except Exception as e:
-        logger.error(f"Error in sync_quarters: {e}\n{traceback.format_exc()}")
-        return json.dumps({"success": False, "error": str(e)})
+        logger.error(f"Error in _sync_one_peer: {e}\n{traceback.format_exc()}")
+        return {"success": False, "error": str(e)}
 
 
 @query
@@ -1995,6 +2015,13 @@ def _run_quarter_scaling() -> Async[text]:
             q = Quarter(name=spec.get("name") or new_canister_id[:8], canister_id=new_canister_id, index=new_index)
             q.federation = realm
 
+        # Start refreshing this quarter's population into the capital's view so
+        # join-page counts don't go stale (issue #156). Best-effort.
+        try:
+            ensure_population_sync_task()
+        except Exception as e:
+            logger.error(f"ensure_population_sync_task (auto-scale) failed: {e}")
+
         # Provisioning complete; allow the next threshold crossing to re-trigger.
         realm.scale_in_flight = False
         logger.info(f"Auto-scale provisioned + registered quarter {new_canister_id} (index {new_index})")
@@ -2066,6 +2093,79 @@ def ensure_autoscale_task() -> bool:
         return True
     except Exception as e:
         logger.error(f"ensure_autoscale_task failed: {e}\n{traceback.format_exc()}")
+        return False
+
+
+def run_population_sync_tick() -> Async[text]:
+    """Recurring population-refresh step (issue #156).
+
+    Polls every known sub-quarter's coarse directory so the capital's stored
+    populations — and therefore the member counts ``get_join_targets`` feeds to
+    the /join page — stay fresh without any external poker. This closes the
+    stale-count gap where a quarter kept gaining members but the capital still
+    advertised its old (often 0) population.
+
+    Self-regulating: disables its own schedule when there are no sub-quarters to
+    poll (so a lone capital never busy-loops), and is re-seeded by
+    ``register_quarter`` / auto-scale provisioning the moment a quarter appears.
+    Invoked by the ``POP_SYNC_TASK_NAME`` TaskManager task via a tiny codex shim
+    (``from main import run_population_sync_tick``).
+    """
+    try:
+        from ggg import Quarter
+        from core.quarter_bootstrap import POP_SYNC_TASK_NAME, disable_recurring_task
+
+        self_id = ic.id().to_str()
+        peers = []
+        for q in Quarter.instances():
+            cid = q.canister_id or ""
+            if cid and cid != self_id and cid not in peers:
+                peers.append(cid)
+
+        if not peers:
+            disable_recurring_task(POP_SYNC_TASK_NAME)
+            return json.dumps({"success": True, "status": "idle", "peers": 0})
+
+        synced = 0
+        errors = []
+        for cid in peers:
+            try:
+                res = yield from _sync_one_peer(cid)
+                if isinstance(res, dict) and res.get("success"):
+                    synced += 1
+                else:
+                    errors.append({"peer": cid, "error": (res or {}).get("error")})
+            except Exception as e:
+                errors.append({"peer": cid, "error": str(e)})
+
+        return json.dumps({
+            "success": True,
+            "status": "synced",
+            "peers": len(peers),
+            "synced": synced,
+            "errors": errors,
+        })
+    except Exception as e:
+        logger.error(f"run_population_sync_tick failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def ensure_population_sync_task() -> bool:
+    """Seed (or re-enable) the recurring population-sync task that keeps the
+    capital's quarter populations fresh. Idempotent; safe to call every time a
+    quarter is registered or auto-provisioned."""
+    try:
+        from core.quarter_bootstrap import (
+            POP_SYNC_INTERVAL_S,
+            POP_SYNC_STEP_CODE,
+            POP_SYNC_TASK_NAME,
+            seed_recurring_codex_task,
+        )
+
+        seed_recurring_codex_task(POP_SYNC_TASK_NAME, POP_SYNC_STEP_CODE, POP_SYNC_INTERVAL_S)
+        return True
+    except Exception as e:
+        logger.error(f"ensure_population_sync_task failed: {e}\n{traceback.format_exc()}")
         return False
 
 
@@ -3692,6 +3792,21 @@ def initialize() -> void:
         logger.error(
             f"❌ Error starting TaskManager: {str(e)}\n{traceback.format_exc()}"
         )
+
+    # Re-arm the recurring population-sync task for federations that already have
+    # sub-quarters (issue #156). New quarters seed it via register_quarter /
+    # auto-scale, but a capital that gained its quarters before this code existed
+    # (e.g. staging Agora) would otherwise never refresh their counts. Gated on a
+    # sub-quarter existing so a lone capital doesn't schedule a no-op task.
+    try:
+        from ggg import Quarter
+
+        self_id = ic.id().to_str()
+        if any((q.canister_id or "") and q.canister_id != self_id for q in Quarter.instances()):
+            ensure_population_sync_task()
+            logger.info("✅ Population-sync task ensured (sub-quarters present)")
+    except Exception as e:
+        logger.error(f"❌ Error ensuring population-sync task: {str(e)}")
 
 
 @init

@@ -236,3 +236,34 @@ class TestStepPlan:
         st["cursor"] = 5
         qb.step_plan(st, True)
         assert st["status"] == "complete"
+
+
+# ---------------------------------------------------------------------------
+# Recurring-task shims — a typo here means the task silently never runs, so
+# guard the constants + generated step code (issue #156).
+# ---------------------------------------------------------------------------
+
+class TestRecurringTaskShims:
+    def test_autoscale_shim_is_async_and_targets_right_fn(self):
+        assert qb.AUTOSCALE_TASK_NAME
+        assert qb.AUTOSCALE_INTERVAL_S > 0
+        code = qb.AUTOSCALE_STEP_CODE
+        assert "def async_task()" in code
+        assert "yield from" in code
+        assert "run_autoscale_tick" in code
+
+    def test_population_sync_shim_is_async_and_targets_right_fn(self):
+        assert qb.POP_SYNC_TASK_NAME == "quarter_population_sync"
+        assert qb.POP_SYNC_INTERVAL_S > 0
+        code = qb.POP_SYNC_STEP_CODE
+        assert "def async_task()" in code
+        assert "yield from" in code
+        assert "run_population_sync_tick" in code
+
+    def test_recurring_task_names_are_distinct(self):
+        names = {qb.BOOTSTRAP_TASK_NAME, qb.AUTOSCALE_TASK_NAME, qb.POP_SYNC_TASK_NAME}
+        assert len(names) == 3
+
+    def test_population_sync_step_code_compiles(self):
+        # The framework exec()s this string; a SyntaxError would wedge the task.
+        compile(qb.POP_SYNC_STEP_CODE, "<pop_sync_step>", "exec")
