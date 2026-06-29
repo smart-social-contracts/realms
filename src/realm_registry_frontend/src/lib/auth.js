@@ -57,7 +57,27 @@ export async function initializeAuthClient() {
 
 export async function login() {
   if (TEST_MODE_II_BYPASS) {
-    const identity = await _createTestIdentity();
+    // If ?as=swarm_agent_NNN and ?pem=<urlencoded-pem> are both present,
+    // create a Secp256k1 identity from the provided PEM so tests can log in
+    // as a specific geister member. If ?as= is present without ?pem=, warn
+    // and fall through to the default Ed25519 seed identity.
+    const urlParams = new URLSearchParams(window.location.search);
+    const asParam = urlParams.get('as');
+    const pemParam = urlParams.get('pem');
+
+    let identity;
+    if (asParam && pemParam) {
+      const { Secp256k1KeyIdentity } = await import('@dfinity/identity');
+      const decodedPem = decodeURIComponent(pemParam);
+      identity = Secp256k1KeyIdentity.fromPem(decodedPem);
+      _testIdentity = identity;
+      console.log(`[TEST MODE] Logged in as ${asParam} with Secp256k1 PEM: ${identity.getPrincipal().toText()}`);
+    } else {
+      if (asParam) {
+        console.warn(`[TEST MODE] ?as=${asParam} present but ?pem= missing — using default Ed25519 seed identity`);
+      }
+      identity = await _createTestIdentity();
+    }
     _testLoggedIn = true;
     authClient = _createTestAuthClientMock();
     const principal = identity.getPrincipal();
