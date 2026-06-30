@@ -61,7 +61,7 @@ def parse_casals_spec(manifest_data: str, next_index: int) -> Dict:
     return {
         "stand": stand,
         "backend_wasm_key": backend_wasm_key,
-        "name": f"{stand}-quarter-{next_index}",
+        "name": f"{stand}-{next_index}",
         "casals_canister_id": (cas.get("casals_canister_id") or "").strip(),
         "registry_canister_id": (cas.get("registry_canister_id") or "").strip(),
         "codex": cas.get("codex") or None,

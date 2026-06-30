@@ -1417,6 +1417,38 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
             _casals_ok(cmd_res)
             jlog(job_id).info(f"stand '{stand}' commander set to backend {backend_id}")
 
+        # 4b. Inject the Casals provisioning config into the realm's manifest_data
+        # so the auto-scale loop can provision quarter backend canisters without
+        # admin intervention (gated on manifest_data.casals in _quarter_casals_args).
+        if backend_id and backend_wasm_key:
+            registry_id = (manifest.get("registry_canister_id") or
+                           manifest.get("infra", {}).get("file_registry_canister_id") or "").strip()
+            casals_config = {
+                "stand": stand,
+                "backend_wasm_key": backend_wasm_key,
+                "casals_canister_id": casals_id,
+                "registry_canister_id": registry_id,
+                "frontend_canister_id": frontend_id,
+            }
+            casals_config_json = json.dumps(casals_config).replace('\\', '\\\\').replace('"', '\\"')
+            casals_config_arg = '("' + casals_config_json + '")'
+            try:
+                qpc_result: CallResult = yield ic.call_raw(
+                    Principal.from_str(backend_id), "set_quarter_provisioning_config",
+                    ic.candid_encode(casals_config_arg), 0,
+                )
+                if isinstance(qpc_result, dict) and "Err" in qpc_result:
+                    jlog(job_id).warning(
+                        f"set_quarter_provisioning_config failed (non-fatal): {qpc_result['Err']}"
+                    )
+                else:
+                    jlog(job_id).info(
+                        f"autoscale config injected: stand={stand}, "
+                        f"backend_wasm_key={backend_wasm_key}, casals={casals_id}"
+                    )
+            except Exception as qpc_err:
+                jlog(job_id).warning(f"set_quarter_provisioning_config error (non-fatal): {qpc_err}")
+
         # Casals already verified module hashes during install; trust them here.
         job.assets_verified = 1
         if want_frontend:
