@@ -19,7 +19,10 @@ export const CONFIG = {
   ii_derivation_origin:
     viteEnv.VITE_II_DERIVATION_ORIGIN ||
     ({
-      staging: 'https://staging.realmsgos.org',
+      // staging pins the registry frontend's own canister origin as the canonical
+      // derivationOrigin (the public *.realmsgos.org domains aren't DNS-wired yet).
+      // It serves /.well-known/ii-alternative-origins listing each realm frontend.
+      staging: 'https://77243-aqaaa-aaaau-aggza-cai.icp0.io',
       demo: 'https://demo.realmsgos.org',
       test: 'https://test.realmsgos.org',
     }[viteEnv.VITE_DEPLOY_QUEUE_NETWORK || 'staging'] || ''),
