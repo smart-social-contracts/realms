@@ -94,7 +94,7 @@ function networkTestFlags(network) {
     return {
       test_mode: true,
       user_self_registration: true,
-      demo_data: true,
+      demo_data: false,
       ii_bypass: false,
       skip_terms: false,
     };
