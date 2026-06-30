@@ -1,0 +1,34 @@
+"""Principal delegation (Power of Attorney) — act-on-behalf grants between Users."""
+
+from ic_python_db import Entity, Integer, String, TimestampedMixin
+from ic_python_logging import get_logger
+
+logger = get_logger("entity.delegation")
+
+STATUS_PENDING = "pending"
+STATUS_ACTIVE = "active"
+STATUS_REVOKED = "revoked"
+STATUS_EXPIRED = "expired"
+
+
+class Delegation(Entity, TimestampedMixin):
+    """Scoped grant for one principal to act on behalf of another.
+
+    ``scope_json`` is a JSON object, e.g.
+    ``{"operations": ["proposal.vote", "proposal.create"]}`` or ``{"all": true}``.
+    """
+
+    __alias__ = "id"
+
+    id = String(max_length=64)
+    grantor = String(max_length=64)
+    delegate = String(max_length=64)
+    scope_json = String(max_length=2048, default="{}")
+    status = String(max_length=16, default=STATUS_PENDING)
+    label = String(max_length=256, default="")
+    requires_acceptance = Integer(default=1)
+    granted_by = String(max_length=64, default="")
+    accepted_at = Integer(default=0)
+    expires_at = Integer(default=0)
+    revoked_at = Integer(default=0)
+    revoked_by = String(max_length=64, default="")

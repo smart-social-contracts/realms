@@ -63,6 +63,8 @@
 		console.log('Principal at login:', principalText);
 		await initBackendWithIdentity();
 		await loadUserProfiles();
+		const { loadDelegations } = await import('$lib/stores/delegation.js');
+		await loadDelegations(backend);
 		await loadUserProfilePicture();
 
 		// Only redirect to dashboard if user is on a neutral page (root, join, welcome).

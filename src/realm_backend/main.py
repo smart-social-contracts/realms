@@ -694,6 +694,91 @@ def store_admin_invite_hash(args_json: text) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+# ── Principal delegation (Power of Attorney) ─────────────────────────────
+
+
+@update
+def grant_delegation_json(args: text) -> text:
+    """Grant scoped act-on-behalf authority from grantor to delegate.
+
+    JSON args: grantor, delegate, scope ({operations: [...]} or {all: true}),
+    optional label, expires_in_hours (default 168), requires_acceptance (default true).
+    Caller must be grantor or realm admin.
+    """
+    try:
+        from core.delegation import grant_delegation
+
+        params = json.loads(args) if args else {}
+        grantor = (params.get("grantor") or "").strip()
+        delegate = (params.get("delegate") or "").strip()
+        scope = params.get("scope") or {}
+        caller = ic.caller().to_str()
+
+        if caller != grantor and not _check_access(caller, Operations.REALM_ADMIN):
+            return json.dumps({
+                "success": False,
+                "error": "Only the grantor or a realm admin may create this delegation",
+            })
+
+        result = grant_delegation(
+            grantor,
+            delegate,
+            scope,
+            label=(params.get("label") or "").strip(),
+            expires_in_hours=int(params.get("expires_in_hours") or 168),
+            requires_acceptance=bool(params.get("requires_acceptance", True)),
+            granted_by=caller,
+        )
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"grant_delegation_json error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def accept_delegation_json(args: text) -> text:
+    """Accept a pending delegation. JSON args: delegation_id."""
+    try:
+        from core.delegation import accept_delegation
+
+        params = json.loads(args) if args else {}
+        delegation_id = (params.get("delegation_id") or "").strip()
+        if not delegation_id:
+            return json.dumps({"success": False, "error": "delegation_id is required"})
+        return json.dumps(accept_delegation(delegation_id))
+    except Exception as e:
+        logger.error(f"accept_delegation_json error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def revoke_delegation_json(args: text) -> text:
+    """Revoke a delegation. JSON args: delegation_id."""
+    try:
+        from core.delegation import revoke_delegation
+
+        params = json.loads(args) if args else {}
+        delegation_id = (params.get("delegation_id") or "").strip()
+        if not delegation_id:
+            return json.dumps({"success": False, "error": "delegation_id is required"})
+        return json.dumps(revoke_delegation(delegation_id))
+    except Exception as e:
+        logger.error(f"revoke_delegation_json error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def list_delegations_json() -> text:
+    """List delegations where the caller is grantor or delegate."""
+    try:
+        from core.delegation import list_delegations_for_caller
+
+        return json.dumps(list_delegations_for_caller())
+    except Exception as e:
+        logger.error(f"list_delegations_json error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 @update
 @require(Operations.SELF_CHANGE_QUARTER)
 def change_quarter(new_quarter_canister_id: text) -> RealmResponse:

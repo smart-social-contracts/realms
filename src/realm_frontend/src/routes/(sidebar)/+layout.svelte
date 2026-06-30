@@ -4,6 +4,7 @@
 	import Sidebar from './Sidebar.svelte';
 	import Footer from './Footer.svelte';
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
+	import DelegationBanner from '$lib/components/DelegationBanner.svelte';
 	import AiAssistantPanel from '$lib/components/AiAssistantPanel.svelte';
 	import PageBreadcrumb from '$lib/components/PageBreadcrumb.svelte';
 	import { onMount } from 'svelte';
@@ -125,6 +126,7 @@
 			style="--ai-panel-width: {aiPanelWidth}px"
 		>
 			<DemoBanner />
+			<DelegationBanner />
 
 			<div class="{isFullBleedExtension ? 'px-0 lg:pl-0 lg:pr-0' : 'px-4 lg:pl-6 lg:pr-0'}">
 				{#if !isFullBleedExtension}

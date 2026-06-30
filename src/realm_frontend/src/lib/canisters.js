@@ -273,3 +273,5 @@ if (typeof window !== 'undefined') {
 	window.__debug_quarterBackend = quarterBackend;
 	console.log('🔍 Debug: backend available as window.__debug_backend');
 }
+
+export { withDelegationArgs, withDelegationJson } from '$lib/stores/delegation.js';
