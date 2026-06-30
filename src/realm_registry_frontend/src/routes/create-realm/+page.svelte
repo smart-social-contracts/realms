@@ -582,12 +582,12 @@
         '$lib/realm-branding-generator.js'
       );
       const seed = String(Date.now());
-      if (kind === 'logo' || kind === 'both') {
+      if (kind === 'logo') {
         const file = await generateRealmLogo(formData.name, { seed });
         formData.logo = file;
         formData.logoPreview = URL.createObjectURL(file);
       }
-      if (kind === 'background' || kind === 'both') {
+      if (kind === 'background') {
         const file = await generateRealmBackground(formData.name, { seed });
         formData.background = file;
         formData.backgroundPreview = URL.createObjectURL(file);
@@ -1138,19 +1138,9 @@
           </div>
         </div>
 
-        <div class="branding-generate-row">
-          <button
-            type="button"
-            class="btn btn-outline btn-generate-both"
-            disabled={brandingGenerating || !formData.name?.trim()}
-            on:click={() => generateBranding('both')}
-          >
-            ✨ Generate logo & background
-          </button>
-          <p class="branding-generate-hint">
-            Unique artwork is generated from your realm name. If none is uploaded, defaults are created automatically at deploy time.
-          </p>
-        </div>
+        <p class="branding-generate-hint">
+          Unique artwork is generated from your realm name. If none is uploaded, defaults are created automatically at deploy time.
+        </p>
 
         <div class="form-group">
           <label>Welcome Message <span class="required">*</span></label>
@@ -1736,27 +1726,20 @@
         <h2>Deploy Your Realm</h2>
         <p class="step-description">Choose how you want to deploy your governance system</p>
 
-        <div class="form-group deploy-version-group">
-          <label for="deploy-version">Realm software version</label>
-          <p class="field-hint">Casals provisions backend and frontend canisters from the file registry at this version.</p>
-          {#if loadingDeployVersions}
-            <p class="field-hint">Loading available versions…</p>
-          {:else}
-            <select id="deploy-version" bind:value={formData.deploy_version} class="deploy-version-select">
-              {#each deployVersionOptions as opt}
-                <option value={opt.value}>{opt.label}</option>
-              {/each}
-            </select>
-          {/if}
-        </div>
-
-        {#if draftId}
-          <p class="draft-status subtle">
-            {#if draftSaving}Saving draft…{:else if draftSaveError}Draft save failed: {draftSaveError}{:else}Draft saved — resume anytime from My Dashboard{/if}
-          </p>
-        {/if}
-
         <div class="deploy-options">
+          <div class="deploy-version-card">
+            <label for="deploy-version">Realm software version</label>
+            {#if loadingDeployVersions}
+              <p class="field-hint">Loading available versions…</p>
+            {:else}
+              <select id="deploy-version" bind:value={formData.deploy_version} class="deploy-version-select">
+                {#each deployVersionOptions as opt}
+                  <option value={opt.value}>{opt.label}</option>
+                {/each}
+              </select>
+            {/if}
+          </div>
+
           <!-- Option 1: Automatic Deployment -->
           <div 
             class="deploy-option" 
@@ -2368,19 +2351,8 @@
     cursor: not-allowed;
   }
 
-  .branding-generate-row {
-    margin: 0.5rem 0 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .btn-generate-both {
-    align-self: flex-start;
-  }
-
   .branding-generate-hint {
-    margin: 0;
+    margin: 0.5rem 0 1.25rem;
     font-size: 0.8125rem;
     color: #737373;
   }
@@ -3381,9 +3353,20 @@
     font-size: 0.875rem;
   }
 
-  .deploy-version-group {
-    margin-bottom: 1.25rem;
-    max-width: 420px;
+  .deploy-version-card {
+    background: #FAFAFA;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .deploy-version-card label {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #171717;
   }
 
   .deploy-version-select {
@@ -3393,12 +3376,6 @@
     border-radius: 8px;
     font-size: 0.95rem;
     background: var(--bg-primary, #fff);
-  }
-
-  .draft-status.subtle {
-    font-size: 0.85rem;
-    color: var(--text-muted, #6b7280);
-    margin-bottom: 1rem;
   }
 
   /* Deploy Step */

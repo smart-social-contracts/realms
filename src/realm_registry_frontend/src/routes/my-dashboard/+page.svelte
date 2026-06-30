@@ -18,28 +18,33 @@
 
   let userPrincipal = null;
   let loading = true;
-  let activeTab = 'credits';
+  let activeTab = 'realms';
 
   // Invitation status
   let invitationActivated = false;
   let invitationModeOn = false;
   
-  // Read tab from URL parameter (?tab=realms or ?tab=credits)
+  // Read tab from URL parameter (?tab=realms | billing | credits | connect)
   $: if (browser && $page.url.searchParams.get('tab')) {
     const tabParam = $page.url.searchParams.get('tab');
-    if (tabParam === 'realms' || tabParam === 'credits' || tabParam === 'connect') {
-      activeTab = tabParam;
+    if (tabParam === 'realms') {
+      activeTab = 'realms';
+    } else if (tabParam === 'connect') {
+      activeTab = 'connect';
+    } else if (tabParam === 'billing' || tabParam === 'credits') {
+      activeTab = 'billing';
     }
   }
   
-  // Credits — registry balance (same source as deploy); billing /credits proxies chain
+  // Billing — registry balance (same source as deploy); billing /credits proxies chain
   let balance = 0;
+  let spentThisMonth = 0;
+  let predictedThisMonth = 0;
   let purchases = [];
   let loadingCredits = true;
   
   // Realms data
   let createdRealms = [];
-  let joinedRealms = [];
   let loadingRealms = true;
 
   // Deployments data
@@ -108,8 +113,6 @@
       await loadDeployments();
       loadWizardDrafts();
       
-      // Load other data in parallel (canister calls can be slow)
-      loadCredits();
       loadVouchers();
       await loadRealms();
       
@@ -131,12 +134,20 @@
     if (!userPrincipal) return;
     loadingCredits = true;
     try {
-      const { fetchUserCreditBalance } = await import('$lib/user-credits.js');
-      balance = await fetchUserCreditBalance(userPrincipal.toText());
+      const { fetchUserBillingSummary } = await import('$lib/user-credits.js');
+      const summary = await fetchUserBillingSummary(
+        userPrincipal.toText(),
+        createdRealms.length
+      );
+      balance = summary.balance;
+      spentThisMonth = summary.spentThisMonth;
+      predictedThisMonth = summary.predictedThisMonth;
       purchases = [];
     } catch (err) {
       console.error('Failed to load credits:', err);
       balance = 0;
+      spentThisMonth = 0;
+      predictedThisMonth = 0;
       purchases = [];
     } finally {
       loadingCredits = false;
@@ -149,11 +160,10 @@
     try {
       const { fetchCreatedRealmsForUser } = await import('$lib/user-created-realms.js');
       createdRealms = await fetchCreatedRealmsForUser(userPrincipal.toText(), deployments);
-      joinedRealms = [];
+      await loadCredits();
     } catch (err) {
       console.error('Failed to load realms:', err);
       createdRealms = [];
-      joinedRealms = [];
     } finally {
       loadingRealms = false;
     }
@@ -430,18 +440,6 @@
       <div class="tabs">
         <button 
           class="tab" 
-          class:active={activeTab === 'credits'}
-          on:click={() => activeTab = 'credits'}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="16"></line>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-          {$_('dashboard.credits_tab')}
-        </button>
-        <button 
-          class="tab" 
           class:active={activeTab === 'realms'}
           on:click={() => activeTab = 'realms'}
         >
@@ -450,6 +448,17 @@
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
           </svg>
           {$_('dashboard.realms_tab')}
+        </button>
+        <button 
+          class="tab" 
+          class:active={activeTab === 'billing'}
+          on:click={() => activeTab = 'billing'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="2" y1="10" x2="22" y2="10"></line>
+          </svg>
+          {$_('dashboard.billing_tab')}
         </button>
         <button
           class="tab"
@@ -466,7 +475,7 @@
 
       <!-- Tab Content -->
       <div class="tab-content">
-        {#if activeTab === 'credits'}
+        {#if activeTab === 'billing'}
           <div class="credits-section">
             <!-- Balance Card -->
             <div class="balance-card">
@@ -477,6 +486,25 @@
                 <div class="balance-value">{balance}</div>
               {/if}
               <div class="balance-unit">{$_('dashboard.credits_unit')}</div>
+            </div>
+
+            <div class="usage-summary">
+              <div class="usage-stat">
+                <span class="usage-label">{$_('dashboard.spent_this_month')}</span>
+                {#if loadingCredits}
+                  <span class="usage-value loading">—</span>
+                {:else}
+                  <span class="usage-value">{spentThisMonth} {$_('dashboard.credits_unit')}</span>
+                {/if}
+              </div>
+              <div class="usage-stat">
+                <span class="usage-label">{$_('dashboard.predicted_this_month')}</span>
+                {#if loadingCredits}
+                  <span class="usage-value loading">—</span>
+                {:else}
+                  <span class="usage-value">{predictedThisMonth} {$_('dashboard.credits_unit')}</span>
+                {/if}
+              </div>
             </div>
 
             <!-- Voucher Redemption Section -->
@@ -655,6 +683,49 @@
               </a>
             </div>
 
+            <!-- Created Realms (on-chain registry — not the same as queued installer jobs) -->
+            <div class="realms-group created-realms-group">
+              <h3>{$_('dashboard.created_realms')}</h3>
+              {#if loadingRealms}
+                <div class="loading-placeholder"></div>
+              {:else if createdRealms.length === 0}
+                <div class="empty-state">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                  </svg>
+                  <p>{$_('dashboard.no_created_realms')}</p>
+                  {#if deployments.some((d) => d.raw_status === 'completed')}
+                    <p class="empty-hint">Your completed deployment may still be registering. Refresh in a moment or check the homepage directory.</p>
+                  {:else if deployments.length > 0}
+                    <p class="empty-hint">Active deployments are listed below. This section updates when your realm is registered on-chain.</p>
+                  {/if}
+                  <a href="/create-realm" class="create-realm-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    Create Realm
+                  </a>
+                </div>
+              {:else}
+                <ul class="realm-list">
+                  {#each createdRealms as realm}
+                    <li class="realm-item">
+                      <div class="realm-info">
+                        <span class="realm-name">{realm.name}</span>
+                        <span class="realm-id">{realm.id}</span>
+                      </div>
+                      {#if realm.url}
+                        <a href={realm.url} target="_blank" rel="noopener noreferrer" class="realm-visit-link">
+                          Visit →
+                        </a>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+
             <!-- Wizard drafts (in-progress realm creation) -->
             <div class="realms-group drafts-group">
               <h3>Drafts</h3>
@@ -744,78 +815,6 @@
               </div>
             {/if}
 
-            <!-- Created Realms (on-chain registry — not the same as queued installer jobs) -->
-            <div class="realms-group">
-              <h3>{$_('dashboard.created_realms')}</h3>
-              {#if loadingRealms}
-                <div class="loading-placeholder"></div>
-              {:else if createdRealms.length === 0}
-                <div class="empty-state">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                  </svg>
-                  <p>{$_('dashboard.no_created_realms')}</p>
-                  {#if deployments.some((d) => d.raw_status === 'completed')}
-                    <p class="empty-hint">Your completed deployment may still be registering. Refresh in a moment or check the homepage directory.</p>
-                  {:else if deployments.length > 0}
-                    <p class="empty-hint">Active deployments are listed above. This section updates when your realm is registered on-chain.</p>
-                  {/if}
-                  <a href="/create-realm" class="create-realm-btn">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 5v14M5 12h14"/>
-                    </svg>
-                    Create Realm
-                  </a>
-                </div>
-              {:else}
-                <ul class="realm-list">
-                  {#each createdRealms as realm}
-                    <li class="realm-item">
-                      <div class="realm-info">
-                        <span class="realm-name">{realm.name}</span>
-                        <span class="realm-id">{realm.id}</span>
-                      </div>
-                      {#if realm.url}
-                        <a href={realm.url} target="_blank" rel="noopener noreferrer" class="realm-visit-link">
-                          Visit →
-                        </a>
-                      {/if}
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-            </div>
-
-            <!-- Joined Realms -->
-            <div class="realms-group">
-              <h3>{$_('dashboard.joined_realms')}</h3>
-              {#if loadingRealms}
-                <div class="loading-placeholder"></div>
-              {:else if joinedRealms.length === 0}
-                <div class="empty-state">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                  </svg>
-                  <p>{$_('dashboard.no_joined_realms')}</p>
-                </div>
-              {:else}
-                <ul class="realm-list">
-                  {#each joinedRealms as realm}
-                    <li class="realm-item">
-                      <div class="realm-info">
-                        <span class="realm-name">{realm.name}</span>
-                        <span class="realm-id">{realm.id}</span>
-                      </div>
-                      <span class="role-badge member">{$_('dashboard.role_member')}</span>
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-            </div>
           </div>
 
         {:else if activeTab === 'connect'}
@@ -1010,6 +1009,37 @@
   .balance-unit {
     font-size: 0.875rem;
     opacity: 0.8;
+  }
+
+  .usage-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .usage-stat {
+    background: #F5F5F5;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .usage-label {
+    font-size: 0.8125rem;
+    color: #737373;
+  }
+
+  .usage-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #171717;
+  }
+
+  .usage-value.loading {
+    color: #A3A3A3;
   }
 
   .balance-loading {
@@ -1680,6 +1710,10 @@
 
     .topup-section {
       padding: 1rem;
+    }
+
+    .usage-summary {
+      grid-template-columns: 1fr;
     }
   }
 </style>
