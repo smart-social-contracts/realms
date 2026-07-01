@@ -24,13 +24,21 @@
 	
 	function saveSidebarState(hidden) {
 		if (browser && initialized) {
-			localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(hidden));
+			try {
+				localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(hidden));
+			} catch {
+				// sandbox / private mode
+			}
 		}
 	}
 
 	function saveAiPanelState(open) {
 		if (browser && initialized) {
-			localStorage.setItem(AI_PANEL_STATE_KEY, JSON.stringify(open));
+			try {
+				localStorage.setItem(AI_PANEL_STATE_KEY, JSON.stringify(open));
+			} catch {
+				// sandbox / private mode
+			}
 		}
 	}
 	
@@ -58,16 +66,20 @@
 			document.documentElement.classList.remove('dark');
 			document.documentElement.classList.add('light');
 			
-			const savedSidebar = localStorage.getItem(SIDEBAR_STATE_KEY);
-			if (savedSidebar !== null) {
-				drawerHidden = JSON.parse(savedSidebar);
-			} else {
-				drawerHidden = window.innerWidth < 1024;
-			}
+			try {
+				const savedSidebar = localStorage.getItem(SIDEBAR_STATE_KEY);
+				if (savedSidebar !== null) {
+					drawerHidden = JSON.parse(savedSidebar);
+				} else {
+					drawerHidden = window.innerWidth < 1024;
+				}
 
-			const savedAi = localStorage.getItem(AI_PANEL_STATE_KEY);
-			if (savedAi !== null) {
-				aiPanelOpen = JSON.parse(savedAi);
+				const savedAi = localStorage.getItem(AI_PANEL_STATE_KEY);
+				if (savedAi !== null) {
+					aiPanelOpen = JSON.parse(savedAi);
+				}
+			} catch {
+				drawerHidden = window.innerWidth < 1024;
 			}
 			
 			initialized = true;
