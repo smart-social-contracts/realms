@@ -2,7 +2,7 @@
   import { Button, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
-  import { login, logout, initializeAuthClient } from '$lib/auth';
+  import { login, logout, initializeAuthClient, restoreAuthSession } from '$lib/auth';
   import { isEmbeddedInPortal, requestAuthRefresh } from '$lib/portal-bridge.ts';
   import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor } from '$lib/canisters.js';
   import { loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
@@ -150,6 +150,22 @@
     }
   }
   
+  async function advanceStepAfterAuth() {
+    await initBackendWithIdentity();
+    await loadUserProfiles();
+    if (inviteCode) {
+      await validateInvite();
+    }
+    userHasJoined = await isJoinedOnTarget();
+    if ($testModeIIBypass) {
+      currentStep = 'profile';
+    } else if (needsQuarterChoice) {
+      currentStep = 'pick_quarter';
+    } else {
+      currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
+    }
+  }
+
   onMount(() => {
     let onPortalAuth;
     let onPortalAuthError;
@@ -159,6 +175,10 @@
       await backendReady;
       if (disposed) return;
       embeddedInPortal = isEmbeddedInPortal();
+
+      // Hydrate stores from AuthClient before step logic (portal iframes remount often).
+      await restoreAuthSession();
+      if (disposed) return;
 
       const urlParams = new URLSearchParams(window.location.search);
       inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
@@ -181,18 +201,10 @@
       }
 
       if ($isAuthenticated) {
-        await initBackendWithIdentity();
-        await loadUserProfiles();
-        userHasJoined = await isJoinedOnTarget();
-        if (inviteCode) {
-          await validateInvite();
-        }
+        await advanceStepAfterAuth();
       }
 
       targetsResolved = true;
-      if (needsQuarterChoice && $isAuthenticated) {
-        currentStep = 'pick_quarter';
-      }
 
       if (embeddedInPortal) {
         onPortalAuth = () => {
@@ -350,19 +362,7 @@
   async function completeAuthAfterLogin(userPrincipal) {
     isAuthenticated.set(true);
     principal.set(userPrincipal.toText());
-    await initBackendWithIdentity();
-    await loadUserProfiles();
-    if (inviteCode) {
-      await validateInvite();
-    }
-    userHasJoined = await isJoinedOnTarget();
-    if ($testModeIIBypass) {
-      currentStep = 'profile';
-    } else if (needsQuarterChoice) {
-      currentStep = 'pick_quarter';
-    } else {
-      currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
-    }
+    await advanceStepAfterAuth();
   }
 
   async function handleLogin(options = {}) {

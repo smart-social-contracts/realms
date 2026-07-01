@@ -6,6 +6,18 @@ function storageAvailable() {
     if (typeof window === 'undefined') return false;
     try {
         const key = '__realms_storage_test__';
+        sessionStorage.setItem(key, '1');
+        sessionStorage.removeItem(key);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function localStorageAvailable() {
+    if (typeof window === 'undefined') return false;
+    try {
+        const key = '__realms_storage_test__';
         localStorage.setItem(key, '1');
         localStorage.removeItem(key);
         return true;
@@ -14,35 +26,40 @@ function storageAvailable() {
     }
 }
 
-const canPersist = !isEmbeddedInPortal() && storageAvailable();
+// Portal iframes: sessionStorage (same tab). Standalone: localStorage (cross-tab).
+const useSessionStorage = isEmbeddedInPortal() && storageAvailable();
+const canPersist = useSessionStorage || localStorageAvailable();
 
 function createPersistentStore(key, defaultValue) {
     if (!canPersist) {
         return writable(defaultValue);
     }
 
-    const initialValue = localStorage.getItem(key)
-        ? JSON.parse(localStorage.getItem(key))
+    const storage = useSessionStorage ? sessionStorage : localStorage;
+    const initialValue = storage.getItem(key)
+        ? JSON.parse(storage.getItem(key))
         : defaultValue;
 
     const store = writable(initialValue);
 
     store.subscribe(value => {
         try {
-            localStorage.setItem(key, JSON.stringify(value));
+            storage.setItem(key, JSON.stringify(value));
         } catch {
             // sandbox or private mode
         }
     });
 
-    window.addEventListener('storage', (event) => {
-        if (event.key !== key || event.newValue === null) return;
-        try {
-            store.set(JSON.parse(event.newValue));
-        } catch {
-            // ignore malformed cross-tab payloads
-        }
-    });
+    if (!useSessionStorage) {
+        window.addEventListener('storage', (event) => {
+            if (event.key !== key || event.newValue === null) return;
+            try {
+                store.set(JSON.parse(event.newValue));
+            } catch {
+                // ignore malformed cross-tab payloads
+            }
+        });
+    }
 
     return store;
 }

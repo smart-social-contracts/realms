@@ -113,6 +113,12 @@ export async function login({ random = false } = {}) {
   if (isEmbeddedInPortal()) {
     let identity = getPortalDelegationIdentity();
     if (!identity) {
+      const client = await initializeAuthClient();
+      if (await client.isAuthenticated()) {
+        identity = client.getIdentity();
+      }
+    }
+    if (!identity) {
       const { waitForPortalDelegation, requestAuthRefresh } = await import(
         '$lib/portal-bridge.ts'
       );
@@ -163,7 +169,16 @@ export async function login({ random = false } = {}) {
   }
 
   const client = await initializeAuthClient();
-  
+
+  // Reuse an existing IC session — critical in portal iframes where auth stores
+  // do not persist across remounts but AuthClient/IndexedDB still holds II.
+  if (await client.isAuthenticated()) {
+    const identity = client.getIdentity();
+    const principal = identity.getPrincipal();
+    console.log(`Reusing existing IC session: ${principal.toText()}`);
+    return { identity, principal };
+  }
+
   return new Promise((resolve) => {
     client.login({
       identityProvider: II_URL,
