@@ -4,9 +4,14 @@
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { hasJoined } from '$lib/stores/profiles';
 	import { sidebarConfig } from '$lib/stores/sidebar';
+	import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
 	import { get } from 'svelte/store';
 
 	onMount(() => {
+		if (isEmbeddedInPortal()) {
+			goto('/join');
+			return;
+		}
 		if (get(isAuthenticated) && hasJoined()) {
 			const config = get(sidebarConfig);
 			const defaultPath = config?.defaultPath || '/extensions/member_dashboard';

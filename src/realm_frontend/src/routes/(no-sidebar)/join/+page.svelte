@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, logout, initializeAuthClient } from '$lib/auth';
+  import { isEmbeddedInPortal, requestAuthRefresh } from '$lib/portal-bridge.ts';
   import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor } from '$lib/canisters.js';
   import { loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
@@ -37,6 +38,7 @@
   let targetsResolved = false;
   let needsQuarterChoice = false;
   let forgotLoading = false;
+  let embeddedInPortal = false;
   let forgotError = '';
   
   // Available profiles with icon names (rendered as SVGs)
@@ -148,46 +150,73 @@
     }
   }
   
-  onMount(async () => {
-    await backendReady;
+  onMount(() => {
+    let onPortalAuth;
+    let onPortalAuthError;
+    let disposed = false;
 
-    // Read invite + target quarter from the URL, then resolve where this user
-    // should register BEFORE fetching realm info / making step decisions.
-    const urlParams = new URLSearchParams(window.location.search);
-    inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
-    const quarterParam = urlParams.get('quarter') || '';
+    void (async () => {
+      await backendReady;
+      if (disposed) return;
+      embeddedInPortal = isEmbeddedInPortal();
 
-    await resolveJoinTarget(quarterParam);
+      const urlParams = new URLSearchParams(window.location.search);
+      inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
+      const quarterParam = urlParams.get('quarter') || '';
 
-    // Realm branding + test flags (capital and quarters share these).
-    await realmInfo.fetch();
-    if ($realmNameStore) {
-      realmName = $realmNameStore;
-    }
+      await resolveJoinTarget(quarterParam);
+      if (disposed) return;
 
-    if ($testModeIIBypass) {
-      await logout();
-      isAuthenticated.set(false);
-      principal.set('');
-      currentStep = 'auth';
-    }
-
-    if ($isAuthenticated) {
-      await initBackendWithIdentity();
-      await loadUserProfiles();
-      userHasJoined = await isJoinedOnTarget();
-      if (inviteCode) {
-        await validateInvite();
+      await realmInfo.fetch();
+      if (disposed) return;
+      if ($realmNameStore) {
+        realmName = $realmNameStore;
       }
-    }
 
-    targetsResolved = true;
-    // Quarter selection comes AFTER sign-in (Sign In → Quarter → …). Only jump
-    // straight to the picker if the user is already authenticated on arrival;
-    // otherwise we stay on the auth step and route to the picker post-login.
-    if (needsQuarterChoice && $isAuthenticated) {
-      currentStep = 'pick_quarter';
-    }
+      if ($testModeIIBypass) {
+        await logout();
+        isAuthenticated.set(false);
+        principal.set('');
+        currentStep = 'auth';
+      }
+
+      if ($isAuthenticated) {
+        await initBackendWithIdentity();
+        await loadUserProfiles();
+        userHasJoined = await isJoinedOnTarget();
+        if (inviteCode) {
+          await validateInvite();
+        }
+      }
+
+      targetsResolved = true;
+      if (needsQuarterChoice && $isAuthenticated) {
+        currentStep = 'pick_quarter';
+      }
+
+      if (embeddedInPortal) {
+        onPortalAuth = () => {
+          if ($isAuthenticated) return;
+          void handleLogin();
+        };
+        onPortalAuthError = (event) => {
+          loading = false;
+          // Delegation failed — user can still sign in with II directly.
+          console.warn('[portal] delegation unavailable:', event?.detail?.error);
+        };
+        window.addEventListener('portal:auth', onPortalAuth);
+        window.addEventListener('portal:auth-error', onPortalAuthError);
+        if (!$isAuthenticated) {
+          requestAuthRefresh();
+        }
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      if (onPortalAuth) window.removeEventListener('portal:auth', onPortalAuth);
+      if (onPortalAuthError) window.removeEventListener('portal:auth-error', onPortalAuthError);
+    };
   });
 
   // Ask the capital where new members may register and pick a target quarter.
@@ -318,35 +347,42 @@
     }
   }
 
+  async function completeAuthAfterLogin(userPrincipal) {
+    isAuthenticated.set(true);
+    principal.set(userPrincipal.toText());
+    await initBackendWithIdentity();
+    await loadUserProfiles();
+    if (inviteCode) {
+      await validateInvite();
+    }
+    userHasJoined = await isJoinedOnTarget();
+    if ($testModeIIBypass) {
+      currentStep = 'profile';
+    } else if (needsQuarterChoice) {
+      currentStep = 'pick_quarter';
+    } else {
+      currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
+    }
+  }
+
   async function handleLogin(options = {}) {
     loading = true;
     error = '';
     try {
       const { principal: userPrincipal } = await login(options);
       if (userPrincipal) {
-        isAuthenticated.set(true);
-        principal.set(userPrincipal.toText());
-        await initBackendWithIdentity();
-        await loadUserProfiles();
-        if (inviteCode) {
-          await validateInvite();
-        }
-        // Check if user has already joined the resolved target quarter
-        userHasJoined = await isJoinedOnTarget();
-        if ($testModeIIBypass) {
-          // In II bypass test mode, always go to profile selection
-          currentStep = 'profile';
-        } else if (needsQuarterChoice) {
-          currentStep = 'pick_quarter';
-        } else {
-          currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
-        }
+        await completeAuthAfterLogin(userPrincipal);
+      } else if (embeddedInPortal) {
+        error =
+          'Could not connect to the federation portal. Sign in with Internet Identity below, or sign in at the portal first.';
       } else {
         error = 'Login was cancelled or failed. Please try again.';
       }
     } catch (e) {
       console.error('Login error:', e);
-      error = 'Failed to authenticate. Please try again.';
+      error = embeddedInPortal
+        ? 'Sign-in failed. Try Internet Identity below or sign in at the federation portal first.'
+        : 'Failed to authenticate. Please try again.';
     } finally {
       loading = false;
     }
@@ -639,7 +675,11 @@
             </div>
             <h2 class="text-2xl font-bold text-gray-900 mb-2">Sign in to continue</h2>
             <p class="text-gray-500">
-              {$testModeIIBypass ? 'Choose how to sign in to' : 'Authenticate with Internet Identity to join'} {realmName}
+              {#if $testModeIIBypass}
+                Choose how to sign in to {realmName}
+              {:else}
+                Authenticate with Internet Identity to join {realmName}
+              {/if}
             </p>
           </div>
 
@@ -695,13 +735,27 @@
                 <span>Sign in with Internet Identity</span>
               {/if}
             </button>
-            
+
+            {#if embeddedInPortal}
+              <p class="mt-6 text-center text-sm text-gray-500">
+                Not signed in on the portal?
+                <a
+                  href="/join"
+                  target="_top"
+                  rel="noopener noreferrer"
+                  class="text-gray-700 hover:text-gray-900 hover:underline font-medium"
+                >
+                  Sign in at the federation portal →
+                </a>
+              </p>
+            {:else}
             <p class="mt-6 text-center text-sm text-gray-500">
               Don't have an Internet Identity? 
               <a href={globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app'} target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-gray-900 hover:underline font-medium">
                 Create one →
               </a>
             </p>
+            {/if}
           {/if}
 
           <!-- Returning member who forgot their quarter -->

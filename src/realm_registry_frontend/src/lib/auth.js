@@ -88,11 +88,8 @@ export async function login() {
   const client = await initializeAuthClient();
   
   return new Promise((resolve) => {
-    client.login({
+    const loginOpts = {
       identityProvider: II_URL,
-      // Pin derivation origin so the registry-issued principal matches the one
-      // every realm frontend gets (they list this origin as canonical).
-      ...(DERIVATION_ORIGIN ? { derivationOrigin: DERIVATION_ORIGIN } : {}),
       onSuccess: () => {
         const identity = client.getIdentity();
         const principal = identity.getPrincipal();
@@ -103,7 +100,12 @@ export async function login() {
         console.error("Login failed:", error);
         resolve({ identity: null, principal: null });
       }
-    });
+    };
+    // Federation portal (#232): single login origin — no derivationOrigin.
+    if (!CONFIG.federation_portal && DERIVATION_ORIGIN) {
+      loginOpts.derivationOrigin = DERIVATION_ORIGIN;
+    }
+    client.login(loginOpts);
   });
 }
 

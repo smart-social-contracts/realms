@@ -85,6 +85,43 @@ class RealmRecord(Entity, TimestampedMixin):
         }
 
 
+class SlugRecord(Entity, TimestampedMixin):
+    """Federation slug → realm mapping (portal routing authority)."""
+    __alias__ = "slug"
+    slug = String(max_length=64)
+    realm_id = String(max_length=64)
+    frontend_canister_id = String(max_length=64)
+    claimed_by = String(max_length=64)
+    claimed_at = Float()
+    portal_url = String(max_length=512)
+    pretty_hostname = String(max_length=256)
+    pretty_hostname_status = String(max_length=16)
+    gos_implementation = String(max_length=64)
+    gos_version = String(max_length=32)
+    ggg_conformance = String(max_length=32)
+    loader_profile = String(max_length=64)
+    created_at = Float()
+    updated_at = Float()
+
+    def to_dict(self) -> dict:
+        return {
+            "slug": self.slug or "",
+            "realm_id": self.realm_id or "",
+            "frontend_canister_id": self.frontend_canister_id or "",
+            "claimed_by": self.claimed_by or "",
+            "claimed_at": self.claimed_at or 0.0,
+            "portal_url": self.portal_url or "",
+            "pretty_hostname": self.pretty_hostname or "",
+            "pretty_hostname_status": self.pretty_hostname_status or "",
+            "gos_implementation": self.gos_implementation or "",
+            "gos_version": self.gos_version or "",
+            "ggg_conformance": self.ggg_conformance or "",
+            "loader_profile": self.loader_profile or "",
+            "created_at": self.created_at or 0.0,
+            "updated_at": self.updated_at or 0.0,
+        }
+
+
 class InvitationCode(Entity, TimestampedMixin):
     __alias__ = "code_hash"
     code_hash = String(max_length=64)

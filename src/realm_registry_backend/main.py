@@ -190,6 +190,12 @@ from api.registry import (
     count_registered_realms, get_registered_realm,
     list_registered_realms, register_realm_by_caller, remove_registered_realm,
 )
+from api.slugs import (
+    claim_slug_by_caller,
+    list_pending_pretty_hostnames as list_pending_pretty_hostnames_impl,
+    mark_pretty_hostname_status,
+    resolve_slug_json,
+)
 from api.status import get_status
 from _cdk import (
     Async, CallResult, Func, Opt, Principal, Query, Record, Service,
@@ -198,7 +204,7 @@ from _cdk import (
 )
 from ic_python_db import Database
 from ic_python_logging import get_logger
-from core.models import ActivatedPrincipal, InvitationCode, RegistryConfig, VersionInfo, WizardDraft
+from core.models import ActivatedPrincipal, InvitationCode, RegistryConfig, VersionInfo
 
 # ── Inter-canister: realm_installer ────────────────────────────────────
 
@@ -216,24 +222,11 @@ class RResultEnqueue(Variant, total=False):
     Ok: REnqueueOk
     Err: RInstallerError
 
-class RProvisionOk(Record):
-    job_id: text
-    status: text
-    stand: text
-    backend_canister_id: text
-    frontend_canister_id: text
-
-class RResultProvision(Variant, total=False):
-    Ok: RProvisionOk
-    Err: RInstallerError
-
 class RealmInstallerService(Service):
     @service_update
     def enqueue_deployment(self, manifest_json: text) -> RResultEnqueue: ...
     @service_update
     def cancel_deployment(self, job_id: text) -> text: ...
-    @service_update
-    def provision_via_casals(self, job_id: text) -> RResultProvision: ...
 
 # ── Candid types (must be in main.py for basilisk .did generator) ──────
 
@@ -356,30 +349,13 @@ def _hash_code(code: str) -> str:
     return hashlib.sha256(code.strip().encode("utf-8")).hexdigest()
 
 
-def _frontend_id_from_url(url: str) -> str:
-    """Derive frontend canister id from a realm URL (legacy records omit the field)."""
-    u = (url or "").strip()
-    if not u:
-        return ""
-    # https://<canister-id>.icp0.io/...
-    if "://" in u:
-        u = u.split("://", 1)[1]
-    host = u.split("/", 1)[0]
-    if host.endswith(".icp0.io"):
-        return host[: -len(".icp0.io")]
-    return ""
-
-
 def _realm_record(r: dict) -> RealmRecord:
-    frontend_id = (r.get("frontend_canister_id") or "").strip()
-    if not frontend_id:
-        frontend_id = _frontend_id_from_url(r.get("url", ""))
     return RealmRecord(
         id=r.get("id", ""), name=r.get("name", ""),
         url=r.get("url", ""), backend_url=r.get("backend_url", ""),
         logo=r.get("logo", ""), users_count=int(r.get("users_count", 0)),
         created_at=float(r.get("created_at", 0.0)),
-        frontend_canister_id=frontend_id,
+        frontend_canister_id=r.get("frontend_canister_id", ""),
     )
 
 
@@ -459,6 +435,52 @@ def remove_realm(realm_id: text) -> AddRealmResult:
 @query
 def realm_count() -> nat64:
     return count_registered_realms()
+
+# ── Federation slug endpoints (portal routing) ─────────────────────────
+
+@update
+def claim_slug(
+    slug: text,
+    frontend_canister_id: text = "",
+    realm_id: text = "",
+    portal_base_url: text = "",
+    pretty_hostname: text = "",
+) -> GenericResult:
+    try:
+        result = claim_slug_by_caller(
+            slug, frontend_canister_id, realm_id,
+            portal_base_url, pretty_hostname,
+        )
+        if result["success"]:
+            return {"Ok": json.dumps(result)}
+        return {"Err": result["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@update
+def resolve_slug(slug: text) -> GenericResult:
+    """Consensus-backed slug resolution — must not be a query."""
+    try:
+        return {"Ok": resolve_slug_json(slug)}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@query
+def list_pending_pretty_hostnames() -> text:
+    try:
+        return json.dumps({"success": True, "slugs": list_pending_pretty_hostnames_impl()})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+@update
+def set_pretty_hostname_status(slug: text, status: text) -> GenericResult:
+    try:
+        result = mark_pretty_hostname_status(slug, status)
+        if result["success"]:
+            return {"Ok": json.dumps(result)}
+        return {"Err": result["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
 
 # ── Credits endpoints ──────────────────────────────────────────────────
 
@@ -568,60 +590,11 @@ def request_deployment(manifest_json: text) -> Async[text]:
                 pass
             return json.dumps({"success": False, "error": hold.get("error", "hold failed")})
 
-        # Casals path: registry triggers on-chain provisioning (replaces off-chain worker).
-        if manifest.get("casals"):
-            prov_call: CallResult = yield installer.provision_via_casals(job_id)
-            prov = _unwrap_provision(prov_call)
-            if not prov.get("success"):
-                try:
-                    yield installer.cancel_deployment(job_id)
-                except Exception:
-                    pass
-                release_deployment_hold(job_id, prov.get("error", "Casals provisioning failed"))
-                return json.dumps({"success": False, "error": prov.get("error", "Casals provisioning failed")})
-            result["provision"] = prov
-            result["status"] = prov.get("status", "pending")
-
         result["credits_held"] = DEPLOYMENT_COST_CREDITS
         result["caller"] = caller
         return json.dumps(result)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
-
-
-def _unwrap_provision(raw):
-    v = raw
-    if isinstance(v, dict):
-        if v.get("Err") is not None:
-            e = v["Err"]
-            msg = e.get("message", str(e)) if isinstance(e, dict) else str(e)
-            return {"success": False, "error": msg}
-        if "Ok" in v:
-            v = v["Ok"]
-    if hasattr(v, "Err") and getattr(v, "Err", None) is not None:
-        e = v.Err
-        return {"success": False, "error": getattr(e, "message", str(e))}
-    if hasattr(v, "Ok"):
-        v = v.Ok
-    if isinstance(v, dict):
-        if v.get("Err") is not None:
-            e = v["Err"]
-            msg = e.get("message", str(e)) if isinstance(e, dict) else str(e)
-            return {"success": False, "error": msg}
-        if "Ok" in v:
-            v = v["Ok"]
-    if isinstance(v, dict) and v.get("job_id"):
-        return {"success": True, **v}
-    if hasattr(v, "job_id"):
-        return {
-            "success": True,
-            "job_id": v.job_id,
-            "status": getattr(v, "status", ""),
-            "stand": getattr(v, "stand", ""),
-            "backend_canister_id": getattr(v, "backend_canister_id", ""),
-            "frontend_canister_id": getattr(v, "frontend_canister_id", ""),
-        }
-    return {"success": False, "error": f"unexpected provision response: {str(raw)[:200]}"}
 
 
 def _unwrap_enqueue(raw):
@@ -737,110 +710,6 @@ def list_versions() -> text:
         versions = [vi.to_dict() for vi in VersionInfo.instances()]
         versions.sort(key=lambda v: v.get("published_at", 0), reverse=True)
         return json.dumps({"success": True, "versions": versions})
-    except Exception as e:
-        return json.dumps({"success": False, "error": str(e)})
-
-
-# ── Wizard draft endpoints ─────────────────────────────────────────────
-
-def _draft_id_for(caller: str) -> str:
-    import hashlib
-    import time
-    seed = f"{caller}:{time.time()}:{ic.time()}"
-    return "draft_" + hashlib.sha256(seed.encode()).hexdigest()[:12]
-
-
-@update
-def save_wizard_draft(args_json: text) -> text:
-    """Create or update a create-realm wizard draft for the caller."""
-    try:
-        caller = str(ic.caller())
-        params = json.loads(args_json or "{}")
-        draft_id = (params.get("id") or "").strip()
-        draft_json = params.get("draft_json") or params.get("form_data") or {}
-        if isinstance(draft_json, dict):
-            draft_json = json.dumps(draft_json)
-        draft_json = draft_json[:8190]
-        realm_name = (params.get("realm_name") or "").strip()
-        if not realm_name:
-            try:
-                parsed = json.loads(draft_json)
-                realm_name = (parsed.get("name") or "").strip()
-            except Exception:
-                realm_name = ""
-        if not realm_name:
-            realm_name = "Untitled Realm"
-        current_step = int(params.get("current_step") or 0)
-        deploy_version = (params.get("deploy_version") or "").strip()[:32]
-
-        import time
-        now = time.time()
-
-        if draft_id:
-            existing = WizardDraft[draft_id]
-            if existing and (existing.principal_id or "") != caller:
-                return json.dumps({"success": False, "error": "draft not found"})
-            if existing:
-                existing.draft_json = draft_json
-                existing.realm_name = realm_name[:128]
-                existing.current_step = current_step
-                existing.deploy_version = deploy_version
-                existing.updated_at = now
-                return json.dumps({"success": True, "id": draft_id, "updated_at": now})
-
-        draft_id = draft_id or _draft_id_for(caller)
-        WizardDraft(
-            id=draft_id,
-            principal_id=caller,
-            realm_name=realm_name[:128],
-            draft_json=draft_json,
-            current_step=current_step,
-            deploy_version=deploy_version,
-            updated_at=now,
-        )
-        return json.dumps({"success": True, "id": draft_id, "updated_at": now})
-    except Exception as e:
-        return json.dumps({"success": False, "error": str(e)})
-
-
-@query
-def list_wizard_drafts() -> text:
-    """List wizard drafts owned by the caller."""
-    try:
-        caller = str(ic.caller())
-        drafts = [
-            d.to_dict() for d in WizardDraft.instances()
-            if (d.principal_id or "") == caller
-        ]
-        drafts.sort(key=lambda d: d.get("updated_at", 0), reverse=True)
-        return json.dumps({"success": True, "drafts": drafts})
-    except Exception as e:
-        return json.dumps({"success": False, "error": str(e)})
-
-
-@query
-def get_wizard_draft(draft_id: text) -> text:
-    """Fetch a single wizard draft (caller must own it)."""
-    try:
-        caller = str(ic.caller())
-        draft = WizardDraft[draft_id]
-        if draft is None or (draft.principal_id or "") != caller:
-            return json.dumps({"success": False, "error": "draft not found"})
-        return json.dumps({"success": True, "draft": draft.to_dict()})
-    except Exception as e:
-        return json.dumps({"success": False, "error": str(e)})
-
-
-@update
-def delete_wizard_draft(draft_id: text) -> text:
-    """Delete a wizard draft owned by the caller."""
-    try:
-        caller = str(ic.caller())
-        draft = WizardDraft[draft_id]
-        if draft is None or (draft.principal_id or "") != caller:
-            return json.dumps({"success": False, "error": "draft not found"})
-        draft.delete()
-        return json.dumps({"success": True, "id": draft_id})
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 

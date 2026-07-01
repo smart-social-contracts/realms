@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 const REALMS_RELEASE_BASE =
   'https://github.com/smart-social-contracts/realms/releases/download';
 
-function slugify(name) {
+export function slugify(name) {
   return (
     (name || 'realm')
       .toLowerCase()
@@ -11,6 +11,19 @@ function slugify(name) {
       .replace(/^-+|-+$/g, '')
       .slice(0, 48) || 'realm'
   );
+}
+
+/** Canonical federation portal URL for a realm slug. */
+export function portalUrlForSlug(slug, network) {
+  const hosts = {
+    staging: 'https://staging.realmsgos.org',
+    demo: 'https://demo.realmsgos.org',
+    test: 'https://test.realmsgos.org',
+    ic: 'https://registry.realmsgos.org',
+    production: 'https://registry.realmsgos.org',
+  };
+  const base = CONFIG.portal_base_url || hosts[network] || hosts.staging;
+  return `${base.replace(/\/$/, '')}/r/${slugify(slug)}`;
 }
 
 /** Normalize version for Casals wasm keys: semver without leading v, or `main`. */
@@ -215,6 +228,12 @@ export async function buildRealmDeploymentManifest(
       files: branding.files,
     };
   }
+
+  const federationSlug = slugify(name);
+  manifest.federation = {
+    slug: federationSlug,
+    portal_url: portalUrlForSlug(federationSlug, network),
+  };
 
   return manifest;
 }

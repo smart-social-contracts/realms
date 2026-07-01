@@ -75,6 +75,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'billing_status' : IDL.Func([], [GetBillingStatusResult], ['query']),
+    'claim_slug' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [GenericResult],
+        [],
+      ),
     'create_invitation_codes' : IDL.Func([IDL.Text], [GenericResult], []),
     'deactivate_principal' : IDL.Func([IDL.Text], [GenericResult], []),
     'deduct_credits' : IDL.Func(
@@ -82,7 +87,6 @@ export const idlFactory = ({ IDL }) => {
         [DeductCreditsResult],
         [],
       ),
-    'delete_wizard_draft' : IDL.Func([IDL.Text], [IDL.Text], []),
     'deployment_failed' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text],
         [IDL.Text],
@@ -98,13 +102,12 @@ export const idlFactory = ({ IDL }) => {
         [TransactionHistoryResult],
         ['query'],
       ),
-    'get_wizard_draft' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'is_principal_activated' : IDL.Func([IDL.Text], [GenericResult], ['query']),
     'list_activated_principals' : IDL.Func([], [IDL.Text], ['query']),
     'list_invitation_codes' : IDL.Func([], [IDL.Text], ['query']),
+    'list_pending_pretty_hostnames' : IDL.Func([], [IDL.Text], ['query']),
     'list_realms' : IDL.Func([], [IDL.Vec(RealmRecord)], ['query']),
     'list_versions' : IDL.Func([], [IDL.Text], ['query']),
-    'list_wizard_drafts' : IDL.Func([], [IDL.Text], ['query']),
     'publish_version' : IDL.Func([IDL.Text], [UpgradeResult], []),
     'realm_count' : IDL.Func([], [IDL.Nat64], ['query']),
     'redeem_invitation_code' : IDL.Func([IDL.Text], [GenericResult], []),
@@ -116,9 +119,14 @@ export const idlFactory = ({ IDL }) => {
     'remove_realm' : IDL.Func([IDL.Text], [AddRealmResult], []),
     'request_deployment' : IDL.Func([IDL.Text], [IDL.Text], []),
     'request_upgrade' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'resolve_slug' : IDL.Func([IDL.Text], [GenericResult], []),
     'revoke_invitation_code' : IDL.Func([IDL.Text], [GenericResult], []),
-    'save_wizard_draft' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_invitation_mode' : IDL.Func([IDL.Text], [GenericResult], []),
+    'set_pretty_hostname_status' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [GenericResult],
+        [],
+      ),
     'status' : IDL.Func([], [GetStatusResult], ['query']),
   });
 };

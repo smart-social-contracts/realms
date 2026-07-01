@@ -22,6 +22,53 @@ network = os.environ.get('NETWORK') or (sys.argv[1] if len(sys.argv) > 1 else 'l
 print(f"🚀 Running post-deployment tasks for network: {network}")
 
 
+PORTAL_HOSTS = {
+    "staging": "https://staging.realmsgos.org",
+    "demo": "https://demo.realmsgos.org",
+    "test": "https://test.realmsgos.org",
+    "ic": "https://registry.realmsgos.org",
+    "production": "https://registry.realmsgos.org",
+}
+
+
+def _slugify(name: str) -> str:
+    import re
+    s = re.sub(r"[^a-z0-9]+", "-", (name or "realm").lower()).strip("-")
+    return (s[:48] or "realm")
+
+
+def _claim_federation_slug(
+    manifest, realm_name, network, registry_canister_id,
+    frontend_id, backend_id, realm_dir,
+):
+    """Register federation slug on realm_registry_backend after deploy."""
+    if not (frontend_id and backend_id and registry_canister_id):
+        return
+    federation = manifest.get("federation") or {}
+    slug = federation.get("slug") or _slugify(realm_name)
+    portal_base = PORTAL_HOSTS.get(network, PORTAL_HOSTS["staging"])
+    portal_url = federation.get("portal_url") or f"{portal_base}/r/{slug}"
+    if portal_url.startswith("http"):
+        portal_base = portal_url.rsplit("/r/", 1)[0]
+    registry_backend = os.environ.get("REGISTRY_BACKEND_CANISTER", "realm_registry_backend")
+    claim_args = f'("{slug}", "{frontend_id}", "{backend_id}", "{portal_base}", "")'
+    print(f"   Claiming federation slug '{slug}' → {portal_url}")
+    try:
+        result = subprocess.run(
+            [
+                "dfx", "canister", "call", registry_backend, "claim_slug",
+                claim_args, "--network", network,
+            ],
+            cwd=realm_dir, capture_output=True, text=True, timeout=60,
+        )
+        if result.returncode == 0 and "Ok" in result.stdout:
+            print(f"   ✅ Slug '{slug}' claimed")
+        else:
+            print(f"   ⚠️  claim_slug: {result.stdout or result.stderr}")
+    except Exception as e:
+        print(f"   ⚠️  claim_slug failed: {e}")
+
+
 def run_command(cmd, capture=True):
     """Run a command and return the result."""
     print(f"Running: {' '.join(cmd)}")
@@ -78,6 +125,7 @@ try:
         frontend_url = ""
         backend_url = ""
         backend_id = ""
+        frontend_id = ""
         
         # Detect dfx webserver port for local network
         local_port = 8000
@@ -179,6 +227,10 @@ try:
                 if '"success": true' in response.lower() or '"success":true' in response.lower():
                     print(f"   ✅ Realm registered successfully!")
                     print(f"   Response: {response[:200]}..." if len(response) > 200 else f"   Response: {response}")
+                    _claim_federation_slug(
+                        manifest, realm_name, network, registry_canister_id,
+                        frontend_id, backend_id, realm_dir,
+                    )
                 else:
                     print(f"   ⚠️  Registration may have failed. Response: {response[:300]}")
                     # Continue to fallback

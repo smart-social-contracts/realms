@@ -1,8 +1,14 @@
 # Cross-realm identity & the user-scoped AI assistant
 
-Implements issue #233. This document is the source of truth for **how one human
-maps to one principal across the federation** and how the **user-scoped AI
-assistant** is built on top of that.
+Implements issue #233. This document describes the **interim staging** cross-realm
+identity model. For **production scale** (unlimited realms, no alternative-origins
+list), see **[FEDERATION_PORTAL.md](./FEDERATION_PORTAL.md)** — single portal
+login origin, `resolve_slug` via consensus update, sandboxed realm iframes with
+scoped delegation handoff ([bridge contract](./FEDERATION_PORTAL_REALM_BRIDGE.md)),
+no `ii-alternative-origins`.
+
+Below is the current **#233 `derivationOrigin` + alternative-origins** approach
+and how the **user-scoped AI assistant** builds on one principal.
 
 ## 1. The identity problem
 

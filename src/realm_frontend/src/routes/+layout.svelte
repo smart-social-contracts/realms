@@ -25,40 +25,44 @@
 
 	onMount(async () => {
 		modeobserver();
-		
-		// Initialize theme system
 		initializeTheme();
 
-		// Restore IC auth session early so sidebar/nav render correctly in new tabs
+		let bridgeDispose = () => {};
 		if (browser) {
+			const { initPortalBridge } = await import('$lib/portal-bridge.ts');
+			bridgeDispose = initPortalBridge();
+			const onPortalAuth = async () => {
+				await restoreAuthSession();
+			};
+			window.addEventListener('portal:auth', onPortalAuth);
 			void restoreAuthSession();
+			const prevDispose = bridgeDispose;
+			bridgeDispose = () => {
+				prevDispose?.();
+				window.removeEventListener('portal:auth', onPortalAuth);
+			};
 		}
-		
+
 		await initI18n();
-		
 		i18nReady = true;
-		
-		// Restore user's preferred language from localStorage or cookie
+
 		if (browser) {
-			// First try localStorage
 			const storedLocale = localStorage.getItem('preferredLocale');
 			if (storedLocale) {
-				console.log('Setting locale from localStorage:', storedLocale);
 				locale.set(storedLocale);
-				return;
-			}
-			
-			// Then try cookie
-			const localeCookie = document.cookie
-				.split('; ')
-				.find(row => row.startsWith('locale='));
-			
-			if (localeCookie) {
-				const cookieLocale = localeCookie.split('=')[1];
-				console.log('Setting locale from cookie:', cookieLocale);
-				locale.set(cookieLocale);
+			} else {
+				const localeCookie = document.cookie
+					.split('; ')
+					.find(row => row.startsWith('locale='));
+				if (localeCookie) {
+					locale.set(localeCookie.split('=')[1]);
+				}
 			}
 		}
+
+		return () => {
+			bridgeDispose?.();
+		};
 	});
 </script>
 

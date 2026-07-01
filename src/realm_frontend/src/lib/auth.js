@@ -2,6 +2,7 @@
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 import { getTestModeIIBypass } from '$lib/config.js';
+import { isEmbeddedInPortal, getPortalDelegationIdentity } from '$lib/portal-bridge.ts';
 
 const II_URL = globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app';
 console.log(`Using Identity Provider: ${II_URL}`);
@@ -19,6 +20,29 @@ if (DERIVATION_ORIGIN) {
 }
 
 let authClient;
+let authClientMode = null;
+
+function getAuthMode() {
+  if (getTestModeIIBypass()) return 'test';
+  // Portal iframe uses scoped delegation when available; otherwise II + derivationOrigin.
+  if (isEmbeddedInPortal() && getPortalDelegationIdentity()) return 'portal';
+  return 'ii';
+}
+
+function _createPortalAuthClientMock() {
+  return {
+    isAuthenticated: async () => !!getPortalDelegationIdentity(),
+    getIdentity: () => getPortalDelegationIdentity(),
+    logout: async () => {},
+    login: async () => {
+      const { waitForPortalDelegation, requestAuthRefresh } = await import(
+        '$lib/portal-bridge.ts'
+      );
+      requestAuthRefresh();
+      return waitForPortalDelegation();
+    }
+  };
+}
 
 // --- Test mode support ---
 // In test mode we bypass Internet Identity entirely and use a deterministic
@@ -56,7 +80,19 @@ function _createTestAuthClientMock() {
 export { authClient };
 
 export async function initializeAuthClient() {
-  if (getTestModeIIBypass()) {
+  const mode = getAuthMode();
+  if (authClient && authClientMode !== mode) {
+    authClient = null;
+  }
+  authClientMode = mode;
+
+  if (mode === 'portal') {
+    if (!authClient) {
+      authClient = _createPortalAuthClientMock();
+    }
+    return authClient;
+  }
+  if (mode === 'test') {
     if (!authClient) {
       authClient = _createTestAuthClientMock();
       console.log('[TEST MODE] Auth client initialized (mock)');
@@ -74,6 +110,29 @@ export async function initializeAuthClient() {
 }
 
 export async function login({ random = false } = {}) {
+  if (isEmbeddedInPortal()) {
+    let identity = getPortalDelegationIdentity();
+    if (!identity) {
+      const { waitForPortalDelegation, requestAuthRefresh } = await import(
+        '$lib/portal-bridge.ts'
+      );
+      requestAuthRefresh();
+      // Brief wait for portal delegation when no canonical derivationOrigin is configured.
+      const delegationTimeoutMs = DERIVATION_ORIGIN ? 1500 : 60_000;
+      identity = await waitForPortalDelegation({ timeoutMs: delegationTimeoutMs });
+    }
+    if (identity) {
+      authClient = _createPortalAuthClientMock();
+      authClientMode = 'portal';
+      const principal = identity.getPrincipal();
+      console.log(`[portal] Authenticated via delegation: ${principal.toText()}`);
+      return { identity, principal };
+    }
+    if (!DERIVATION_ORIGIN) {
+      return { identity: null, principal: null };
+    }
+    console.log('[portal] No delegation yet — using Internet Identity with derivationOrigin');
+  }
   if (getTestModeIIBypass()) {
     // If ?as=swarm_agent_NNN and ?pem=<urlencoded-pem> are both present,
     // create a Secp256k1 identity from the provided PEM so tests can log in
@@ -140,6 +199,9 @@ export async function logout() {
 }
 
 export async function isAuthenticated() {
+  if (isEmbeddedInPortal() && getPortalDelegationIdentity()) {
+    return true;
+  }
   if (getTestModeIIBypass()) {
     return _testLoggedIn;
   }
@@ -169,6 +231,28 @@ export async function restoreAuthSession() {
 }
 
 async function _restoreAuthSession() {
+  if (isEmbeddedInPortal()) {
+    const portalId = getPortalDelegationIdentity();
+    if (portalId) {
+      const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
+        '$lib/stores/auth.js'
+      );
+      const principalText = portalId.getPrincipal().toText();
+      isAuthenticatedStore.set(true);
+      userIdentity.set(principalText);
+      principal.set(principalText);
+      try {
+        const { initBackendWithIdentity } = await import('$lib/canisters.js');
+        await initBackendWithIdentity(portalId);
+        const { loadUserProfiles } = await import('$lib/stores/profiles.js');
+        await loadUserProfiles();
+      } catch (e) {
+        console.warn('[portal] backend init deferred:', e);
+      }
+      return { authenticated: true, principal: principalText };
+    }
+  }
+
   const authenticated = await isAuthenticated();
   const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
     '$lib/stores/auth.js'
