@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1060" viewBox="0 0 1280 1060">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f1f5f9"/>
+    </linearGradient>
+    <filter id="shadow" x="-6%" y="-6%" width="112%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.1"/>
+    </filter>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#d97706"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#7c3aed"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="1060" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="640" y="32" font-size="24" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="system-ui,sans-serif">Realms deployment - components &amp; connections</text>
+  <text x="640" y="52" font-size="12" fill="#64748b" text-anchor="middle" font-family="system-ui,sans-serif">how the canisters, the off-chain deploy service, and Casals wire together (test / demo / staging on IC mainnet)</text>
+
+  <!-- LEGEND -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="68" width="1200" height="78" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="56" y="86" font-size="11" font-weight="700" fill="#334155" font-family="system-ui,sans-serif">Where it runs</text>
+  </g>
+  <!-- row 1 -->
+  <rect x="150" y="76" width="88" height="16" rx="4" fill="#24292f"/>
+  <text x="194" y="87" font-size="9" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions</text>
+  <text x="244" y="88" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">workflow runner</text>
+  <rect x="360" y="76" width="64" height="16" rx="4" fill="#16a34a"/>
+  <text x="392" y="87" font-size="9" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Local CLI</text>
+  <text x="430" y="88" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">dfx / realms CLI</text>
+  <rect x="540" y="76" width="76" height="16" rx="4" fill="#2563eb"/>
+  <text x="578" y="87" font-size="9" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="622" y="88" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">on-chain update/query</text>
+  <rect x="760" y="76" width="80" height="16" rx="4" fill="#d97706"/>
+  <text x="800" y="87" font-size="9" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Off-chain svc</text>
+  <text x="846" y="88" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">deploy.realmsgos.dev</text>
+  <rect x="980" y="76" width="80" height="16" rx="4" fill="#7c3aed"/>
+  <text x="1020" y="87" font-size="9" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Casals exec</text>
+  <rect x="1100" y="76" width="64" height="16" rx="4" fill="#0891b2"/>
+  <text x="1132" y="87" font-size="9" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Browser</text>
+  <!-- row 2: arrow color legend -->
+  <text x="56" y="118" font-size="11" font-weight="700" fill="#334155" font-family="system-ui,sans-serif">Arrows</text>
+  <line x1="150" y1="114" x2="186" y2="114" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
+  <text x="192" y="118" font-size="9" fill="#475569" font-family="system-ui,sans-serif">Casals path (authoritative)</text>
+  <line x1="380" y1="114" x2="416" y2="114" stroke="#d97706" stroke-width="2.5" marker-end="url(#arrow-amber)"/>
+  <text x="422" y="118" font-size="9" fill="#475569" font-family="system-ui,sans-serif">Off-chain mundus path</text>
+  <line x1="600" y1="114" x2="636" y2="114" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="642" y="118" font-size="9" fill="#475569" font-family="system-ui,sans-serif">shared on-chain call</text>
+  <line x1="800" y1="114" x2="836" y2="114" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow-purple)"/>
+  <text x="842" y="118" font-size="9" fill="#475569" font-family="system-ui,sans-serif">dormant (provision_via_casals)</text>
+  <line x1="1070" y1="114" x2="1106" y2="114" stroke="#64748b" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="1112" y="118" font-size="9" fill="#475569" font-family="system-ui,sans-serif">cycles</text>
+  <text x="56" y="138" font-size="9" fill="#94a3b8" font-family="system-ui,sans-serif">Both paths build/store artifacts in file_registry and share the realm_installer domain steps (extensions, codices, registration).</text>
+
+  <!-- ============ CONNECTORS (drawn before boxes) ============ -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- A: publish-build -> file_registry -->
+    <path d="M120,220 L120,238 L420,238 L420,697 L500,697" stroke="#2563eb" stroke-width="1.6" marker-end="url(#arrow-blue)"/>
+    <!-- B: publish-build -> Casals (authorize_wasm) -->
+    <path d="M160,220 L160,250" stroke="#2563eb" stroke-width="1.6" marker-end="url(#arrow-blue)"/>
+    <!-- C: rollout -> Casals (upgrade_to) -->
+    <path d="M355,220 L355,310 L340,310" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+    <!-- D: Casals -> file_registry (pull WASM) -->
+    <path d="M170,370 L170,710 L500,710" stroke="#2563eb" stroke-width="1.6" marker-end="url(#arrow-blue)"/>
+    <!-- E: Casals -> realm targets -->
+    <path d="M110,370 L110,800" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+    <!-- F: Casals -> infra targets -->
+    <path d="M340,300 L755,300 L755,800" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+    <!-- G: wizard -> registry -->
+    <path d="M1120,220 L1120,236 L580,236 L580,400" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber)"/>
+    <!-- H: mundus -> registry -->
+    <path d="M540,220 L540,400" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber)"/>
+    <!-- I: mundus -> deploy service -->
+    <path d="M620,220 L620,228 L1062,228 L1062,250" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber)"/>
+    <!-- J: registry -> installer (enqueue) -->
+    <path d="M580,472 L580,510" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+    <!-- K: deploy service <-> installer (poll + report) -->
+    <path d="M900,335 L800,335 L800,560 L740,560" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber)"/>
+    <!-- L: deploy service -> realm targets (dfx install) -->
+    <path d="M1000,390 L1000,770 L320,770 L320,800" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber)"/>
+    <!-- M: installer -> file_registry (pull bundles) -->
+    <path d="M605,640 L605,680" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+    <!-- N: installer -> realm targets (ext/codex/config) -->
+    <path d="M470,640 L470,800" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+    <!-- O: installer -> registry (register_realm) -->
+    <path d="M690,510 L690,472" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+    <!-- P: installer ..> Casals (dormant) -->
+    <path d="M440,540 L400,540 L400,330 L340,330" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-purple)"/>
+    <!-- Q: CycleOps ..> infra targets (cycles) -->
+    <path d="M1152,580 L1152,800" stroke="#64748b" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- Connector labels -->
+  <text x="426" y="470" font-size="8.5" fill="#1d4ed8" font-family="system-ui,sans-serif">1. upload WASM/bundle</text>
+  <text x="166" y="242" font-size="8.5" fill="#1d4ed8" font-family="system-ui,sans-serif">authorize_wasm</text>
+  <text x="360" y="262" font-size="8.5" fill="#1d4ed8" font-family="system-ui,sans-serif">upgrade_to</text>
+  <text x="176" y="560" font-size="8.5" fill="#1d4ed8" font-family="system-ui,sans-serif">pull WASM</text>
+  <text x="60" y="600" font-size="8.5" fill="#1d4ed8" font-family="system-ui,sans-serif">install / upgrade</text>
+  <text x="60" y="614" font-size="8.5" fill="#1d4ed8" font-family="system-ui,sans-serif">(snapshot+rollback)</text>
+  <text x="600" y="294" font-size="8.5" fill="#b45309" text-anchor="middle" font-family="system-ui,sans-serif">upgrade infra</text>
+  <text x="850" y="232" font-size="8.5" fill="#b45309" font-family="system-ui,sans-serif">request_deployment</text>
+  <text x="544" y="392" font-size="8.5" fill="#b45309" font-family="system-ui,sans-serif">request</text>
+  <text x="900" y="224" font-size="8.5" fill="#b45309" font-family="system-ui,sans-serif">upload-file + trigger</text>
+  <text x="586" y="494" font-size="8.5" fill="#475569" font-family="system-ui,sans-serif">enqueue_deployment</text>
+  <text x="806" y="352" font-size="8.5" fill="#b45309" font-family="system-ui,sans-serif">poll get_pending</text>
+  <text x="806" y="364" font-size="8.5" fill="#b45309" font-family="system-ui,sans-serif">+ report status</text>
+  <text x="640" y="764" font-size="8.5" fill="#b45309" text-anchor="middle" font-family="system-ui,sans-serif">dfx install WASM + frontend</text>
+  <text x="610" y="672" font-size="8.5" fill="#475569" font-family="system-ui,sans-serif">pull ext/codex</text>
+  <text x="356" y="700" font-size="8.5" fill="#475569" font-family="system-ui,sans-serif">extensions / codices / config</text>
+  <text x="696" y="492" font-size="8.5" fill="#475569" font-family="system-ui,sans-serif">register_realm</text>
+  <text x="404" y="324" font-size="8.5" fill="#7c3aed" font-family="system-ui,sans-serif">provision_via_casals (dormant)</text>
+  <text x="1158" y="700" font-size="8.5" fill="#64748b" font-family="system-ui,sans-serif">cycle top-ups</text>
+
+  <!-- ============ TRIGGERS ============ -->
+  <!-- T1 publish-build -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="170" width="200" height="50" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <rect x="40" y="170" width="200" height="20" rx="8" fill="#24292f"/>
+    <rect x="40" y="182" width="200" height="8" fill="#24292f"/>
+    <text x="140" y="184" font-size="9.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="ui-monospace,monospace">publish-build.yml</text>
+    <text x="140" y="205" font-size="8.5" fill="#64748b" text-anchor="middle" font-family="system-ui,sans-serif">build + upload + authorize</text>
+    <text x="140" y="216" font-size="8" fill="#94a3b8" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions / publish_build.py</text>
+  </g>
+  <!-- T2 rollout -->
+  <g filter="url(#shadow)">
+    <rect x="255" y="170" width="200" height="50" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <rect x="255" y="170" width="200" height="20" rx="8" fill="#24292f"/>
+    <rect x="255" y="182" width="200" height="8" fill="#24292f"/>
+    <text x="355" y="184" font-size="9.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="ui-monospace,monospace">rollout.yml</text>
+    <text x="355" y="205" font-size="8.5" fill="#64748b" text-anchor="middle" font-family="system-ui,sans-serif">drive Casals upgrade_to</text>
+    <text x="355" y="216" font-size="8" fill="#94a3b8" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions / realms rollout</text>
+  </g>
+  <!-- T3 mundus -->
+  <g filter="url(#shadow)">
+    <rect x="470" y="170" width="210" height="50" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <rect x="470" y="170" width="210" height="20" rx="8" fill="#24292f"/>
+    <rect x="470" y="182" width="210" height="8" fill="#24292f"/>
+    <text x="575" y="184" font-size="9.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="ui-monospace,monospace">deploy-mundus.yml</text>
+    <text x="575" y="205" font-size="8.5" fill="#64748b" text-anchor="middle" font-family="system-ui,sans-serif">fast off-chain realm deploy</text>
+    <text x="575" y="216" font-size="8" fill="#94a3b8" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions / realms mundus deploy</text>
+  </g>
+  <!-- T4 wizard -->
+  <g filter="url(#shadow)">
+    <rect x="1015" y="170" width="210" height="50" rx="8" fill="#ecfeff" stroke="#67e8f9"/>
+    <rect x="1015" y="170" width="210" height="20" rx="8" fill="#0891b2"/>
+    <rect x="1015" y="182" width="210" height="8" fill="#0891b2"/>
+    <text x="1120" y="184" font-size="9.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Create-realm wizard</text>
+    <text x="1120" y="205" font-size="8.5" fill="#64748b" text-anchor="middle" font-family="system-ui,sans-serif">user creates a realm in browser</text>
+    <text x="1120" y="216" font-size="8" fill="#94a3b8" text-anchor="middle" font-family="system-ui,sans-serif">realm_registry_frontend</text>
+  </g>
+
+  <!-- ============ CASALS ============ -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="250" width="300" height="120" rx="10" fill="#f5f3ff" stroke="#a78bfa"/>
+    <rect x="40" y="250" width="300" height="24" rx="10" fill="#7c3aed"/>
+    <rect x="40" y="264" width="300" height="10" fill="#7c3aed"/>
+    <text x="190" y="267" font-size="12" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Casals orchestrator</text>
+  </g>
+  <rect x="52" y="282" width="76" height="15" rx="3" fill="#2563eb"/>
+  <text x="90" y="293" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <rect x="134" y="282" width="80" height="15" rx="3" fill="#7c3aed"/>
+  <text x="174" y="293" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Casals exec</text>
+  <text x="52" y="314" font-size="9" fill="#334155" font-family="system-ui,sans-serif">casals_backend + casals_frontend</text>
+  <text x="52" y="328" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">create_stand / create_canister / upgrade_to</text>
+  <text x="52" y="342" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">snapshot &#8594; verify hash &#8594; rollback-on-fail</text>
+  <text x="52" y="356" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">pulls WASM/bundle from file_registry</text>
+
+  <!-- ============ DEPLOY SERVICE ============ -->
+  <g filter="url(#shadow)">
+    <rect x="900" y="250" width="325" height="140" rx="10" fill="#fff7ed" stroke="#fdba74"/>
+    <rect x="900" y="250" width="325" height="24" rx="10" fill="#d97706"/>
+    <rect x="900" y="264" width="325" height="10" fill="#d97706"/>
+    <text x="1062" y="267" font-size="12" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Deploy service (deploy.realmsgos.dev)</text>
+  </g>
+  <rect x="912" y="282" width="80" height="15" rx="3" fill="#d97706"/>
+  <text x="952" y="293" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Off-chain svc</text>
+  <text x="998" y="293" font-size="8.5" fill="#64748b" font-family="ui-monospace,monospace">realms-management-service @ :8003</text>
+  <text x="912" y="314" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">polls installer.get_pending_deployments (10s)</text>
+  <text x="912" y="328" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">dfx install backend WASM + deploy frontend</text>
+  <text x="912" y="342" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">take_pre_upgrade_snapshot, report_canister_ready</text>
+  <text x="912" y="356" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">report_deployment_failure on error</text>
+  <text x="912" y="372" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">hosts uploaded artifacts via /upload-file</text>
+  <text x="912" y="384" font-size="8" fill="#b45309" font-family="system-ui,sans-serif">Legacy fast path - slated for retirement by Casals (CASALS_MIGRATION.md)</text>
+
+  <!-- ============ REALM REGISTRY ============ -->
+  <g filter="url(#shadow)">
+    <rect x="460" y="400" width="240" height="72" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="460" y="400" width="240" height="22" rx="10" fill="#2563eb"/>
+    <rect x="460" y="412" width="240" height="10" fill="#2563eb"/>
+    <text x="580" y="416" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">realm_registry</text>
+  </g>
+  <rect x="472" y="430" width="76" height="15" rx="3" fill="#2563eb"/>
+  <text x="510" y="441" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="472" y="458" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">request_deployment &#8594; enqueue job</text>
+  <text x="472" y="469" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">realms register here to be listed</text>
+
+  <!-- ============ REALM INSTALLER ============ -->
+  <g filter="url(#shadow)">
+    <rect x="440" y="510" width="300" height="130" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="440" y="510" width="300" height="24" rx="10" fill="#2563eb"/>
+    <rect x="440" y="524" width="300" height="10" fill="#2563eb"/>
+    <text x="590" y="527" font-size="12" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">realm_installer</text>
+  </g>
+  <rect x="452" y="542" width="76" height="15" rx="3" fill="#2563eb"/>
+  <text x="490" y="553" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="538" y="553" font-size="8.5" fill="#334155" font-family="system-ui,sans-serif">deployment orchestrator + on-chain verifier</text>
+  <text x="452" y="574" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">job queue: get_pending_deployments / status</text>
+  <text x="452" y="588" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">extensions / codices / branding install</text>
+  <text x="452" y="602" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">register_realm + credit settlement</text>
+  <text x="452" y="616" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">verify module_hash vs manifest</text>
+  <text x="452" y="632" font-size="9" fill="#7c3aed" font-family="system-ui,sans-serif">provision_via_casals (flag, default OFF)</text>
+
+  <!-- ============ FILE REGISTRY ============ -->
+  <g filter="url(#shadow)">
+    <rect x="500" y="680" width="210" height="72" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="500" y="680" width="210" height="22" rx="10" fill="#2563eb"/>
+    <rect x="500" y="692" width="210" height="10" fill="#2563eb"/>
+    <text x="605" y="696" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">file_registry</text>
+  </g>
+  <rect x="512" y="710" width="76" height="15" rx="3" fill="#2563eb"/>
+  <text x="550" y="721" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="512" y="738" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">WASM + frontend bundles (chunked)</text>
+  <text x="512" y="749" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">extension / codex manifests</text>
+
+  <!-- ============ CYCLEOPS ============ -->
+  <g filter="url(#shadow)">
+    <rect x="1080" y="510" width="145" height="70" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <rect x="1080" y="510" width="145" height="22" rx="10" fill="#475569"/>
+    <rect x="1080" y="522" width="145" height="10" fill="#475569"/>
+    <text x="1152" y="526" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">CycleOps</text>
+  </g>
+  <text x="1092" y="548" font-size="8.5" fill="#64748b" font-family="ui-monospace,monospace">cpbhu-...-aalta-cai</text>
+  <text x="1092" y="562" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">co-controller of all</text>
+  <text x="1092" y="574" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">orchestra canisters</text>
+
+  <!-- ============ REALM TARGETS ============ -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="800" width="560" height="150" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="40" y="800" width="560" height="24" rx="10" fill="#2563eb"/>
+    <rect x="40" y="814" width="560" height="10" fill="#2563eb"/>
+    <text x="320" y="817" font-size="12" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Realm target canisters</text>
+  </g>
+  <rect x="56" y="832" width="76" height="15" rx="3" fill="#2563eb"/>
+  <text x="94" y="843" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="142" y="843" font-size="9" fill="#334155" font-family="system-ui,sans-serif">one Casals Stand per realm (agora / dominion / syntropia)</text>
+  <text x="56" y="868" font-size="10" fill="#334155" font-family="ui-monospace,monospace">realm_backend</text>
+  <text x="180" y="868" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">domain logic; Stand commander (can self-upgrade)</text>
+  <text x="56" y="888" font-size="10" fill="#334155" font-family="ui-monospace,monospace">realm_frontend</text>
+  <text x="180" y="888" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">dedicated certified-assets canister (per realm)</text>
+  <text x="56" y="912" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Both deploy paths land here: Casals upgrades on-chain, or the deploy</text>
+  <text x="56" y="924" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">service installs via dfx; installer then adds extensions/codices.</text>
+  <rect x="56" y="932" width="528" height="14" rx="3" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="64" y="942" font-size="8.5" fill="#1e40af" font-family="system-ui,sans-serif">Controllers: Casals + CycleOps only (no human key on orchestra canisters)</text>
+
+  <!-- ============ INFRA TARGETS ============ -->
+  <g filter="url(#shadow)">
+    <rect x="680" y="800" width="545" height="150" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="680" y="800" width="545" height="24" rx="10" fill="#2563eb"/>
+    <rect x="680" y="814" width="545" height="10" fill="#2563eb"/>
+    <text x="952" y="817" font-size="12" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Infra canisters (Casals "Infra" section)</text>
+  </g>
+  <rect x="696" y="832" width="76" height="15" rx="3" fill="#2563eb"/>
+  <text x="734" y="843" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="782" y="843" font-size="9" fill="#334155" font-family="system-ui,sans-serif">platform-shared services - upgraded via Casals only</text>
+  <text x="696" y="868" font-size="9.5" fill="#334155" font-family="ui-monospace,monospace">realm_registry (backend + frontend)</text>
+  <text x="696" y="886" font-size="9.5" fill="#334155" font-family="ui-monospace,monospace">realm_installer</text>
+  <text x="696" y="904" font-size="9.5" fill="#334155" font-family="ui-monospace,monospace">file_registry</text>
+  <text x="696" y="922" font-size="9.5" fill="#334155" font-family="ui-monospace,monospace">marketplace / platform_dashboard</text>
+  <text x="696" y="940" font-size="8.5" fill="#64748b" font-family="system-ui,sans-serif">(these same canisters appear above as live services; here they are also upgrade targets)</text>
+
+  <!-- ============ FOOTER ============ -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="970" width="1200" height="74" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  </g>
+  <text x="56" y="990" font-size="11" font-weight="700" fill="#2563eb" font-family="system-ui,sans-serif">Casals path (authoritative)</text>
+  <text x="56" y="1006" font-size="9" fill="#475569" font-family="system-ui,sans-serif">publish-build &#8594; file_registry + authorize_wasm; rollout &#8594; Casals.upgrade_to pulls</text>
+  <text x="56" y="1019" font-size="9" fill="#475569" font-family="system-ui,sans-serif">artifacts and upgrades realms + infra on-chain (snapshot/verify/rollback built in).</text>
+  <text x="56" y="1035" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">The deploy service is NOT involved on this path.</text>
+  <text x="640" y="990" font-size="11" font-weight="700" fill="#d97706" font-family="system-ui,sans-serif">Off-chain mundus path (fast)</text>
+  <text x="640" y="1006" font-size="9" fill="#475569" font-family="system-ui,sans-serif">wizard / mundus &#8594; registry.request_deployment &#8594; installer queues job &#8594; deploy</text>
+  <text x="640" y="1019" font-size="9" fill="#475569" font-family="system-ui,sans-serif">service polls, installs WASM+frontend via dfx, reports back &#8594; installer finishes</text>
+  <text x="640" y="1035" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">extensions/codices + register_realm. Docs: AGENTS.md | CASALS_ROLLOUT.md | CASALS_MIGRATION.md</text>
+</svg>
