@@ -91,6 +91,14 @@ export interface Block {
 export type BlockHash = Uint8Array | number[];
 export type BlockIndex = bigint;
 export interface BlockRange { 'blocks' : Array<Block> }
+export type Callback = ActorMethod<
+  [StreamingToken],
+  StreamingCallbackHttpResponse
+>;
+export interface CallbackStrategy {
+  'token' : StreamingToken,
+  'callback' : [Principal, string],
+}
 export interface CanisterInfo {
   'canister_id' : string,
   'canister_type' : string,
@@ -111,6 +119,22 @@ export interface CanisterStatusResult {
   'cycles' : bigint,
   'settings' : DefiniteCanisterSettings,
   'module_hash' : [] | [Uint8Array | number[]],
+}
+export interface CasalsConfigView {
+  'provision_via_casals' : boolean,
+  'casals_section' : string,
+  'registry_principal' : string,
+  'casals_canister_id' : string,
+}
+export interface CasalsProvisionService {
+  'create_canister' : ActorMethod<[string], string>,
+}
+export interface CasalsService {
+  'create_canister' : ActorMethod<[string], string>,
+  'create_stand' : ActorMethod<[string], string>,
+  'get_tree' : ActorMethod<[], string>,
+  'set_commander' : ActorMethod<[string], string>,
+  'upgrade_to' : ActorMethod<[string], string>,
 }
 export interface CodexInput {
   'categories' : string,
@@ -194,6 +218,24 @@ export interface DefiniteCanisterSettings {
   'compute_allocation' : bigint,
 }
 export interface DeleteCanisterArgs { 'canister_id' : Principal }
+export interface DeploymentJobView {
+  'status' : string,
+  'expected_wasm_hash' : string,
+  'registry_canister_id' : string,
+  'backend_canister_id' : string,
+  'ext_deploy_task_id' : string,
+  'assets_verified' : number,
+  'network' : string,
+  'created_at' : bigint,
+  'error' : string,
+  'wasm_verified' : number,
+  'job_id' : string,
+  'realm_name' : string,
+  'actual_wasm_hash' : string,
+  'caller_principal' : string,
+  'completed_at' : bigint,
+  'frontend_canister_id' : string,
+}
 export interface DepositCyclesArgs { 'canister_id' : Principal }
 export interface DeveloperLicense {
   'last_payment_amount_usd_cents' : bigint,
@@ -214,6 +256,12 @@ export interface EcdsaPublicKeyArgs {
 export interface EcdsaPublicKeyResult {
   'public_key' : Uint8Array | number[],
   'chain_code' : Uint8Array | number[],
+}
+export interface EnqueueOk {
+  'status' : string,
+  'network' : string,
+  'job_id' : string,
+  'realm_name' : string,
 }
 export interface EnvelopeListRecord { 'envelopes' : Array<EnvelopeRecord> }
 export interface EnvelopeRecord {
@@ -314,6 +362,7 @@ export interface GroupRecord { 'name' : string, 'description' : string }
 export type GuardResult = { 'Ok' : null } |
   { 'Err' : string };
 export type Header = [string, string];
+export interface HealthView { 'ok' : boolean, 'canister' : string }
 export interface HttpHeader { 'value' : string, 'name' : string }
 export type HttpMethod = { 'get' : null } |
   { 'head' : null } |
@@ -366,6 +415,20 @@ export interface InstallCodeArgs {
 export type InstallCodeMode = { 'reinstall' : null } |
   { 'upgrade' : null } |
   { 'install' : null };
+export interface InstallerError { 'message' : string, 'traceback' : string }
+export interface InstallerProvisionService {
+  'provision_quarter' : ActorMethod<[string], string>,
+}
+export interface JobStatusAck {
+  'status' : string,
+  'prev_status' : string,
+  'noop' : boolean,
+  'job_id' : string,
+}
+export interface JobsListOk {
+  'jobs' : Array<DeploymentJobView>,
+  'count' : number,
+}
 export interface KeyId { 'name' : string, 'curve' : EcdsaCurve }
 export interface KeyTooLarge { 'max' : number, 'given' : number }
 export interface LicensePaymentInput {
@@ -461,6 +524,21 @@ export interface PendingAudit {
   'item_id' : string,
   'developer' : string,
 }
+export interface PendingJobEntry {
+  'job' : DeploymentJobView,
+  'manifest' : string,
+}
+export interface PendingJobsOk {
+  'jobs' : Array<PendingJobEntry>,
+  'count' : number,
+}
+export interface ProvisionOk {
+  'status' : string,
+  'backend_canister_id' : string,
+  'stand' : string,
+  'job_id' : string,
+  'frontend_canister_id' : string,
+}
 export interface ProvisionalCreateCanisterWithCyclesArgs {
   'settings' : [] | [CanisterSettings],
   'amount' : [] | [bigint],
@@ -472,6 +550,13 @@ export interface ProvisionalTopUpCanisterArgs {
   'canister_id' : Principal,
   'amount' : bigint,
 }
+export interface PublicLogEntry {
+  'id' : bigint,
+  'level' : string,
+  'logger_name' : string,
+  'message' : string,
+  'timestamp' : bigint,
+}
 export interface PurchaseRecord {
   'purchased_at' : number,
   'item_kind' : string,
@@ -480,6 +565,9 @@ export interface PurchaseRecord {
   'price_paid_e8s' : bigint,
   'item_id' : string,
   'developer' : string,
+}
+export interface QuarterBootstrapService {
+  'bootstrap_as_quarter' : ActorMethod<[string], string>,
 }
 export interface QuarterDirectoryService {
   'get_quarter_directory' : ActorMethod<[], string>,
@@ -548,9 +636,11 @@ export interface RealmRecord {
   'users_count' : bigint,
 }
 export interface RealmRegistryService {
+  'deployment_failed' : ActorMethod<[string, string, string], string>,
+  'deployment_succeeded' : ActorMethod<[string, string], string>,
   'register_realm' : ActorMethod<
     [string, string, string, string, string],
-    AddRealmResult
+    string
   >,
 }
 export interface RealmRegistryUpgradeService {
@@ -569,12 +659,56 @@ export type RealmResponseData = { 'status' : StatusRecord } |
   { 'userGet' : UserGetRecord } |
   { 'error' : string } |
   { 'message' : string };
+export interface RealmTargetService {
+  'install_codex_from_registry' : ActorMethod<[string], string>,
+  'install_extension_from_registry' : ActorMethod<[string], string>,
+}
 export type RejectionCode = { 'NoError' : null } |
   { 'CanisterError' : null } |
   { 'SysTransient' : null } |
   { 'DestinationInvalid' : null } |
   { 'SysFatal' : null } |
   { 'CanisterReject' : null };
+export interface ReportFrontendOk {
+  'status' : string,
+  'assets_verified' : number,
+  'failed_verification' : boolean,
+  'frontend_wasm_verified' : boolean,
+  'job_id' : string,
+  'actual_assets_hash' : string,
+  'actual_frontend_wasm_hash' : string,
+}
+export interface ReportReadyOk {
+  'status' : string,
+  'expected_wasm_hash' : string,
+  'failed_verification' : boolean,
+  'extensions_started' : boolean,
+  'wasm_verified' : boolean,
+  'job_id' : string,
+  'actual_wasm_hash' : string,
+}
+export type ResultCasalsConfig = { 'Ok' : CasalsConfigView } |
+  { 'Err' : InstallerError };
+export type ResultEnqueue = { 'Ok' : EnqueueOk } |
+  { 'Err' : InstallerError };
+export type ResultJobCancel = { 'Ok' : JobStatusAck } |
+  { 'Err' : InstallerError };
+export type ResultJobIdStatus = { 'Ok' : DeploymentJobView } |
+  { 'Err' : InstallerError };
+export type ResultJobsList = { 'Ok' : JobsListOk } |
+  { 'Err' : InstallerError };
+export type ResultPendingJobs = { 'Ok' : PendingJobsOk } |
+  { 'Err' : InstallerError };
+export type ResultProvision = { 'Ok' : ProvisionOk } |
+  { 'Err' : InstallerError };
+export type ResultReportFailure = { 'Ok' : JobStatusAck } |
+  { 'Err' : InstallerError };
+export type ResultReportFrontend = { 'Ok' : ReportFrontendOk } |
+  { 'Err' : InstallerError };
+export type ResultReportReady = { 'Ok' : ReportReadyOk } |
+  { 'Err' : InstallerError };
+export type ResultTakeSnapshot = { 'Ok' : TakeSnapshotOk } |
+  { 'Err' : InstallerError };
 export type Satoshi = bigint;
 export interface ScopeListRecord { 'scopes' : Array<string> }
 export interface SendTransactionArgs {
@@ -608,8 +742,19 @@ export interface StatusRecord {
 export type StatusResult = { 'Ok' : StatusRecord } |
   { 'Err' : string };
 export interface StopCanisterArgs { 'canister_id' : Principal }
+export interface StreamingCallbackHttpResponse {
+  'token' : [] | [StreamingToken],
+  'body' : Uint8Array | number[],
+}
+export type StreamingStrategy = { 'Callback' : CallbackStrategy };
+export interface StreamingToken { 'key' : string }
 export type SubAccount = Uint8Array | number[];
 export interface SymbolResult { 'symbol' : string }
+export interface TakeSnapshotOk {
+  'skipped' : boolean,
+  'job_id' : string,
+  'snapshot_id' : string,
+}
 export interface TimeStamp { 'timestamp_nanos' : bigint }
 export interface Tokens { 'e8s' : bigint }
 export interface Transaction {
