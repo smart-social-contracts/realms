@@ -2,8 +2,8 @@
   import { Button, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
-  import { login, logout, initializeAuthClient, restoreAuthSession } from '$lib/auth';
-  import { isEmbeddedInPortal, requestAuthRefresh } from '$lib/portal-bridge.ts';
+  import { login, logout, initializeAuthClient, restoreAuthSession, isAuthenticated as checkIcAuth } from '$lib/auth';
+  import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
   import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor } from '$lib/canisters.js';
   import { loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
@@ -213,14 +213,10 @@
         };
         onPortalAuthError = (event) => {
           loading = false;
-          // Delegation failed — user can still sign in with II directly.
           console.warn('[portal] delegation unavailable:', event?.detail?.error);
         };
         window.addEventListener('portal:auth', onPortalAuth);
         window.addEventListener('portal:auth-error', onPortalAuthError);
-        if (!$isAuthenticated) {
-          requestAuthRefresh();
-        }
       }
     })();
 
@@ -296,7 +292,9 @@
     error = '';
     await selectQuarter(selectedQuarter);
     needsQuarterChoice = false;
-    if ($isAuthenticated) {
+    await restoreAuthSession();
+    const authed = (await checkIcAuth()) || $isAuthenticated;
+    if (authed) {
       userHasJoined = await isJoinedOnTarget();
       if (inviteCode) await validateInvite();
       currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
@@ -372,17 +370,12 @@
       const { principal: userPrincipal } = await login(options);
       if (userPrincipal) {
         await completeAuthAfterLogin(userPrincipal);
-      } else if (embeddedInPortal) {
-        error =
-          'Could not connect to the federation portal. Sign in with Internet Identity below, or sign in at the portal first.';
       } else {
         error = 'Login was cancelled or failed. Please try again.';
       }
     } catch (e) {
       console.error('Login error:', e);
-      error = embeddedInPortal
-        ? 'Sign-in failed. Try Internet Identity below or sign in at the federation portal first.'
-        : 'Failed to authenticate. Please try again.';
+      error = 'Failed to authenticate. Please try again.';
     } finally {
       loading = false;
     }
@@ -736,26 +729,12 @@
               {/if}
             </button>
 
-            {#if embeddedInPortal}
-              <p class="mt-6 text-center text-sm text-gray-500">
-                Not signed in on the portal?
-                <a
-                  href="/join"
-                  target="_top"
-                  rel="noopener noreferrer"
-                  class="text-gray-700 hover:text-gray-900 hover:underline font-medium"
-                >
-                  Sign in at the federation portal →
-                </a>
-              </p>
-            {:else}
             <p class="mt-6 text-center text-sm text-gray-500">
               Don't have an Internet Identity? 
               <a href={globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app'} target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-gray-900 hover:underline font-medium">
                 Create one →
               </a>
             </p>
-            {/if}
           {/if}
 
           <!-- Returning member who forgot their quarter -->

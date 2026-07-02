@@ -110,7 +110,10 @@ export async function initializeAuthClient() {
 }
 
 export async function login({ random = false } = {}) {
-  if (isEmbeddedInPortal()) {
+  // Federation portal embed: same single II login as direct icp0.io when
+  // derivationOrigin is configured (staging/demo/prod). Portal delegation
+  // is only used when no canonical derivation origin exists.
+  if (isEmbeddedInPortal() && !DERIVATION_ORIGIN) {
     let identity = getPortalDelegationIdentity();
     if (!identity) {
       const client = await initializeAuthClient();
