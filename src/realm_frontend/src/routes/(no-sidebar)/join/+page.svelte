@@ -10,6 +10,7 @@
   import { goto } from '$app/navigation';
   import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmManifesto, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
+  import { formatQuarterLabel } from '$lib/utils/quarterLabels';
   import { _ } from 'svelte-i18n';
   
   // Step management: 'auth' | 'already_joined' | 'terms' | 'profile' | 'success'
@@ -630,7 +631,7 @@
                 <div class="flex items-center justify-between gap-3">
                   <div class="min-w-0">
                     <div class="font-semibold text-gray-900 truncate">
-                      #{q.index} {q.name || 'Quarter'}
+                      {formatQuarterLabel(q)}
                     </div>
                     <div class="text-xs text-gray-500 truncate font-mono">{q.canister_id}</div>
                   </div>
@@ -874,7 +875,7 @@
               <div class="min-w-0">
                 <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
                 <div class="font-semibold text-gray-900 truncate">
-                  {#if targetQuarterInfo}#{targetQuarterInfo.index} {targetQuarterInfo.name || 'Quarter'}{:else}{targetQuarterId}{/if}
+                  {#if targetQuarterInfo}{formatQuarterLabel(targetQuarterInfo)}{:else}{targetQuarterId}{/if}
                 </div>
               </div>
               {#if joinMode === 'choice' && joinTargets.length > 1}

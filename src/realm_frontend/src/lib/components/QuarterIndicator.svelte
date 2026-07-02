@@ -11,6 +11,7 @@
 	import { userProfiles } from '$lib/stores/profiles';
 	import { realmInfo } from '$lib/stores/realmInfo';
 	import { activeQuarterId } from '$lib/stores/quarters';
+	import { formatQuarterLabel } from '$lib/utils/quarterLabels';
 
 	interface QuarterOption {
 		name: string;
@@ -33,13 +34,7 @@
 	);
 	// Read-only badge for members of an actual federation. Admins use the switcher.
 	const visible = $derived(!isAdmin && quarters.length > 1 && !!active);
-	const label = $derived(
-		active
-			? active.is_capital
-				? `★ ${active.name || 'Capital'}`
-				: `#${active.index ?? 0} ${active.name || 'Quarter'}`
-			: ''
-	);
+	const label = $derived(active ? formatQuarterLabel(active) : '');
 </script>
 
 {#if visible}

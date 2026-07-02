@@ -13,6 +13,7 @@
 	import { activeQuarterId } from '$lib/stores/quarters';
 	// @ts-ignore - canisters.js is untyped
 	import { setActiveQuarter } from '$lib/canisters';
+	import { formatQuarterLabel } from '$lib/utils/quarterLabels';
 
 	interface QuarterOption {
 		name: string;
@@ -53,7 +54,7 @@
 		>
 			{#each quarters as quarter (quarter.canister_id)}
 				<option value={quarter.canister_id}>
-					{quarter.is_capital ? '★ ' : ''}#{quarter.index ?? 0} {quarter.name} ({quarter.population})
+					{formatQuarterLabel(quarter)} ({quarter.population})
 				</option>
 			{/each}
 		</select>
