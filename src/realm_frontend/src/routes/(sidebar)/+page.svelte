@@ -5,11 +5,19 @@
 	import { hasJoined } from '$lib/stores/profiles';
 	import { sidebarConfig } from '$lib/stores/sidebar';
 	import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
+	import { restoreAuthSession } from '$lib/auth';
 	import { get } from 'svelte/store';
 
-	onMount(() => {
+	onMount(async () => {
 		if (isEmbeddedInPortal()) {
-			goto('/join');
+			await restoreAuthSession();
+			if (get(isAuthenticated) && hasJoined()) {
+				const config = get(sidebarConfig);
+				const defaultPath = config?.defaultPath || '/extensions/public_dashboard';
+				goto(defaultPath);
+			} else {
+				goto('/join');
+			}
 			return;
 		}
 		if (get(isAuthenticated) && hasJoined()) {

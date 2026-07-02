@@ -72,7 +72,7 @@
     <a href="/" class="home-link">← Registry</a>
     <span class="slug">/r/{slug}</span>
     {#if realm}
-      <span class="canister-id" title="Frontend canister">{realm.frontendCanisterId}</span>
+      <span class="canister-id" title="Realm frontend canister (not your II principal)">{realm.frontendCanisterId}</span>
     {/if}
   </header>
 

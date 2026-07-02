@@ -142,7 +142,7 @@
         if (currentStep === 'auth') {
           currentStep = 'profile';
         }
-      } else if (userHasJoined && (currentStep === 'auth' || currentStep === 'terms')) {
+      } else if (userHasJoined && (currentStep === 'auth' || currentStep === 'terms' || currentStep === 'pick_quarter')) {
         currentStep = 'already_joined';
       } else if (!userHasJoined && currentStep === 'auth') {
         currentStep = $testModeSkipTerms ? 'profile' : 'terms';
@@ -159,10 +159,12 @@
     userHasJoined = await isJoinedOnTarget();
     if ($testModeIIBypass) {
       currentStep = 'profile';
+    } else if (userHasJoined) {
+      currentStep = 'already_joined';
     } else if (needsQuarterChoice) {
       currentStep = 'pick_quarter';
     } else {
-      currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
+      currentStep = $testModeSkipTerms ? 'profile' : 'terms';
     }
   }
 
@@ -775,7 +777,7 @@
           </div>
           
           <a
-            href="/"
+            href="/extensions/public_dashboard"
             class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3"
           >
             <span>Go to Dashboard</span>
