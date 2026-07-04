@@ -247,6 +247,7 @@ service : {
   "sync_quarters" : (text) -> (text);
   "get_scale_status" : () -> (text) query;
   "set_quarter_provisioning_config" : (text) -> (text);
+  "approve_orchestration_action" : (text) -> (text);
   "process_quarter_scaling" : () -> (text);
   "get_zones" : (nat) -> (text) query;
   "get_my_user_status" : () -> (RealmResponse) query;

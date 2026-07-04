@@ -1,16 +1,22 @@
 {
-  "$comment": "Realms orchestra sheet: the desired topology (Sections > Stands > Canisters) for this project's Casals-managed canisters. Each canister references an authorized WASM by `wasm_key` (bare family => latest authorized version). deploy_sheet reconciles by NAME: a stand/canister whose name matches one already registered in Casals reuses that canister (and its bound canister_id) instead of creating a new one — so the names here MUST match the live registrations (see get_tree). Scope: the 3 demo realms + the Casals-deployed infra (installer, realm-registry). Intentionally EXCLUDED: transient provisioning scaffolding (provtest*, casalspilot*), and externally-managed/registered-only infra that Casals does not install (file-registry, marketplace, token, nft, platform-dashboard) — those are registered for reference, not deployed from this sheet. The authorized-WASM catalog itself is managed by publish-build.yml, not here. Regenerate/verify against `icp canister call <casals> get_tree`.",
+  "$comment": "Realms orchestra sheet: the desired topology (Sections > Stands > Canisters) for this project's Casals-managed canisters. Each canister references an authorized WASM by `wasm_key` (bare family => latest authorized version). deploy_sheet reconciles by NAME: a stand/canister whose name matches one already registered in Casals reuses that canister (and its bound canister_id) instead of creating a new one — so the names here MUST match the live registrations (see get_tree). Scope: the 3 demo realms + the Casals-deployed infra (installer, realm-registry) + the orchestration governance layer (multisig, per-stand batons). Baton topology: every realm stand carries a `<realm>-baton` (top_commander = the Casals backend via $self) that co-controls the realm's canisters; its commanders are casals-backend + the realm backend under a 2-of-2 approval policy (set post-deploy via orchestration_configure_baton — the sheet only installs the canister). The Infra section's `infra-baton` governs the Casals-deployed infra canisters the same way. Intentionally EXCLUDED: transient provisioning scaffolding (provtest*, casalspilot*), and externally-managed/registered-only infra that Casals does not install (file-registry, marketplace, token, nft, platform-dashboard) — those are registered for reference, not deployed from this sheet. The authorized-WASM catalog itself is managed by publish-build.yml (realm WASMs) and the Casals engine seed (orchestration templates), not here. Regenerate/verify against `icp canister call <casals> get_tree`.",
   "name": "realms",
-  "description": "Realms test-environment orchestra: a Deployments section with one stand per demo realm (Dominion, Agora, Syntropia), each a realm backend + certified-assets frontend; and an Infra section with the Casals-deployed installer and realm-registry.",
+  "description": "Realms orchestra: a Deployments section with one stand per demo realm (Dominion, Agora, Syntropia) — each a baton + realm backend + certified-assets frontend — and an Infra section with the multisig, the infra baton, and the Casals-deployed installer and realm-registry.",
   "sections": [
     {
       "name": "Deployments",
-      "description": "The demo realms. One stand per realm, each running a realm backend canister plus its certified-assets frontend canister. Post-deploy configuration (runtime flags, identity, codex + extension installs) is applied by the environment's Casals arrangement (see ../arrangements), not by the sheet.",
+      "description": "The demo realms. One stand per realm, each running an orchestration baton (2-of-2 upgrade governance: casals-backend + realm backend), a realm backend canister, and its certified-assets frontend canister. Post-deploy configuration (runtime flags, identity, codex + extension installs) is applied by the environment's Casals arrangement (see ../arrangements), not by the sheet.",
       "stands": [
         {
           "name": "dominion",
           "description": "Dominion realm: algorithmic/technocratic-governance demo.",
           "canisters": [
+            {
+              "name": "dominion-baton",
+              "wasm_key": "orchestration-baton",
+              "kind": "backend",
+              "install_arg": { "top_commander": "$self" }
+            },
             { "name": "dominion-backend", "wasm_key": "realm-backend", "kind": "backend" },
             { "name": "dominion-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
           ]
@@ -19,6 +25,12 @@
           "name": "agora",
           "description": "Agora realm: direct-democracy / membership-dues demo.",
           "canisters": [
+            {
+              "name": "agora-baton",
+              "wasm_key": "orchestration-baton",
+              "kind": "backend",
+              "install_arg": { "top_commander": "$self" }
+            },
             { "name": "agora-backend", "wasm_key": "realm-backend", "kind": "backend" },
             { "name": "agora-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
           ]
@@ -27,6 +39,12 @@
           "name": "syntropia",
           "description": "Syntropia realm: adaptive protocol-based-governance demo.",
           "canisters": [
+            {
+              "name": "syntropia-baton",
+              "wasm_key": "orchestration-baton",
+              "kind": "backend",
+              "install_arg": { "top_commander": "$self" }
+            },
             { "name": "syntropia-backend", "wasm_key": "realm-backend", "kind": "backend" },
             { "name": "syntropia-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
           ]
@@ -35,8 +53,27 @@
     },
     {
       "name": "Infra",
-      "description": "Shared infrastructure that Casals deploys for this project. Externally-managed/registered-only canisters (file-registry, marketplace, token, nft, platform-dashboard) are intentionally omitted — they are registered with Casals for reference but not installed from this sheet.",
+      "description": "Shared infrastructure that Casals deploys for this project, plus the orchestration governance layer: the multisig (root of hard control — IC controller of the Casals canisters and every baton; signers configured post-deploy) and the infra baton (managed-upgrade governance for the Casals-deployed infra canisters). Externally-managed/registered-only canisters (file-registry, marketplace, token, nft, platform-dashboard) are intentionally omitted — they are registered with Casals for reference but not installed from this sheet.",
       "stands": [
+        {
+          "name": "governance",
+          "description": "Orchestration governance: the multisig canister (signers + threshold configured post-deploy via its configure method).",
+          "canisters": [
+            { "name": "multisig", "wasm_key": "orchestration-multisig", "kind": "backend" }
+          ]
+        },
+        {
+          "name": "orchestration",
+          "description": "Infra baton: governs managed upgrades of the Casals-deployed infra canisters (installer, realm-registry). Top commander + sole commander: the Casals backend.",
+          "canisters": [
+            {
+              "name": "infra-baton",
+              "wasm_key": "orchestration-baton",
+              "kind": "backend",
+              "install_arg": { "top_commander": "$self" }
+            }
+          ]
+        },
         {
           "name": "installer",
           "description": "Installer backend.",

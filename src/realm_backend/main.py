@@ -1885,7 +1885,7 @@ def set_quarter_provisioning_config(args: text) -> text:
         casals = manifest.get("casals") if isinstance(manifest.get("casals"), dict) else {}
         allowed = (
             "stand", "backend_wasm_key", "casals_canister_id", "registry_canister_id",
-            "codex", "extensions", "frontend_canister_id",
+            "codex", "extensions", "frontend_canister_id", "baton_canister_id",
         )
         for k in allowed:
             if k in incoming:
@@ -1896,6 +1896,106 @@ def set_quarter_provisioning_config(args: text) -> text:
         return json.dumps({"success": True, "casals": casals})
     except Exception as e:
         logger.error(f"set_quarter_provisioning_config error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def _orchestration_baton_id(realm) -> str:
+    """This realm's Baton canister id from ``manifest_data.casals.baton_canister_id``."""
+    try:
+        manifest = json.loads(getattr(realm, "manifest_data", "") or "{}")
+        cas = (manifest.get("casals") if isinstance(manifest, dict) else None) or {}
+        return (cas.get("baton_canister_id") or "").strip()
+    except Exception:
+        return ""
+
+
+def _parse_baton_text_reply(decoded) -> dict:
+    """Parse a Baton text-method reply: plain JSON or candid-wrapped ("<json>")."""
+    if isinstance(decoded, dict):
+        return decoded
+    if isinstance(decoded, (list, tuple)) and decoded:
+        decoded = decoded[0]
+    s = str(decoded or "").strip()
+    if s.startswith("(") and ")" in s:
+        inner = s[1:s.rfind(")")].strip().rstrip(",").strip()
+        if inner.startswith('"') and inner.endswith('"'):
+            try:
+                inner_text = json.loads(inner)
+                if isinstance(inner_text, str):
+                    s = inner_text
+            except json.JSONDecodeError:
+                pass
+    try:
+        parsed = json.loads(s)
+        return parsed if isinstance(parsed, dict) else {"result": parsed}
+    except json.JSONDecodeError:
+        return {"raw": s[:500]}
+
+
+@update
+@require(Operations.ORCHESTRATION_APPROVE)
+def approve_orchestration_action(args: text) -> Async[text]:
+    """Submit this realm's approval (or rejection) of a Baton orchestration
+    action — the realm-backend half of the 2-of-2 (casals-backend +
+    realm-backend) approval policy on this realm's Baton.
+
+    Who may call this is realm governance: the codex grants the
+    ``orchestration.approve`` operation to the right profiles (admins for
+    dominion, organization representatives for agora, all members for
+    syntropia); a voting extension resolving a proposal can also drive it.
+
+    Args (JSON): {"action_id": "<baton action id>",
+                  "decision"?: "approve" | "reject",
+                  "baton_canister_id"?: "<override>"}
+
+    The Baton id defaults to ``manifest_data.casals.baton_canister_id``
+    (injected by the realm_installer at provisioning time).
+    Returns the Baton's JSON reply (approval progress / quorum state).
+    """
+    try:
+        params = json.loads(args or "{}")
+        action_id = (params.get("action_id") or "").strip()
+        if not action_id:
+            return json.dumps({"success": False, "error": "action_id required"})
+        decision = (params.get("decision") or "approve").strip().lower()
+        if decision not in ("approve", "reject"):
+            return json.dumps({"success": False, "error": "decision must be 'approve' or 'reject'"})
+
+        from ggg import Realm
+        realm = Realm.load("1")
+        baton_id = (params.get("baton_canister_id") or "").strip() or (
+            _orchestration_baton_id(realm) if realm else ""
+        )
+        if not baton_id:
+            return json.dumps({
+                "success": False,
+                "error": "no baton configured (manifest_data.casals.baton_canister_id)",
+            })
+
+        method = "submit_approval" if decision == "approve" else "reject_action"
+        escaped = action_id.replace("\\", "\\\\").replace('"', '\\"')
+        call_res: CallResult = yield ic.call_raw(
+            Principal.from_str(baton_id), method,
+            ic.candid_encode(f'("{escaped}")'), 0,
+        )
+        if isinstance(call_res, dict):
+            if call_res.get("Err") is not None:
+                return json.dumps({"success": False, "error": str(call_res["Err"])})
+            raw = call_res.get("Ok")
+        elif hasattr(call_res, "Err") and call_res.Err is not None:
+            return json.dumps({"success": False, "error": str(call_res.Err)})
+        else:
+            raw = getattr(call_res, "Ok", call_res)
+        decoded = ic.candid_decode(raw) if isinstance(raw, (bytes, bytearray)) else raw
+        reply = _parse_baton_text_reply(decoded)
+        ok = bool(reply.get("ok")) if isinstance(reply, dict) else True
+        logger.info(
+            f"orchestration {decision} for action {action_id} on baton {baton_id}: "
+            f"{str(reply)[:200]}"
+        )
+        return json.dumps({"success": ok, "decision": decision, "baton": baton_id, "reply": reply})
+    except Exception as e:
+        logger.error(f"approve_orchestration_action error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

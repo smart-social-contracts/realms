@@ -63,6 +63,10 @@ class CasalsService(Service):
     def set_commander(self, args: text) -> text: ...
     @service_update
     def upgrade_to(self, args: text) -> text: ...
+    @service_update
+    def orchestration_hand_to_baton(self, args: text) -> text: ...
+    @service_update
+    def orchestration_configure_baton(self, args: text) -> text: ...
 
 # ── Entities ───────────────────────────────────────────────────────────
 
@@ -139,6 +143,13 @@ class InstallerConfig(Entity):
     # controllers (intended: the realm_registry_backend canister). Empty => only
     # controllers may trigger on-chain provisioning.
     registry_principal = String(max_length=64, default="")
+    # Opt-in per-realm Baton governance: when 1, every provisioned stand gets an
+    # orchestration-baton canister, the realm canisters are handed to it, and a
+    # 2-of-2 (casals-backend + realm-backend) upgrade approval policy is set.
+    # Requires the Casals catalog to carry the `orchestration-baton` template
+    # and the installer to hold the orchestration.* section permissions.
+    create_stand_baton = Integer(default=0)
+    baton_wasm_key = String(max_length=64, default="orchestration-baton")
 
 def _config() -> "InstallerConfig":
     list(InstallerConfig.instances())
@@ -297,6 +308,8 @@ class CasalsConfigView(Record, _CA):
     casals_canister_id: text
     casals_section: text
     registry_principal: text
+    create_stand_baton: bool
+    baton_wasm_key: text
 
 class ResultCasalsConfig(Variant, total=False):
     Ok: CasalsConfigView
@@ -1254,11 +1267,12 @@ def _casals_find_canister(tree: dict, stand: str, canister_name: str) -> str:
 
 
 def _casals_create_or_reuse_canister(casals, job_id: str, stand: str, name: str,
-                                     kind: str, wasm_key: str):
+                                     kind: str, wasm_key: str, install_arg=None):
     """Generator: create a canister via Casals, or reuse one left by a prior attempt."""
-    create_res: CallResult = yield casals.create_canister(json.dumps({
-        "stand": stand, "name": name, "kind": kind, "wasm_key": wasm_key,
-    }))
+    create_args = {"stand": stand, "name": name, "kind": kind, "wasm_key": wasm_key}
+    if install_arg is not None:
+        create_args["install_arg"] = install_arg
+    create_res: CallResult = yield casals.create_canister(json.dumps(create_args))
     try:
         parsed = _casals_ok(create_res)
         cid = (parsed.get("canister_id") or "").strip()
@@ -1276,6 +1290,54 @@ def _casals_create_or_reuse_canister(casals, job_id: str, stand: str, name: str,
         raise RuntimeError(f"casals: canister '{name}' already exists but was not found in get_tree")
     jlog(job_id).info(f"reusing existing {kind} {cid} ({name})")
     return cid
+
+
+def _setup_stand_baton(casals, job_id: str, stand: str, casals_id: str,
+                       baton_key: str, targets: list, backend_id: str):
+    """Generator: per-realm Baton governance for a freshly provisioned stand.
+
+    Creates ``<stand>-baton`` (top_commander = the Casals backend, so Casals
+    can administer it), hands each realm canister to it (Baton becomes a
+    co-controller + registers it as managed), then sets the commanders and the
+    2-of-2 approval policy: casals-backend AND the realm backend must both
+    approve every managed upgrade / asset provision.
+
+    ``targets`` is a list of (canister_name, canister_id) to hand off.
+    Idempotent — safe to re-run on a partially provisioned job.
+    """
+    baton_name = f"{stand}-baton"
+    baton_id = yield from _casals_create_or_reuse_canister(
+        casals, job_id, stand, baton_name, "backend", baton_key,
+        install_arg={"top_commander": casals_id},
+    )
+    jlog(job_id).info(f"stand baton ready: {baton_name} ({baton_id})")
+
+    for target_name, target_id in targets:
+        if not target_id:
+            continue
+        hand_res: CallResult = yield casals.orchestration_hand_to_baton(json.dumps({
+            "target": target_name, "baton": baton_name,
+        }))
+        _casals_ok(hand_res)
+        jlog(job_id).info(f"handed {target_name} ({target_id}) to {baton_name}")
+
+    commanders = [casals_id] + ([backend_id] if backend_id else [])
+    policy = {
+        "threshold": len(commanders),
+        "eligible": list(commanders),
+        "required": list(commanders),
+    }
+    cfg_res: CallResult = yield casals.orchestration_configure_baton(json.dumps({
+        "baton": baton_name,
+        "commanders": commanders,
+        "approval_policy": policy,
+    }))
+    _casals_ok(cfg_res)
+    jlog(job_id).info(
+        f"baton {baton_name} configured: commanders={commanders}, "
+        f"policy {policy['threshold']}-of-{len(commanders)}"
+    )
+    return baton_id
 
 
 @update
@@ -1297,6 +1359,10 @@ def set_casals_config(args: text) -> ResultCasalsConfig:
             cfg.casals_section = (params.get("casals_section") or "Deployments").strip()
         if "registry_principal" in params:
             cfg.registry_principal = (params.get("registry_principal") or "").strip()
+        if "create_stand_baton" in params:
+            cfg.create_stand_baton = 1 if params["create_stand_baton"] else 0
+        if "baton_wasm_key" in params:
+            cfg.baton_wasm_key = (params.get("baton_wasm_key") or "orchestration-baton").strip()
         return ResultCasalsConfig(Ok=_casals_config_view(cfg))
     except Exception as e:
         return ResultCasalsConfig(Err=ie(str(e), traceback.format_exc()[-1500:]))
@@ -1308,6 +1374,8 @@ def _casals_config_view(cfg) -> CasalsConfigView:
         casals_canister_id=cfg.casals_canister_id or "",
         casals_section=cfg.casals_section or "Deployments",
         registry_principal=cfg.registry_principal or "",
+        create_stand_baton=bool(cfg.create_stand_baton),
+        baton_wasm_key=cfg.baton_wasm_key or "orchestration-baton",
     )
 
 
@@ -1409,6 +1477,22 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
             job.frontend_canister_id = frontend_id
             job.frontend_wasm_verified = 1
 
+        # 3b. Per-realm Baton governance (opt-in): stand baton + hand-offs +
+        # 2-of-2 (casals-backend + realm-backend) approval policy.
+        baton_id = ""
+        if int(cfg.create_stand_baton or 0):
+            baton_key = (cas.get("baton_wasm_key") or cfg.baton_wasm_key
+                         or "orchestration-baton").strip()
+            hand_targets = []
+            if want_backend and backend_id:
+                hand_targets.append((f"{stand}-backend", backend_id))
+            if want_frontend and frontend_id:
+                hand_targets.append((f"{stand}-frontend", frontend_id))
+            baton_id = yield from _setup_stand_baton(
+                casals, job_id, stand, casals_id, baton_key,
+                hand_targets, backend_id if want_backend else "",
+            )
+
         # 4. Make the realm backend the Stand commander so it can self-upgrade.
         if backend_id:
             cmd_res: CallResult = yield casals.set_commander(json.dumps({
@@ -1430,6 +1514,8 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
                 "registry_canister_id": registry_id,
                 "frontend_canister_id": frontend_id,
             }
+            if baton_id:
+                casals_config["baton_canister_id"] = baton_id
             casals_config_json = json.dumps(casals_config).replace('\\', '\\\\').replace('"', '\\"')
             casals_config_arg = '("' + casals_config_json + '")'
             try:
@@ -1538,8 +1624,26 @@ def provision_quarter(args: text) -> Async[text]:
         }))
         _casals_ok(cmd_res)
 
+        # Hand the new quarter to the stand's Baton so it is governed like the
+        # rest of the realm. Approval-free (the hand-off itself needs no vote);
+        # non-fatal for stands without a Baton (legacy topology).
+        baton_handed = False
+        try:
+            hand_res: CallResult = yield casals.orchestration_hand_to_baton(json.dumps({
+                "target": name,
+            }))
+            _casals_ok(hand_res)
+            baton_handed = True
+            _log.info(f"quarter {backend_id} handed to stand '{stand}' baton")
+        except Exception as hand_err:
+            if "no baton canister" in str(hand_err).lower():
+                _log.info(f"stand '{stand}' has no baton; quarter {backend_id} not handed off")
+            else:
+                _log.warning(f"quarter baton hand-off failed (non-fatal): {hand_err}")
+
         _log.info(f"provisioned quarter backend {backend_id} ({backend_wasm_key}) under stand '{stand}'")
-        return json.dumps({"ok": True, "canister_id": backend_id, "stand": stand, "name": name})
+        return json.dumps({"ok": True, "canister_id": backend_id, "stand": stand,
+                           "name": name, "baton_handed": baton_handed})
     except Exception as e:
         _log.error(f"provision_quarter failed: {e}\n{traceback.format_exc()}")
         return json.dumps({"ok": False, "error": str(e)})

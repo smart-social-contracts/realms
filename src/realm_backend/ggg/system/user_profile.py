@@ -49,6 +49,11 @@ class Operations:
     SHELL_EXECUTE = "shell.execute"
 
     # Governance
+    # Approve/reject Baton orchestration actions (managed upgrades / asset
+    # provisions) on behalf of this realm. The codex decides which profiles
+    # carry it: admins (dominion), organization representatives (agora), or
+    # every member (syntropia).
+    ORCHESTRATION_APPROVE = "orchestration.approve"
     MANDATE_CREATE = "mandate.create"
     MANDATE_ASSIGN_EXECUTOR = "mandate.assign_executor"
     PROPOSAL_CREATE = "proposal.create"
