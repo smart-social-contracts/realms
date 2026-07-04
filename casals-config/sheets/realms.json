@@ -78,7 +78,7 @@
           "name": "installer",
           "description": "Installer backend.",
           "canisters": [
-            { "name": "installer", "wasm_key": "installer-backend", "kind": "backend" }
+            { "name": "installer-backend", "wasm_key": "installer-backend", "kind": "backend" }
           ]
         },
         {
