@@ -198,7 +198,7 @@ from api.slugs import (
 )
 from api.status import get_status
 from _cdk import (
-    Async, CallResult, Func, Opt, Principal, Query, Record, Service,
+    Async, CallResult, Duration, Func, Opt, Principal, Query, Record, Service,
     StableBTreeMap, Variant, Vec, blob, float64, ic, init, match, nat,
     nat64, post_upgrade, query, service_update, text, update, void,
 )
@@ -222,11 +222,24 @@ class RResultEnqueue(Variant, total=False):
     Ok: REnqueueOk
     Err: RInstallerError
 
+class RProvisionOk(Record):
+    job_id: text
+    status: text
+    stand: text
+    backend_canister_id: text
+    frontend_canister_id: text
+
+class RResultProvision(Variant, total=False):
+    Ok: RProvisionOk
+    Err: RInstallerError
+
 class RealmInstallerService(Service):
     @service_update
     def enqueue_deployment(self, manifest_json: text) -> RResultEnqueue: ...
     @service_update
     def cancel_deployment(self, job_id: text) -> text: ...
+    @service_update
+    def provision_via_casals(self, job_id: text) -> RResultProvision: ...
 
 # ── Candid types (must be in main.py for basilisk .did generator) ──────
 
@@ -541,6 +554,23 @@ def billing_status() -> GetBillingStatusResult:
 
 # ── Deployment queue endpoints ─────────────────────────────────────────
 
+def _schedule_casals_provision(installer_id: str, job_id: str):
+    """Kick the installer's on-chain Casals provisioning for a freshly enqueued
+    job (registry -> installer trigger, CASALS_ROLLOUT.md §9 cutover). Runs on a
+    zero-delay timer so the user-facing request_deployment reply is not blocked
+    by the minutes-long provisioning call; the installer settles credits back
+    through deployment_succeeded/deployment_failed either way."""
+    def _cb():
+        try:
+            installer = RealmInstallerService(Principal.from_str(installer_id))
+            result: CallResult = yield installer.provision_via_casals(job_id)
+            logger.info(f"provision_via_casals({job_id}) triggered: {str(result)[:300]}")
+        except Exception as e:
+            logger.error(f"provision_via_casals({job_id}) trigger failed: {e}")
+
+    ic.set_timer(Duration(0), _cb)
+
+
 @update
 def request_deployment(manifest_json: text) -> Async[text]:
     try:
@@ -589,6 +619,9 @@ def request_deployment(manifest_json: text) -> Async[text]:
             except Exception:
                 pass
             return json.dumps({"success": False, "error": hold.get("error", "hold failed")})
+
+        if (result.get("status") or "") == "provisioning":
+            _schedule_casals_provision(installer_id, job_id)
 
         result["credits_held"] = DEPLOYMENT_COST_CREDITS
         result["caller"] = caller

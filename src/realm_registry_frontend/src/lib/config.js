@@ -21,7 +21,8 @@ export const CONFIG = {
 	portal_hosts: PORTAL_HOSTS,
 	deploy_queue_network: network,
 	billing_service_url: viteEnv.VITE_BILLING_SERVICE_URL || 'https://billing.realmsgos.dev',
-	realm_installer_canister_id: viteEnv.VITE_REALM_INSTALLER_CANISTER_ID || '',
+	realm_installer_canister_id:
+		viteEnv.VITE_REALM_INSTALLER_CANISTER_ID || viteEnv.CANISTER_ID_REALM_INSTALLER || '',
 	default_deploy_queue_network: network,
 	deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v0.4.0',
 	default_deploy_version: viteEnv.VITE_DEFAULT_DEPLOY_VERSION || 'main',
@@ -35,8 +36,10 @@ export const CONFIG = {
 			'58cf46349679f137c9e481aa7831d367ee14f0f6aba78de9b76a2385d5031406'
 	},
 	deploy_service_url: viteEnv.VITE_DEPLOY_SERVICE_URL || 'https://deploy.realmsgos.dev',
-	file_registry_canister_id: viteEnv.VITE_FILE_REGISTRY_CANISTER_ID || '',
-	marketplace_canister_id: viteEnv.VITE_MARKETPLACE_CANISTER_ID || ''
+	file_registry_canister_id:
+		viteEnv.VITE_FILE_REGISTRY_CANISTER_ID || viteEnv.CANISTER_ID_FILE_REGISTRY || '',
+	marketplace_canister_id:
+		viteEnv.VITE_MARKETPLACE_CANISTER_ID || viteEnv.CANISTER_ID_MARKETPLACE_BACKEND || ''
 };
 
 function _readFlag(envKey, urlParam) {
