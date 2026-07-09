@@ -32,6 +32,7 @@ from realm_backend.core.cross_quarter import (  # noqa: E402
     ResolutionStatus,
     classify_ref,
     merge_quarter_directory,
+    resolve_population_report,
     walk_chain,
 )
 from realm_backend.core.realm_ref import RealmRef  # noqa: E402
@@ -209,6 +210,42 @@ class TestMergeQuarterDirectory:
         merged, changed = merge_quarter_directory(None, None)
         assert merged == []
         assert changed is False
+
+
+# ---------------------------------------------------------------------------
+# resolve_population_report (quarter → capital push)
+# ---------------------------------------------------------------------------
+
+class TestResolvePopulationReport:
+    def test_updates_when_higher(self):
+        res = resolve_population_report(["q1", "q2"], "q2", 5, current_population=1)
+        assert res["ok"] is True
+        assert res["updated"] is True
+        assert res["population"] == 5
+        assert res["previous"] == 1
+
+    def test_ignores_equal_or_lower(self):
+        res = resolve_population_report(["q1"], "q1", 3, current_population=3)
+        assert res["ok"] is True
+        assert res["updated"] is False
+        assert res["population"] == 3
+        res2 = resolve_population_report(["q1"], "q1", 2, current_population=3)
+        assert res2["updated"] is False
+        assert res2["population"] == 3
+
+    def test_rejects_unknown_caller(self):
+        res = resolve_population_report(["q1"], "evil", 99, current_population=1)
+        assert res["ok"] is False
+        assert "not a registered quarter" in res["error"]
+
+    def test_rejects_missing_caller(self):
+        res = resolve_population_report(["q1"], "", 1, current_population=0)
+        assert res["ok"] is False
+
+    def test_rejects_negative(self):
+        res = resolve_population_report(["q1"], "q1", -1, current_population=0)
+        assert res["ok"] is False
+        assert res["error"] == "invalid population"
 
 
 # ---------------------------------------------------------------------------

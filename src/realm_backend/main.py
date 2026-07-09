@@ -507,7 +507,9 @@ def _assign_quarter(principal: str, realm, quarters, preferred_quarter: str) -> 
 
 
 @update
-def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: text) -> RealmResponse:
+def join_realm(
+    profile: str, preferred_quarter: text, invite_code_checksum_hex: text
+) -> Async[RealmResponse]:
     """Register the caller in the realm.
 
     Registration modes:
@@ -521,6 +523,10 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
       test_mode_ii_bypass) is True, the sha256-matched codes "admin",
       "member", and "dev"/"developer" grant the respective profiles, so
       a caller may self-register without a real invite code.
+
+    On a *new* registration against a quarter, pushes the live
+    ``User.count()`` to the capital immediately so join-target populations
+    stay fresh without waiting on the recurring gossip task (issue #156).
     """
     try:
         caller = ic.caller().to_str()
@@ -647,6 +653,12 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
 
         # --- Register user and assign quarter ---
 
+        was_new_user = False
+        try:
+            was_new_user = User[caller] is None
+        except Exception:
+            was_new_user = True
+
         user = user_register(caller, granted_profile)
         profiles = Vec[text]()
         if "profiles" in user and user["profiles"]:
@@ -662,6 +674,32 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
             u = User[caller]
             if u and assigned_quarter_canister_id:
                 u.home_quarter = assigned_quarter_canister_id
+
+        # Immediate capital population push (issue #156): after a brand-new
+        # member lands on a quarter, tell the capital our live User.count() so
+        # least-populated assignment and the admin switcher update without
+        # waiting on the recurring gossip task. Best-effort — join already
+        # succeeded if the push fails.
+        if (
+            was_new_user
+            and realm
+            and bool(getattr(realm, "is_quarter", False))
+        ):
+            capital_id = (getattr(realm, "federation_realm_id", "") or "").strip()
+            if capital_id:
+                try:
+                    from api.cross_quarter import report_population_to_capital
+
+                    pop = int(User.count())
+                    push = yield from report_population_to_capital(capital_id, pop)
+                    if not (isinstance(push, dict) and push.get("success")):
+                        logger.error(
+                            f"Population push to capital {capital_id} failed: {push}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Population push to capital {capital_id} raised: {e}"
+                    )
 
         return RealmResponse(
             success=True,
@@ -1759,6 +1797,75 @@ def sync_quarters(peer_canister_id: text) -> Async[text]:
 
     res = yield from sync_one_peer(peer_canister_id)
     return json.dumps(res)
+
+
+@update
+def report_quarter_population(population: nat) -> text:
+    """Accept a quarter's live population push (issue #156).
+
+    Called by a sub-quarter immediately after a new member joins so the
+    capital's cached ``Quarter.population`` (and therefore ``get_join_targets``
+    / least-populated assignment) updates without waiting on the recurring
+    gossip task.
+
+    Auth: ``ic.caller()`` must be a canister id already registered as a
+    ``Quarter`` on this capital. Population is monotonic (higher wins).
+    Public to known quarters only — unknown callers are rejected.
+    """
+    try:
+        from core.cross_quarter import resolve_population_report
+        from ggg import Quarter
+
+        caller = ic.caller().to_str()
+        known = []
+        target = None
+        for q in Quarter.instances():
+            cid = q.canister_id or ""
+            if not cid:
+                continue
+            known.append(cid)
+            if cid == caller:
+                target = q
+
+        decision = resolve_population_report(
+            known,
+            caller,
+            population,
+            int(getattr(target, "population", 0) or 0) if target else 0,
+        )
+        if not decision.get("ok"):
+            return json.dumps({"success": False, "error": decision.get("error", "rejected")})
+
+        if decision.get("updated") and target is not None:
+            target.population = int(decision["population"])
+            logger.info(
+                f"Population report from {caller}: "
+                f"{decision['previous']} -> {decision['population']}"
+            )
+            # Same as after a gossip sync tick: re-evaluate auto-scale with
+            # the fresh federation-wide populations (joins land on quarters,
+            # so the capital never sees the threshold via its own join path).
+            try:
+                from core.autoscale import maybe_request_quarter_scale
+
+                if maybe_request_quarter_scale():
+                    logger.info(
+                        f"Quarter auto-scale requested after population report "
+                        f"from {caller}"
+                    )
+            except Exception as e:
+                logger.error(f"Auto-scale after population report failed: {e}")
+
+        return json.dumps({
+            "success": True,
+            "updated": bool(decision.get("updated")),
+            "population": int(decision.get("population") or 0),
+            "previous": int(decision.get("previous") or 0),
+            "canister_id": caller,
+        })
+    except Exception as e:
+        logger.error(f"Error in report_quarter_population: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @query

@@ -121,10 +121,12 @@ export interface CanisterStatusResult {
   'module_hash' : [] | [Uint8Array | number[]],
 }
 export interface CasalsConfigView {
+  'create_stand_baton' : boolean,
   'provision_via_casals' : boolean,
   'casals_section' : string,
   'registry_principal' : string,
   'casals_canister_id' : string,
+  'baton_wasm_key' : string,
 }
 export interface CasalsProvisionService {
   'create_canister' : ActorMethod<[string], string>,
@@ -133,6 +135,8 @@ export interface CasalsService {
   'create_canister' : ActorMethod<[string], string>,
   'create_stand' : ActorMethod<[string], string>,
   'get_tree' : ActorMethod<[], string>,
+  'orchestration_configure_baton' : ActorMethod<[string], string>,
+  'orchestration_hand_to_baton' : ActorMethod<[string], string>,
   'set_commander' : ActorMethod<[string], string>,
   'upgrade_to' : ActorMethod<[string], string>,
 }
@@ -576,6 +580,7 @@ export interface QuarterInfoRecord {
   'status' : string,
   'name' : string,
   'canister_id' : string,
+  'is_capital' : boolean,
   'index' : bigint,
   'population' : bigint,
 }
@@ -613,11 +618,21 @@ export interface REnqueueOk {
   'realm_name' : string,
 }
 export interface RInstallerError { 'message' : string, 'traceback' : string }
+export interface RProvisionOk {
+  'status' : string,
+  'backend_canister_id' : string,
+  'stand' : string,
+  'job_id' : string,
+  'frontend_canister_id' : string,
+}
 export type RResultEnqueue = { 'Ok' : REnqueueOk } |
+  { 'Err' : RInstallerError };
+export type RResultProvision = { 'Ok' : RProvisionOk } |
   { 'Err' : RInstallerError };
 export interface RealmInstallerService {
   'cancel_deployment' : ActorMethod<[string], string>,
   'enqueue_deployment' : ActorMethod<[string], RResultEnqueue>,
+  'provision_via_casals' : ActorMethod<[string], RResultProvision>,
 }
 export interface RealmMessagingService {
   'receive_realm_message' : ActorMethod<
@@ -1049,6 +1064,7 @@ export interface _SERVICE {
   'status' : ActorMethod<[], RealmResponse>,
   'store_admin_invite_hash' : ActorMethod<[string], RealmResponse>,
   'sync_quarters' : ActorMethod<[string], string>,
+  'report_quarter_population' : ActorMethod<[bigint], string>,
   'test_timer' : ActorMethod<[], string>,
   'uninstall_codex' : ActorMethod<[string], string>,
   'uninstall_extension' : ActorMethod<[string], string>,

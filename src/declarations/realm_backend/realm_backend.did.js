@@ -7,6 +7,7 @@ export const idlFactory = ({ IDL }) => {
     'status' : IDL.Text,
     'name' : IDL.Text,
     'canister_id' : IDL.Text,
+    'is_capital' : IDL.Bool,
     'index' : IDL.Nat,
     'population' : IDL.Nat,
   });
@@ -382,6 +383,7 @@ export const idlFactory = ({ IDL }) => {
     'status' : IDL.Func([], [RealmResponse], ['query']),
     'store_admin_invite_hash' : IDL.Func([IDL.Text], [RealmResponse], []),
     'sync_quarters' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'report_quarter_population' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'test_timer' : IDL.Func([], [IDL.Text], []),
     'uninstall_codex' : IDL.Func([IDL.Text], [IDL.Text], []),
     'uninstall_extension' : IDL.Func([IDL.Text], [IDL.Text], []),

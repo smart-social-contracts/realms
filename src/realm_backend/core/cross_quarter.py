@@ -177,3 +177,75 @@ def merge_quarter_directory(local_quarters, peer_quarters):
                 changed = True
 
     return list(by_id.values()), changed
+
+
+def resolve_population_report(
+    known_canister_ids,
+    caller_canister_id,
+    reported_population,
+    current_population=0,
+):
+    """Decide whether a quarter→capital population push should stick.
+
+    Pure helper for the ``report_quarter_population`` endpoint (issue #156):
+    joins push the quarter's live ``User.count()`` to the capital immediately
+    so ``get_join_targets`` / the admin switcher stay fresh without waiting on
+    the recurring gossip task.
+
+    Rules:
+    * Caller must be a *known* quarter (already registered on the capital).
+    * Population is monotonic — only a strictly higher count updates.
+    * Unknown callers and non-positive garbage are rejected.
+
+    Returns ``{ok, updated, population, previous, error?}``.
+    """
+    caller = (caller_canister_id or "").strip()
+    if not caller:
+        return {
+            "ok": False,
+            "updated": False,
+            "population": int(current_population or 0),
+            "previous": int(current_population or 0),
+            "error": "missing caller canister id",
+        }
+    known = set(known_canister_ids or [])
+    if caller not in known:
+        return {
+            "ok": False,
+            "updated": False,
+            "population": int(current_population or 0),
+            "previous": int(current_population or 0),
+            "error": "caller is not a registered quarter",
+        }
+    try:
+        reported = int(reported_population)
+    except (TypeError, ValueError):
+        return {
+            "ok": False,
+            "updated": False,
+            "population": int(current_population or 0),
+            "previous": int(current_population or 0),
+            "error": "invalid population",
+        }
+    if reported < 0:
+        return {
+            "ok": False,
+            "updated": False,
+            "population": int(current_population or 0),
+            "previous": int(current_population or 0),
+            "error": "invalid population",
+        }
+    previous = int(current_population or 0)
+    if reported > previous:
+        return {
+            "ok": True,
+            "updated": True,
+            "population": reported,
+            "previous": previous,
+        }
+    return {
+        "ok": True,
+        "updated": False,
+        "population": previous,
+        "previous": previous,
+    }

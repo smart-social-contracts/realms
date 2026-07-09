@@ -203,6 +203,7 @@ type AssistantResult = variant { Ok : AssistantListing; Err : text };
 type LicenseResult = variant { Ok : DeveloperLicense; Err : text };
 type _ICRC1IndexerService = service { get_account_transactions : (_GetAccountTransactionsArgs) -> (_GetAccountTransactionsResult) query };
 type QuarterDirectoryService = service { get_quarter_directory : () -> (text) query };
+type CapitalPopulationService = service { report_quarter_population : (nat) -> (text) };
 type FileRegistryService = service { get_backend_files_icc : (text, text, text) -> (text) query; get_frontend_files_icc : (text, text) -> (text) query; get_extension_manifest : (text) -> (text) query; get_file_size_icc : (text, text) -> (text) query; get_file_chunk_icc : (text, text, text, text) -> (text) query };
 type AssetCanisterService = service { store : (_AssetStoreArg) -> () };
 type RealmMessagingService = service { receive_realm_message : (text, text, text, text) -> (text) };
@@ -246,6 +247,7 @@ service : {
   "get_quarter_directory" : () -> (text) query;
   "get_join_targets" : () -> (text) query;
   "sync_quarters" : (text) -> (text);
+  "report_quarter_population" : (nat) -> (text);
   "get_scale_status" : () -> (text) query;
   "set_quarter_provisioning_config" : (text) -> (text);
   "approve_orchestration_action" : (text) -> (text);
