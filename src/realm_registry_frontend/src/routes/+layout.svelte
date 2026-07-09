@@ -20,6 +20,7 @@
   <div
     class="app-shell"
     class:assistant-docked={$assistantChrome.open && $assistantChrome.docked}
+    class:assistant-resizing={$assistantChrome.resizing}
     style="--assistant-width: {$assistantChrome.width}px"
   >
     <slot />
@@ -39,6 +40,9 @@
   }
   .app-shell.assistant-docked {
     padding-right: var(--assistant-width);
+  }
+  .app-shell.assistant-docked.assistant-resizing {
+    transition: none;
   }
   /* Narrow: docked panel is a full-width overlay — don't pad the shell. */
   @media (max-width: 767px) {
