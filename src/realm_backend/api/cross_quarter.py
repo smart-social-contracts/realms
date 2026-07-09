@@ -68,6 +68,27 @@ def fetch_peer_directory(peer_canister_id: str) -> Async[Dict]:
         return {"success": False, "error": str(e)}
 
 
+def _unwrap_call_text(result) -> str:
+    """Extract text from an inter-canister ``CallResult`` (same as provisioning)."""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        if result.get("Ok") is not None:
+            return result["Ok"]
+        if result.get("ok") is not None:
+            return result["ok"]
+        if result.get("Err") is not None:
+            return json.dumps({"err": str(result["Err"])})
+        return str(result)
+    if hasattr(result, "Ok") and result.Ok is not None:
+        return result.Ok
+    if hasattr(result, "Err") and result.Err is not None:
+        return json.dumps({"err": str(result.Err)})
+    if result is None:
+        return ""
+    return str(result)
+
+
 def report_population_to_capital(capital_canister_id: str, population: int) -> Async[Dict]:
     """Push this quarter's live population to the capital (issue #156).
 
@@ -86,14 +107,9 @@ def report_population_to_capital(capital_canister_id: str, population: int) -> A
         result: CallResult[text] = yield service.report_quarter_population(
             int(population)
         )
-        if isinstance(result, str):
-            raw = result
-        elif isinstance(result, dict):
-            raw = result.get("Ok", result.get("ok", str(result)))
-        elif hasattr(result, "Ok") and result.Ok is not None:
-            raw = result.Ok
-        else:
-            raw = str(result)
+        raw = _unwrap_call_text(result)
+        if not raw:
+            return {"success": False, "error": "empty capital response"}
         try:
             parsed = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
