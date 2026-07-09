@@ -1,21 +1,27 @@
 <script>
   import { Button, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { principal, isAuthenticated } from '$lib/stores/auth';
-  import { login, logout, initializeAuthClient, restoreAuthSession, resetAuthSessionRestore, isAuthenticated as checkIcAuth } from '$lib/auth';
+  import { login, logout, restoreAuthSession, resetAuthSessionRestore } from '$lib/auth';
   import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
   import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor } from '$lib/canisters.js';
   import { loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmManifesto, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
   import { formatQuarterLabel } from '$lib/utils/quarterLabels';
+  import { probeFederatedMembership } from '$lib/utils/federatedMembership';
   import { _ } from 'svelte-i18n';
   
   // Step management: 'auth' | 'already_joined' | 'terms' | 'profile' | 'success'
   let currentStep = 'auth';
   let userHasJoined = false;
+  let membershipProbed = false;
+  /** @type {Promise<void> | null} */
+  let membershipProbePromise = null;
   let agreement = false;
   let error = '';
   let loading = false;
@@ -28,17 +34,15 @@
   let inviteChecking = false;
 
   // Quarter targeting (issue #156): a new member joins exactly ONE quarter.
-  // The target is encoded in the invite link (?quarter=) or resolved from the
-  // capital's join policy (auto = newest quarter, choice = user picks).
+  // Target comes from invite (?quarter=) or system assignment via
+  // get_join_targets().default_quarter (least-populated joinable). No free picker.
   let capitalId = '';
-  let joinMode = 'auto';        // 'auto' | 'choice'
-  let joinTargets = [];         // quarters shown in the choice picker (full directory)
+  let joinMode = 'auto';        // 'auto' | 'choice' (choice must not enable a free picker)
   let quarterDirectory = [];    // all quarters from get_join_targets (for lookups)
-  let selectedQuarter = '';     // canister id the user picks / is assigned
+  let selectedQuarter = '';     // canister id assigned / invite override
   let targetQuarterId = '';     // resolved join target
   let targetActor = null;       // actor for the target quarter (or capital backend)
   let targetsResolved = false;
-  let needsQuarterChoice = false;
   let forgotLoading = false;
   let embeddedInPortal = false;
   let forgotError = '';
@@ -80,21 +84,28 @@
   // Invite is required when registration is closed (not open) and user has no valid invite
   $: inviteRequired = !$realmOpenRegistration && !inviteValid && !$testModeUserSelfRegistration && !$testModeIIBypass;
 
-  $: selectedQuarterInfo = quarterDirectory.find((q) => q.canister_id === selectedQuarter) || null;
   $: targetQuarterInfo = quarterDirectory.find((q) => q.canister_id === targetQuarterId) || null;
-  // Show which quarter the user picked whenever choice mode offers a picker.
-  $: showQuarterBanner = quarterStepEnabled && !!targetQuarterId;
+  // Assignment banner when federation has multiple quarters or target is a sub-quarter.
+  $: showQuarterBanner = !!targetQuarterId && (
+    quarterDirectory.length > 1 ||
+    (!!capitalId && targetQuarterId !== capitalId)
+  );
 
   $: welcomeImageUrl = $realmInfo.backgroundImageUrl || '/custom/background.png';
 
+  const internetIdentityUrl =
+    (typeof globalThis !== 'undefined' && globalThis.__CANISTER_IDS?.internet_identity) ||
+    'https://identity.ic0.app';
+
+  function openInternetIdentity() {
+    window.open(internetIdentityUrl, '_blank', 'noopener,noreferrer');
+  }
+
   // ── Linear step model for the progress indicator (issue #156) ──────────────
-  // Order: Sign In → Quarter (federation only) → Terms → Profile → Welcome.
-  // The Quarter step only exists in choice mode when there are multiple quarters
-  // to pick from (including the capital).
-  $: quarterStepEnabled = joinMode === 'choice' && quarterDirectory.length > 1;
+  // Order: Sign In → Terms → Profile → Welcome. System assigns the quarter;
+  // there is no free pick_quarter step on the open-registration path.
   $: steps = [
     { id: 'auth', label: 'Sign In' },
-    ...(quarterStepEnabled ? [{ id: 'pick_quarter', label: 'Quarter' }] : []),
     ...($testModeSkipTerms ? [] : [{ id: 'terms', label: 'Terms' }]),
     { id: 'profile', label: 'Profile' },
     { id: 'success', label: 'Welcome' },
@@ -132,21 +143,40 @@
     currentStep = prevStepId;
   }
 
-  // Determine initial step based on auth status and join status. We wait until
-  // the join target is resolved (and the quarter is chosen, in choice mode) so
-  // we never auto-advance past the quarter picker.
-  $: {
-    if (targetsResolved && !needsQuarterChoice && $isAuthenticated && !$profilesLoading) {
-      if ($testModeIIBypass) {
-        // In II bypass test mode, always allow profile selection regardless of join status
-        if (currentStep === 'auth') {
-          currentStep = 'profile';
-        }
-      } else if (userHasJoined && (currentStep === 'auth' || currentStep === 'terms' || currentStep === 'pick_quarter')) {
-        currentStep = 'already_joined';
-      } else if (!userHasJoined && currentStep === 'auth') {
-        currentStep = $testModeSkipTerms ? 'profile' : 'terms';
+  function stepAfterProbe() {
+    if ($testModeIIBypass) {
+      // II bypass: after probe, always continue to profile (re-join testing
+      // when membership was found; normal new-user path when not).
+      return 'profile';
+    }
+    if (userHasJoined) return 'already_joined';
+    return $testModeSkipTerms ? 'profile' : 'terms';
+  }
+
+  /** Federated membership probe before any new registration (issue #156). */
+  async function runMembershipProbe() {
+    if (membershipProbePromise) return membershipProbePromise;
+    membershipProbePromise = (async () => {
+      try {
+        const { primary } = await probeFederatedMembership({ activate: true, cache: true });
+        userHasJoined = !!primary;
+      } catch (e) {
+        console.warn('Federated membership probe failed; falling back to target check', e);
+        userHasJoined = await isJoinedOnTarget();
+      } finally {
+        membershipProbed = true;
+        membershipProbePromise = null;
       }
+    })();
+    return membershipProbePromise;
+  }
+
+  /** Probe (if needed) then leave the auth step — never skip the federated probe. */
+  async function ensureProbedAndAdvance() {
+    if (currentStep !== 'auth') return;
+    await runMembershipProbe();
+    if (currentStep === 'auth') {
+      currentStep = stepAfterProbe();
     }
   }
   
@@ -163,22 +193,29 @@
     if (inviteCode) {
       await validateInvite();
     }
-    userHasJoined = await isJoinedOnTarget();
-    if ($testModeIIBypass) {
-      currentStep = 'profile';
-    } else if (userHasJoined) {
-      currentStep = 'already_joined';
-    } else if (needsQuarterChoice) {
-      currentStep = 'pick_quarter';
-    } else {
-      currentStep = $testModeSkipTerms ? 'profile' : 'terms';
-    }
+    // Always probe federation before deciding Terms/Profile vs welcome-back.
+    // II bypass must not skip this; it only changes the post-probe destination
+    // (found → still profile for re-join tests; not found → normal new-user path).
+    await ensureProbedAndAdvance();
   }
 
   onMount(() => {
     let onPortalAuth;
     let onPortalAuthError;
     let disposed = false;
+    let authUnsub = () => {};
+    let profilesUnsub = () => {};
+
+    // Session/portal races: if auth becomes ready while still on the auth step,
+    // run the federated probe before Terms/Profile (not a reactive $: side-effect).
+    const maybeAdvanceFromStores = () => {
+      if (disposed || !targetsResolved) return;
+      if (!get(isAuthenticated) || get(profilesLoading)) return;
+      if (currentStep !== 'auth' || membershipProbed) return;
+      void ensureProbedAndAdvance();
+    };
+    authUnsub = isAuthenticated.subscribe(() => maybeAdvanceFromStores());
+    profilesUnsub = profilesLoading.subscribe(() => maybeAdvanceFromStores());
 
     void (async () => {
       await backendReady;
@@ -206,6 +243,8 @@
         await logout();
         isAuthenticated.set(false);
         principal.set('');
+        membershipProbed = false;
+        userHasJoined = false;
         currentStep = 'auth';
       }
 
@@ -214,6 +253,7 @@
       }
 
       targetsResolved = true;
+      maybeAdvanceFromStores();
 
       if (embeddedInPortal) {
         onPortalAuth = () => {
@@ -231,12 +271,14 @@
 
     return () => {
       disposed = true;
+      authUnsub();
+      profilesUnsub();
       if (onPortalAuth) window.removeEventListener('portal:auth', onPortalAuth);
       if (onPortalAuthError) window.removeEventListener('portal:auth-error', onPortalAuthError);
     };
   });
 
-  // Ask the capital where new members may register and pick a target quarter.
+  // Ask the capital where new members may register and assign a target quarter.
   async function resolveJoinTarget(quarterParam) {
     let policy = null;
     try {
@@ -249,12 +291,8 @@
     capitalId = policy?.capital_id || '';
     joinMode = policy?.mode || 'auto';
     quarterDirectory = policy?.quarters || [];
-    // Choice mode lists every quarter (capital included); join eligibility is
-    // checked at registration time, not by hiding options.
-    joinTargets =
-      joinMode === 'choice'
-        ? [...quarterDirectory].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-        : quarterDirectory.filter((q) => q.joinable);
+    // Product path: never open a free picker for open registration, even when
+    // the backend still reports mode === 'choice'.
 
     // Invite links target the quarter encoded in the link, regardless of mode.
     if (quarterParam) {
@@ -264,11 +302,38 @@
 
     const def = policy?.default_quarter || capitalId || '';
     selectedQuarter = def;
-    // Pre-target the default so a single-call join works even if the user never
-    // touches the picker. In choice mode with >1 option we still gate on the
-    // explicit picker step.
+    // System-assigned least-populated joinable (or capital fallback).
     await selectQuarter(def);
-    needsQuarterChoice = joinMode === 'choice' && quarterDirectory.length > 1;
+  }
+
+  /** Re-fetch join targets and retarget after coordinator-only / full errors. */
+  async function reassignJoinTarget() {
+    try {
+      const raw = await backend.get_join_targets();
+      const policy = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      capitalId = policy?.capital_id || capitalId;
+      joinMode = policy?.mode || joinMode;
+      quarterDirectory = policy?.quarters || quarterDirectory;
+      const def = policy?.default_quarter || capitalId || '';
+      if (def) {
+        await selectQuarter(def);
+      }
+    } catch (e) {
+      console.warn('Failed to re-resolve join target after join error', e);
+    }
+  }
+
+  function isAssignableJoinError(message) {
+    const m = (message || '').toLowerCase();
+    return (
+      m.includes('coordinator-only') ||
+      m.includes('coordinator only') ||
+      m.includes('join through a quarter') ||
+      m.includes('quarter is full') ||
+      m.includes('is full') ||
+      m.includes('at capacity') ||
+      m.includes('no capacity')
+    );
   }
 
   // Point the page at a specific quarter (or the capital) for validate + join.
@@ -287,7 +352,7 @@
     }
   }
 
-  // Is the authenticated caller already a member on the resolved target?
+  // Fallback: is the authenticated caller already a member on the resolved target?
   async function isJoinedOnTarget() {
     try {
       const actor = targetActor || backend;
@@ -298,29 +363,7 @@
     }
   }
 
-  // Choice mode: user picked a quarter from the directory.
-  async function handlePickQuarter() {
-    if (!selectedQuarter) {
-      error = 'Please choose a quarter to continue';
-      return;
-    }
-    error = '';
-    await selectQuarter(selectedQuarter);
-    needsQuarterChoice = false;
-    await restoreAuthSession();
-    const authed = (await checkIcAuth()) || $isAuthenticated;
-    if (authed) {
-      userHasJoined = await isJoinedOnTarget();
-      if (inviteCode) await validateInvite();
-      currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
-    } else {
-      currentStep = 'auth';
-    }
-  }
-
-  // "Forgot my quarter?" — scatter-gather get_my_user_status() across every
-  // known canister for the caller's principal (localStorage is the primary
-  // memory; this is the on-demand recovery path).
+  // "Find my quarter" — federated probe, then enter the app (or report miss).
   async function findMyQuarter() {
     forgotError = '';
     forgotLoading = true;
@@ -333,39 +376,16 @@
         return;
       }
 
-      let candidates = [];
-      try {
-        const raw = await backend.get_join_targets();
-        const policy = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        candidates = (policy?.quarters || []).map((q) => q.canister_id).filter(Boolean);
-        if (policy?.capital_id && !candidates.includes(policy.capital_id)) {
-          candidates.unshift(policy.capital_id);
-        }
-      } catch (e) {
-        candidates = joinTargets.map((q) => q.canister_id).filter(Boolean);
+      const { primary } = await probeFederatedMembership({ activate: true, cache: true });
+      if (primary) {
+        userHasJoined = true;
+        membershipProbed = true;
+        await goto(resolve('/'));
+        return;
       }
-
-      for (const cid of candidates) {
-        try {
-          const actor = cid === capitalId ? backend : await createQuarterActor(cid);
-          const res = await actor.get_my_user_status();
-          if (res && res.success) {
-            if (cid && cid !== capitalId) {
-              activeQuarterId.set(cid);
-              await setActiveQuarter(cid);
-              if (typeof localStorage !== 'undefined') localStorage.setItem('home_quarter', cid);
-            } else {
-              activeQuarterId.set(null);
-              await setActiveQuarter(null);
-              if (typeof localStorage !== 'undefined') localStorage.removeItem('home_quarter');
-            }
-            await goto('/');
-            return;
-          }
-        } catch (e) {
-          // try next candidate
-        }
-      }
+      forgotError = 'We could not find your membership on any quarter. You may need to join.';
+    } catch (e) {
+      console.warn('Find my quarter failed', e);
       forgotError = 'We could not find your membership on any quarter. You may need to join.';
     } finally {
       forgotLoading = false;
@@ -509,18 +529,16 @@
       } else {
         const joinError = response.data?.error || 'Unknown error occurred';
         error = joinError;
-        // Let the user pick a different quarter when registration is rejected.
-        if (quarterStepEnabled) {
-          needsQuarterChoice = true;
-          currentStep = 'pick_quarter';
+        // Coordinator-only / full quarter: re-resolve assignment, no free picker.
+        if (isAssignableJoinError(joinError)) {
+          await reassignJoinTarget();
         }
       }
     } catch (e) {
       console.error('Error joining realm:', e);
       error = e.message || 'Failed to join the realm';
-      if (quarterStepEnabled) {
-        needsQuarterChoice = true;
-        currentStep = 'pick_quarter';
+      if (isAssignableJoinError(error)) {
+        await reassignJoinTarget();
       }
     } finally {
       loading = false;
@@ -582,7 +600,7 @@
            the steps evenly across the full width. -->
       {#if currentStep !== 'already_joined'}
         <div class="flex items-start justify-between mb-6 md:mb-8 px-1">
-          {#each steps as step, i}
+          {#each steps as step, i (step.id)}
             {#if i > 0}
               <div class="flex-1 h-px bg-gray-300 mt-3.5 sm:mt-4 mx-1.5"></div>
             {/if}
@@ -628,65 +646,8 @@
         </div>
       {/if}
 
-      <!-- Step: Pick Quarter (choice mode) -->
-      {#if currentStep === 'pick_quarter'}
-        <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
-          <div class="text-center mb-6">
-            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Choose your quarter</h2>
-            <p class="text-gray-500">Select which quarter of {realmName} you want to join</p>
-          </div>
-
-          <div class="space-y-3 mb-6">
-            {#each joinTargets as q}
-              <button
-                type="button"
-                on:click={() => (selectedQuarter = q.canister_id)}
-                class={cn(
-                  'w-full p-4 rounded-xl border-2 text-left transition-all',
-                  selectedQuarter === q.canister_id
-                    ? 'border-gray-900 bg-gray-50'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                )}
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="font-semibold text-gray-900 truncate">
-                      {formatQuarterLabel(q)}
-                    </div>
-                    <div class="text-xs text-gray-500 truncate font-mono">{q.canister_id}</div>
-                  </div>
-                  <span class="shrink-0 text-xs text-gray-500">{q.population} members</span>
-                </div>
-              </button>
-            {/each}
-          </div>
-
-          <div class="flex gap-3">
-            {#if prevStepId}
-              <button
-                on:click={goBack}
-                class="flex-1 py-4 px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
-              >
-                Back
-              </button>
-            {/if}
-            <button
-              on:click={handlePickQuarter}
-              disabled={!selectedQuarter}
-              class="flex-1 py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-
       <!-- Step: Auth -->
-      {:else if currentStep === 'auth'}
+      {#if currentStep === 'auth'}
         <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <div class="text-center mb-8">
             <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -758,10 +719,14 @@
             </button>
 
             <p class="mt-6 text-center text-sm text-gray-500">
-              Don't have an Internet Identity? 
-              <a href={globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app'} target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-gray-900 hover:underline font-medium">
+              Don't have an Internet Identity?
+              <button
+                type="button"
+                on:click={openInternetIdentity}
+                class="text-gray-700 hover:text-gray-900 hover:underline font-medium"
+              >
                 Create one →
-              </a>
+              </button>
             </p>
           {/if}
 
@@ -803,7 +768,7 @@
           </div>
           
           <a
-            href="/extensions/member_dashboard"
+            href={resolve('/extensions/member_dashboard')}
             class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3"
           >
             <span>Go to Dashboard</span>
@@ -818,6 +783,15 @@
         <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <h2 class="text-2xl font-bold text-gray-900 mb-2">Terms & Conditions</h2>
           <p class="text-gray-500 mb-6">Please review and accept to continue</p>
+
+          {#if showQuarterBanner}
+            <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+              <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
+              <div class="font-semibold text-gray-900 truncate">
+                {#if targetQuarterInfo}{formatQuarterLabel(targetQuarterInfo)}{:else}{targetQuarterId}{/if}
+              </div>
+            </div>
+          {/if}
           
           <div class="space-y-4 mb-6">
             <div class="flex gap-3 p-3 bg-gray-50 rounded-lg items-start">
@@ -896,27 +870,16 @@
           <p class="text-gray-500 mb-6">Choose how you want to participate</p>
 
           {#if showQuarterBanner}
-            <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between gap-3">
-              <div class="min-w-0">
-                <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
-                <div class="font-semibold text-gray-900 truncate">
-                  {#if targetQuarterInfo}{formatQuarterLabel(targetQuarterInfo)}{:else}{targetQuarterId}{/if}
-                </div>
+            <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+              <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
+              <div class="font-semibold text-gray-900 truncate">
+                {#if targetQuarterInfo}{formatQuarterLabel(targetQuarterInfo)}{:else}{targetQuarterId}{/if}
               </div>
-              {#if joinMode === 'choice' && joinTargets.length > 1}
-                <button
-                  type="button"
-                  on:click={() => (currentStep = 'pick_quarter')}
-                  class="shrink-0 text-sm font-medium text-gray-700 hover:text-gray-900 hover:underline"
-                >
-                  Change
-                </button>
-              {/if}
             </div>
           {/if}
 
           <div class="space-y-3 mb-6">
-            {#each profiles as profile}
+            {#each profiles as profile (profile.value)}
               <button
                 type="button"
                 on:click={() => selectedProfile = profile.value}
@@ -1076,7 +1039,7 @@
           </p>
           
           <a
-            href="/extensions/member_dashboard"
+            href={resolve('/extensions/member_dashboard')}
             class="inline-flex items-center justify-center w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all gap-2"
           >
             <span>Go to Member Dashboard</span>

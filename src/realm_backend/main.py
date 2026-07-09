@@ -1682,8 +1682,8 @@ def get_join_targets() -> text:
       quarter regardless of mode).
     - Once >=1 active sub-quarter exists the capital becomes coordinator-only:
       it is listed with ``joinable=false`` and ``default_quarter`` points at the
-      newest active sub-quarter (highest index). With no sub-quarters the capital
-      itself is the joinable default.
+      least-populated active sub-quarter (tie-break: highest index). With no
+      sub-quarters the capital itself is the joinable default.
 
     Public (no auth): the caller is typically anonymous at this point.
     """
@@ -1726,8 +1726,15 @@ def get_join_targets() -> text:
         }] + sub_quarters
 
         if active_subs:
-            newest = max(active_subs, key=lambda q: q["index"])
-            default_quarter = newest["canister_id"]
+            # Prefer the least-populated joinable quarter so open registration
+            # balances load (issue #156 join-assignment addendum). Tie-break by
+            # highest index so a freshly minted empty quarter wins over older
+            # empty peers.
+            least = min(
+                active_subs,
+                key=lambda q: (int(q.get("population") or 0), -int(q.get("index") or 0)),
+            )
+            default_quarter = least["canister_id"]
         else:
             default_quarter = self_id
 

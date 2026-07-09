@@ -115,97 +115,21 @@ export async function loadUserProfiles() {
     }));
     
     try {
-        // Dynamically import backend to avoid circular dependencies
-        // @ts-ignore
-        const { backend, setActiveQuarter, createQuarterActor } = await import('$lib/canisters');
-        // @ts-ignore
-        const { activeQuarterId } = await import('$lib/stores/quarters');
+        const { probeFederatedMembership } = await import('$lib/utils/federatedMembership');
+        const { primary } = await probeFederatedMembership({ activate: true, cache: true });
 
-        if (!backend || typeof backend.get_my_user_status !== 'function') {
-            throw new Error("Backend canister is not properly initialized");
-        }
-
-        // Resolve which canister actually holds this user's membership. In a
-        // federation a member lives on a *quarter*, not the capital, so querying
-        // the capital backend would wrongly report them as a non-member
-        // ("Guest"). If we cached the home quarter on a prior session/join,
-        // activate it app-wide AND query it directly for the status below.
-        let statusActor = backend;
-        if (typeof localStorage !== 'undefined') {
-            const cached = localStorage.getItem('home_quarter');
-            if (cached) {
-                try {
-                    await setActiveQuarter(cached);
-                    activeQuarterId.set(cached);
-                    statusActor = await createQuarterActor(cached);
-                    console.log('🏘️ Routed profile lookup to cached home quarter:', cached);
-                } catch (e) {
-                    console.warn('Cached home quarter activation failed:', e);
-                }
-            }
-        }
-
-        const hasMembership = (r: any) =>
-            !!(r && r.success && r.data && r.data.userGet &&
-               (r.data.userGet.profiles || []).length > 0);
-
-        let response = await statusActor.get_my_user_status();
-        // Stale cache safety net: if the cached quarter no longer recognizes the
-        // caller, fall back to the capital (which may auto-route us below).
-        if (!hasMembership(response) && statusActor !== backend) {
-            response = await backend.get_my_user_status();
-        }
-
-        // Federated "find my quarter": on a fresh session (e.g. incognito) there
-        // is no cached home quarter, so the lookups above hit the capital, which
-        // does not hold members once sub-quarters exist -> the user looks like a
-        // "Guest". Search every known quarter for this principal and adopt the
-        // first one that recognizes them as the home quarter.
-        if (!hasMembership(response)) {
-            try {
-                const raw = await backend.get_join_targets();
-                const targets = JSON.parse(raw);
-                const capitalId = targets.capital_id;
-                const candidates = (targets.quarters || []).filter(
-                    (q: any) => q && q.canister_id && !q.is_capital && q.canister_id !== capitalId
-                );
-                for (const q of candidates) {
-                    try {
-                        const qActor = await createQuarterActor(q.canister_id);
-                        const r = await qActor.get_my_user_status();
-                        if (hasMembership(r)) {
-                            response = r;
-                            await setActiveQuarter(q.canister_id);
-                            activeQuarterId.set(q.canister_id);
-                            if (typeof localStorage !== 'undefined') {
-                                localStorage.setItem('home_quarter', q.canister_id);
-                            }
-                            console.log('🔎 Recovered home quarter via federated search:', q.canister_id);
-                            break;
-                        }
-                    } catch (qe) {
-                        console.warn('Quarter membership probe failed for', q.canister_id, qe);
-                    }
-                }
-            } catch (e) {
-                console.warn('Federated quarter search unavailable:', e);
-            }
-        }
-
-        console.log("User profiles response:", response);
-        
-        if (response && response.success && response.data && response.data.userGet) {
-            const profiles = response.data.userGet.profiles || [];
+        if (primary) {
+            const profiles = primary.profiles || [];
             profileState.update(state => ({
                 ...state,
                 profiles,
                 loading: false
             }));
-            console.log("User profiles loaded:", profiles);
+            console.log('User profiles loaded via federated probe:', profiles, 'quarter:', primary.canisterId);
 
-            // Auto-route to home quarter if assigned
-            const assignedQuarter = response.data.userGet.assigned_quarter;
-            if (assignedQuarter) {
+            // Prefer assigned_quarter from the record when present (may refine cache).
+            const assignedQuarter = primary.response?.data?.userGet?.assigned_quarter;
+            if (assignedQuarter && assignedQuarter !== primary.canisterId) {
                 try {
                     // @ts-ignore
                     const { setActiveQuarter } = await import('$lib/canisters');
@@ -213,25 +137,19 @@ export async function loadUserProfiles() {
                     const { activeQuarterId } = await import('$lib/stores/quarters');
                     activeQuarterId.set(assignedQuarter);
                     await setActiveQuarter(assignedQuarter);
-                    console.log("🏘️ Auto-routed to home quarter:", assignedQuarter);
-
-                    // Cache in localStorage for instant reconnect
                     if (typeof localStorage !== 'undefined') {
                         localStorage.setItem('home_quarter', assignedQuarter);
                     }
                 } catch (qErr) {
-                    console.error("Failed to auto-route to home quarter:", qErr);
+                    console.error('Failed to auto-route to assigned_quarter:', qErr);
                 }
             }
-        } else if (response && !response.success) {
+        } else {
             profileState.update(state => ({
                 ...state,
                 profiles: [],
                 loading: false
             }));
-        } else {
-            console.error("Invalid backend response format:", response);
-            throw new Error('Invalid response format');
         }
     } catch (e: unknown) {
         const errorMessage = e instanceof Error ? e.message : 'Unknown error loading profiles';

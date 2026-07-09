@@ -31,7 +31,7 @@ Everything else — capital, fees, taxation, reputation — is policy *inside* t
 
 2. **The codex defines the realm.** Two quarters are in the same realm iff they run the same codex. No shared codex, no shared realm.
 
-3. **Quarters are sovereign.** No quarter depends on another to function. Users register directly on the quarter they choose and pay that quarter's fees. There is no global user registry and no cross-quarter "guest" presence — to participate in another quarter, you register there.
+3. **Quarters are sovereign.** No quarter depends on another to function. There is no global user registry and no cross-quarter "guest" presence — to participate in another quarter, you register there. **First join** is system-assigned (codex policy, default least-populated) so open registration cannot overload a single quarter; **additional** quarter memberships are deliberate and separate.
 
 4. **The capital is a pusher, not a ruler.** Its two central functions (admission, codex propagation) are real but bounded: any quarter can secede at any time, so the capital's power is continuously re-tested by the exit option.
 
@@ -72,7 +72,8 @@ Everything else — capital, fees, taxation, reputation — is policy *inside* t
 The codex is the only thing quarters of a realm share. It encodes, at minimum:
 
 - **Admission policy** — who may join the realm, and on what terms.
-- **Fee policy** — registration and maintenance fees per quarter, ideally set by supply/demand and technical constraints. Fees are the natural assignment mechanism: users register where they choose and pay accordingly.
+- **Fee policy** — registration and maintenance fees per quarter, ideally set by supply/demand and technical constraints.
+- **Assignment policy** — how new members are placed on first join (`assign_quarter`). Default: least-populated joinable quarter with capacity. Free pick at join time is not the product default (overload / brigading risk).
 - **Governance** — how proposals are made, who votes, how amendments are ratified.
 - **Capital policy** — whether and how capital-hood can move (advocated: by realm-wide vote across all quarters).
 - **Taxation/tributes (optional)** — the codex may require quarters to pay tributes to the capital. This is allowed but not built-in; absence of tribute policy means no tribute.
@@ -84,9 +85,31 @@ There is no quantized, system-level reputation. Reputation is whatever a subject
 
 ## Users
 
-- A user registers directly on the quarter of their choice and pays that quarter's fees.
-- A user is present only on quarters where they have registered. There is **no GuestUser** and no seamless cross-quarter presence — visiting another quarter means registering there.
-- Duplicate identities across quarters are not prevented by infrastructure. They are detected after the fact and sanctioned per the codex if disallowed.
+### First join (assigned)
+
+1. User signs in on the shared frontend.
+2. Capital / federation policy assigns a **joinable** quarter (default: least-populated with capacity). Once sub-quarters exist, the capital is coordinator-only and not a join target.
+3. Frontend registers the user on that quarter and caches `home_quarter` in `localStorage`.
+4. UI shows the assignment; it does **not** offer a free picker across all quarters.
+5. Invite / deep links (`?quarter=<id>`) may override the target (issuer-assigned, not user browsing).
+
+### Returning users (discovery ladder)
+
+There is **no central principal→quarter index**. Location is recovered from:
+
+1. Client-carried `localStorage.home_quarter` (fast path)
+2. Federated broadcast: probe each known quarter with `get_my_user_status()`
+3. Manual "Find my quarter" on `/join` (same broadcast)
+4. Optional: user-entered quarter catalog `index` (capital = 0)
+
+Before any **new** registration on `/join`, the app must run the federated probe so a returning member is never accidentally registered on a second quarter.
+
+### Multi-quarter membership
+
+- A principal **may** register on more than one quarter (admins, strategic presence, fork prep).
+- That is a **separate deliberate flow**, not the default join wizard.
+- A user is present only on quarters where they have registered. There is **no GuestUser**.
+- Duplicate identities across quarters are not prevented by infrastructure; they are detected after the fact and sanctioned per the codex if disallowed.
 
 ---
 
@@ -137,8 +160,9 @@ No `home_quarter` on users, no `GuestUser` entity, no central tax aggregator. Th
 ## Frontend
 
 1. **Bootstrap** from the capital's canister ID (baked in at build time).
-2. **Quarter selection** — the user picks/registers on a quarter; the frontend switches its actor to that quarter's backend.
-3. **localStorage cache** — remember the user's quarter canister ID for instant reconnect.
+2. **First join** — resolve assignment via `get_join_targets()` / codex policy; register on the assigned quarter; show an assignment banner (not a free picker).
+3. **Returning login** — restore from `localStorage`, else federated membership probe; switch the actor to that quarter's backend.
+4. **Multi-quarter session** — if several memberships exist, an activation picker may choose which quarter to work in (session routing), distinct from registration.
 
 ---
 
@@ -148,7 +172,9 @@ This document supersedes an earlier, heavier design. Removed or reframed:
 
 - **GuestUser / cross-quarter guest presence** — removed. Participation requires registration on the target quarter.
 - **Central tax aggregation** — removed as a built-in; optional tributes can be encoded in the codex.
-- **`home_quarter` on User** — removed; users simply register where they choose.
-- **Built-in random assignment** — removed as a default; assignment is governed by codex fee policy (supply/demand).
+- **`home_quarter` as a global registry** — there is still no central index; the client may cache a pointer, and each quarter holds its own `User` rows. Optional `User.home_quarter` on a quarter is a local hint, not a federation-wide map.
+- **Free pick at first join** — ruled out as the product default (overload risk). Assignment is codex-driven; default strategy is least-populated among joinable quarters.
 - **Capital as governance coordinator** — reframed: the capital is the codex origin + admission gate + pusher, nothing more.
 - **Quantized reputation** — removed; reputation is interpretive and codex/user-driven.
+
+See also GitHub [#156](https://github.com/smart-social-contracts/realms/issues/156) (join-assignment addendum).

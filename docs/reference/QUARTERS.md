@@ -66,7 +66,8 @@ This design supports the core Realms GOS principle: **opting out must always be 
 
 ## What Quarters Own Independently
 
-- **Users** — each user has one home quarter.
+- **Users** — each quarter holds its own `User` rows. First join is
+  system-assigned to one quarter; additional quarter memberships are deliberate.
 - **Governance data** — proposals, votes, disputes, etc. local to the quarter.
 - **Zones** — potentially same or different geographic zones.
 
@@ -74,39 +75,45 @@ This design supports the core Realms GOS principle: **opting out must always be 
 
 ## User Model
 
-### Home Quarter (Full Membership)
-- User's `User` entity lives here with full profiles and permissions.
-- Votes on realm-wide proposals are counted via home quarter.
-- Tax obligations apply here.
-- Subject to this quarter's justice system.
-- On secession, user goes with the quarter.
+### First join (assigned)
 
-### Guest Access (Lightweight)
-- `GuestUser` entity on non-home quarters (principal + home quarter reference + permissions).
-- Can transact, view content, participate in local events.
-- No governance weight (no voting, no proposing).
-- Severed on secession of either quarter.
+There is **no free picker** on `/join` for open registration (overload /
+brigading risk). The system assigns a joinable quarter:
 
-### Registration Flow
 1. User opens frontend → connects to capital (bootstrap canister ID).
-2. Capital runs assignment strategy (least populated / user choice / codex-defined).
-3. Capital returns assigned quarter canister ID.
-4. Frontend switches actor to the assigned quarter.
-5. User registers on the assigned quarter (this is their home).
+2. `get_join_targets()` / federation codex `assign_quarter` picks a joinable
+   quarter (default: **least-populated** with capacity). Once sub-quarters
+   exist, the capital is coordinator-only (`joinable=false`).
+3. Frontend switches actor to the assigned quarter and registers there.
+4. UI shows the assignment banner; invite / `?quarter=` may override (issuer-
+   assigned, not user browsing).
+5. Client caches `home_quarter` in `localStorage`.
+
+### Multi-quarter membership
+
+A principal **may** register on more than one quarter (admins, strategic
+presence). That is a **separate deliberate flow**, not the default join wizard.
+There is **no GuestUser** — presence requires full registration on that quarter.
+Duplicates are not prevented centrally; the codex may sanction them ex-post.
 
 ### Returning User Flow (home-quarter discovery ladder)
-There is **no central per-user index**, so a returning user's home quarter is
+
+There is **no central per-user index**, so a returning user's quarter is
 recovered from progressively slower sources:
 1. **Client-carried pointer (fast path)** — frontend reads the cached
    `home_quarter` canister ID from `localStorage` and activates it immediately
    (`setActiveQuarter`) before any round-trip.
-2. **Capital resolution** — `get_my_user_status()` on the capital confirms /
-   corrects the assigned quarter, which re-caches `home_quarter`.
+2. **Federated broadcast** — probe each known quarter with
+   `get_my_user_status()` (also runs automatically on login via
+   `loadUserProfiles`).
 3. **User-entered quarter number** — every quarter has a small stable integer
    `index` in the federation catalog (capital = 0); a user who remembers it can
    route directly.
-4. **"I forgot my quarter" broadcast** — last-resort search across all known
-   quarters to locate the user's record.
+4. **"Find my quarter" on `/join`** — same broadcast, then redirect into the app.
+
+**Hardening:** before any new registration on `/join`, the app must run the
+federated membership probe. If the principal is found on any quarter →
+"Welcome back" + route; never offer Terms/Profile join again for that session.
 
 > Note on identity: an Internet Identity principal is **per-frontend-origin**.
 > A single realm frontend yields a stable principal across all its backend
@@ -128,9 +135,9 @@ recovered from progressively slower sources:
 
 Defined in the federation codex (`assign_quarter` function). Built-in strategies:
 
-1. **random** — `hash(principal) % len(active_quarters)` → uniform load.
-2. **user_choice** — honour user's preference if quarter has capacity.
-3. **least_populated** — pick quarter with fewest residents.
+1. **least_populated** — **product default**; pick the joinable quarter with fewest residents (capacity-checked).
+2. **random** — `hash(principal) % len(active_quarters)` → uniform load.
+3. **user_choice** — honour a *preferred* quarter (invite / deep link / deliberate multi-quarter flow) if it has capacity — **not** an open join-page picker.
 
 Custom codexes can implement arbitrary rules (geography, invitation codes, profile attributes).
 
@@ -193,55 +200,44 @@ A quarter declares independence:
 3. Deploy own frontend asset canister (optional — can reuse existing).
 4. All local users, data, governance, extensions remain intact.
 5. Former peers remove it from their quarter list.
-6. Guest users from/to this quarter lose cross-access.
+6. Cross-quarter registrations involving this quarter become ordinary
+   out-of-federation memberships (no automatic guest severance — there is no
+   GuestUser layer).
 
 **Joining a federation** is the reverse: set `is_quarter = True`, configure `federation_realm_id`, start gossip, register with peers.
 
 ---
 
-## Data Model Changes
+## Data Model
 
 ### Realm Entity
 ```python
-# Existing
 is_quarter = Boolean(default=False)
+is_capital = Boolean(default=False)  # codex origin + admission gate
 federation_realm_id = String(max_length=64)
-
-# New
-is_capital = Boolean(default=False)  # This quarter coordinates federation governance
+auto_scale_enabled = Boolean(default=True)
+scale_in_flight = Boolean(default=False)
+# ... plus installer / casals wiring fields
 ```
 
-### User Entity
+### User Entity (per quarter canister)
 ```python
-# New
-home_quarter = String(max_length=64)  # Canister ID of user's home quarter
+# Optional local hint — not a federation-wide index
+home_quarter = String(max_length=64)
 ```
 
-### GuestUser Entity (New)
-```python
-class GuestUser(Entity):
-    principal = String()           # Visitor's IC principal
-    home_quarter = String()        # Where they actually live
-    permissions = String()         # What they can do here
-```
+There is **no GuestUser** entity in the product model. Multi-quarter presence =
+full registration on each quarter.
 
 ### Quarter Entity
 ```python
 class Quarter(Entity, TimestampedMixin):
     name = String()
-    canister_id = String()         # Backend canister principal
+    canister_id = String()
     federation = ManyToOne("Realm", "quarter_ids")
     population = Integer(default=0)
-    status = String(default="active")  # active/suspended/splitting/merging
+    status = String(default="active")
     index = Integer(default=0)     # stable catalog number (capital = 0)
-```
-
-### Realm Entity (auto-scaling fields)
-```python
-auto_scale_enabled = Boolean(default=True)
-scale_in_flight = Boolean(default=False)   # idempotent provisioning guard
-scale_requested_at = String(max_length=32)
-installer_canister_id = String(max_length=64)  # Casals broker for self-provision
 ```
 
 ---
@@ -252,20 +248,20 @@ installer_canister_id = String(max_length=64)  # Casals broker for self-provisio
 
 | Endpoint | Change |
 |----------|--------|
-| `join_realm(profile, preferred_quarter)` | Persist `home_quarter` on User entity after assignment |
-| `get_my_user_status()` | Return stored `home_quarter` instead of `""` |
-| `change_quarter(new_quarter_canister_id)` | Persist new `home_quarter` on User entity |
+| `join_realm(profile, preferred_quarter)` | Register on the target quarter; may set local `home_quarter` |
+| `get_my_user_status()` | Return membership on *this* canister (+ optional `assigned_quarter`) |
+| `get_join_targets()` | Public join policy; `default_quarter` = least-populated joinable |
+| `change_quarter(new_quarter_canister_id)` | Move / update local home pointer (separate from multi-register) |
 
-### New Endpoints
+### New / federation Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
 | `declare_independence()` | Secede from federation |
 | `join_federation(capital_canister_id)` | Join an existing federation |
 | `sync_quarters()` | Peer gossip: exchange quarter list + populations |
-| `get_scale_status()` | Report auto-scale state (N, threshold, populations, in-flight) |
-| `process_quarter_scaling()` | Act on a pending scale: provision + register a new quarter |
-| `register_guest(principal, home_quarter)` | Create GuestUser for cross-quarter access |
+| `get_scale_status()` | Report auto-scale state |
+| `process_quarter_scaling()` | Provision + register a new quarter |
 
 `realm_installer.provision_quarter(args)` is the Casals broker endpoint that
 mints a backend-only quarter canister under the realm's existing stand.
@@ -274,10 +270,13 @@ mints a backend-only quarter canister under the realm's existing stand.
 
 ## Frontend Changes
 
-1. **Auto-routing on login** — after `get_my_user_status()`, call `setActiveQuarter(home_quarter)`.
-2. **Two-step join** — register on capital, get assignment, register on assigned quarter.
-3. **Guest mode** — `QuarterSelector` already exists; tag non-home quarters as "guest" in the UI.
+1. **Auto-routing on login** — cache → federated probe → `setActiveQuarter`.
+2. **Assigned join** — resolve target via `get_join_targets`, register on that quarter, show assignment banner (no free picker).
+3. **Federated probe before join** — prevent accidental double-registration.
 4. **localStorage cache** — persist `home_quarter` canister ID for instant reconnect.
+5. **Multi-quarter activation** (optional) — session routing among existing memberships, distinct from registration.
+
+Canonical product doc: root [`QUARTERS.md`](../../QUARTERS.md). Tracking: GitHub [#156](https://github.com/smart-social-contracts/realms/issues/156).
 
 ---
 
@@ -291,9 +290,9 @@ mints a backend-only quarter canister under the realm's existing stand.
 - Frontend two-step join flow
 
 ### Phase 2: Federation (Medium Priority)
-- GuestUser entity + `register_guest` endpoint
 - Peer gossip (`sync_quarters` inter-canister calls)
 - `declare_independence()` / `join_federation()` endpoints
+- Deliberate multi-quarter registration / activation UX (not GuestUser)
 - CLI `--capital` flag for `quarter create`
 
 ### Phase 3: Automation (Low Priority)
