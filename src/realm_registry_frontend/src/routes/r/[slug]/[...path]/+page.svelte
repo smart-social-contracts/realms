@@ -6,6 +6,7 @@
   import { realmIframeUrl, portalPath } from '$lib/federation.js';
   import { attachPortalBridge } from '$lib/portal-bridge-host.js';
   import { portalDocumentFocus } from '$lib/portal-focus.js';
+  import { requestAssistantOpen } from '$lib/assistant-open.js';
   import { login, isAuthenticated } from '$lib/auth.js';
   import { CONFIG } from '$lib/config.js';
 
@@ -97,6 +98,9 @@
       },
       onFocus: (focus) => {
         portalDocumentFocus.set(focus ?? null);
+      },
+      onAssistantOpen: () => {
+        requestAssistantOpen();
       }
     });
     bridge.syncPath(iframePath);

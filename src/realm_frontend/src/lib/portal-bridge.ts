@@ -12,6 +12,8 @@ let pendingDelegationRequest = false;
 let pendingNavPush = null;
 /** @type {{ source: string, uri: string, label?: string } | null | undefined} */
 let pendingFocusPush = undefined;
+/** @type {boolean} */
+let pendingAssistantOpen = false;
 /** @type {Ed25519KeyIdentity | null} */
 let sessionIdentity = null;
 /** @type {DelegationIdentity | null} */
@@ -169,6 +171,10 @@ export function initPortalBridge() {
       pendingFocusPush = undefined;
       post({ type: 'focus:push', payload: queuedFocus });
     }
+    if (pendingAssistantOpen) {
+      pendingAssistantOpen = false;
+      post({ type: 'assistant:open' });
+    }
   };
 
   window.addEventListener('message', onWindowMessage);
@@ -232,6 +238,21 @@ export function portalFocusPush(focus) {
   }
   pendingFocusPush = undefined;
   post({ type: 'focus:push', payload: focus });
+  return true;
+}
+
+/**
+ * Ask the portal host to open the mundus-level RegistryAssistant.
+ * Fire-and-forget; queues briefly if the MessagePort is not ready yet.
+ */
+export function portalAssistantOpen() {
+  if (!isPortalEmbedded()) return false;
+  if (!port) {
+    pendingAssistantOpen = true;
+    return false;
+  }
+  pendingAssistantOpen = false;
+  post({ type: 'assistant:open' });
   return true;
 }
 

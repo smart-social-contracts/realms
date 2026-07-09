@@ -12,7 +12,7 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { hostActionEvents, documentFocus } from '$lib/host-bridge';
-	import { portalFocusPush } from '$lib/portal-bridge.ts';
+	import { portalFocusPush, portalAssistantOpen, isEmbeddedInPortal } from '$lib/portal-bridge.ts';
 	import { realmInfo, aiAssistantEnabled } from '$lib/stores/realmInfo';
 	
 	const SIDEBAR_STATE_KEY = 'realm_sidebar_state';
@@ -22,6 +22,7 @@
 	let aiPanelOpen = false;
 	let aiPanelWidth = 320;
 	let initialized = false;
+	let embeddedInPortal = false;
 	
 	function saveSidebarState(hidden) {
 		if (browser && initialized) {
@@ -47,7 +48,7 @@
 		saveSidebarState(drawerHidden);
 	}
 
-	$: if (browser && initialized) {
+	$: if (browser && initialized && !embeddedInPortal) {
 		saveAiPanelState(aiPanelOpen);
 	}
 
@@ -63,6 +64,7 @@
 
 	onMount(() => {
 		if (browser) {
+			embeddedInPortal = isEmbeddedInPortal();
 			void realmInfo.fetch();
 			document.documentElement.classList.remove('dark');
 			document.documentElement.classList.add('light');
@@ -75,9 +77,11 @@
 					drawerHidden = window.innerWidth < 1024;
 				}
 
-				const savedAi = localStorage.getItem(AI_PANEL_STATE_KEY);
-				if (savedAi !== null) {
-					aiPanelOpen = JSON.parse(savedAi);
+				if (!embeddedInPortal) {
+					const savedAi = localStorage.getItem(AI_PANEL_STATE_KEY);
+					if (savedAi !== null) {
+						aiPanelOpen = JSON.parse(savedAi);
+					}
 				}
 			} catch {
 				drawerHidden = window.innerWidth < 1024;
@@ -93,7 +97,7 @@
 				const isDesktop = window.innerWidth >= 1024;
 				if (wasDesktop && !isDesktop) {
 					drawerHidden = true;
-					aiPanelOpen = false;
+					if (!embeddedInPortal) aiPanelOpen = false;
 				}
 				wasDesktop = isDesktop;
 			};
@@ -101,7 +105,12 @@
 			window.addEventListener('resize', handleResize);
 
 			const unsubHostActions = hostActionEvents.subscribe((event) => {
-				if (event?.action.type === 'assistant.open' && get(aiAssistantEnabled)) {
+				if (event?.action.type !== 'assistant.open') return;
+				if (embeddedInPortal) {
+					portalAssistantOpen();
+					return;
+				}
+				if (get(aiAssistantEnabled)) {
 					aiPanelOpen = true;
 				}
 			});
@@ -131,7 +140,7 @@
 	<header
 		class="flex-none z-50 mx-auto w-full border-b border-gray-200 bg-white"
 	>
-		<Navbar bind:drawerHidden bind:aiPanelOpen />
+		<Navbar bind:drawerHidden bind:aiPanelOpen {embeddedInPortal} />
 	</header>
 	<div class="flex flex-1 overflow-hidden">
 		<!-- Sidebar (left) -->
@@ -140,7 +149,7 @@
 		<!-- Main Content -->
 		<div
 			class="main-content-area relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {!drawerHidden ? 'lg:ml-64' : ''}"
-			class:ai-panel-open={aiPanelOpen && $aiAssistantEnabled}
+			class:ai-panel-open={aiPanelOpen && $aiAssistantEnabled && !embeddedInPortal}
 			style="--ai-panel-width: {aiPanelWidth}px"
 		>
 			<DemoBanner />
@@ -163,8 +172,9 @@
 	     `ai_assistant_enabled` (#233) governs ONLY this in-realm, realm-context surface
 	     (codex/proposal tools, realm status injection). It does NOT and must not disable
 	     the user's global assistant, which lives on the registry (canonical II origin) and
-	     never consults this realm flag. -->
-	{#if $aiAssistantEnabled}
+	     never consults this realm flag. Hidden when embedded in the portal iframe so
+	     users only see the mundus-level RegistryAssistant. -->
+	{#if $aiAssistantEnabled && !embeddedInPortal}
 		<AiAssistantPanel
 			bind:open={aiPanelOpen}
 			bind:panelWidth={aiPanelWidth}

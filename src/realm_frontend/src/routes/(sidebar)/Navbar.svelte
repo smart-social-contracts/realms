@@ -8,14 +8,20 @@
 	import { Navbar } from 'flowbite-svelte';
 	import { IconMessageChatbot, IconMenu2 } from '@tabler/icons-svelte';
 	import { _ } from 'svelte-i18n';
+	import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
 	import '../../app.pcss';
 
 	export let fluid = true;
 	export let drawerHidden = false;
 	export let aiPanelOpen = false;
+	/** When true (portal iframe), hide the in-realm assistant toggle. */
+	export let embeddedInPortal = false;
 
 	onMount(() => {
 		realmInfo.fetch();
+		if (!embeddedInPortal) {
+			embeddedInPortal = isEmbeddedInPortal();
+		}
 	});
 </script>
 
@@ -49,7 +55,7 @@
 		<QuarterIndicator />
 		<QuarterSwitcher />
 		<DelegationSwitcher />
-		{#if $aiAssistantEnabled}
+		{#if $aiAssistantEnabled && !embeddedInPortal}
 		<!-- AI Assistant toggle button -->
 		<button
 			on:click={() => (aiPanelOpen = !aiPanelOpen)}

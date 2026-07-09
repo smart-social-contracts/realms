@@ -1,9 +1,11 @@
 <!--
-  Registry-level AI assistant (issue #233).
+  Mundus-level AI assistant (issue #233).
 
-  Lives on the registry (the canonical II origin). On the registry home it talks
-  to Geister in GENERAL mode (no `context_realm`) for cross-realm / platform
-  help. When the user is browsing a portal realm page (`/r/<slug>/...`) it is
+  Owned by the registry/portal (canonical II origin). Toggleable between a
+  floating bottom-right card and a docked right-side panel; dock preference and
+  open state persist in localStorage. On the registry home it talks to Geister
+  in GENERAL mode (no `context_realm`) for cross-realm / platform help. When
+  the user is browsing a portal realm page (`/r/<slug>/...`) it is
   realm-scoped: it resolves the realm's backend canister id and sends
   `context_realm` plus `page_context` (and optional document focus from the
   embedded iframe) so Geister can enrich answers with realm status / tools.
@@ -23,15 +25,21 @@
   import { page } from '$app/stores';
   import { CONFIG } from '$lib/config.js';
   import { portalDocumentFocus } from '$lib/portal-focus.js';
+  import { assistantChrome } from '$lib/assistant-chrome.js';
+  import { assistantOpenRequest } from '$lib/assistant-open.js';
 
   const PRODUCTION_API_HOST = 'https://geister-api.realmsgos.dev/';
   const API_URL = `${PRODUCTION_API_HOST}api/ask`;
   const CHAT_REQUEST_TIMEOUT_MS = 360_000;
+  const PANEL_WIDTH = 380;
+  const DOCKED_KEY = 'mundus_assistant_docked';
+  const OPEN_KEY = 'mundus_assistant_open';
 
   // Geister network: reuse the registry's deploy-queue network mapping.
   const GEISTER_NETWORK = CONFIG.default_deploy_queue_network || 'staging';
 
   let open = false;
+  let docked = false;
   /** @type {{ text: string, isUser: boolean }[]} */
   let messages = [];
   let newMessage = '';
@@ -61,10 +69,46 @@
   let unsubFocus;
   /** @type {(() => void) | undefined} */
   let unsubPage;
+  /** @type {(() => void) | undefined} */
+  let unsubOpenRequest;
 
   // Cache backend canister ids by slug for the session.
   /** @type {Record<string, { backend: string, frontend: string }>} */
   const realmCache = Object.create(null);
+
+  function syncChrome() {
+    assistantChrome.set({ open, docked, width: PANEL_WIDTH });
+  }
+
+  function persistOpen(value) {
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify(!!value));
+    } catch (e) { /* private mode */ }
+  }
+
+  function persistDocked(value) {
+    try {
+      localStorage.setItem(DOCKED_KEY, JSON.stringify(!!value));
+    } catch (e) { /* private mode */ }
+  }
+
+  function setOpen(value) {
+    open = !!value;
+    persistOpen(open);
+    syncChrome();
+  }
+
+  function setDocked(value) {
+    docked = !!value;
+    persistDocked(docked);
+    syncChrome();
+  }
+
+  function toggleDock() {
+    setDocked(!docked);
+  }
+
+  $: showFab = !(docked && open);
 
   async function ensureRealmContext(slug) {
     const key = (slug || '').trim().toLowerCase();
@@ -140,11 +184,22 @@
   }
 
   onMount(async () => {
+    try {
+      const savedDocked = localStorage.getItem(DOCKED_KEY);
+      if (savedDocked !== null) docked = JSON.parse(savedDocked) === true;
+      const savedOpen = localStorage.getItem(OPEN_KEY);
+      if (savedOpen !== null) open = JSON.parse(savedOpen) === true;
+    } catch (e) { /* private mode */ }
+    syncChrome();
+
     unsubPage = page.subscribe(($p) => {
       syncPortalRoute($p.url.pathname || '');
     });
     unsubFocus = portalDocumentFocus.subscribe((focus) => {
       documentFocus = focus;
+    });
+    unsubOpenRequest = assistantOpenRequest.subscribe((n) => {
+      if (n > 0) setOpen(true);
     });
     try {
       const { isAuthenticated, getPrincipal } = await import('$lib/auth.js');
@@ -160,6 +215,7 @@
   onDestroy(() => {
     unsubPage?.();
     unsubFocus?.();
+    unsubOpenRequest?.();
   });
 
   async function scrollToBottom() {
@@ -302,25 +358,53 @@
   }
 </script>
 
-<button
-  class="assistant-fab"
-  class:open
-  on:click={() => (open = !open)}
-  aria-label={$_('assistant.toggle', { default: 'AI Assistant' })}
-  title={$_('assistant.toggle', { default: 'AI Assistant' })}
->
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-  </svg>
-</button>
+{#if showFab}
+  <button
+    class="assistant-fab"
+    class:open
+    on:click={() => setOpen(!open)}
+    aria-label={$_('assistant.toggle', { default: 'AI Assistant' })}
+    title={$_('assistant.toggle', { default: 'AI Assistant' })}
+  >
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+    </svg>
+  </button>
+{/if}
 
 {#if open}
-  <section class="assistant-panel" aria-label={$_('assistant.title', { default: 'Realms Assistant' })}>
+  <section
+    class="assistant-panel"
+    class:docked
+    aria-label={$_('assistant.title', { default: 'Realms Assistant' })}
+  >
     <header class="assistant-header">
       <span class="assistant-title">{$_('assistant.title', { default: 'Realms Assistant' })}</span>
-      <button class="assistant-close" on:click={() => (open = false)} aria-label="Close">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
-      </button>
+      <div class="assistant-header-actions">
+        <button
+          class="assistant-icon-btn"
+          on:click={toggleDock}
+          aria-label={docked ? 'Undock' : 'Dock to side'}
+          title={docked ? 'Undock' : 'Dock to side'}
+        >
+          {#if docked}
+            <!-- Window / float card icon -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="6" width="16" height="12" rx="2" />
+              <path d="M4 10h16" />
+            </svg>
+          {:else}
+            <!-- Sidebar / dock panel icon -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M15 4v16" />
+            </svg>
+          {/if}
+        </button>
+        <button class="assistant-icon-btn" on:click={() => setOpen(false)} aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+        </button>
+      </div>
     </header>
 
     <div class="assistant-messages" use:scrollRegion>
@@ -395,6 +479,25 @@
     z-index: 1000;
   }
 
+  .assistant-panel.docked {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 100vw);
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+    border-left: 1px solid #e5e5e5;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+    z-index: 1100;
+  }
+
+  @media (max-width: 767px) {
+    .assistant-panel.docked {
+      width: 100%;
+    }
+  }
+
   .assistant-header {
     display: flex;
     align-items: center;
@@ -403,7 +506,22 @@
     border-bottom: 1px solid #eee;
   }
   .assistant-title { font-weight: 600; font-size: 0.95rem; color: #111; }
-  .assistant-close { background: none; border: none; cursor: pointer; color: #666; padding: 4px; }
+  .assistant-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .assistant-icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .assistant-icon-btn:hover { color: #111; }
 
   .assistant-messages {
     flex: 1;
