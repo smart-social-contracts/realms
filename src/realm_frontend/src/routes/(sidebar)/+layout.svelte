@@ -11,7 +11,8 @@
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
-	import { hostActionEvents } from '$lib/host-bridge';
+	import { hostActionEvents, documentFocus } from '$lib/host-bridge';
+	import { portalFocusPush } from '$lib/portal-bridge.ts';
 	import { realmInfo, aiAssistantEnabled } from '$lib/stores/realmInfo';
 	
 	const SIDEBAR_STATE_KEY = 'realm_sidebar_state';
@@ -104,10 +105,15 @@
 					aiPanelOpen = true;
 				}
 			});
+
+			const unsubFocus = documentFocus.subscribe((focus) => {
+				portalFocusPush(focus);
+			});
 			
 			return () => {
 				window.removeEventListener('resize', handleResize);
 				unsubHostActions();
+				unsubFocus();
 			};
 		}
 	});

@@ -1,8 +1,8 @@
 {
-  "$comment": "Every realm gets config + identity + branding + codex + the core extension subset (public_dashboard, member_dashboard, welcome, demo_simulator, hello_world, llm_chat), ~33 steps. Proves a full sheet reinstall (all realm canisters + branding) end-to-end without installing every manifest extension. Marked active (exclusive): seeding it deactivates `test`/`test-lite`. Regenerate via casals-config/_gen_test_arrangement.py.",
+  "$comment": "Every test realm with the core extension subset only. Regenerate: python3 casals-config/_gen_arrangements.py.",
   "name": "test-lite-all",
-  "description": "Lite-but-complete realms test arrangement: all 3 realms (Dominion, Agora, Syntropia) with core extensions only (public_dashboard, member_dashboard, welcome, demo_simulator, hello_world, llm_chat).",
-  "active": true,
+  "description": "Lite-but-complete test arrangement: all 3 realms, core extensions only.",
+  "active": false,
   "parameters": {
     "network": "test",
     "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
@@ -104,6 +104,78 @@
       "method": "install_extension_from_registry",
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "realm_settings",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "extensions_manager",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "voting",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "census",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "admin_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "vault",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "codex_viewer",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "llm_chat",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "welcome",
         "version": null
       }
@@ -123,15 +195,6 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "hello_world",
-        "version": null
-      }
-    },
-    {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "ext_id": "llm_chat",
         "version": null
       }
     },
@@ -221,6 +284,78 @@
       "method": "install_extension_from_registry",
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "realm_settings",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "extensions_manager",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "voting",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "census",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "admin_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "vault",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "codex_viewer",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "llm_chat",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "welcome",
         "version": null
       }
@@ -240,15 +375,6 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "hello_world",
-        "version": null
-      }
-    },
-    {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "ext_id": "llm_chat",
         "version": null
       }
     },
@@ -338,6 +464,78 @@
       "method": "install_extension_from_registry",
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "realm_settings",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "extensions_manager",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "voting",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "census",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "admin_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "vault",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "codex_viewer",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "llm_chat",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "welcome",
         "version": null
       }
@@ -357,15 +555,6 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "hello_world",
-        "version": null
-      }
-    },
-    {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "ext_id": "llm_chat",
         "version": null
       }
     }

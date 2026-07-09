@@ -6,8 +6,11 @@
 	import MetaTag from '../../utils/MetaTag.svelte';
 	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
-	import { backend } from '$lib/canisters.js';
+	import { get } from 'svelte/store';
+	// @ts-ignore
+	import { quarterBackend } from '$lib/canisters.js';
 	import { realmInfo } from '$lib/stores/realmInfo';
+	import { activeQuarterId } from '$lib/stores/quarters';
 
 	const path: string = '/settings';
 	const description: string = 'Settings example - Smart Social Contracts';
@@ -39,7 +42,9 @@
 		quarterChangeError = '';
 		quarterChangeSuccess = '';
 		try {
-			const response = await backend.change_quarter(selectedQuarter);
+			// The caller's User record lives on their home quarter — the capital
+			// doesn't know quarter-homed members, so route via the active actor.
+			const response = await quarterBackend.change_quarter(selectedQuarter);
 			if (response.success) {
 				assignedQuarter = selectedQuarter;
 				quarterChangeSuccess = `Switched to ${getQuarterName(selectedQuarter)}`;
@@ -55,22 +60,27 @@
 
 	onMount(async () => {
 		try {
-			if (!backend || typeof backend.get_my_user_status !== 'function') {
-				throw new Error("Backend canister is not properly initialized");
-			}
-			
-			const response = await backend.get_my_user_status();
-			
+			// Query the quarter-aware actor: a federated member's User record
+			// lives on their home quarter, and asking the capital returns
+			// "user not found" for them.
+			const response = await quarterBackend.get_my_user_status();
+
 			if (response && response.success && response.data && response.data.userGet) {
 				const u = response.data.userGet;
 				principal = u.principal;
 				nickname = u.nickname || '';
 				avatarUrl = u.avatar || '';
 				profiles = u.profiles || [];
-				assignedQuarter = u.assigned_quarter || '';
+				// Members who joined a quarter directly have no home_quarter value
+				// on their own record — the quarter itself IS home. Fall back to
+				// the active quarter for display.
+				assignedQuarter = u.assigned_quarter || (get(activeQuarterId) as string) || '';
 				selectedQuarter = assignedQuarter;
 			} else {
-				throw new Error('Could not fetch user status: Invalid response format.');
+				throw new Error(
+					(response && !response.success && response.data?.error) ||
+						'Could not fetch user status: Invalid response format.'
+				);
 			}
 		} catch (e: any) {
 			userStatusError = e.message || 'Failed to fetch user status.';

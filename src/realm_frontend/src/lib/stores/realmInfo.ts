@@ -69,29 +69,74 @@ const createRealmInfoStore = () => {
 					throw new Error('Actor not initialized');
 				}
 
-				const response = await currentActor.status();
-				
-				if (response.success && response.data.status) {
-					const status = response.data.status;
+				// Prefer the lightweight runtime-flags query (fast on large realms).
+				// Full status() may exceed the instruction limit; flags alone are enough
+				// for the join flow (test mode, open registration, branding).
+				let flagsPayload: Record<string, unknown> | null = null;
+				try {
+					const flagsRaw = await currentActor.get_runtime_flags();
+					flagsPayload = typeof flagsRaw === 'string' ? JSON.parse(flagsRaw) : flagsRaw;
+				} catch {
+					flagsPayload = null;
+				}
+
+				let status: Record<string, unknown> | null = null;
+				try {
+					const response = await currentActor.status();
+					if (response.success && response.data.status) {
+						status = response.data.status as Record<string, unknown>;
+					}
+				} catch {
+					status = null;
+				}
+
+				// status().quarters counts populations by scanning the capital's own
+				// user table, which misses members who joined a quarter directly (they
+				// live in the quarter's table) — sub-quarters show 0 forever. The
+				// join-targets directory carries the synced per-quarter counts plus
+				// index/is_capital, so overlay it. Best-effort: the raw status list
+				// still renders if this query fails.
+				const quarters = (status?.quarters as Array<Record<string, unknown>>) || [];
+				if (quarters.length > 0) {
+					try {
+						const raw = await currentActor.get_join_targets();
+						const directory = (JSON.parse(raw)?.quarters || []) as Array<
+							Record<string, unknown>
+						>;
+						for (const q of quarters) {
+							const match = directory.find((d) => d.canister_id === q.canister_id);
+							if (!match) continue;
+							q.population = Math.max(Number(q.population ?? 0), Number(match.population ?? 0));
+							if (q.index === undefined && match.index !== undefined) q.index = match.index;
+							if (q.is_capital === undefined && match.is_capital !== undefined)
+								q.is_capital = match.is_capital;
+						}
+					} catch {
+						// keep the unmodified status list
+					}
+				}
+
+				if (status || flagsPayload?.success) {
+					const fromFlags = flagsPayload?.success ? flagsPayload : null;
 					update(state => ({
 						...state,
-						name: status.realm_name || '',
-						welcomeMessage: status.realm_welcome_message || '',
-						manifesto: status.realm_manifesto || '',
-						openRegistration: status.open_registration || false,
-						aiAssistantEnabled: status.ai_assistant_enabled !== false,
-						registries: status.registries || [],
-						quarters: status.quarters || [],
-						isQuarter: status.is_quarter || false,
-						parentRealmCanisterId: status.parent_realm_canister_id || '',
-						logoUrl: status.logo_url || '',
-						backgroundImageUrl: status.background_image_url || '',
-						testMode: status.test_mode || false,
-						testModeIIBypass: status.test_mode_ii_bypass || false,
-						testModeUserSelfRegistration: status.test_mode_user_self_registration || false,
-						testModeDemoData: status.test_mode_demo_data || false,
-						testModeSkipTerms: status.test_mode_skip_terms || false,
-						testModeSkipPassportZkproof: status.test_mode_skip_passport_zkproof || false,
+						name: (fromFlags?.realm_name as string) || (status?.realm_name as string) || '',
+						welcomeMessage: (fromFlags?.realm_welcome_message as string) || (status?.realm_welcome_message as string) || '',
+						manifesto: (fromFlags?.realm_manifesto as string) || (status?.realm_manifesto as string) || '',
+						openRegistration: (fromFlags?.open_registration as boolean) ?? (status?.open_registration as boolean) ?? false,
+						aiAssistantEnabled: (fromFlags?.ai_assistant_enabled as boolean) ?? (status?.ai_assistant_enabled as boolean) !== false,
+						registries: (status?.registries as typeof state.registries) || [],
+						quarters: (status?.quarters as typeof state.quarters) || [],
+						isQuarter: (status?.is_quarter as boolean) || false,
+						parentRealmCanisterId: (status?.parent_realm_canister_id as string) || '',
+						logoUrl: (fromFlags?.logo_url as string) || (status?.logo_url as string) || '',
+						backgroundImageUrl: (fromFlags?.background_image_url as string) || (status?.background_image_url as string) || '',
+						testMode: (fromFlags?.test_mode as boolean) ?? (status?.test_mode as boolean) ?? false,
+						testModeIIBypass: (fromFlags?.test_mode_ii_bypass as boolean) ?? (status?.test_mode_ii_bypass as boolean) ?? false,
+						testModeUserSelfRegistration: (fromFlags?.test_mode_user_self_registration as boolean) ?? (status?.test_mode_user_self_registration as boolean) ?? false,
+						testModeDemoData: (fromFlags?.test_mode_demo_data as boolean) ?? (status?.test_mode_demo_data as boolean) ?? false,
+						testModeSkipTerms: (fromFlags?.test_mode_skip_terms as boolean) ?? (status?.test_mode_skip_terms as boolean) ?? false,
+						testModeSkipPassportZkproof: (fromFlags?.test_mode_skip_passport_zkproof as boolean) ?? (status?.test_mode_skip_passport_zkproof as boolean) ?? false,
 						loading: false
 					}));
 				} else {

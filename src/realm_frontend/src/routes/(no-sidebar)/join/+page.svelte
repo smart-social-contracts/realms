@@ -2,7 +2,7 @@
   import { Button, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
-  import { login, logout, initializeAuthClient, restoreAuthSession, isAuthenticated as checkIcAuth } from '$lib/auth';
+  import { login, logout, initializeAuthClient, restoreAuthSession, resetAuthSessionRestore, isAuthenticated as checkIcAuth } from '$lib/auth';
   import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
   import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor } from '$lib/canisters.js';
   import { loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
@@ -32,7 +32,8 @@
   // capital's join policy (auto = newest quarter, choice = user picks).
   let capitalId = '';
   let joinMode = 'auto';        // 'auto' | 'choice'
-  let joinTargets = [];         // joinable quarters from the capital directory
+  let joinTargets = [];         // quarters shown in the choice picker (full directory)
+  let quarterDirectory = [];    // all quarters from get_join_targets (for lookups)
   let selectedQuarter = '';     // canister id the user picks / is assigned
   let targetQuarterId = '';     // resolved join target
   let targetActor = null;       // actor for the target quarter (or capital backend)
@@ -79,20 +80,18 @@
   // Invite is required when registration is closed (not open) and user has no valid invite
   $: inviteRequired = !$realmOpenRegistration && !inviteValid && !$testModeUserSelfRegistration && !$testModeIIBypass;
 
-  $: selectedQuarterInfo = joinTargets.find((q) => q.canister_id === selectedQuarter) || null;
-  $: targetQuarterInfo = joinTargets.find((q) => q.canister_id === targetQuarterId) || null;
-  // Show the quarter banner on the profile step only when there is a real
-  // federation (>=1 joinable sub-quarter beyond the capital).
-  $: showQuarterBanner = joinTargets.length > 0 && targetQuarterId && targetQuarterId !== capitalId;
+  $: selectedQuarterInfo = quarterDirectory.find((q) => q.canister_id === selectedQuarter) || null;
+  $: targetQuarterInfo = quarterDirectory.find((q) => q.canister_id === targetQuarterId) || null;
+  // Show which quarter the user picked whenever choice mode offers a picker.
+  $: showQuarterBanner = quarterStepEnabled && !!targetQuarterId;
 
   $: welcomeImageUrl = $realmInfo.backgroundImageUrl || '/custom/background.png';
 
   // ── Linear step model for the progress indicator (issue #156) ──────────────
   // Order: Sign In → Quarter (federation only) → Terms → Profile → Welcome.
-  // The Quarter step only exists when the user actually picks one (choice mode
-  // with >1 joinable quarter); Terms is dropped in test-mode skip. The
-  // 'already_joined' off-ramp is terminal and intentionally excluded.
-  $: quarterStepEnabled = joinMode === 'choice' && joinTargets.length > 1;
+  // The Quarter step only exists in choice mode when there are multiple quarters
+  // to pick from (including the capital).
+  $: quarterStepEnabled = joinMode === 'choice' && quarterDirectory.length > 1;
   $: steps = [
     { id: 'auth', label: 'Sign In' },
     ...(quarterStepEnabled ? [{ id: 'pick_quarter', label: 'Quarter' }] : []),
@@ -153,6 +152,13 @@
   
   async function advanceStepAfterAuth() {
     await initBackendWithIdentity();
+    // The target actor may have been built before authentication completed
+    // (resolveJoinTarget runs on mount) — an anonymous actor here makes the
+    // membership probe and join_realm run as the anonymous principal 2vxsx-fae.
+    // Rebuild it now that an identity is available.
+    if (targetQuarterId) {
+      await selectQuarter(targetQuarterId);
+    }
     await loadUserProfiles();
     if (inviteCode) {
       await validateInvite();
@@ -242,7 +248,13 @@
 
     capitalId = policy?.capital_id || '';
     joinMode = policy?.mode || 'auto';
-    joinTargets = (policy?.quarters || []).filter((q) => q.joinable);
+    quarterDirectory = policy?.quarters || [];
+    // Choice mode lists every quarter (capital included); join eligibility is
+    // checked at registration time, not by hiding options.
+    joinTargets =
+      joinMode === 'choice'
+        ? [...quarterDirectory].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+        : quarterDirectory.filter((q) => q.joinable);
 
     // Invite links target the quarter encoded in the link, regardless of mode.
     if (quarterParam) {
@@ -256,7 +268,7 @@
     // touches the picker. In choice mode with >1 option we still gate on the
     // explicit picker step.
     await selectQuarter(def);
-    needsQuarterChoice = joinMode === 'choice' && joinTargets.length > 1;
+    needsQuarterChoice = joinMode === 'choice' && quarterDirectory.length > 1;
   }
 
   // Point the page at a specific quarter (or the capital) for validate + join.
@@ -488,15 +500,28 @@
             localStorage.removeItem('home_quarter');
           }
         }
+        // The profiles store still holds the pre-join answer ("no profiles" →
+        // Guest) and the memoized session restore would keep serving it to the
+        // dashboard after navigation. Refresh both now that we're a member.
+        resetAuthSessionRestore();
+        await loadUserProfiles();
         currentStep = 'success';
-      } else if (response.data && response.data.error) {
-        error = response.data.error;
       } else {
-        error = 'Unknown error occurred';
+        const joinError = response.data?.error || 'Unknown error occurred';
+        error = joinError;
+        // Let the user pick a different quarter when registration is rejected.
+        if (quarterStepEnabled) {
+          needsQuarterChoice = true;
+          currentStep = 'pick_quarter';
+        }
       }
     } catch (e) {
       console.error('Error joining realm:', e);
       error = e.message || 'Failed to join the realm';
+      if (quarterStepEnabled) {
+        needsQuarterChoice = true;
+        currentStep = 'pick_quarter';
+      }
     } finally {
       loading = false;
     }
@@ -778,7 +803,7 @@
           </div>
           
           <a
-            href="/extensions/public_dashboard"
+            href="/extensions/member_dashboard"
             class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3"
           >
             <span>Go to Dashboard</span>

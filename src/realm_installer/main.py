@@ -433,7 +433,10 @@ def _candid_opt_text(v: str) -> str:
 
 
 def _build_canister_ids_js(
-    backend_id: str, file_registry_id: str = "", derivation_origin: str = ""
+    backend_id: str,
+    file_registry_id: str = "",
+    derivation_origin: str = "",
+    portal_url: str = "",
 ) -> str:
     """Build the /canister_ids.js runtime config for a realm frontend.
 
@@ -442,6 +445,12 @@ def _build_canister_ids_js(
     realm (one human → one principal). It must be the canonical origin that lists
     this realm's frontend in its ``/.well-known/ii-alternative-origins`` (the
     registry). Empty string preserves legacy per-origin principals. See #233.
+
+    ``portal_url`` is the realm's canonical federation portal page
+    (e.g. ``https://staging.realmsgos.org/r/<slug>``). When set, the frontend
+    redirects direct-visit sign-ins to the portal, where the single II login is
+    bridged into the embedded realm (the raw icp0.io origin cannot II-login —
+    it is not in the registry's capped ii-alternative-origins list).
     """
     fields = {
         "realm_backend": backend_id,
@@ -451,6 +460,8 @@ def _build_canister_ids_js(
         fields["file_registry"] = file_registry_id
     if derivation_origin:
         fields["derivation_origin"] = derivation_origin
+    if portal_url:
+        fields["portal_url"] = portal_url
     body = ",".join(f'{k}:"{v}"' for k, v in fields.items())
     return "globalThis.__CANISTER_IDS={" + body + "};"
 
@@ -510,7 +521,9 @@ def schedule_registration(job_id_val: str):
                 infra_early = manifest.get("infra") or {}
                 fr_js = infra_early.get("file_registry_canister_id", "") or ""
                 deriv_origin = infra_early.get("ii_derivation_origin", "") or ""
-                js = _build_canister_ids_js(backend_id, fr_js, deriv_origin)
+                federation = manifest.get("federation") or {}
+                portal_url = (federation.get("portal_url") or "").strip()
+                js = _build_canister_ids_js(backend_id, fr_js, deriv_origin, portal_url)
                 installer_id = ic.id().to_str()
                 for principal in (installer_id, backend_id):
                     grant_res = yield from _grant_frontend_commit(frontend_id, principal)
@@ -640,6 +653,29 @@ def schedule_registration(job_id_val: str):
             )
             raw = unwrap_call_result(result)
             jlog(job_id_val).info(f"registered realm: {raw}")
+
+            # Claim the federation slug so the portal page in the injected
+            # portal_url resolves (portal-first login depends on it). Must run
+            # after register_realm — claim_slug requires the RealmRecord.
+            fed = manifest.get("federation") or {}
+            slug = (fed.get("slug") or "").strip()
+            if slug and backend_id and frontend_id:
+                try:
+                    claim_arg = (
+                        f'("{slug}", "{frontend_id}", "{backend_id}", "", "")'
+                    )
+                    claim_result: CallResult = yield ic.call_raw(
+                        Principal.from_str(reg_id), "claim_slug",
+                        ic.candid_encode(claim_arg), 0,
+                    )
+                    if isinstance(claim_result, dict) and "Err" in claim_result:
+                        jlog(job_id_val).warning(
+                            f"claim_slug '{slug}' failed (non-fatal): {claim_result['Err']}"
+                        )
+                    else:
+                        jlog(job_id_val).info(f"federation slug claimed: {slug}")
+                except Exception as slug_err:
+                    jlog(job_id_val).warning(f"claim_slug error (non-fatal): {slug_err}")
 
             j = DeploymentJob[job_id_val]
             if j:
@@ -878,14 +914,16 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0):
     ic.set_timer(Duration(int(delay_s)), _cb)
 
 
+_FILE_REGISTRY_IDS = {
+    "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
+    "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
+    "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
+}
+
+
 def _start_extensions_for_job(job, manifest: dict):
     realm_info = manifest.get("realm", {})
     network = (manifest.get("network") or "").strip()
-    _FILE_REGISTRY_IDS = {
-        "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
-        "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
-        "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
-    }
     registry_id = manifest.get("file_registry_canister_id", "") or _FILE_REGISTRY_IDS.get(network, "")
 
     jlog(job.name).info(f"starting extension install: network={network}, file_registry={registry_id}")
@@ -1505,8 +1543,14 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
         # so the auto-scale loop can provision quarter backend canisters without
         # admin intervention (gated on manifest_data.casals in _quarter_casals_args).
         if backend_id and backend_wasm_key:
-            registry_id = (manifest.get("registry_canister_id") or
-                           manifest.get("infra", {}).get("file_registry_canister_id") or "").strip()
+            # The casals-block registry is the *file* registry the quarter's
+            # self-bootstrap pulls codex/extension files from — never the realm
+            # registry (manifest.registry_canister_id), which only serves
+            # registrations. Resolve it like _start_extensions_for_job does.
+            network = (manifest.get("network") or "").strip()
+            registry_id = (manifest.get("file_registry_canister_id") or
+                           manifest.get("infra", {}).get("file_registry_canister_id") or
+                           _FILE_REGISTRY_IDS.get(network, "") or "").strip()
             casals_config = {
                 "stand": stand,
                 "backend_wasm_key": backend_wasm_key,

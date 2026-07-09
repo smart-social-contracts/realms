@@ -35,19 +35,67 @@ realms/
 
 Visual overview (decision tree): [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — paths **P1**–**P6** (see diagram footer).
 
-Deploys go through **Casals** (the on-chain orchestrator): publish artifacts, then
-roll them out. See "Casals — On-Chain Deploy & Upgrade" below for the full reference;
-this is the quick version.
+### Choose your path first
 
-### Decision: What Changed?
+**Default for agents:** if you changed code under a realm canister (`src/realm_frontend/`,
+`src/realm_backend/`) and need to see it live on test/demo/staging, use **`realms mundus
+deploy`** (~90s). Do **not** start with Casals for routine UI/backend iteration — the
+Casals frontend rollout copies ~109 asset files in small batches and takes several minutes
+per realm.
 
-| What changed | Flow |
+| Goal | Path | Typical time |
+|---|---|---|
+| **Realm UI or backend change** (Agora, Dominion, Syntropia) | `realms mundus deploy` with `--version build` | ~90s |
+| **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install (see below) | ~26s |
+| **Registry / installer / other infra** during dev | `scripts/infra_dev_deploy.sh` or direct `dfx deploy` | ~2–5 min |
+| **Pre-merge / make Casals authoritative** | `publish-build` → `rollout` | several min |
+
+### What changed?
+
+| What changed | Dev iteration (use this) | Authoritative (pre-merge only) |
+|---|---|---|
+| **Frontend** (`src/realm_frontend/`) | `mundus deploy --canister frontend --version build` | `publish-build` (`component=frontend`) → `rollout` (`scope=frontend`) |
+| **Backend** (`src/realm_backend/`) | `mundus deploy --canister backend --version build` | `publish-build` (`component=both`) → `rollout` (`scope=backend`) |
+| **Extension** (`extensions/`) | `deploy-files` → re-install the extension | `deploy-files` → rollout (or re-install) |
+
+### Fast realm deploy (mundus) — default
+
+Builds from your **local checkout**, uploads artifacts, and upgrades the target realm
+canister(s) via the registry installer. No git push required.
+
+```bash
+export TERM=xterm
+export DFX_WARNING=-mainnet_plaintext_identity
+
+# Frontend-only, staging Agora (~90s)
+realms mundus deploy deployment-descriptors/staging-mundus-layered.yml \
+  --realm agora --canister frontend \
+  --skip-extensions --codices none \
+  --version build
+
+# Same for test
+realms mundus deploy deployment-descriptors/test-mundus-layered.yml \
+  --realm agora --canister frontend \
+  --skip-extensions --codices none \
+  --version build
+```
+
+| Flag | Notes |
 |---|---|
-| **Frontend** (`src/realm_frontend/`) | `publish-build` (`family=realm component=frontend`) → `rollout` (`scope=frontend`) |
-| **Backend** (`src/realm_backend/`) | `publish-build` (`family=realm component=both`) → `rollout` (`scope=both`) |
-| **Extension** (`extensions/`) | `deploy-files` (publish bundle) → re-install the extension (fast path below) |
+| `--version build` | **Required for local/un-pushed changes** — compiles from the repo checkout |
+| `--version latest` | Pulls artifacts from the latest GitHub release — **will not include your local edits** |
+| `--canister frontend` / `backend` | Scope to what changed; omit both flags to redeploy both |
+| `--skip-extensions` | Skip extension/codex install when you only changed realm frontend/backend |
+| `--realm agora` | One realm instead of all three in the descriptor |
 
-### Realm deploy (publish → rollout)
+Descriptors: `deployment-descriptors/test-mundus-layered.yml`, `staging-mundus-layered.yml`,
+`demo-mundus-layered.yml` (each sets the network).
+
+### Casals rollout (pre-merge / authoritative)
+
+Use Casals when you need the environment's **authorized-WASM catalog** updated — e.g.
+before merge, or to roll the same artifact to all realms at once. See "Casals — On-Chain
+Deploy & Upgrade" below for the full reference.
 
 ```bash
 git add . && git commit -m "fix: describe change" && git push origin main
@@ -65,6 +113,15 @@ gh workflow run rollout.yml \
 
 Scope as narrowly as possible: `scope=frontend` skips the backend; `targets=dominion`
 does one realm instead of all three.
+
+**Before merge**, align Casals with what you deployed off-chain via mundus:
+
+```bash
+python3 scripts/publish_build.py --environment staging --family realm \
+  --component frontend --from-main --identity deployer
+realms rollout -e staging -t agora -s frontend -v main \
+  --identity deployer --execute --yes
+```
 
 ### Environments
 
@@ -263,15 +320,24 @@ npm run build --workspace=realm_registry_frontend
 dfx deploy realm_registry_frontend --network staging --yes
 ```
 
-**When to use which path:**
+**When to use which path** (see also [Choose your path first](#choose-your-path-first) at the top):
 
 | Situation | Path |
 |---|---|
+| Realm UI/backend change (Agora, Dominion, …) | `realms mundus deploy` with `--version build` |
 | Iterating on registry/wizard during development | `scripts/infra_dev_deploy.sh` |
-| Pre-merge / making staging authoritative | `publish_build.py` → `realms rollout` |
-| Realm sheet changes (Agora, Dominion, …) | `realms mundus deploy` (fast) or Casals |
+| Pre-merge / making Casals authoritative | `publish_build.py` → `realms rollout` |
 
-**Before merge**, align Casals with what you deployed:
+**Before merge**, align Casals with what you deployed off-chain (realm code):
+
+```bash
+python3 scripts/publish_build.py --environment staging --family realm \
+  --component frontend --from-main --identity deployer
+realms rollout -e staging -t agora -s frontend -v main \
+  --identity deployer --execute --yes
+```
+
+To sync **registry** UI after a mundus deploy (footer version, etc.):
 
 ```bash
 python3 scripts/publish_build.py --environment staging --family registry \
@@ -461,8 +527,10 @@ authorization model, cycle budget).
 
 A sheet rollout stands up the canisters (code); a Casals **arrangement** configures
 them afterwards (state). Realms-owned arrangements live in
-`casals-config/arrangements/` and are **generated** — edit `_gen_test_arrangement.py`
-and re-run it (`python3 casals-config/_gen_test_arrangement.py`), never hand-edit the
+`casals-config/arrangements/` and are **generated** — edit deployment-descriptors
+`parameters` and realm manifests, then re-run `python3 casals-config/_gen_arrangements.py`
+(never hand-edit the JSON). One arrangement per environment (`test`, `staging`, `demo`);
+`realms rollout` upserts `casals-config/arrangements/<env>.json` before applying it.
 JSON. Variants:
 
 | Arrangement | Scope | Use |
@@ -539,7 +607,8 @@ gh workflow run rollout.yml \
 The active arrangement (seeded via `casals-upgrade.yml` `-f seed_arrangement=...` from
 `casals-config/arrangements/`) is what reinstalls extensions/codices and applies runtime
 flags after the canisters come up. See "Realm config via Casals arrangements" below for
-the arrangement variants (`test`, `test-lite`, `test-lite-all`) and per-realm steps.
+the arrangement variants (`test`, `staging`, `demo`, plus `test-lite` / `test-lite-all`
+for fast test iteration) and per-realm steps.
 
 ---
 
@@ -658,15 +727,20 @@ The `install_extension_from_registry` call goes directly to the realm backend, b
 | Dominion | `ku6cv-2iaaa-aaaab-agrpa-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
 | Syntropia | `m2wv3-uaaaa-aaaah-quoiq-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
 
-**When to use `mundus deploy` instead:** if you need to redeploy the main frontend canister WASM (changes to `src/realm_frontend/`), not just a runtime extension bundle:
+**Realm frontend/backend redeploy** (changes to `src/realm_frontend/` or
+`src/realm_backend/`, not just a runtime extension bundle): use
+[`mundus deploy`](#fast-realm-deploy-mundus--default) with `--version build` (~90s).
+See the top of this doc — do not default to Casals for iteration.
 
 ```bash
-realms mundus deploy deployment-descriptors/test-mundus-layered.yml \
+realms mundus deploy deployment-descriptors/staging-mundus-layered.yml \
   --realm agora --canister frontend \
-  --extensions <ext_id> --codices none --version latest
+  --skip-extensions --codices none --version build
 ```
 
-This takes ~90s but handles frontend WASM + branding + extension install together.
+This handles frontend WASM + branding; add `--extensions <ext_id>` when you also need
+to reinstall extensions. Use `--version latest` only when deploying a tagged release
+artifact, not local edits.
 
 **Constraints:**
 - The extension bundle must stay under ~200KB for `files publish` to succeed (file_registry instruction limit). Keep heavy libraries (leaflet, h3-js) loaded at runtime via `fetch()` + `eval()` instead of bundling them.
@@ -794,11 +868,12 @@ until updated manually or re-provisioned.
 
 ## Rules
 
-- **Three deploy paths on non-production:** Casals (`publish-build.yml` + `rollout.yml`)
-  for authoritative rollouts; fast off-chain (`deploy-mundus.yml` / `realms mundus deploy`)
-  for realm sheets; and **fast infra** (`scripts/infra_dev_deploy.sh` / direct
-  `dfx deploy`) for registry/installer/etc. during development. Use
-  `deploy-files.yml` to publish extension/codex bundles into the file registry.
+- **Default deploy path for realm changes:** `realms mundus deploy` with
+  `--version build` (~90s). Casals (`publish-build.yml` + `rollout.yml`) is for
+  **pre-merge / authoritative** rollouts only — frontend rollout there is slow
+  (several minutes per realm). **Fast infra:** `scripts/infra_dev_deploy.sh` or direct
+  `dfx deploy` for registry/installer during development. **Extensions:**
+  `deploy-files.yml` to publish bundles into the file registry.
 - **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
 - Do not commit unless explicitly told to do so.
 - Always use `mode=upgrade` for production/test deploys (`reinstall` wipes state).

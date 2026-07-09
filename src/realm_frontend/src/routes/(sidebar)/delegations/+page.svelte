@@ -3,7 +3,7 @@
 	import { Button, Card, Heading, P, Spinner } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { backend } from '$lib/canisters.js';
+	import { resolveDelegationBackend } from '$lib/stores/delegation.js';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import {
 		delegationsAsDelegate,
@@ -34,7 +34,7 @@
 	async function refresh() {
 		loading = true;
 		error = '';
-		await loadDelegations(backend);
+		await loadDelegations();
 		loading = false;
 	}
 
@@ -42,7 +42,8 @@
 		error = '';
 		message = '';
 		try {
-			const raw = await backend.accept_delegation_json(
+			const actor = await resolveDelegationBackend();
+			const raw = await actor.accept_delegation_json(
 				JSON.stringify({ delegation_id: delegationId })
 			);
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -61,7 +62,8 @@
 		error = '';
 		message = '';
 		try {
-			const raw = await backend.revoke_delegation_json(
+			const actor = await resolveDelegationBackend();
+			const raw = await actor.revoke_delegation_json(
 				JSON.stringify({ delegation_id: delegationId })
 			);
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;

@@ -9,26 +9,37 @@ engine repo.
 ```
 casals-config/
   arrangements/         # post-deploy config overlays applied by Casals
-    test.json           #   full fidelity: 3 realms × identity/codex/~28 ext (93 steps)
-    test-lite.json      #   fast iteration: 1 realm (Dominion) + 5 core ext (8 steps)
+    test.json           #   test env: full fidelity (3 realms × ~28 ext, 99 steps)
+    staging.json        #   staging env: same shape, staging canister ids + flags
+    demo.json           #   demo env: same shape, demo canister ids + flags
+    test-lite.json      #   fast iteration: 1 realm (Dominion) + core ext (test only)
+    test-lite-all.json  #   all 3 test realms, core ext only
   sheets/               # orchestra topology
     realms.json         #   3 realms (Dominion/Agora/Syntropia) + Casals-deployed infra
-  _gen_test_arrangement.py   # regenerates the arrangements from the realm manifests
+  _gen_arrangements.py       # regenerates arrangements from deployment descriptors
+  _gen_test_arrangement.py   # backward-compatible wrapper for _gen_arrangements.py
 ```
 
 ## Arrangements
 
 An *arrangement* is a Casals entity: a declarative, environment-specific post-deploy
 overlay (runtime parameters + a list of `{target, method, args}` steps) that Casals
-applies after a sheet deploy/reinstall. For realms that means: set runtime test flags,
-set each realm's identity (name/manifesto/welcome), and install its codex + extensions
-from the file registry. Canisters self-reconcile (download/install); Casals just drives
+applies after a sheet deploy/reinstall. For realms that means: set runtime test flags
+(from `deployment-descriptors/<env>-mundus-layered.yml` `parameters`), set each
+realm's identity (name/manifesto/welcome), and install its codex + extensions from
+the file registry. Canisters self-reconcile (download/install); Casals just drives
 the steps.
 
-Regenerate after editing the source data:
+Each IC environment (test, staging, demo) has its **own** Casals instance and its
+**own** active arrangement (`test.json`, `staging.json`, `demo.json`). Test flags
+differ per descriptor — e.g. staging enables magic invite codes
+(`user_self_registration`) but keeps real Internet Identity; test also enables II
+bypass and skip-terms.
+
+Regenerate after editing descriptors or manifests:
 
 ```bash
-python3 casals-config/_gen_test_arrangement.py
+python3 casals-config/_gen_arrangements.py
 ```
 
 ## Seeding into a Casals environment
@@ -36,14 +47,18 @@ python3 casals-config/_gen_test_arrangement.py
 Point the (submoduled) engine's seeder at this config directory:
 
 ```bash
+# Staging example — use the arrangement name matching the environment
 casals/scripts/seed.py -e ic --identity <id> \
   --config-dir casals-config \
-  --arrangement test-lite --arrangement-only
+  --arrangement staging --arrangement-only
 ```
 
 `--config-dir` makes `seed.py` read its `arrangements/` (and, if present, `templates.json`,
 `templates/`, `assets/`) from here instead of the engine's in-repo `seed/`. The
 `casals-upgrade.yml` workflow does this automatically when given `seed_arrangement`.
+
+`realms rollout` also upserts `casals-config/arrangements/<env>.json` and applies it
+after each rollout, so CI keeps staging/demo/test flags in sync with the descriptors.
 
 ## Sheets (topology)
 

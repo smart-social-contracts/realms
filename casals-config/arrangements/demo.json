@@ -1,44 +1,42 @@
 {
-  "$comment": "Full-fidelity test-environment arrangement for the realms mundus. Generated from deployment-descriptors/test-mundus-layered.yml (canister ids + parameters.test_flags) and examples/demo manifests. Per realm: set_canister_config_json \u2192 update_realm_config \u2192 register_realm_from_registry \u2192 install_branding_from_registry \u2192 install_codex_from_registry \u2192 install_extension_from_registry (each ext). Apply in batches via Casals apply_arrangement. Regenerate: python3 casals-config/_gen_arrangements.py.",
-  "name": "test",
-  "description": "Realms test environment: runtime flags (demo_data=True, ii_bypass=True, skip_authentication=True, skip_passport_zkproof=True, skip_terms=True, test_mode=True, user_self_registration=True) + identity + codex + full extensions.",
+  "$comment": "Full-fidelity demo-environment arrangement for the realms mundus. Generated from deployment-descriptors/demo-mundus-layered.yml (canister ids + parameters.test_flags) and examples/demo manifests. Per realm: set_canister_config_json \u2192 update_realm_config \u2192 register_realm_from_registry \u2192 install_branding_from_registry \u2192 install_codex_from_registry \u2192 install_extension_from_registry (each ext). Apply in batches via Casals apply_arrangement. Regenerate: python3 casals-config/_gen_arrangements.py.",
+  "name": "demo",
+  "description": "Realms demo environment: runtime flags (demo_data=True, ii_bypass=False, skip_passport_zkproof=False, skip_terms=False, test_mode=True, user_self_registration=True) + identity + codex + full extensions.",
   "active": true,
   "parameters": {
-    "network": "test",
-    "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-    "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
+    "network": "demo",
+    "file_registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
+    "marketplace_canister_id": "ehyfg-wyaaa-aaaae-qg3qq-cai",
     "test_flags": {
       "test_mode": true,
-      "skip_authentication": true,
-      "ii_bypass": true,
+      "ii_bypass": false,
       "user_self_registration": true,
       "demo_data": true,
-      "skip_terms": true,
-      "skip_passport_zkproof": true
+      "skip_terms": false,
+      "skip_passport_zkproof": false
     }
   },
   "steps": [
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "set_canister_config_json",
       "args": {
-        "network": "test",
-        "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai",
-        "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
+        "network": "demo",
+        "file_registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
+        "frontend_canister_id": "gzya5-jyaaa-aaaac-qai5a-cai",
+        "marketplace_canister_id": "ehyfg-wyaaa-aaaae-qg3qq-cai",
         "test_flags": {
           "test_mode": true,
-          "skip_authentication": true,
-          "ii_bypass": true,
+          "ii_bypass": false,
           "user_self_registration": true,
           "demo_data": true,
-          "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_terms": false,
+          "skip_passport_zkproof": false
         }
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "update_realm_config",
       "args": {
         "name": "Dominion",
@@ -47,24 +45,24 @@
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "register_realm_from_registry",
       "args": {
-        "registry_canister_id": "yhw3g-fyaaa-aaaas-qgorq-cai",
+        "registry_canister_id": "rhw4p-gqaaa-aaaac-qbw7q-cai",
         "realm_name": "Dominion",
-        "frontend_url": "https://2enu3-byaaa-aaaad-qlxfa-cai.icp0.io",
+        "frontend_url": "https://gzya5-jyaaa-aaaac-qai5a-cai.icp0.io",
         "canister_ids": {
-          "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai"
+          "frontend_canister_id": "gzya5-jyaaa-aaaac-qai5a-cai"
         }
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_branding_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "namespace": "branding",
-        "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai",
+        "frontend_canister_id": "gzya5-jyaaa-aaaac-qai5a-cai",
         "files": {
           "/custom/logo.png": "dominion/logo.png",
           "/custom/background.png": "dominion/background.png"
@@ -72,288 +70,287 @@
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_codex_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "codex_id": "dominion",
         "version": null,
         "run_init": true
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "public_dashboard",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "member_dashboard",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "admin_dashboard",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "census",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "realm_settings",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "extensions_manager",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "welcome",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "voting",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "vault",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "codex_viewer",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "passport_verification",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "notifications",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "metrics",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "package_manager",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "system_info",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "task_monitor",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "justice_litigation",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "land_registry",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "market_place",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "erd_explorer",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "zone_selector",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "llm_chat",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "hello_world",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "test_bench",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "demo_simulator",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "managed_services",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "mundus_explorer",
         "version": null
       }
     },
     {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "department_docs",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "set_canister_config_json",
       "args": {
-        "network": "test",
-        "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "frontend_canister_id": "pqwsi-vyaaa-aaaau-agrbq-cai",
-        "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
+        "network": "demo",
+        "file_registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
+        "frontend_canister_id": "3gpbx-xaaaa-aaaac-qcylq-cai",
+        "marketplace_canister_id": "ehyfg-wyaaa-aaaae-qg3qq-cai",
         "test_flags": {
           "test_mode": true,
-          "skip_authentication": true,
-          "ii_bypass": true,
+          "ii_bypass": false,
           "user_self_registration": true,
           "demo_data": true,
-          "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_terms": false,
+          "skip_passport_zkproof": false
         }
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "update_realm_config",
       "args": {
         "name": "Agora",
@@ -362,24 +359,24 @@
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "register_realm_from_registry",
       "args": {
-        "registry_canister_id": "yhw3g-fyaaa-aaaas-qgorq-cai",
+        "registry_canister_id": "rhw4p-gqaaa-aaaac-qbw7q-cai",
         "realm_name": "Agora",
-        "frontend_url": "https://pqwsi-vyaaa-aaaau-agrbq-cai.icp0.io",
+        "frontend_url": "https://3gpbx-xaaaa-aaaac-qcylq-cai.icp0.io",
         "canister_ids": {
-          "frontend_canister_id": "pqwsi-vyaaa-aaaau-agrbq-cai"
+          "frontend_canister_id": "3gpbx-xaaaa-aaaac-qcylq-cai"
         }
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_branding_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "namespace": "branding",
-        "frontend_canister_id": "pqwsi-vyaaa-aaaau-agrbq-cai",
+        "frontend_canister_id": "3gpbx-xaaaa-aaaac-qcylq-cai",
         "files": {
           "/custom/logo.png": "agora/logo.png",
           "/custom/background.png": "agora/background.png"
@@ -387,297 +384,296 @@
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_codex_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "codex_id": "agora",
         "version": null,
         "run_init": true
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "public_dashboard",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "member_dashboard",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "admin_dashboard",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "census",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "realm_settings",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "extensions_manager",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "welcome",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "voting",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "vault",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "codex_viewer",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "passport_verification",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "notifications",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "metrics",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "package_manager",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "system_info",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "task_monitor",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "justice_litigation",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "land_registry",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "market_place",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "erd_explorer",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "zone_selector",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "llm_chat",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "hello_world",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "test_bench",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "demo_simulator",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "managed_services",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "role_manager",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "access_manager",
         "version": null
       }
     },
     {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "mundus_explorer",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "set_canister_config_json",
       "args": {
-        "network": "test",
-        "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "frontend_canister_id": "2dmsp-maaaa-aaaad-qlxfq-cai",
-        "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
+        "network": "demo",
+        "file_registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
+        "frontend_canister_id": "2madn-vqaaa-aaaac-qcymq-cai",
+        "marketplace_canister_id": "ehyfg-wyaaa-aaaae-qg3qq-cai",
         "test_flags": {
           "test_mode": true,
-          "skip_authentication": true,
-          "ii_bypass": true,
+          "ii_bypass": false,
           "user_self_registration": true,
           "demo_data": true,
-          "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_terms": false,
+          "skip_passport_zkproof": false
         }
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "update_realm_config",
       "args": {
         "name": "Syntropia",
@@ -686,24 +682,24 @@
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "register_realm_from_registry",
       "args": {
-        "registry_canister_id": "yhw3g-fyaaa-aaaas-qgorq-cai",
+        "registry_canister_id": "rhw4p-gqaaa-aaaac-qbw7q-cai",
         "realm_name": "Syntropia",
-        "frontend_url": "https://2dmsp-maaaa-aaaad-qlxfq-cai.icp0.io",
+        "frontend_url": "https://2madn-vqaaa-aaaac-qcymq-cai.icp0.io",
         "canister_ids": {
-          "frontend_canister_id": "2dmsp-maaaa-aaaad-qlxfq-cai"
+          "frontend_canister_id": "2madn-vqaaa-aaaac-qcymq-cai"
         }
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_branding_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "namespace": "branding",
-        "frontend_canister_id": "2dmsp-maaaa-aaaad-qlxfq-cai",
+        "frontend_canister_id": "2madn-vqaaa-aaaac-qcymq-cai",
         "files": {
           "/custom/logo.png": "syntropia/logo.png",
           "/custom/background.png": "syntropia/background.png"
@@ -711,254 +707,254 @@
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_codex_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "codex_id": "syntropia",
         "version": null,
         "run_init": true
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "public_dashboard",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "member_dashboard",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "admin_dashboard",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "census",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "realm_settings",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "extensions_manager",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "welcome",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "voting",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "vault",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "codex_viewer",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "passport_verification",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "notifications",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "metrics",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "package_manager",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "system_info",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "task_monitor",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "justice_litigation",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "land_registry",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "market_place",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "erd_explorer",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "zone_selector",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "llm_chat",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "hello_world",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "test_bench",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "demo_simulator",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "managed_services",
         "version": null
       }
     },
     {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "install_extension_from_registry",
       "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "mundus_explorer",
         "version": null
       }

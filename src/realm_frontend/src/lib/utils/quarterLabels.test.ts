@@ -17,6 +17,7 @@ describe('formatQuarterLabel', () => {
 
 	it('falls back safely', () => {
 		expect(formatQuarterLabel(null)).toBe('Quarter');
-		expect(formatQuarterLabel({ index: 0 })).toBe('Quarter 0');
+		// candid status() drops is_capital — index 0 alone must still read as capital
+		expect(formatQuarterLabel({ index: 0 })).toBe('Quarter 0 (Capital)');
 	});
 });

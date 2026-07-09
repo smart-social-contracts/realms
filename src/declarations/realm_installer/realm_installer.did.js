@@ -31,10 +31,12 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Nat,
   });
   const CasalsConfigView = IDL.Record({
+    'create_stand_baton' : IDL.Bool,
     'provision_via_casals' : IDL.Bool,
     'casals_section' : IDL.Text,
     'registry_principal' : IDL.Text,
     'casals_canister_id' : IDL.Text,
+    'baton_wasm_key' : IDL.Text,
   });
   const ResultCasalsConfig = IDL.Variant({
     'Ok' : CasalsConfigView,

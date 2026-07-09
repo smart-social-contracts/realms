@@ -294,7 +294,11 @@ def derive_capital_install_set(default_registry=""):
         logger.error(f"derive_capital_install_set: codices read failed — {e}")
 
     return {
-        "registry_canister_id": registry or inferred_registry,
+        # Trust the registry the extensions actually came from (recorded at
+        # install time) over the configured default: the casals-block value is
+        # operator-supplied and has been observed to carry the *realm* registry
+        # id, which cannot serve extension pulls.
+        "registry_canister_id": inferred_registry or registry,
         "codices": codices,
         "extensions": extensions,
     }
@@ -355,6 +359,13 @@ def _install_item(state, item):
     return parsed
 
 
+# Reentrancy guard: an install can outlast the tick interval (chunked registry
+# pulls), and a plan re-seed can leave two live schedules for a moment. Two
+# concurrent ticks corrupt the plan — each installs items[cursor] but marks the
+# *reloaded* cursor item done, silently skipping every other item.
+_bootstrap_tick_in_flight = False
+
+
 def advance_bootstrap():
     """Install the next pending plan item, one per call (generator).
 
@@ -362,10 +373,15 @@ def advance_bootstrap():
     dict describing this tick. When the plan is exhausted it disables the
     recurring schedule so the task stops firing.
     """
+    global _bootstrap_tick_in_flight
+
     try:
         from ggg import Realm
     except ImportError:
         from realm_backend.ggg import Realm  # test/module layout
+
+    if _bootstrap_tick_in_flight:
+        return {"success": True, "status": "busy", "message": "previous tick still installing"}
 
     realm = Realm.load("1")
     if not realm:
@@ -392,17 +408,34 @@ def advance_bootstrap():
     item = items[cursor]
     ok = False
     result = None
+    _bootstrap_tick_in_flight = True
     try:
-        result = yield from _install_item(state, item)
-        ok = not (isinstance(result, dict) and result.get("success") is False)
-    except Exception as e:
-        logger.error(f"advance_bootstrap install of {item.get('id')} failed: {e}")
-        result = {"success": False, "error": str(e)}
-        ok = False
+        try:
+            result = yield from _install_item(state, item)
+            ok = not (isinstance(result, dict) and result.get("success") is False)
+        except Exception as e:
+            logger.error(f"advance_bootstrap install of {item.get('id')} failed: {e}")
+            result = {"success": False, "error": str(e)}
+            ok = False
+    finally:
+        _bootstrap_tick_in_flight = False
 
-    # Reload across the async boundary, then record progress.
+    # Reload across the async boundary, then record progress — but only if the
+    # plan still points at the item we actually installed (a concurrent driver
+    # or re-seed may have moved the cursor; stepping then would mark a
+    # never-installed item as done).
     realm = Realm.load("1")
     state = load_state(realm) or state
+    fresh_items = state.get("items") or []
+    fresh_cursor = int(state.get("cursor") or 0)
+    fresh_item = fresh_items[fresh_cursor] if fresh_cursor < len(fresh_items) else None
+    if fresh_item is None or fresh_item.get("id") != item.get("id"):
+        logger.warning(
+            f"advance_bootstrap: plan moved under us (installed {item.get('id')!r}, "
+            f"cursor now at {fresh_item.get('id') if fresh_item else 'end'!r}); not stepping"
+        )
+        return {"success": ok, "status": state.get("status"),
+                "cursor": fresh_cursor, "item": item.get("id"), "result": result}
     error = None if ok else (result.get("error") if isinstance(result, dict) else str(result))
     step_plan(state, ok, error=error)
     save_state(realm, state)
@@ -539,12 +572,31 @@ def run_population_sync_tick():
             except Exception as e:
                 errors.append({"peer": cid, "error": str(e)})
 
+        # Re-evaluate auto-scale with the freshly synced federation-wide
+        # populations. Joins land on the fullest *joinable* quarter, so the
+        # capital's own registration path never sees the threshold crossing —
+        # without this, ``should_scale`` stays true forever and no Quarter N+1
+        # is minted (issue #156).
+        scale_requested = False
+        try:
+            from core.autoscale import maybe_request_quarter_scale
+
+            scale_requested = bool(maybe_request_quarter_scale())
+            if scale_requested:
+                logger.info(
+                    "Quarter auto-scale requested after population sync "
+                    f"(synced={synced}/{len(peers)})"
+                )
+        except Exception as e:
+            logger.error(f"Auto-scale evaluation after population sync failed: {e}")
+
         return json.dumps({
             "success": True,
             "status": "synced",
             "peers": len(peers),
             "synced": synced,
             "errors": errors,
+            "scale_requested": scale_requested,
         })
     except Exception as e:
         import traceback as _tb

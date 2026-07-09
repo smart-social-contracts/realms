@@ -1,10 +1,18 @@
 import { building } from '$app/environment';
 
+/** No-op actor for prerender/build — methods resolve to null instead of throwing. */
 function dummyActor() {
-    return new Proxy({}, { get() { throw new Error("Canister invoked while building"); } });
+    return new Proxy(
+        {},
+        {
+            get: () => async () => null
+        }
+    );
 }
 
-const buildingOrTesting = building || process.env.NODE_ENV === "test";
+function isBuildingOrTesting() {
+    return building || process.env.NODE_ENV === 'test';
+}
 
 // Detect if we're running in local development
 function isLocalDevelopment() {
@@ -17,7 +25,7 @@ function isLocalDevelopment() {
 
 // Create backend actor with proper root key fetching for local development
 async function createBackendActor() {
-    if (buildingOrTesting) {
+    if (isBuildingOrTesting()) {
         return dummyActor();
     }
 
@@ -44,14 +52,18 @@ async function createBackendActor() {
     return createActor(canisterId, { agent });
 }
 
-// Initialize backend with a promise
-let backendPromise = createBackendActor();
+/** Lazy so merely importing this module during prerender does not start actor setup. */
+let backendPromise = null;
+function getBackendPromise() {
+    if (!backendPromise) backendPromise = createBackendActor();
+    return backendPromise;
+}
 
 // Export a proxy that waits for the backend to be ready
 export const backend = new Proxy({}, {
     get: function (target, prop) {
         return async function (...args) {
-            const actor = await backendPromise;
+            const actor = await getBackendPromise();
             return actor[prop](...args);
         };
     }
@@ -62,7 +74,7 @@ export const backend = new Proxy({}, {
  * request_deployment and other caller-scoped updates).
  */
 export async function getAuthenticatedRegistryActor() {
-    if (buildingOrTesting) {
+    if (isBuildingOrTesting()) {
         return dummyActor();
     }
     const { getIdentity } = await import('$lib/auth.js');

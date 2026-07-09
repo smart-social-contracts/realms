@@ -18,6 +18,7 @@
 		.map((x) => +x)
 		.reduce((p, c) => (p < status ? c : p)) as ErrorCode;
 	const component = pages[index];
+	const errMessage = $page.error?.message;
 
 	import MetaTag from './utils/MetaTag.svelte';
 
@@ -29,4 +30,13 @@
 
 <MetaTag {path} {description} {title} {subtitle} />
 
-<svelte:component this={component} />
+{#if index === 500}
+	<ServerError
+		description={errMessage ||
+			"It's always time for a coffee break. We should be back by the time you finish your coffee."}
+		btnTitle={errMessage ? 'Refresh page' : 'Go back home'}
+		reloadOnClick={!!errMessage}
+	/>
+{:else}
+	<svelte:component this={component} />
+{/if}

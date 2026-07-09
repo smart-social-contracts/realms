@@ -1,5 +1,7 @@
 import { writable, get } from 'svelte/store';
 import { browser } from '$app/environment';
+import { backend, quarterBackend, setActiveQuarter } from '$lib/canisters.js';
+import { activeQuarterId } from '$lib/stores/quarters';
 
 const STORAGE_KEY = 'realm_acting_on_behalf_of';
 
@@ -51,7 +53,18 @@ export function withDelegationJson(args = {}) {
 	return JSON.stringify(withDelegationArgs(args));
 }
 
-export async function loadDelegations(backend) {
+/** PoA lives on the member's assigned quarter backend when one is active. */
+export async function resolveDelegationBackend() {
+	const quarterId = get(activeQuarterId);
+	if (quarterId) {
+		await setActiveQuarter(quarterId);
+		return quarterBackend;
+	}
+	return backend;
+}
+
+export async function loadDelegations(backendActor) {
+	const backend = backendActor || (await resolveDelegationBackend());
 	if (!backend?.list_delegations_json) return;
 	try {
 		const raw = await backend.list_delegations_json();

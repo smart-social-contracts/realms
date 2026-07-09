@@ -63,15 +63,19 @@ class TestThresholds:
 
 
 # ---------------------------------------------------------------------------
-# should_scale_default — fullest quarter vs threshold
+# should_scale_default — every joinable quarter at/above threshold
 # ---------------------------------------------------------------------------
 
 class TestShouldScaleDefault:
     def test_below_threshold(self):
-        assert should_scale_default([5, 8, 3], "test") is False  # max 8 < 9
+        assert should_scale_default([5, 8, 3], "test") is False  # min 3 < 9
 
-    def test_at_threshold(self):
-        assert should_scale_default([2, 9], "test") is True       # 9 >= 9
+    def test_headroom_on_newer_quarter(self):
+        # One quarter full, one with room → do NOT mint another.
+        assert should_scale_default([2, 9], "test") is False
+
+    def test_all_at_threshold(self):
+        assert should_scale_default([9, 9], "test") is True
 
     def test_above_threshold(self):
         assert should_scale_default([12], "test") is True
@@ -93,7 +97,9 @@ class TestShouldScaleDefault:
         assert should_scale_default([90], "ic", n_override=100) is True
 
     def test_handles_none_populations(self):
-        assert should_scale_default([None, 9, None], "test") is True
+        # None → 0; min is 0 → below threshold.
+        assert should_scale_default([None, 9, None], "test") is False
+        assert should_scale_default([9, 9], "test") is True
 
 
 # ---------------------------------------------------------------------------

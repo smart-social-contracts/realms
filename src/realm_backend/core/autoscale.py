@@ -10,8 +10,10 @@ Design (see issue #156):
 * The federation codex may define ``should_deploy_quarter(populations, network,
   realm)`` to fully override the policy. When it does not, the built-in default
   applies.
-* **Default rule:** scale when the *fullest* quarter reaches **90% of N**, so
-  the user who triggers scaling still has room to land on an existing quarter.
+* **Default rule:** scale when *every joinable* quarter has reached **90% of N**
+  (i.e. there is no joinable quarter left with headroom). Using only the
+  fullest quarter would keep minting forever after the first scale, because
+  the old full quarter stays above the threshold.
 * **N** = 2000 in production; **10** for the ``test`` / ``staging`` / ``demo``
   environments (so CI exercises sharding without 2000 joins).
 * The actual deploy is **non-blocking**: the trigger only sets an idempotent
@@ -51,10 +53,16 @@ def scale_at(n):
 
 
 def should_scale_default(populations, network, n_override=None):
-    """Built-in policy: True when the fullest quarter has reached the threshold.
+    """Built-in policy: True when every joinable quarter is at/above the threshold.
+
+    We mint a new quarter only when there is *no* joinable quarter with
+    headroom left. Using ``max(pops) >= threshold`` alone would keep minting
+    forever after the first scale: the old full quarter stays above the
+    threshold even though the freshly minted one has room for new joins.
 
     Args:
-        populations: iterable of per-quarter populations (ints), incl. capital.
+        populations: iterable of per-quarter populations (ints) for *joinable*
+            quarters only (capital is excluded when ``joinable=false``).
         network: realm network string ("test"/"staging"/"demo"/"ic"/...).
         n_override: explicit N (e.g. from codex config); falls back to env default.
 
@@ -67,7 +75,8 @@ def should_scale_default(populations, network, n_override=None):
     threshold = scale_at(n)
     if threshold <= 0:
         return False
-    return max(pops) >= threshold
+    # All joinable quarters are full enough → need another one.
+    return min(pops) >= threshold
 
 
 def resolve_should_scale(populations, network, codex_fn=None, n_override=None,
@@ -118,20 +127,41 @@ def _codex_should_deploy_fn(realm):
 
 
 def quarter_populations(realm):
-    """Populations of every active quarter in the federation, incl. the capital.
+    """Populations of every *joinable* active quarter (for the scale decision).
 
-    The capital (this canister) counts its local ``User`` records; registered
-    peer quarters contribute their last-synced ``population``.
+    The capital is included only while it still accepts joins (no peer quarters
+    yet, or ``is_quarter`` is unset). Once peer quarters exist the capital is
+    typically ``joinable=false``, and counting its historical members would
+    either force perpetual scaling (``max`` policy) or suppress needed scales
+    (``min`` policy). Peer quarters contribute their last-synced ``population``.
     """
     pops = []
     try:
-        pops.append(int(_ggg().User.count()))
+        from _cdk import ic
+
+        self_id = ic.id().to_str()
     except Exception:
-        pass
+        self_id = ""
+
+    peers = []
     try:
         for q in getattr(realm, "quarter_ids", []) or []:
-            if getattr(q, "status", "active") == "active":
-                pops.append(int(getattr(q, "population", 0) or 0))
+            if getattr(q, "status", "active") != "active":
+                continue
+            cid = (getattr(q, "canister_id", "") or "").strip()
+            if not cid or cid == self_id:
+                continue
+            peers.append(int(getattr(q, "population", 0) or 0))
+    except Exception:
+        pass
+
+    if peers:
+        # Capital no longer takes joins — only peer (joinable) populations matter.
+        return peers
+
+    # Lone capital (or quarter evaluating locally): use local User count.
+    try:
+        pops.append(int(_ggg().User.count()))
     except Exception:
         pass
     return pops
@@ -140,10 +170,17 @@ def quarter_populations(realm):
 def maybe_request_quarter_scale():
     """Evaluate the scaling policy and set an idempotent "scale in flight" flag.
 
-    Called after every successful user registration. Non-blocking: it never
+    Called after every successful user registration **and** after the capital's
+    population-sync tick refreshes peer counts. Non-blocking: it never
     performs the Casals provisioning itself (that needs an async endpoint);
     it only records intent so a separate task can act on it. Safe to call
     repeatedly — once the flag is set it is a no-op until cleared.
+
+    Quarters never set the flag: only the capital has the Casals stand /
+    ``manifest_data.casals`` needed to mint a sibling. A quarter that set
+    ``scale_in_flight`` locally would stick forever (``process_quarter_scaling``
+    returns ``blocked`` and the autoscale task self-disables). The capital
+    re-evaluates with the federation-wide populations after each sync.
 
     Returns True iff this call newly requested a scale.
     """
@@ -156,6 +193,13 @@ def maybe_request_quarter_scale():
     if not realm:
         return False
     if not bool(getattr(realm, "auto_scale_enabled", True)):
+        return False
+    # Only the capital provisions. Quarters that previously set this flag
+    # (pre-fix) also clear it here so a stuck quarter recovers on the next
+    # registration / tick without an operator poke.
+    if bool(getattr(realm, "is_quarter", False)):
+        if bool(getattr(realm, "scale_in_flight", False)):
+            realm.scale_in_flight = False
         return False
     if bool(getattr(realm, "scale_in_flight", False)):
         return False  # idempotent: a deploy is already queued/running

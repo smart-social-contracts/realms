@@ -259,10 +259,15 @@ def get_status() -> "dict[str, Any]":
                 )
                 for q in quarter_entities:
                     qcid = q.canister_id or ""
-                    q_pop = sum(
+                    # Users who joined the quarter directly live in the quarter's
+                    # own table, not the capital's — the local home_quarter scan
+                    # misses them. The population-sync task writes the quarter's
+                    # true count into q.population; trust whichever is larger.
+                    local_scan = sum(
                         1 for u in all_users
                         if (getattr(u, "home_quarter", "") or "") == qcid
                     )
+                    q_pop = max(local_scan, int(q.population or 0))
                     quarters.append(
                         {
                             "name": q.name or "",

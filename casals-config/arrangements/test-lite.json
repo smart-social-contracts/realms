@@ -1,8 +1,8 @@
 {
-  "$comment": "Fast-iteration variant of `test`: just Dominion and a handful of core extensions (public_dashboard, member_dashboard, welcome, demo_simulator, hello_world, llm_chat), ~11 steps, to exercise the reinstall\u2192arrangement-apply chain end-to-end without ~93 mainnet calls. Same per-realm step shape as `test`. Marked active: seeding it makes it the env's active arrangement (exclusive, so it deactivates `test`); re-seed/activate `test` to restore full fidelity. Regenerate via casals-config/_gen_test_arrangement.py.",
+  "$comment": "Fast-iteration variant of `test`: one realm (Dominion) and core extensions only. Regenerate: python3 casals-config/_gen_arrangements.py.",
   "name": "test-lite",
-  "description": "Lightweight realms test arrangement: 1 realm (Dominion) + core extensions (public_dashboard, member_dashboard, welcome, demo_simulator, hello_world, llm_chat) for fast iteration.",
-  "active": true,
+  "description": "Lightweight test arrangement: Dominion + core extensions for fast iteration.",
+  "active": false,
   "parameters": {
     "network": "test",
     "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
@@ -104,6 +104,78 @@
       "method": "install_extension_from_registry",
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "realm_settings",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "extensions_manager",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "voting",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "census",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "admin_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "vault",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "codex_viewer",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "llm_chat",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "welcome",
         "version": null
       }
@@ -123,15 +195,6 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "hello_world",
-        "version": null
-      }
-    },
-    {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "ext_id": "llm_chat",
         "version": null
       }
     }

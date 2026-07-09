@@ -1,11 +1,12 @@
 <!--
   Registry-level AI assistant (issue #233).
 
-  This is the USER-SCOPED assistant surface that lives on the registry (the
-  canonical II origin). Because it runs outside any realm it talks to Geister in
-  GENERAL mode: it sends no `context_realm`, so the backend skips realm status /
-  codex / proposal enrichment and realm-scoped tools, and answers cross-realm
-  questions ("which realm should I join?", platform help, etc.).
+  Lives on the registry (the canonical II origin). On the registry home it talks
+  to Geister in GENERAL mode (no `context_realm`) for cross-realm / platform
+  help. When the user is browsing a portal realm page (`/r/<slug>/...`) it is
+  realm-scoped: it resolves the realm's backend canister id and sends
+  `context_realm` plus `page_context` (and optional document focus from the
+  embedded iframe) so Geister can enrich answers with realm status / tools.
 
   It deliberately does NOT consult any realm's `ai_assistant_enabled` flag — a
   realm cannot disable the user's global assistant. When the user is signed in
@@ -17,9 +18,11 @@
   Svelte 5 `LlmChat.svelte` extension component).
 -->
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import { page } from '$app/stores';
   import { CONFIG } from '$lib/config.js';
+  import { portalDocumentFocus } from '$lib/portal-focus.js';
 
   const PRODUCTION_API_HOST = 'https://geister-api.realmsgos.dev/';
   const API_URL = `${PRODUCTION_API_HOST}api/ask`;
@@ -44,7 +47,105 @@
     return { destroy() { messagesContainer = undefined; } };
   }
 
+  /** @type {string | null} */
+  let portalSlug = null;
+  /** @type {string} */
+  let inRealmPath = '/';
+  /** @type {string | null} */
+  let contextRealmId = null;
+  /** @type {string | null} */
+  let frontendCanisterId = null;
+  /** @type {{ source?: string, uri?: string, label?: string } | null} */
+  let documentFocus = null;
+  /** @type {(() => void) | undefined} */
+  let unsubFocus;
+  /** @type {(() => void) | undefined} */
+  let unsubPage;
+
+  // Cache backend canister ids by slug for the session.
+  /** @type {Record<string, { backend: string, frontend: string }>} */
+  const realmCache = Object.create(null);
+
+  async function ensureRealmContext(slug) {
+    const key = (slug || '').trim().toLowerCase();
+    if (!key) {
+      contextRealmId = null;
+      frontendCanisterId = null;
+      return;
+    }
+    const cached = realmCache[key];
+    if (cached) {
+      contextRealmId = cached.backend;
+      frontendCanisterId = cached.frontend;
+      return;
+    }
+    try {
+      // Dynamic import keeps canister client out of the layout SSR graph.
+      const { resolveSlug } = await import('$lib/slug-resolver.js');
+      const data = await resolveSlug(key);
+      const backend = data.backend_canister_id || null;
+      const frontend = data.frontend_canister_id || null;
+      if (backend) realmCache[key] = { backend, frontend: frontend || '' };
+      // Only apply if still on the same slug (race with navigation).
+      if (portalSlug === slug) {
+        contextRealmId = backend;
+        frontendCanisterId = frontend;
+      }
+    } catch (e) {
+      console.warn('[RegistryAssistant] resolveSlug failed:', e);
+      if (portalSlug === slug) {
+        contextRealmId = null;
+        frontendCanisterId = null;
+      }
+    }
+  }
+
+  function syncPortalRoute(pathname) {
+    const match = (pathname || '').match(/^\/r\/([^/]+)(\/.*)?$/);
+    const nextSlug = match ? match[1] : null;
+    inRealmPath = match ? (match[2] || '/') : '/';
+    if (nextSlug === portalSlug) return;
+    portalSlug = nextSlug;
+    if (nextSlug) {
+      void ensureRealmContext(nextSlug);
+    } else {
+      contextRealmId = null;
+      frontendCanisterId = null;
+    }
+  }
+
+  function extensionIdFromPath(path) {
+    const m = (path || '').match(/^\/extensions\/([^/]+)/);
+    return m ? m[1] : null;
+  }
+
+  function buildPageContext() {
+    if (!portalSlug) return null;
+    const extensionId = extensionIdFromPath(inRealmPath);
+    const title = extensionId
+      ? `${portalSlug} · ${extensionId}`
+      : `Realm ${portalSlug}`;
+    const parts = [`slug=${portalSlug}`];
+    if (frontendCanisterId) parts.push(`frontend=${frontendCanisterId}`);
+    if (documentFocus?.label) parts.push(`focus=${documentFocus.label}`);
+    else if (documentFocus?.uri) parts.push(`focus=${documentFocus.uri}`);
+    /** @type {Record<string, string>} */
+    const ctx = {
+      pathname: inRealmPath,
+      title,
+      description: parts.join('; '),
+    };
+    if (extensionId) ctx.extensionId = extensionId;
+    return ctx;
+  }
+
   onMount(async () => {
+    unsubPage = page.subscribe(($p) => {
+      syncPortalRoute($p.url.pathname || '');
+    });
+    unsubFocus = portalDocumentFocus.subscribe((focus) => {
+      documentFocus = focus;
+    });
     try {
       const { isAuthenticated, getPrincipal } = await import('$lib/auth.js');
       if (await isAuthenticated()) {
@@ -54,6 +155,11 @@
     } catch (e) {
       // Anonymous use is allowed (no persistence); ignore auth errors.
     }
+  });
+
+  onDestroy(() => {
+    unsubPage?.();
+    unsubFocus?.();
   });
 
   async function scrollToBottom() {
@@ -100,7 +206,7 @@
     void scrollToBottom();
 
     try {
-      // GENERAL MODE: no context_realm — cross-realm / platform-level help.
+      // GENERAL on registry home; realm-scoped when browsing /r/<slug>/...
       const payload = {
         question,
         user_principal: userPrincipal,
@@ -109,6 +215,20 @@
         persona: 'ashoka',
         network: GEISTER_NETWORK,
       };
+
+      if (contextRealmId) {
+        payload.context_realm = contextRealmId;
+        const pageContext = buildPageContext();
+        if (pageContext) payload.page_context = pageContext;
+      }
+
+      if (documentFocus?.uri) {
+        payload.focus = {
+          uri: documentFocus.uri,
+          label: documentFocus.label,
+          source: documentFocus.source,
+        };
+      }
 
       const response = await fetch(API_URL, {
         method: 'POST',

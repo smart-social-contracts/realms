@@ -48,3 +48,40 @@ def is_demo_data_active() -> bool:
 def skip_passport_zkproof() -> bool:
     """True when passport ZK-proof verification should be bypassed (test mode)."""
     return get_realm_flag("test_mode_skip_passport_zkproof", False)
+
+
+def get_runtime_flags_payload() -> dict:
+    """Lightweight runtime flags + identity for the frontend join flow.
+
+    Avoids the heavy ``status()`` query (which can exceed the instruction limit on
+    large staging realms). Used by ``get_runtime_flags`` and unit tests.
+    """
+    try:
+        from ggg import Realm
+
+        realm = Realm.load("1")
+    except Exception:
+        realm = None
+    if not realm:
+        return {"success": False, "error": "Realm not found"}
+    return {
+        "success": True,
+        "realm_name": str(getattr(realm, "name", "") or ""),
+        "realm_manifesto": str(getattr(realm, "manifesto", "") or ""),
+        "realm_welcome_message": str(getattr(realm, "welcome_message", "") or ""),
+        "open_registration": bool(getattr(realm, "open_registration", False)),
+        "ai_assistant_enabled": bool(getattr(realm, "ai_assistant_enabled", True)),
+        "logo_url": str(getattr(realm, "logo_url", "") or ""),
+        "background_image_url": str(getattr(realm, "background_image_url", "") or ""),
+        "network": str(getattr(realm, "network", "") or ""),
+        "test_mode": get_realm_flag("test_mode", False),
+        "test_mode_ii_bypass": get_realm_flag("test_mode_ii_bypass", False),
+        "test_mode_user_self_registration": get_realm_flag(
+            "test_mode_user_self_registration", False
+        ),
+        "test_mode_demo_data": get_realm_flag("test_mode_demo_data", False),
+        "test_mode_skip_terms": get_realm_flag("test_mode_skip_terms", False),
+        "test_mode_skip_passport_zkproof": get_realm_flag(
+            "test_mode_skip_passport_zkproof", False
+        ),
+    }

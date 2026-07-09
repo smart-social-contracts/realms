@@ -19,6 +19,46 @@ if (DERIVATION_ORIGIN) {
   console.log(`Using II derivationOrigin: ${DERIVATION_ORIGIN}`);
 }
 
+// Canonical portal page for this realm (e.g. https://staging.realmsgos.org/r/<slug>).
+// Injected at deploy time via canister_ids.js. When a visitor lands on the raw
+// icp0.io origin and tries to sign in, we redirect them here: the realm origin
+// is not in the registry's /.well-known/ii-alternative-origins (II caps that
+// list at ~10 entries; wizard realms are unbounded), so a direct II login would
+// fail with "Unverified origin". On the portal the login is handled once, on
+// the canonical origin, and bridged into the embedded realm.
+const PORTAL_URL = (globalThis.__CANISTER_IDS?.portal_url || '').replace(/\/+$/, '');
+
+/** Portal URL for the current in-app path, or '' when no redirect should happen. */
+export function getPortalRedirectUrl() {
+  if (!PORTAL_URL || typeof window === 'undefined') return '';
+  // Inside the portal iframe the bridge handles auth — nothing to redirect.
+  if (isEmbeddedInPortal()) return '';
+  // Skip for local dev, where the portal doesn't exist.
+  const host = window.location.hostname;
+  if (host.includes('localhost') || host.includes('127.0.0.1')) return '';
+  // Already on the portal origin.
+  if (window.location.href.startsWith(PORTAL_URL)) return '';
+  // Escape hatch for tests/ops: ?standalone=1 pins this browser session to the
+  // raw canister origin (sticky via sessionStorage so SPA navigation keeps it).
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('standalone') === '1') {
+    try {
+      sessionStorage.setItem('realms:standalone', '1');
+    } catch {
+      // storage unavailable — the query param alone still skips this load
+    }
+    return '';
+  }
+  try {
+    if (sessionStorage.getItem('realms:standalone') === '1') return '';
+  } catch {
+    // ignore
+  }
+  // The portal's /r/[slug]/[...path] route mirrors any in-realm path.
+  const path = window.location.pathname === '/' ? '' : window.location.pathname;
+  return `${PORTAL_URL}${path}${window.location.search}${window.location.hash}`;
+}
+
 let authClient;
 let authClientMode = null;
 
@@ -110,10 +150,14 @@ export async function initializeAuthClient() {
 }
 
 export async function login({ random = false } = {}) {
-  // Federation portal embed: same single II login as direct icp0.io when
-  // derivationOrigin is configured (staging/demo/prod). Portal delegation
-  // is only used when no canonical derivation origin exists.
-  if (isEmbeddedInPortal() && !DERIVATION_ORIGIN) {
+  // Federation portal embed: ALWAYS authenticate via the host's scoped
+  // delegation. Never open Internet Identity from inside the iframe — the
+  // per-realm icp0.io origin is not in the canonical
+  // /.well-known/ii-alternative-origins (II caps that list at ~10 entries and
+  // wizard realms are unbounded), so an in-iframe II login with
+  // derivationOrigin fails with "Unverified origin". The single II login
+  // happens on the portal origin; the host bridges identity down to us.
+  if (isEmbeddedInPortal()) {
     let identity = getPortalDelegationIdentity();
     if (!identity) {
       const client = await initializeAuthClient();
@@ -126,9 +170,9 @@ export async function login({ random = false } = {}) {
         '$lib/portal-bridge.ts'
       );
       requestAuthRefresh();
-      // Brief wait for portal delegation when no canonical derivationOrigin is configured.
-      const delegationTimeoutMs = DERIVATION_ORIGIN ? 1500 : 60_000;
-      identity = await waitForPortalDelegation({ timeoutMs: delegationTimeoutMs });
+      // Generous timeout: a first-time visitor must complete the II flow on
+      // the portal origin (the host shows its sign-in overlay meanwhile).
+      identity = await waitForPortalDelegation({ timeoutMs: 300_000 });
     }
     if (identity) {
       authClient = _createPortalAuthClientMock();
@@ -137,10 +181,8 @@ export async function login({ random = false } = {}) {
       console.log(`[portal] Authenticated via delegation: ${principal.toText()}`);
       return { identity, principal };
     }
-    if (!DERIVATION_ORIGIN) {
-      return { identity: null, principal: null };
-    }
-    console.log('[portal] No delegation yet — using Internet Identity with derivationOrigin');
+    console.warn('[portal] No delegation from host — user must sign in on the portal origin');
+    return { identity: null, principal: null };
   }
   if (getTestModeIIBypass()) {
     // If ?as=swarm_agent_NNN and ?pem=<urlencoded-pem> are both present,
@@ -180,6 +222,17 @@ export async function login({ random = false } = {}) {
     const principal = identity.getPrincipal();
     console.log(`Reusing existing IC session: ${principal.toText()}`);
     return { identity, principal };
+  }
+
+  // Direct visit to the raw canister origin: signing in here would fail
+  // ("Unverified origin") or mint a different principal. Hand the user to the
+  // portal, where one II login covers the whole federation and is bridged back
+  // into this realm's iframe. Never resolves — we're navigating away.
+  const portalRedirect = getPortalRedirectUrl();
+  if (portalRedirect) {
+    console.log(`[portal] Redirecting sign-in to the portal origin: ${portalRedirect}`);
+    window.location.assign(portalRedirect);
+    return new Promise(() => {});
   }
 
   return new Promise((resolve) => {
@@ -249,27 +302,32 @@ export async function restoreAuthSession() {
 }
 
 async function _restoreAuthSession() {
-  if (isEmbeddedInPortal()) {
-    const portalId = getPortalDelegationIdentity();
-    if (portalId) {
-      const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
-        '$lib/stores/auth.js'
-      );
-      const principalText = portalId.getPrincipal().toText();
-      isAuthenticatedStore.set(true);
-      userIdentity.set(principalText);
-      principal.set(principalText);
-      try {
-        const { initBackendWithIdentity } = await import('$lib/canisters.js');
-        await initBackendWithIdentity(portalId);
-        const { loadUserProfiles } = await import('$lib/stores/profiles.js');
-        await loadUserProfiles();
-      } catch (e) {
-        console.warn('[portal] backend init deferred:', e);
-      }
-      return { authenticated: true, principal: principalText };
+  const restorePortal = async () => {
+    const portalId = isEmbeddedInPortal() ? getPortalDelegationIdentity() : null;
+    if (!portalId) return null;
+    // Swap the shared authClient to the portal mock so every later
+    // isAuthenticated()/getIdentity() consumer sees the bridged session.
+    await initializeAuthClient();
+    const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
+      '$lib/stores/auth.js'
+    );
+    const principalText = portalId.getPrincipal().toText();
+    isAuthenticatedStore.set(true);
+    userIdentity.set(principalText);
+    principal.set(principalText);
+    try {
+      const { initBackendWithIdentity } = await import('$lib/canisters.js');
+      await initBackendWithIdentity(portalId);
+      const { loadUserProfiles } = await import('$lib/stores/profiles.js');
+      await loadUserProfiles();
+    } catch (e) {
+      console.warn('[portal] backend init deferred:', e);
     }
-  }
+    return { authenticated: true, principal: principalText };
+  };
+
+  const viaPortal = await restorePortal();
+  if (viaPortal) return viaPortal;
 
   const authenticated = await isAuthenticated();
   const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
@@ -277,6 +335,10 @@ async function _restoreAuthSession() {
   );
 
   if (!authenticated) {
+    // A portal delegation may have landed while we awaited the AuthClient;
+    // never stomp a fresher portal session with "logged out".
+    const latePortal = await restorePortal();
+    if (latePortal) return latePortal;
     isAuthenticatedStore.set(false);
     return { authenticated: false, principal: '' };
   }
@@ -292,8 +354,12 @@ async function _restoreAuthSession() {
   const { initBackendWithIdentity } = await import('$lib/canisters.js');
   await initBackendWithIdentity();
 
-  const { loadUserProfiles } = await import('$lib/stores/profiles.js');
-  await loadUserProfiles();
+  try {
+    const { loadUserProfiles } = await import('$lib/stores/profiles.js');
+    await loadUserProfiles();
+  } catch (e) {
+    console.warn('[auth] profile load deferred:', e);
+  }
 
   return { authenticated: true, principal: principalText };
 }

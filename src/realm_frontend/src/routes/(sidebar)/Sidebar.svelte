@@ -13,13 +13,13 @@
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
 	import { IconLogin, IconLayoutDashboard } from '@tabler/icons-svelte';
 	// @ts-ignore
-	import { backend } from '$lib/canisters';
+	import { backend, quarterBackendStore } from '$lib/canisters';
 
 	export let drawerHidden: boolean = false;
 	
 	let showScrollIndicator = true;
 	let sidebarContainer: HTMLElement;
-	let loaded = false;
+	let lastSidebarActor: unknown = null;
 
 	const STORAGE_KEY = 'sidebar_collapsed';
 
@@ -44,10 +44,16 @@
 		} catch {}
 	}
 
+	// get_sidebar resolves visibility from the *caller's* user record, which in
+	// a federation lives on the member's home quarter — not the capital. Route
+	// through the quarter-aware actor and reload whenever it swaps (quarter
+	// activation, re-authentication), otherwise the capital answers with the
+	// guest menu and admin/member extensions vanish from the sidebar.
 	$: {
-		if (!loaded && backend) {
-			loaded = true;
-			loadSidebar(backend, get(locale) || 'en');
+		const actor = $quarterBackendStore || backend;
+		if (actor && actor !== lastSidebarActor) {
+			lastSidebarActor = actor;
+			loadSidebar(actor, get(locale) || 'en');
 		}
 	}
 	

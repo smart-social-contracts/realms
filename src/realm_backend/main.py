@@ -112,6 +112,7 @@ class QuarterInfoRecord(Record):
     population: nat
     status: text
     index: nat
+    is_capital: bool
 
 
 class StatusRecord(Record):
@@ -370,6 +371,18 @@ def status() -> RealmResponse:
 
 
 @query
+def get_runtime_flags() -> text:
+    """Return runtime test flags and join-relevant realm fields without heavy status()."""
+    try:
+        from core.runtime_flags import get_runtime_flags_payload
+
+        return json.dumps(get_runtime_flags_payload())
+    except Exception as e:
+        logger.error(f"get_runtime_flags error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
 def get_quarter_info() -> RealmResponse:
     """Get quarter information for this realm (workaround for Basilisk Record field limitation)"""
     try:
@@ -411,10 +424,15 @@ def get_quarter_info() -> RealmResponse:
                 )
                 for q in quarter_entities:
                     qcid = q.canister_id or ""
-                    q_pop = sum(
+                    # Users who joined the quarter directly live in the quarter's
+                    # own table — the local home_quarter scan misses them. The
+                    # population-sync task keeps q.population fresh; trust
+                    # whichever is larger.
+                    local_scan = sum(
                         1 for u in all_users
                         if (getattr(u, "home_quarter", "") or "") == qcid
                     )
+                    q_pop = max(local_scan, int(q.population or 0))
                     quarters.append(
                         {
                             "name": q.name or "",
@@ -506,6 +524,16 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
     """
     try:
         caller = ic.caller().to_str()
+        # The anonymous principal must never become a member: a User record for
+        # 2vxsx-fae makes every pre-auth membership probe answer "already a
+        # member" (any unauthenticated actor IS 2vxsx-fae), corrupting the join
+        # flow for all users. Races in embedded frontends have produced exactly
+        # this (anonymous actor + test-mode code → anonymous admin).
+        if caller == "2vxsx-fae":
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="Anonymous principal cannot join a realm — sign in first"),
+            )
         from ggg import Quarter, Realm, User
 
         realm = Realm.load("1")
@@ -1003,14 +1031,13 @@ def set_canister_config_json(args: text) -> text:
             network=params.get("network"),
             test_flags_json=flags,
         )
-        data = getattr(resp, "data", None)
-        out = {"success": bool(getattr(resp, "success", False))}
-        msg = getattr(data, "message", None) if data is not None else None
-        err = getattr(data, "error", None) if data is not None else None
-        if msg:
-            out["message"] = msg
-        if err:
-            out["error"] = err
+        out = {"success": bool(resp.success)}
+        data = resp.data
+        if data is not None:
+            if data.message is not None:
+                out["message"] = data.message
+            elif data.error is not None:
+                out["error"] = data.error
         return json.dumps(out)
     except Exception as e:
         logger.error(f"set_canister_config_json error: {e}\n{traceback.format_exc()}")
@@ -1644,6 +1671,11 @@ def get_join_targets() -> text:
     ``{mode, default_quarter, capital_id, quarters: [{canister_id, name,
     population, status, index, is_capital, joinable}, ...]}``.
 
+    ``joinable`` is a hint for *auto* routing (which quarter to pre-select). The
+    join page in ``choice`` mode lists every quarter regardless; registration
+    errors (coordinator-only capital, full quarter, closed registration, etc.)
+    are returned by ``join_realm`` on the target canister.
+
     Policy:
     - ``mode`` is the capital's ``quarter_join_mode`` ("auto" | "choice") and
       only governs open/codeless joins (invite links always target the encoded
@@ -2040,6 +2072,17 @@ def _run_quarter_scaling() -> Async[text]:
             return json.dumps({"success": False, "error": "Realm not found"})
         if not bool(getattr(realm, "scale_in_flight", False)):
             return json.dumps({"success": True, "status": "idle", "message": "no scale in flight"})
+
+        # Quarters must never provision siblings — only the capital has the
+        # Casals stand / casals block. Clear a stuck flag left by older builds
+        # that set scale_in_flight on the join target (the fullest quarter).
+        if bool(getattr(realm, "is_quarter", False)):
+            realm.scale_in_flight = False
+            return json.dumps({
+                "success": True,
+                "status": "idle",
+                "message": "quarter cannot provision; capital re-evaluates after population sync",
+            })
 
         spec = _quarter_casals_args(realm)
         if not spec:

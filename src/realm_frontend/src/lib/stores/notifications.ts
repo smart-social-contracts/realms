@@ -19,11 +19,8 @@ export const unreadCount = writable<number>(0);
 export async function loadNotifications() {
     try {
         console.log('[notifications] Loading notifications...');
-        const result = await backend.extension_sync_call({
-            extension_name: 'notifications',
-            function_name: 'get_notifications',
-            args: '{}'
-        });
+        // Candid signature is positional: (extension_name, function_name, args)
+        const result = await backend.extension_sync_call('notifications', 'get_notifications', '{}');
         console.log('[notifications] Raw result:', result);
         // ExtensionCallResponse is { response: string, success: bool }
         const responseStr = result.response || result;
@@ -44,11 +41,11 @@ export async function loadNotifications() {
 
 export async function markAsRead(notificationId: string, read: boolean = true) {
     try {
-        await backend.extension_sync_call({
-            extension_name: 'notifications',
-            function_name: 'mark_as_read',
-            args: JSON.stringify({ id: notificationId, read })
-        });
+        await backend.extension_sync_call(
+            'notifications',
+            'mark_as_read',
+            JSON.stringify({ id: notificationId, read })
+        );
         
         notifications.update(items => {
             const updated = items.map(item => 

@@ -126,9 +126,13 @@ export interface CasalsConfigView {
   'registry_principal' : string,
   'casals_canister_id' : string,
 }
+export interface CasalsProvisionService {
+  'create_canister' : ActorMethod<[string], string>,
+}
 export interface CasalsService {
   'create_canister' : ActorMethod<[string], string>,
   'create_stand' : ActorMethod<[string], string>,
+  'get_tree' : ActorMethod<[], string>,
   'set_commander' : ActorMethod<[string], string>,
   'upgrade_to' : ActorMethod<[string], string>,
 }
@@ -412,6 +416,9 @@ export type InstallCodeMode = { 'reinstall' : null } |
   { 'upgrade' : null } |
   { 'install' : null };
 export interface InstallerError { 'message' : string, 'traceback' : string }
+export interface InstallerProvisionService {
+  'provision_quarter' : ActorMethod<[string], string>,
+}
 export interface JobStatusAck {
   'status' : string,
   'prev_status' : string,
@@ -559,10 +566,17 @@ export interface PurchaseRecord {
   'item_id' : string,
   'developer' : string,
 }
+export interface QuarterBootstrapService {
+  'bootstrap_as_quarter' : ActorMethod<[string], string>,
+}
+export interface QuarterDirectoryService {
+  'get_quarter_directory' : ActorMethod<[], string>,
+}
 export interface QuarterInfoRecord {
   'status' : string,
   'name' : string,
   'canister_id' : string,
+  'index' : bigint,
   'population' : bigint,
 }
 export type QueryArchiveError = {
@@ -891,6 +905,9 @@ export interface _SERVICE {
   '__browse__' : ActorMethod<[string], string>,
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
   '__shell__' : ActorMethod<[string], string>,
+  'accept_delegation_json' : ActorMethod<[string], string>,
+  'approve_orchestration_action' : ActorMethod<[string], string>,
+  'bootstrap_as_quarter' : ActorMethod<[string], string>,
   'change_quarter' : ActorMethod<[string], RealmResponse>,
   'create_multi_step_scheduled_task' : ActorMethod<
     [string, string, bigint, bigint],
@@ -941,10 +958,13 @@ export interface _SERVICE {
     RealmResponse
   >,
   'get_available_upgrade' : ActorMethod<[string], string>,
+  'get_bootstrap_status' : ActorMethod<[], string>,
   'get_canister_id' : ActorMethod<[], string>,
   'get_extension_frontend_info' : ActorMethod<[string], string>,
   'get_extensions' : ActorMethod<[], RealmResponse>,
+  'get_join_targets' : ActorMethod<[], string>,
   'get_menu_config' : ActorMethod<[], string>,
+  'get_migration' : ActorMethod<[string], string>,
   'get_my_extensions' : ActorMethod<[], string>,
   'get_my_invoices' : ActorMethod<[], RealmResponse>,
   'get_my_principal' : ActorMethod<[], string>,
@@ -952,19 +972,23 @@ export interface _SERVICE {
   'get_my_vetkey_public_key' : ActorMethod<[], RealmResponse>,
   'get_nft_config' : ActorMethod<[], string>,
   'get_objects' : ActorMethod<[Array<[string, string]>], RealmResponse>,
+  'get_objects_by_ref' : ActorMethod<[Array<string>], string>,
   'get_objects_paginated' : ActorMethod<
     [string, bigint, bigint, string],
     RealmResponse
   >,
-  'get_join_targets' : ActorMethod<[], string>,
+  'get_quarter_directory' : ActorMethod<[], string>,
   'get_quarter_info' : ActorMethod<[], RealmResponse>,
   'get_realm_credits' : ActorMethod<[string], string>,
   'get_realm_registry_info' : ActorMethod<[], string>,
+  'get_runtime_flags' : ActorMethod<[], string>,
+  'get_scale_status' : ActorMethod<[], string>,
   'get_sharing_root_public_key' : ActorMethod<[], RealmResponse>,
   'get_sidebar' : ActorMethod<[string], string>,
   'get_sidebar_manifests' : ActorMethod<[], string>,
   'get_upgrade_status' : ActorMethod<[], string>,
   'get_zones' : ActorMethod<[bigint], string>,
+  'grant_delegation_json' : ActorMethod<[string], string>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
   'http_transform' : ActorMethod<[HttpTransformArgs], HttpResponse>,
   'install_branding_from_registry' : ActorMethod<[string], string>,
@@ -975,6 +999,7 @@ export interface _SERVICE {
   'join_federation' : ActorMethod<[string, boolean], RealmResponse>,
   'join_realm' : ActorMethod<[string, string, string], RealmResponse>,
   'list_codex_packages' : ActorMethod<[], string>,
+  'list_delegations_json' : ActorMethod<[], string>,
   'list_extensions' : ActorMethod<[string], RealmResponse>,
   'list_runtime_extensions' : ActorMethod<[], string>,
   'list_share_audiences' : ActorMethod<[], RealmResponse>,
@@ -982,10 +1007,12 @@ export interface _SERVICE {
     [string, string, bigint, string],
     string
   >,
+  'process_quarter_scaling' : ActorMethod<[], string>,
   'receive_realm_message' : ActorMethod<
     [string, string, string, string],
     string
   >,
+  'record_migration' : ActorMethod<[string], string>,
   'refresh_invoice' : ActorMethod<[string], string>,
   'register_quarter' : ActorMethod<[string, string], RealmResponse>,
   'register_realm_from_registry' : ActorMethod<[string], string>,
@@ -996,6 +1023,8 @@ export interface _SERVICE {
   'reload_codex' : ActorMethod<[string], string>,
   'reload_entity_method_overrides' : ActorMethod<[], string>,
   'request_upgrade' : ActorMethod<[string], string>,
+  'resolve_ref' : ActorMethod<[string], string>,
+  'revoke_delegation_json' : ActorMethod<[string], string>,
   'send_realm_message' : ActorMethod<[string, string, string, string], string>,
   'set_canister_config' : ActorMethod<
     [
@@ -1015,9 +1044,11 @@ export interface _SERVICE {
   'set_menu_item_config' : ActorMethod<[string], string>,
   'set_menu_visibility' : ActorMethod<[string], string>,
   'set_quarter_config' : ActorMethod<[string], RealmResponse>,
+  'set_quarter_provisioning_config' : ActorMethod<[string], string>,
   'start_task_manager' : ActorMethod<[], string>,
   'status' : ActorMethod<[], RealmResponse>,
   'store_admin_invite_hash' : ActorMethod<[string], RealmResponse>,
+  'sync_quarters' : ActorMethod<[string], string>,
   'test_timer' : ActorMethod<[], string>,
   'uninstall_codex' : ActorMethod<[string], string>,
   'uninstall_extension' : ActorMethod<[string], string>,

@@ -2,7 +2,6 @@
 <script lang="ts">
 	import { IconUserShield } from '@tabler/icons-svelte';
 	import { onMount } from 'svelte';
-	import { backend } from '$lib/canisters.js';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import {
 		actingOnBehalfOf,
@@ -22,7 +21,7 @@
 	onMount(async () => {
 		if ($isAuthenticated) {
 			loading = true;
-			await loadDelegations(backend);
+			await loadDelegations();
 			loading = false;
 		}
 	});

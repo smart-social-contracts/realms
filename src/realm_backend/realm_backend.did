@@ -92,7 +92,7 @@ type NameResult = record { name : text };
 type DecimalsResult = record { decimals : nat32 };
 type PaginationInfo = record { page_num : int; page_size : int; total_items_count : int; total_pages : int };
 type CanisterInfo = record { canister_id : text; canister_type : text };
-type QuarterInfoRecord = record { name : text; canister_id : text; population : nat; status : text; index : nat };
+type QuarterInfoRecord = record { name : text; canister_id : text; population : nat; status : text; index : nat; is_capital : bool };
 type StatusRecord = record { version : text; status : text; users_count : nat; organizations_count : nat; realms_count : nat; mandates_count : nat; tasks_count : nat; transfers_count : nat; instruments_count : nat; codexes_count : nat; disputes_count : nat; licenses_count : nat; trades_count : nat; proposals_count : nat; votes_count : nat; commit : text; commit_datetime : text; extensions : vec text; test_mode : bool; test_mode_ii_bypass : bool; test_mode_user_self_registration : bool; test_mode_demo_data : bool; test_mode_skip_terms : bool; test_mode_skip_passport_zkproof : bool; realm_name : text; realm_manifesto : text; realm_welcome_message : text; realm_stage : text; open_registration : bool; ai_assistant_enabled : bool; user_profiles_count : nat; canisters : vec CanisterInfo; registries : vec CanisterInfo; dependencies : vec text; python_version : text; quarters : vec QuarterInfoRecord; is_quarter : bool; parent_realm_canister_id : text; accounting_currency : text; accounting_currency_decimals : nat; logo_url : text; background_image_url : text; file_registry_canister_id : text; marketplace_canister_id : text; realm_logo : text; realm_description : text; realm_welcome_image : text };
 type UserGetRecord = record { "principal" : principal; profiles : vec text; nickname : text; avatar : text; private_data : text; assigned_quarter : text };
 type ObjectsListRecordPaginated = record { objects : vec text; pagination : PaginationInfo };
@@ -150,7 +150,7 @@ type PublicLogEntry = record { timestamp : nat; level : text; logger_name : text
 type HealthView = record { ok : bool; canister : text };
 type TakeSnapshotOk = record { job_id : text; snapshot_id : text; skipped : bool };
 type ProvisionOk = record { job_id : text; status : text; stand : text; backend_canister_id : text; frontend_canister_id : text };
-type CasalsConfigView = record { provision_via_casals : bool; casals_canister_id : text; casals_section : text; registry_principal : text };
+type CasalsConfigView = record { provision_via_casals : bool; casals_canister_id : text; casals_section : text; registry_principal : text; create_stand_baton : bool; baton_wasm_key : text };
 type ConfigRecord = record { file_registry_canister_id : text; billing_service_principal : text; license_price_usd_cents : nat64; license_duration_seconds : nat64 };
 type LicensePricingRecord = record { license_price_usd_cents : nat64; license_duration_seconds : nat64 };
 type ExtensionInput = record { extension_id : text; name : text; description : text; version : text; price_e8s : nat64; icon : text; categories : text; file_registry_canister_id : text; file_registry_namespace : text; download_url : text };
@@ -214,10 +214,11 @@ type RealmRegistryService = service { register_realm : (text, text, text, text, 
 type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (GetCreditsResult) query; get_latest_version : () -> (UpgradeResult) query };
 type RealmInstallerService = service { enqueue_deployment : (text) -> (RResultEnqueue); cancel_deployment : (text) -> (text); provision_via_casals : (text) -> (RResultProvision) };
 type RealmTargetService = service { install_extension_from_registry : (text) -> (text); install_codex_from_registry : (text) -> (text) };
-type CasalsService = service { create_stand : (text) -> (text); create_canister : (text) -> (text); set_commander : (text) -> (text); upgrade_to : (text) -> (text) };
+type CasalsService = service { get_tree : () -> (text) query; create_stand : (text) -> (text); create_canister : (text) -> (text); set_commander : (text) -> (text); upgrade_to : (text) -> (text); orchestration_hand_to_baton : (text) -> (text); orchestration_configure_baton : (text) -> (text) };
 
 service : {
   "status" : () -> (RealmResponse) query;
+  "get_runtime_flags" : () -> (text) query;
   "get_quarter_info" : () -> (RealmResponse) query;
   "get_extensions" : () -> (RealmResponse) query;
   "join_realm" : (text, text, text) -> (RealmResponse);

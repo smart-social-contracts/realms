@@ -18,11 +18,12 @@ touching anything; `--execute` is required to apply, and `reinstall` requires an
 extra confirmation because a successful reinstall permanently wipes state.
 
 After the canister actions, each environment's **active arrangement** is applied
-on its own Casals. An environment maps 1:1 to its Casals instance, whose active
-arrangement *is* that environment's post-deploy configuration (runtime params +
-extension/codex installs) — so a rollout (especially a reinstall, which wipes
-state) converges the environment back to ready-to-use. Idempotent; skip with
-`--no-apply-arrangement`.
+on its own Casals. First `casals-config/arrangements/<env>.json` is upserted and
+activated, then its steps are applied in batches. An environment maps 1:1 to its
+Casals instance, whose active arrangement *is* that environment's post-deploy
+configuration (runtime params + extension/codex installs) — so a rollout (especially
+a reinstall, which wipes state) converges the environment back to ready-to-use.
+Idempotent; skip with `--no-apply-arrangement`.
 
 This path is independent of the legacy off-chain deployer: it never touches the
 registry version catalog, so old and new deployment paths coexist.
@@ -31,6 +32,7 @@ registry version catalog, so old and new deployment paths coexist.
 import json
 import re
 import time
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -38,6 +40,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ..casals_versions import MAIN_CHANNEL, pick_latest_main_key
+from ..utils import get_project_root
 from .extension import _dfx_call
 
 console = Console()
@@ -276,6 +279,84 @@ _ARRANGEMENT_BATCH = 4
 _ARRANGEMENT_MAX_BATCHES = 500
 
 
+def _arrangement_file_for_env(env: str) -> Path:
+    return get_project_root() / "casals-config" / "arrangements" / f"{env}.json"
+
+
+def _seed_env_arrangement(env: str, casals: str, identity: Optional[str]) -> tuple[bool, str]:
+    """Upsert casals-config/arrangements/<env>.json and mark it active on this Casals."""
+    path = _arrangement_file_for_env(env)
+    if not path.is_file():
+        return True, "no arrangement file (skipped)"
+    arr = json.loads(path.read_text())
+    payload = {
+        "name": arr.get("name") or env,
+        "description": arr.get("description", ""),
+        "parameters": arr.get("parameters", {}),
+        "steps": arr.get("steps", []),
+        "active": True,
+    }
+    res = _casals_update(casals, "set_arrangement", payload, identity)
+    if not res.get("ok", False):
+        return False, res.get("error", str(res))
+    steps = len(payload["steps"])
+    verb = "created" if res.get("created") else "updated"
+    return True, f"{verb} arrangement '{payload['name']}' ({steps} steps, active)"
+
+
+def _candid_opt_text(value: Optional[str]) -> str:
+    if not value:
+        return "null"
+    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'opt "{escaped}"'
+
+
+def _apply_runtime_config_steps(env: str, identity: Optional[str]) -> tuple[bool, str]:
+    """Apply set_canister_config_json arrangement steps via multi-arg set_canister_config.
+
+    Some deployed realm backends return ``{"success": false}`` from
+    ``set_canister_config_json`` (Variant field access bug in the JSON wrapper).
+    The multi-arg ``set_canister_config`` path is reliable, so we drive runtime
+    flags from the arrangement file directly before Casals applies the rest.
+    """
+    path = _arrangement_file_for_env(env)
+    if not path.is_file():
+        return True, "no arrangement file (skipped)"
+    arr = json.loads(path.read_text())
+    applied = 0
+    failed = 0
+    for step in arr.get("steps") or []:
+        if step.get("method") != "set_canister_config_json":
+            continue
+        args = step.get("args") or {}
+        target = step.get("target") or ""
+        flags_obj = args.get("test_flags")
+        flags_json = json.dumps(flags_obj) if isinstance(flags_obj, dict) else ""
+        candid = (
+            f"({_candid_opt_text(args.get('frontend_canister_id'))}, "
+            f"null, null, "
+            f"{_candid_opt_text(args.get('file_registry_canister_id'))}, "
+            f"{_candid_opt_text(args.get('marketplace_canister_id'))}, "
+            f"null, "
+            f"{_candid_opt_text(args.get('network'))}, "
+            f"{_candid_opt_text(flags_json) if flags_json else 'null'})"
+        )
+        try:
+            raw = _dfx_call(
+                target, "set_canister_config", candid, _CASALS_NETWORK, identity, timeout=120,
+            )
+            if "success = true" in raw:
+                applied += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    if applied == 0 and failed == 0:
+        return True, "no runtime config steps (skipped)"
+    detail = f"runtime config via set_canister_config: {applied} ok, {failed} failed"
+    return failed == 0, detail
+
+
 def _apply_env_arrangement(casals: str, identity: Optional[str]) -> tuple[bool, str]:
     """Apply an environment's active arrangement on its own Casals, in batches.
 
@@ -454,7 +535,31 @@ def rollout_command(
             atable.add_column("result")
             atable.add_column("detail")
             for env, casals in env_casals.items():
-                console.print(f"\n[blue]→ applying {env} active arrangement[/blue]")
+                console.print(f"\n[blue]→ seeding {env} arrangement from casals-config[/blue]")
+                try:
+                    seed_ok, seed_detail = _seed_env_arrangement(env, casals, identity)
+                except Exception as e:  # noqa: BLE001 - report and continue
+                    seed_ok, seed_detail = False, str(e)
+                seed_mark = "[green]✓[/green]" if seed_ok else "[red]✗[/red]"
+                console.print(f"  {seed_mark} {seed_detail}")
+                if not seed_ok:
+                    arr_failures += 1
+                    atable.add_row(env, "[red]FAILED[/red]", f"seed: {seed_detail}")
+                    continue
+
+                console.print(f"[blue]→ applying {env} runtime config (test flags)[/blue]")
+                try:
+                    cfg_ok, cfg_detail = _apply_runtime_config_steps(env, identity)
+                except Exception as e:  # noqa: BLE001
+                    cfg_ok, cfg_detail = False, str(e)
+                cfg_mark = "[green]✓[/green]" if cfg_ok else "[red]✗[/red]"
+                console.print(f"  {cfg_mark} {cfg_detail}")
+                if not cfg_ok:
+                    arr_failures += 1
+                    atable.add_row(env, "[red]FAILED[/red]", f"config: {cfg_detail}")
+                    continue
+
+                console.print(f"[blue]→ applying {env} active arrangement[/blue]")
                 try:
                     ok, detail = _apply_env_arrangement(casals, identity)
                 except Exception as e:  # noqa: BLE001 - report and continue

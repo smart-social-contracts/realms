@@ -224,11 +224,12 @@
 				Promise.all(
 					providerExtensions.map(async (ext: any, i: number) => {
 						try {
-							const statusResponse = await backend.extension_sync_call({
-								extension_name: ext.name,
-								function_name: 'get_identity_status',
-								args: ''
-							});
+							// Candid signature is positional: (extension_name, function_name, args)
+							const statusResponse = await backend.extension_sync_call(
+								ext.name,
+								'get_identity_status',
+								'{}'
+							);
 							if (statusResponse.success) {
 								const statusData = JSON.parse(statusResponse.response);
 								if (statusData.verified) {

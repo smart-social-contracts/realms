@@ -136,8 +136,11 @@ export const backend = new Proxy(
 	}
 );
 
-// Initialize backend with authenticated identity
-export async function initBackendWithIdentity() {
+// Initialize backend with authenticated identity.
+// An explicit identity (e.g. a portal-scoped delegation) takes precedence over
+// whatever the shared AuthClient holds — in portal iframes the AuthClient is a
+// plain unauthenticated client and must not win over the bridged delegation.
+export async function initBackendWithIdentity(explicitIdentity = null) {
 	try {
 		console.log('Initializing backend with authenticated identity...');
 
@@ -146,9 +149,8 @@ export async function initBackendWithIdentity() {
 		// Make sure we're using the shared auth client
 		const client = authClient || (await initializeAuthClient());
 
-		if (await client.isAuthenticated()) {
-			// Get the authenticated identity from the shared client
-			const identity = client.getIdentity();
+		if (explicitIdentity || (await client.isAuthenticated())) {
+			const identity = explicitIdentity || client.getIdentity();
 			console.log('Using authenticated identity:', identity.getPrincipal().toText());
 
 			const currentActor = get(backendStore);
@@ -177,6 +179,19 @@ export async function initBackendWithIdentity() {
 			// Update the store with the authenticated actor
 			backendStore.set(authenticatedActor);
 
+			// If a quarter is active, its actor was built with the previous
+			// (possibly anonymous) identity — rebuild it so quarter-routed calls
+			// carry the fresh identity too.
+			if (_currentQuarterId) {
+				try {
+					const quarterActor = await createQuarterActor(_currentQuarterId, identity);
+					quarterBackendStore.set(quarterActor);
+					console.log(`🏘️ quarterBackend re-authenticated → quarter ${_currentQuarterId}`);
+				} catch (e) {
+					console.warn('Failed to re-authenticate quarter actor:', e);
+				}
+			}
+
 			console.log('Backend initialized with authenticated identity');
 			return authenticatedActor;
 		} else {
@@ -189,21 +204,37 @@ export async function initBackendWithIdentity() {
 	}
 }
 
-// Quarter-aware actor: creates an actor for a specific canister ID
-export async function createQuarterActor(quarterCanisterId) {
+// Quarter-aware actor: creates an actor for a specific canister ID.
+// `explicitIdentity` wins over the shared AuthClient for the same reason as in
+// initBackendWithIdentity: in portal iframes the bridged delegation may not be
+// reflected in the AuthClient yet, and an anonymous quarter actor gets its
+// user-scoped calls rejected (AccessDenied) by the quarter.
+export async function createQuarterActor(quarterCanisterId, explicitIdentity = null) {
 	if (buildingOrTesting) return dummyActor();
 
 	await initializeImports();
 
-	const client = authClient || (await initializeAuthClient());
-	let agent;
-
-	if (await client.isAuthenticated()) {
-		const identity = client.getIdentity();
-		agent = new HttpAgent({ identity, verifyQuerySignatures: false });
-	} else {
-		agent = new HttpAgent({ verifyQuerySignatures: false });
+	let identity = explicitIdentity;
+	if (!identity) {
+		try {
+			const { isEmbeddedInPortal, getPortalDelegationIdentity } = await import(
+				'$lib/portal-bridge.ts'
+			);
+			if (isEmbeddedInPortal()) identity = getPortalDelegationIdentity();
+		} catch {
+			// portal bridge unavailable outside an embed
+		}
 	}
+	if (!identity) {
+		const client = authClient || (await initializeAuthClient());
+		if (await client.isAuthenticated()) {
+			identity = client.getIdentity();
+		}
+	}
+
+	const agent = identity
+		? new HttpAgent({ identity, verifyQuerySignatures: false })
+		: new HttpAgent({ verifyQuerySignatures: false });
 
 	if (isLocalDevelopment()) {
 		await agent.fetchRootKey().catch(() => {});
