@@ -22,7 +22,7 @@ export type ProbeResult = {
 	capitalId: string;
 };
 
-function hasMembership(r: any): boolean {
+export function hasMembership(r: any): boolean {
 	return !!(
 		r &&
 		r.success &&
@@ -37,6 +37,52 @@ function profilesOf(r: any): string[] {
 }
 
 /**
+ * Choose which membership to activate when several exist.
+ * Prefers a still-valid localStorage cache; otherwise the first hit.
+ */
+export function pickPrimaryHit(
+	hits: MembershipHit[],
+	cachedCanisterId: string = ''
+): MembershipHit | null {
+	if (!hits.length) return null;
+	if (cachedCanisterId) {
+		const cached = hits.find((h) => h.canisterId === cachedCanisterId);
+		if (cached) return cached;
+	}
+	return hits[0];
+}
+
+/**
+ * Activate a membership hit for this browser session (actor + optional cache).
+ */
+export async function activateMembership(
+	hit: MembershipHit,
+	capitalId: string,
+	options?: { cache?: boolean }
+): Promise<void> {
+	const cache = options?.cache !== false;
+	// @ts-ignore
+	const { setActiveQuarter } = await import('$lib/canisters');
+	// @ts-ignore
+	const { activeQuarterId } = await import('$lib/stores/quarters');
+
+	const cid = hit.canisterId;
+	if (cid && !hit.isCapital && cid !== capitalId) {
+		activeQuarterId.set(cid);
+		await setActiveQuarter(cid);
+		if (cache && typeof localStorage !== 'undefined') {
+			localStorage.setItem('home_quarter', cid);
+		}
+	} else {
+		activeQuarterId.set(null);
+		await setActiveQuarter(null);
+		if (cache && typeof localStorage !== 'undefined') {
+			localStorage.removeItem('home_quarter');
+		}
+	}
+}
+
+/**
  * Probe capital + every quarter from get_join_targets for the caller's membership.
  * Prefers a valid localStorage home_quarter cache when it still recognizes the caller.
  */
@@ -48,9 +94,7 @@ export async function probeFederatedMembership(options?: {
 	const cache = options?.cache !== false;
 
 	// @ts-ignore
-	const { backend, setActiveQuarter, createQuarterActor } = await import('$lib/canisters');
-	// @ts-ignore
-	const { activeQuarterId } = await import('$lib/stores/quarters');
+	const { backend, createQuarterActor } = await import('$lib/canisters');
 
 	if (!backend || typeof backend.get_my_user_status !== 'function') {
 		throw new Error('Backend canister is not properly initialized');
@@ -108,29 +152,10 @@ export async function probeFederatedMembership(options?: {
 		}
 	}
 
-	let primary: MembershipHit | null = null;
-	if (cached) {
-		primary = hits.find((h) => h.canisterId === cached) || null;
-	}
-	if (!primary) {
-		primary = hits[0] || null;
-	}
+	const primary = pickPrimaryHit(hits, cached);
 
 	if (primary && activate) {
-		const cid = primary.canisterId;
-		if (cid && !primary.isCapital && cid !== capitalId) {
-			activeQuarterId.set(cid);
-			await setActiveQuarter(cid);
-			if (cache && typeof localStorage !== 'undefined') {
-				localStorage.setItem('home_quarter', cid);
-			}
-		} else {
-			activeQuarterId.set(null);
-			await setActiveQuarter(null);
-			if (cache && typeof localStorage !== 'undefined') {
-				localStorage.removeItem('home_quarter');
-			}
-		}
+		await activateMembership(primary, capitalId, { cache });
 	}
 
 	return { primary, hits, capitalId };

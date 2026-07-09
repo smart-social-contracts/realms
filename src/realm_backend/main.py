@@ -1671,15 +1671,14 @@ def get_join_targets() -> text:
     ``{mode, default_quarter, capital_id, quarters: [{canister_id, name,
     population, status, index, is_capital, joinable}, ...]}``.
 
-    ``joinable`` is a hint for *auto* routing (which quarter to pre-select). The
-    join page in ``choice`` mode lists every quarter regardless; registration
-    errors (coordinator-only capital, full quarter, closed registration, etc.)
-    are returned by ``join_realm`` on the target canister.
+    ``joinable`` is a hint for *auto* routing (which quarter to pre-select).
+    Registration errors (coordinator-only capital, full quarter, closed
+    registration, etc.) are returned by ``join_realm`` on the target canister.
 
     Policy:
-    - ``mode`` is the capital's ``quarter_join_mode`` ("auto" | "choice") and
-      only governs open/codeless joins (invite links always target the encoded
-      quarter regardless of mode).
+    - ``mode`` is the capital's ``quarter_join_mode`` ("auto" | "choice").
+      Product join UX always system-assigns; invite links may still encode a
+      quarter via ``?quarter=``.
     - Once >=1 active sub-quarter exists the capital becomes coordinator-only:
       it is listed with ``joinable=false`` and ``default_quarter`` points at the
       least-populated active sub-quarter (tie-break: highest index). With no
@@ -1688,6 +1687,7 @@ def get_join_targets() -> text:
     Public (no auth): the caller is typically anonymous at this point.
     """
     try:
+        from core.join_targets import pick_default_join_quarter
         from ggg import Quarter, Realm
 
         self_id = ic.id().to_str()
@@ -1725,18 +1725,7 @@ def get_join_targets() -> text:
             "joinable": capital_joinable,
         }] + sub_quarters
 
-        if active_subs:
-            # Prefer the least-populated joinable quarter so open registration
-            # balances load (issue #156 join-assignment addendum). Tie-break by
-            # highest index so a freshly minted empty quarter wins over older
-            # empty peers.
-            least = min(
-                active_subs,
-                key=lambda q: (int(q.get("population") or 0), -int(q.get("index") or 0)),
-            )
-            default_quarter = least["canister_id"]
-        else:
-            default_quarter = self_id
+        default_quarter = pick_default_join_quarter(active_subs, self_id)
 
         return json.dumps({
             "mode": mode,

@@ -13,7 +13,7 @@
   import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmManifesto, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
   import { formatQuarterLabel } from '$lib/utils/quarterLabels';
-  import { probeFederatedMembership } from '$lib/utils/federatedMembership';
+  import { probeFederatedMembership, activateMembership } from '$lib/utils/federatedMembership';
   import { _ } from 'svelte-i18n';
   
   // Step management: 'auth' | 'already_joined' | 'terms' | 'profile' | 'success'
@@ -22,6 +22,10 @@
   let membershipProbed = false;
   /** @type {Promise<void> | null} */
   let membershipProbePromise = null;
+  /** @type {import('$lib/utils/federatedMembership').MembershipHit[]} */
+  let membershipHits = [];
+  let probeCapitalId = '';
+  let selectedActivationId = '';
   let agreement = false;
   let error = '';
   let loading = false;
@@ -153,22 +157,59 @@
     return $testModeSkipTerms ? 'profile' : 'terms';
   }
 
+  function membershipQuarterLabel(hit) {
+    if (!hit) return '';
+    const info = quarterDirectory.find((q) => q.canister_id === hit.canisterId);
+    if (info) return formatQuarterLabel(info);
+    return hit.canisterId || 'Capital';
+  }
+
   /** Federated membership probe before any new registration (issue #156). */
   async function runMembershipProbe() {
     if (membershipProbePromise) return membershipProbePromise;
     membershipProbePromise = (async () => {
       try {
-        const { primary } = await probeFederatedMembership({ activate: true, cache: true });
+        const { primary, hits, capitalId: probedCapital } = await probeFederatedMembership({
+          activate: true,
+          cache: true,
+        });
         userHasJoined = !!primary;
+        membershipHits = hits || [];
+        probeCapitalId = probedCapital || capitalId || '';
+        selectedActivationId = primary?.canisterId || membershipHits[0]?.canisterId || '';
       } catch (e) {
         console.warn('Federated membership probe failed; falling back to target check', e);
         userHasJoined = await isJoinedOnTarget();
+        membershipHits = [];
+        probeCapitalId = capitalId || '';
+        selectedActivationId = '';
       } finally {
         membershipProbed = true;
         membershipProbePromise = null;
       }
     })();
     return membershipProbePromise;
+  }
+
+  /** Activate the selected membership for this session, then enter the app. */
+  async function continueWithMembership() {
+    error = '';
+    const hit =
+      membershipHits.find((h) => h.canisterId === selectedActivationId) || membershipHits[0];
+    if (!hit) {
+      await goto(resolve('/extensions/member_dashboard'));
+      return;
+    }
+    loading = true;
+    try {
+      await activateMembership(hit, probeCapitalId || capitalId, { cache: true });
+      await goto(resolve('/extensions/member_dashboard'));
+    } catch (e) {
+      console.error('Failed to activate membership', e);
+      error = e.message || 'Failed to activate membership';
+    } finally {
+      loading = false;
+    }
   }
 
   /** Probe (if needed) then leave the auth step — never skip the federated probe. */
@@ -245,6 +286,9 @@
         principal.set('');
         membershipProbed = false;
         userHasJoined = false;
+        membershipHits = [];
+        probeCapitalId = '';
+        selectedActivationId = '';
         currentStep = 'auth';
       }
 
@@ -752,7 +796,7 @@
           </div>
         </div>
 
-      <!-- Step: Already Joined (Welcome Back) -->
+      <!-- Step: Already Joined (Welcome Back / multi-membership activation) -->
       {:else if currentStep === 'already_joined'}
         <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <div class="text-center mb-8">
@@ -766,16 +810,62 @@
               You're already a member of {realmName}
             </p>
           </div>
-          
-          <a
-            href={resolve('/extensions/member_dashboard')}
-            class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3"
-          >
-            <span>Go to Dashboard</span>
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </a>
+
+          {#if membershipHits.length > 1}
+            <p class="text-sm text-gray-500 mb-4 text-center">
+              You belong to multiple quarters. Choose which membership to use for this session.
+            </p>
+            <div class="space-y-3 mb-6">
+              {#each membershipHits as hit (hit.canisterId)}
+                <button
+                  type="button"
+                  on:click={() => selectedActivationId = hit.canisterId}
+                  class={cn(
+                    "w-full p-4 rounded-xl border-2 text-left transition-all",
+                    selectedActivationId === hit.canisterId
+                      ? "border-gray-900 bg-gray-50"
+                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  )}
+                >
+                  <div class="font-semibold text-gray-900">{membershipQuarterLabel(hit)}</div>
+                  {#if hit.profiles?.length}
+                    <div class="text-sm text-gray-500 mt-0.5">{hit.profiles.join(', ')}</div>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+            <button
+              type="button"
+              on:click={continueWithMembership}
+              disabled={!selectedActivationId || loading}
+              class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {#if loading}
+                <Spinner size="5" color="white" />
+                <span>Continuing...</span>
+              {:else}
+                <span>Continue</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              {/if}
+            </button>
+          {:else}
+            {#if membershipHits.length === 1}
+              <p class="text-sm text-gray-500 mb-6 text-center">
+                Your quarter: {membershipQuarterLabel(membershipHits[0])}
+              </p>
+            {/if}
+            <a
+              href={resolve('/extensions/member_dashboard')}
+              class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3"
+            >
+              <span>Go to Dashboard</span>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </a>
+          {/if}
         </div>
 
       <!-- Step: Terms -->
