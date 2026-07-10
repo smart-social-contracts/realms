@@ -273,15 +273,6 @@
       "method": "install_extension_from_registry",
       "args": {
         "registry_canister_id": "iebdk-kqaaa-aaaau-agoxq-cai",
-        "ext_id": "llm_chat",
-        "version": null
-      }
-    },
-    {
-      "target": "ijdaw-dyaaa-aaaac-beh2a-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "iebdk-kqaaa-aaaau-agoxq-cai",
         "ext_id": "hello_world",
         "version": null
       }
@@ -579,15 +570,6 @@
       "args": {
         "registry_canister_id": "iebdk-kqaaa-aaaau-agoxq-cai",
         "ext_id": "zone_selector",
-        "version": null
-      }
-    },
-    {
-      "target": "ihbn6-yiaaa-aaaac-beh3a-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "iebdk-kqaaa-aaaau-agoxq-cai",
-        "ext_id": "llm_chat",
         "version": null
       }
     },
@@ -902,15 +884,6 @@
       "args": {
         "registry_canister_id": "iebdk-kqaaa-aaaau-agoxq-cai",
         "ext_id": "zone_selector",
-        "version": null
-      }
-    },
-    {
-      "target": "jnope-2yaaa-aaaac-beh4a-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "iebdk-kqaaa-aaaau-agoxq-cai",
-        "ext_id": "llm_chat",
         "version": null
       }
     },

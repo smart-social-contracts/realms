@@ -115,12 +115,13 @@ sequenceDiagram
 
 ## Access Manager Extension
 
-The `access_manager` extension provides a UI for managing all these relationships:
+The `access_manager` extension provides a UI for **Organizations** (GGG `Department`; see [ORGANIZATIONS.md](./ORGANIZATIONS.md) and issue #240):
 
-| Tab | Purpose |
-|-----|---------|
-| **Departments** | Create/delete departments, assign heads, manage members |
-| **Extensions** | View/edit access grants per user, department, or profile |
-| **Users** | View user access summary, assign/revoke profiles |
+| Area | Purpose |
+|------|---------|
+| **Organizations** | Create orgs (no nesting), members, `root` |
+| **Policy & budget** | M/N, quorum, veto, fund link |
+| **Authority** | Org-over-org grants (local or cross-quarter target fields) |
+| **Permissions / extensions** | Operation grants and extension visibility |
 
 Accessible to users with `admin` or `user_manager` profiles.

@@ -64,6 +64,10 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : DeploymentJobView,
     'Err' : InstallerError,
   });
+  const ResultJobManifest = IDL.Variant({
+    'Ok' : IDL.Text,
+    'Err' : InstallerError,
+  });
   const PendingJobEntry = IDL.Record({
     'job' : DeploymentJobView,
     'manifest' : IDL.Text,
@@ -164,6 +168,11 @@ export const idlFactory = ({ IDL }) => {
     'get_deployment_job_status' : IDL.Func(
         [IDL.Text],
         [ResultJobIdStatus],
+        ['query'],
+      ),
+    'get_deployment_manifest' : IDL.Func(
+        [IDL.Text],
+        [ResultJobManifest],
         ['query'],
       ),
     'get_pending_deployments' : IDL.Func([], [ResultPendingJobs], ['query']),

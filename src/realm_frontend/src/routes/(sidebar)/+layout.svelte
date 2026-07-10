@@ -5,22 +5,17 @@
 	import Footer from './Footer.svelte';
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
 	import DelegationBanner from '$lib/components/DelegationBanner.svelte';
-	import AiAssistantPanel from '$lib/components/AiAssistantPanel.svelte';
 	import PageBreadcrumb from '$lib/components/PageBreadcrumb.svelte';
 	import { onMount } from 'svelte';
-	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { hostActionEvents, documentFocus } from '$lib/host-bridge';
 	import { portalFocusPush, portalAssistantOpen, isEmbeddedInPortal } from '$lib/portal-bridge.ts';
-	import { realmInfo, aiAssistantEnabled } from '$lib/stores/realmInfo';
+	import { realmInfo } from '$lib/stores/realmInfo';
 	
 	const SIDEBAR_STATE_KEY = 'realm_sidebar_state';
-	const AI_PANEL_STATE_KEY = 'realm_ai_panel_state';
 	
 	let drawerHidden = true;
-	let aiPanelOpen = false;
-	let aiPanelWidth = 320;
 	let initialized = false;
 	let embeddedInPortal = false;
 	
@@ -33,23 +28,9 @@
 			}
 		}
 	}
-
-	function saveAiPanelState(open) {
-		if (browser && initialized) {
-			try {
-				localStorage.setItem(AI_PANEL_STATE_KEY, JSON.stringify(open));
-			} catch {
-				// sandbox / private mode
-			}
-		}
-	}
 	
 	$: if (browser && initialized) {
 		saveSidebarState(drawerHidden);
-	}
-
-	$: if (browser && initialized && !embeddedInPortal) {
-		saveAiPanelState(aiPanelOpen);
 	}
 
 	$: if (browser) {
@@ -76,13 +57,6 @@
 				} else {
 					drawerHidden = window.innerWidth < 1024;
 				}
-
-				if (!embeddedInPortal) {
-					const savedAi = localStorage.getItem(AI_PANEL_STATE_KEY);
-					if (savedAi !== null) {
-						aiPanelOpen = JSON.parse(savedAi);
-					}
-				}
 			} catch {
 				drawerHidden = window.innerWidth < 1024;
 			}
@@ -97,21 +71,18 @@
 				const isDesktop = window.innerWidth >= 1024;
 				if (wasDesktop && !isDesktop) {
 					drawerHidden = true;
-					if (!embeddedInPortal) aiPanelOpen = false;
 				}
 				wasDesktop = isDesktop;
 			};
 			
 			window.addEventListener('resize', handleResize);
 
+			// Chat UI lives on the mundus RegistryAssistant. When embedded in the
+			// portal, forward assistant.open to the parent; otherwise ignore.
 			const unsubHostActions = hostActionEvents.subscribe((event) => {
 				if (event?.action.type !== 'assistant.open') return;
 				if (embeddedInPortal) {
 					portalAssistantOpen();
-					return;
-				}
-				if (get(aiAssistantEnabled)) {
-					aiPanelOpen = true;
 				}
 			});
 
@@ -127,20 +98,14 @@
 		}
 	});
 
-	$: if (browser && initialized && !$aiAssistantEnabled) {
-		aiPanelOpen = false;
-	}
-
-	$: isFullBleedExtension =
-		$page.url.pathname.includes('/extensions/codex_viewer') ||
-		($page.url.pathname.includes('/extensions/') && $page.url.pathname.includes('/llm_chat'));
+	$: isFullBleedExtension = $page.url.pathname.includes('/extensions/codex_viewer');
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden">
 	<header
 		class="flex-none z-50 mx-auto w-full border-b border-gray-200 bg-white"
 	>
-		<Navbar bind:drawerHidden bind:aiPanelOpen {embeddedInPortal} />
+		<Navbar bind:drawerHidden />
 	</header>
 	<div class="flex flex-1 overflow-hidden">
 		<!-- Sidebar (left) -->
@@ -149,8 +114,6 @@
 		<!-- Main Content -->
 		<div
 			class="main-content-area relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {!drawerHidden ? 'lg:ml-64' : ''}"
-			class:ai-panel-open={aiPanelOpen && $aiAssistantEnabled && !embeddedInPortal}
-			style="--ai-panel-width: {aiPanelWidth}px"
 		>
 			<DemoBanner />
 			<DelegationBanner />
@@ -167,26 +130,4 @@
 			</div>
 		</div>
 	</div>
-
-	<!-- AI Assistant Panel — sibling of overflow-hidden row so resize handle isn't clipped.
-	     `ai_assistant_enabled` (#233) governs ONLY this in-realm, realm-context surface
-	     (codex/proposal tools, realm status injection). It does NOT and must not disable
-	     the user's global assistant, which lives on the registry (canonical II origin) and
-	     never consults this realm flag. Hidden when embedded in the portal iframe so
-	     users only see the mundus-level RegistryAssistant. -->
-	{#if $aiAssistantEnabled && !embeddedInPortal}
-		<AiAssistantPanel
-			bind:open={aiPanelOpen}
-			bind:panelWidth={aiPanelWidth}
-			onClose={() => (aiPanelOpen = false)}
-		/>
-	{/if}
 </div>
-
-<style>
-	@media (min-width: 1024px) {
-		.main-content-area.ai-panel-open {
-			margin-right: var(--ai-panel-width);
-		}
-	}
-</style>

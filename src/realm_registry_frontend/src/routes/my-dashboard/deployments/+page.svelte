@@ -4,7 +4,9 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import DeploymentProgress from '$lib/components/DeploymentProgress.svelte';
+  import DeploymentManifestPanel from '$lib/components/DeploymentManifestPanel.svelte';
   import { deploymentJobUrl, loadDeploymentRow, startDeploymentJobPolling } from '$lib/deployment-tracker.js';
+  import { fetchDeploymentManifest } from '$lib/installer-queue.js';
   import { recordDeploymentStageObservation } from '$lib/deployment-stage-timing.js';
   import {
     findDraftForDeployment,
@@ -24,6 +26,23 @@
   let deleteError = null;
   let showDeleteConfirm = false;
   let stopPolling = () => {};
+  let manifestRaw = null;
+  let manifestLoading = false;
+  let manifestError = null;
+
+  async function loadManifest() {
+    if (!jobId || !userPrincipal) return;
+    manifestLoading = true;
+    manifestError = null;
+    try {
+      manifestRaw = await fetchDeploymentManifest(jobId);
+    } catch (err) {
+      manifestRaw = null;
+      manifestError = err?.message || 'Could not load manifest.';
+    } finally {
+      manifestLoading = false;
+    }
+  }
 
   $: jobId = ($page.url.searchParams.get('job') || '').trim();
   $: linkedDraft = deployment ? findDraftForDeployment(wizardDrafts, deployment) : null;
@@ -94,6 +113,7 @@
       wizardDrafts = [];
     }
     await refresh();
+    await loadManifest();
 
     if (jobId && deployment?.progress?.isActive) {
       stopPolling = startDeploymentJobPolling(jobId, async (row) => {
@@ -102,6 +122,9 @@
           try {
             wizardDrafts = await listWizardDrafts();
           } catch (_) { /* non-fatal */ }
+          if (!manifestRaw && !manifestLoading) {
+            await loadManifest();
+          }
         }
       });
     }
@@ -189,6 +212,13 @@
       {/if}
 
       <DeploymentProgress progress={deployment.progress} variant="full" showSteps={true} />
+
+      <DeploymentManifestPanel
+        manifestRaw={manifestRaw}
+        frontendCanisterId={deployment.frontend_canister_id || ''}
+        loading={manifestLoading}
+        error={manifestError}
+      />
 
       {#if isFailedDeployment(deployment)}
         <div class="failure-panel">

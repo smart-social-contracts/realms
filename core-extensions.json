@@ -9,11 +9,10 @@
     "census",
     "admin_dashboard",
     "vault",
-    "codex_viewer",
-    "llm_chat"
+    "codex_viewer"
   ],
   "defaults": {
     "ai_assistant_enabled": true,
-    "assistant_consumer_extension": "llm_chat"
+    "assistant_consumer_extension": ""
   }
 }

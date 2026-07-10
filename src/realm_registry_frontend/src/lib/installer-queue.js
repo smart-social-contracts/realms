@@ -88,6 +88,18 @@ export async function fetchDeploymentJobStatus(jobId) {
   return resultOk(raw);
 }
 
+/** @returns {Promise<string|null>} manifest JSON for owner-authenticated caller */
+export async function fetchDeploymentManifest(jobId) {
+  if (buildingOrTesting || !browser || !jobId) return null;
+  const actor = await createAuthenticatedInstallerActor();
+  const raw = await actor.get_deployment_manifest(jobId);
+  if (raw == null) return null;
+  if (typeof raw === 'object' && 'Err' in raw) {
+    throw new Error(raw.Err?.message || raw.Err || 'Failed to load manifest');
+  }
+  return resultOk(raw);
+}
+
 /** Delete a terminal failed deployment job (owner only). */
 export async function deleteDeploymentJob(jobId) {
   if (buildingOrTesting || !browser || !jobId) {

@@ -222,6 +222,10 @@ class ResultJobIdStatus(Variant, total=False):
     Ok: DeploymentJobView
     Err: InstallerError
 
+class ResultJobManifest(Variant, total=False):
+    Ok: text
+    Err: InstallerError
+
 class JobStatusAck(Record, _CA):
     job_id: text
     prev_status: text
@@ -554,6 +558,23 @@ def schedule_registration(job_id_val: str):
                     jlog(job_id_val).error(f"update_realm_config failed: {config_result['Err']}")
                 else:
                     jlog(job_id_val).info(f"realm config updated: name={realm_name}")
+
+            founder = (manifest.get("requesting_principal") or "").strip()
+            if founder and backend_id and founder != "2vxsx-fae":
+                try:
+                    founder_arg = f'("{founder}")'
+                    founder_result: CallResult = yield ic.call_raw(
+                        Principal.from_str(backend_id), "register_founder",
+                        ic.candid_encode(founder_arg), 0,
+                    )
+                    if isinstance(founder_result, dict) and "Err" in founder_result:
+                        jlog(job_id_val).error(
+                            f"register_founder failed: {founder_result['Err']}"
+                        )
+                    else:
+                        jlog(job_id_val).info(f"founder registered as admin: {founder[:8]}…")
+                except Exception as founder_err:
+                    jlog(job_id_val).error(f"register_founder error: {founder_err}")
 
             infra = manifest.get("infra") or {}
             fr_id = infra.get("file_registry_canister_id", "")
@@ -1188,6 +1209,21 @@ def get_deployment_job_status(job_id: text) -> ResultJobIdStatus:
         return ResultJobIdStatus(Ok=_job_to_view(job))
     except Exception as e:
         return ResultJobIdStatus(Err=ie(str(e)))
+
+@query
+def get_deployment_manifest(job_id: text) -> ResultJobManifest:
+    """Return the deployment manifest JSON for a job (owner-only)."""
+    try:
+        caller = str(ic.caller())
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return ResultJobManifest(Err=ie(f"unknown job_id: {job_id}"))
+        if (job.caller_principal or "") != caller:
+            return ResultJobManifest(Err=ie("only the job owner may view the manifest"))
+        return ResultJobManifest(Ok=job.manifest_json or "{}")
+    except Exception as e:
+        return ResultJobManifest(Err=ie(str(e)))
 
 @query
 def list_deployment_jobs() -> ResultJobsList:

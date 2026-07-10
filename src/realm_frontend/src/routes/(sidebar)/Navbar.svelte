@@ -3,25 +3,17 @@
 	import QuarterSwitcher from '$lib/components/QuarterSwitcher.svelte';
 	import QuarterIndicator from '$lib/components/QuarterIndicator.svelte';
 	import DelegationSwitcher from '$lib/components/DelegationSwitcher.svelte';
-	import { realmInfo, realmName, aiAssistantEnabled } from '$lib/stores/realmInfo';
+	import { realmInfo, realmName } from '$lib/stores/realmInfo';
 	import { onMount } from 'svelte';
 	import { Navbar } from 'flowbite-svelte';
-	import { IconMessageChatbot, IconMenu2 } from '@tabler/icons-svelte';
-	import { _ } from 'svelte-i18n';
-	import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
+	import { IconMenu2 } from '@tabler/icons-svelte';
 	import '../../app.pcss';
 
 	export let fluid = true;
 	export let drawerHidden = false;
-	export let aiPanelOpen = false;
-	/** When true (portal iframe), hide the in-realm assistant toggle. */
-	export let embeddedInPortal = false;
 
 	onMount(() => {
 		realmInfo.fetch();
-		if (!embeddedInPortal) {
-			embeddedInPortal = isEmbeddedInPortal();
-		}
 	});
 </script>
 
@@ -55,23 +47,6 @@
 		<QuarterIndicator />
 		<QuarterSwitcher />
 		<DelegationSwitcher />
-		{#if $aiAssistantEnabled && !embeddedInPortal}
-		<!-- AI Assistant toggle button -->
-		<button
-			on:click={() => (aiPanelOpen = !aiPanelOpen)}
-			class="group inline-flex items-center gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
-			title={$_('common.assistant', { default: 'Assistant' })}
-			aria-label={$_('common.assistant', { default: 'Assistant' })}
-		>
-			<IconMessageChatbot size={22} class={aiPanelOpen ? 'text-gray-900' : 'text-gray-500'} />
-			<span
-				class="hidden md:inline-block md:max-w-0 md:overflow-hidden md:opacity-0 md:group-hover:max-w-[8rem] md:group-hover:opacity-100 md:group-focus-visible:max-w-[8rem] md:group-focus-visible:opacity-100 transition-[max-width,opacity] duration-500 ease-in-out text-sm font-medium whitespace-nowrap"
-			>
-				{$_('common.assistant', { default: 'Assistant' })}
-			</span>
-		</button>
-		{/if}
-
 		<AuthButton />
 	</div>
 </Navbar>

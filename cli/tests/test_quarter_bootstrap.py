@@ -252,31 +252,6 @@ class TestRecurringTaskShims:
         assert "yield from" in code
         assert "run_autoscale_tick" in code
 
-    def test_population_sync_shim_is_async_and_targets_right_fn(self):
-        assert qb.POP_SYNC_TASK_NAME == "quarter_population_sync"
-        assert qb.POP_SYNC_INTERVAL_S > 0
-        code = qb.POP_SYNC_STEP_CODE
-        assert "def async_task()" in code
-        assert "yield from" in code
-        assert "run_population_sync_tick" in code
-
-    def test_population_sync_shim_imports_from_core_not_main(self):
-        # Regression guard (issue #156): the canister entry is registered as
-        # ``__main__`` with a lazy-loader that re-execs on attribute access, so a
-        # codex shim doing ``from main import …`` traps with "Database instance
-        # already exists" and the recurring task never runs. The entrypoint MUST
-        # live in this module and be imported from ``core.quarter_bootstrap``.
-        code = qb.POP_SYNC_STEP_CODE
-        assert "from core.quarter_bootstrap import run_population_sync_tick" in code
-        assert "from main import" not in code
-        # And the function it targets must actually exist here.
-        assert callable(getattr(qb, "run_population_sync_tick", None))
-        assert callable(getattr(qb, "sync_one_peer", None))
-
     def test_recurring_task_names_are_distinct(self):
-        names = {qb.BOOTSTRAP_TASK_NAME, qb.AUTOSCALE_TASK_NAME, qb.POP_SYNC_TASK_NAME}
-        assert len(names) == 3
-
-    def test_population_sync_step_code_compiles(self):
-        # The framework exec()s this string; a SyntaxError would wedge the task.
-        compile(qb.POP_SYNC_STEP_CODE, "<pop_sync_step>", "exec")
+        names = {qb.BOOTSTRAP_TASK_NAME, qb.AUTOSCALE_TASK_NAME}
+        assert len(names) == 2

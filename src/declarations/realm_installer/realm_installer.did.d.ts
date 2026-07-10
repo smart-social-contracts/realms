@@ -120,6 +120,9 @@ export interface CanisterStatusResult {
   'settings' : DefiniteCanisterSettings,
   'module_hash' : [] | [Uint8Array | number[]],
 }
+export interface CapitalPopulationService {
+  'report_quarter_population' : ActorMethod<[bigint], string>,
+}
 export interface CasalsConfigView {
   'create_stand_baton' : boolean,
   'provision_via_casals' : boolean,
@@ -710,6 +713,8 @@ export type ResultJobCancel = { 'Ok' : JobStatusAck } |
   { 'Err' : InstallerError };
 export type ResultJobIdStatus = { 'Ok' : DeploymentJobView } |
   { 'Err' : InstallerError };
+export type ResultJobManifest = { 'Ok' : string } |
+  { 'Err' : InstallerError };
 export type ResultJobsList = { 'Ok' : JobsListOk } |
   { 'Err' : InstallerError };
 export type ResultPendingJobs = { 'Ok' : PendingJobsOk } |
@@ -886,6 +891,7 @@ export interface _SERVICE {
   >,
   'get_casals_config' : ActorMethod<[], ResultCasalsConfig>,
   'get_deployment_job_status' : ActorMethod<[string], ResultJobIdStatus>,
+  'get_deployment_manifest' : ActorMethod<[string], ResultJobManifest>,
   'get_pending_deployments' : ActorMethod<[], ResultPendingJobs>,
   'health' : ActorMethod<[], HealthView>,
   'list_deployment_jobs' : ActorMethod<[], ResultJobsList>,

@@ -3,8 +3,8 @@
      It drives setActiveQuarter(), so every quarterBackend / ctx.backend call —
      including the realm_settings Quarters panel reads — targets the selection.
      Only shown to admins when the realm actually has more than one quarter.
-     Quarter list comes from the realmInfo store (already fetched by the Navbar),
-     so no extra backend call is needed here. -->
+     Quarter list comes from the realmInfo store (capital.status().quarters),
+     fetched from the capital backend on navbar mount. -->
 <script lang="ts">
 	import { IconBuildingCommunity } from '@tabler/icons-svelte';
 	import { _ } from 'svelte-i18n';

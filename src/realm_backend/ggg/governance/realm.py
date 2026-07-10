@@ -84,8 +84,8 @@ class Realm(Entity, TimestampedMixin):
     # Invite-link joins always target the quarter encoded in the link, so this
     # only affects open/self-registration. Unused on leaf quarters.
     quarter_join_mode = String(max_length=16, default="auto")
-    # When True (default), the AI assistant sidebar and Explain actions are available.
-    # Admins can disable via update_realm_config without uninstalling llm_chat.
+    # When True (default), Explain actions and related realm-context hooks are available.
+    # The chat UI lives on the mundus registry (RegistryAssistant), not llm_chat.
     ai_assistant_enabled = Boolean(default=True)
     # Branding URLs (optional; frontend falls back to static /images/ assets)
     logo_url = String(max_length=512, default="")

@@ -228,13 +228,13 @@
     return t.length > 60 ? `${t.slice(0, 57)}…` : t;
   }
 
-  /** Keep the in-progress thread visible even before Geister lists it. */
+  /** Keep the active thread visible in history, including a fresh empty New chat. */
   function mergeCurrentConversation(list) {
-    if (messages.length === 0) return list;
+    if (messages.length === 0 && !conversationId) return list;
     const id = conversationId || '__current__';
     const entry = {
       conversation_id: id,
-      title: titleFromMessages(messages),
+      title: messages.length ? titleFromMessages(messages) : null,
       persona: selectedAssistant?.id || 'ashoka',
       updated_at: new Date().toISOString(),
       message_count: messages.length,
@@ -248,15 +248,20 @@
     return [entry, ...list];
   }
 
-  function upsertConversationInList(forId = conversationId, msgCount = messages.length) {
+  function upsertConversationInList(forId = conversationId, msgCount = messages.length, title = null) {
     if (!forId || !userPrincipal) return;
-    const titleSource =
-      forId === conversationId
-        ? messages
-        : conversations.find((c) => c.conversation_id === forId)?.title || '';
+    let resolvedTitle = title;
+    if (resolvedTitle == null) {
+      const titleSource =
+        forId === conversationId
+          ? messages
+          : conversations.find((c) => c.conversation_id === forId)?.title || '';
+      resolvedTitle =
+        typeof titleSource === 'string' ? titleSource : titleFromMessages(titleSource);
+    }
     const entry = {
       conversation_id: forId,
-      title: typeof titleSource === 'string' ? titleSource : titleFromMessages(titleSource),
+      title: resolvedTitle,
       persona: selectedAssistant?.id || 'ashoka',
       updated_at: new Date().toISOString(),
       message_count: msgCount,
@@ -436,9 +441,9 @@
     suggestions = [];
     await refreshAuth();
     if (userPrincipal) {
-      // Client id only — server session is created on first send (/touch + /ask).
       conversationId = newConversationId();
       persistLastConversation(conversationId);
+      upsertConversationInList(conversationId, 0, null);
     } else {
       conversationId = null;
       persistLastConversation(null);
@@ -469,6 +474,13 @@
       (conversationId === conv.conversation_id || conv.conversation_id === '__current__')
     ) {
       return titleFromMessages(messages);
+    }
+    if (
+      !messages.length &&
+      (conversationId === conv.conversation_id || conv.conversation_id === '__current__') &&
+      !(conv.message_count || 0)
+    ) {
+      return $_('assistant.new_chat', { default: 'New chat' });
     }
     return $_('assistant.untitled', { default: 'Untitled' });
   }
@@ -1040,7 +1052,7 @@
             </div>
           {:else if historyError}
             <div class="history-empty history-error">{historyError}</div>
-          {:else if displayConversations.length === 0 && messages.length === 0}
+          {:else if displayConversations.length === 0}
             <div class="history-empty">{$_('assistant.history_empty', { default: 'No past conversations yet. Start chatting!' })}</div>
           {:else}
             {#if !userPrincipal && messages.length > 0}

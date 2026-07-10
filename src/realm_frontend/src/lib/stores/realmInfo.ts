@@ -118,12 +118,14 @@ const createRealmInfoStore = () => {
 
 				if (status || flagsPayload?.success) {
 					const fromFlags = flagsPayload?.success ? flagsPayload : null;
+					const openFromFlags = fromFlags?.open_registration as boolean | undefined;
+					const openFromStatus = status?.open_registration as boolean | undefined;
 					update(state => ({
 						...state,
 						name: (fromFlags?.realm_name as string) || (status?.realm_name as string) || '',
 						welcomeMessage: (fromFlags?.realm_welcome_message as string) || (status?.realm_welcome_message as string) || '',
 						manifesto: (fromFlags?.realm_manifesto as string) || (status?.realm_manifesto as string) || '',
-						openRegistration: (fromFlags?.open_registration as boolean) ?? (status?.open_registration as boolean) ?? false,
+						openRegistration: openFromFlags ?? openFromStatus ?? false,
 						aiAssistantEnabled: (fromFlags?.ai_assistant_enabled as boolean) ?? (status?.ai_assistant_enabled as boolean) !== false,
 						registries: (status?.registries as typeof state.registries) || [],
 						quarters: (status?.quarters as typeof state.quarters) || [],

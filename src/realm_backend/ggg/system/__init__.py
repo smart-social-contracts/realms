@@ -2,7 +2,8 @@
 
 from .call import Call
 from .constants import *
-from .department import Department
+from .department import Department, ROOT_ORG_NAME
+from .department_authority import DepartmentAuthority
 from .extension import Extension
 from .menu_category_config import MenuCategoryConfig
 from .menu_department_visibility import MenuDepartmentVisibility
@@ -35,8 +36,10 @@ __all__ = [
     "Call",
     "ContractStatus",
     "Department",
+    "DepartmentAuthority",
     "DisputeStatus",
     "Extension",
+    "ROOT_ORG_NAME",
     "InstrumentStatus",
     "MandateStatus",
     "MenuCategoryConfig",

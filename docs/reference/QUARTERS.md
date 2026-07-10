@@ -53,7 +53,9 @@ This design supports the core Realms GOS principle: **opting out must always be 
 ```
 
 - **Capital** coordinates realm-wide governance but is logically equal to other quarters.
-- **Peer gossip** syncs quarter list + population counts between all quarters.
+- **Join-time population push** — after a new member registers on a quarter,
+  that quarter immediately reports its live `User.count()` to the capital
+  (`report_quarter_population`). The UI reads populations from **`capital.status().quarters`** only.
 - **Frontend** bootstraps from the capital's canister ID (baked in at build time), then routes dynamically.
 
 ---
@@ -260,6 +262,7 @@ class Quarter(Entity, TimestampedMixin):
 | `declare_independence()` | Secede from federation |
 | `join_federation(capital_canister_id)` | Join an existing federation |
 | `sync_quarters()` | Peer gossip: exchange quarter list + populations |
+| `report_quarter_population(population)` | Quarter→capital push of live `User.count()` after join |
 | `get_scale_status()` | Report auto-scale state |
 | `process_quarter_scaling()` | Provision + register a new quarter |
 

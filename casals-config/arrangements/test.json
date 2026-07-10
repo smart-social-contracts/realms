@@ -275,15 +275,6 @@
       "method": "install_extension_from_registry",
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "ext_id": "llm_chat",
-        "version": null
-      }
-    },
-    {
-      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "hello_world",
         "version": null
       }
@@ -582,15 +573,6 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "zone_selector",
-        "version": null
-      }
-    },
-    {
-      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "ext_id": "llm_chat",
         "version": null
       }
     },
@@ -906,15 +888,6 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "zone_selector",
-        "version": null
-      }
-    },
-    {
-      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
-      "method": "install_extension_from_registry",
-      "args": {
-        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "ext_id": "llm_chat",
         "version": null
       }
     },

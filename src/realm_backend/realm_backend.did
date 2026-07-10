@@ -188,6 +188,7 @@ type ResultPendingJobs = variant { Ok : PendingJobsOk; Err : InstallerError };
 type ResultJobsList = variant { Ok : JobsListOk; Err : InstallerError };
 type ResultEnqueue = variant { Ok : EnqueueOk; Err : InstallerError };
 type ResultJobIdStatus = variant { Ok : DeploymentJobView; Err : InstallerError };
+type ResultJobManifest = variant { Ok : text; Err : InstallerError };
 type ResultJobCancel = variant { Ok : JobStatusAck; Err : InstallerError };
 type ResultReportFailure = variant { Ok : JobStatusAck; Err : InstallerError };
 type ResultReportReady = variant { Ok : ReportReadyOk; Err : InstallerError };
@@ -224,6 +225,7 @@ service : {
   "get_extensions" : () -> (RealmResponse) query;
   "join_realm" : (text, text, text) -> (RealmResponse);
   "store_admin_invite_hash" : (text) -> (RealmResponse);
+  "register_founder" : (text) -> (RealmResponse);
   "grant_delegation_json" : (text) -> (text);
   "accept_delegation_json" : (text) -> (text);
   "revoke_delegation_json" : (text) -> (text);

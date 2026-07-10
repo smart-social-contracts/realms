@@ -69,6 +69,15 @@ class Operations:
     ROLE_REVOKE = "role.revoke"
     PERMISSION_GRANT = "permission.grant"
 
+    # Organization governance (issue #240) — org-over-org and policy
+    ORG_CREATE = "org.create"
+    ORG_APPOINT = "org.appoint"
+    ORG_EXPEL = "org.expel"
+    ORG_SET_POLICY = "org.set_policy"
+    ORG_GRANT_AUTHORITY = "org.grant_authority"
+    ORG_REVOKE_AUTHORITY = "org.revoke_authority"
+    ORG_MANAGE_BUDGET = "org.manage_budget"
+
     # Judicial administration
     DISPUTE_CREATE = "dispute.create"
     DISPUTE_VIEW = "dispute.view"

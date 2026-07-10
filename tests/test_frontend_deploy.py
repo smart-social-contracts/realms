@@ -226,6 +226,7 @@ class TestInstallerManifestParsing:
         did_text = did_path.read_text()
         assert "enqueue_deployment" in did_text
         assert "get_deployment_job_status" in did_text
+        assert "get_deployment_manifest" in did_text
         assert "report_frontend_verified" in did_text
         assert "deploy_frontend" not in did_text
         assert "install_realm_backend" not in did_text
@@ -236,6 +237,8 @@ class TestInstallerManifestParsing:
         main_text = main_path.read_text()
         assert "report_frontend_verified" in main_text
         assert "_schedule_registry_settlement" in main_text
+        assert "register_founder" in main_text
+        assert "get_deployment_manifest" in main_text
         assert "_deploy_frontend_core" not in main_text
         assert "AssetCanisterService" not in main_text
         assert "def deploy_frontend(" not in main_text

@@ -52,28 +52,6 @@ AUTOSCALE_STEP_CODE = (
     "    return res\n"
 )
 
-# Capital-side refresh task: periodically pulls each known sub-quarter's coarse
-# directory so the capital's stored populations (and thus the join-page counts
-# in get_join_targets) stay fresh with no external poker (issue #156). Unlike
-# the autoscale trigger this is NOT gated on scale_in_flight — counts drift
-# whenever members join a quarter — but it self-disables when no sub-quarter
-# exists and is re-seeded the moment one is registered/provisioned.
-#
-# The shim imports the tick from THIS module (not ``main``): the canister entry
-# is registered as ``__main__`` with a basilisk lazy-loader that re-execs on any
-# attribute access, so ``from main import …`` inside a codex step traps with
-# "Database instance already exists". Recurring task entrypoints must therefore
-# live in a normal package module like this one (mirrors ``advance_bootstrap``).
-POP_SYNC_TASK_NAME = "quarter_population_sync"
-POP_SYNC_INTERVAL_S = 60
-POP_SYNC_STEP_CODE = (
-    "def async_task():\n"
-    "    from core.quarter_bootstrap import run_population_sync_tick\n"
-    "    res = yield from run_population_sync_tick()\n"
-    "    return res\n"
-)
-
-
 # ── Pure plan construction + state machine (unit-testable, no canister) ──────
 
 def build_bootstrap_plan(spec):
@@ -455,17 +433,14 @@ def advance_bootstrap():
     }
 
 
-# ── Capital-side population sync (capital ← quarters) ───────────────────────
+# ── Capital-side quarter directory merge (capital ← quarters) ───────────────
 
 def sync_one_peer(peer_canister_id):
     """Generator: pull one peer quarter's coarse directory and merge it into
     ours (un-gated). Adds ``Quarter`` entities for peers we did not know about
     and refreshes known populations (monotonic: takes the larger count, per
-    ``merge_quarter_directory``). Shared by the ``sync_quarters`` endpoint and
-    the recurring population-sync task. Returns a JSON-able dict.
-
-    Lives here (not in ``main``) because the recurring task's codex shim can only
-    import from a normal package module — see ``POP_SYNC_STEP_CODE``.
+    ``merge_quarter_directory``). Used by the ``sync_quarters`` gossip endpoint.
+    Returns a JSON-able dict.
     """
     try:
         from _cdk import ic
@@ -528,81 +503,6 @@ def sync_one_peer(peer_canister_id):
 
         logger.error(f"Error in sync_one_peer: {e}\n{_tb.format_exc()}")
         return {"success": False, "error": str(e)}
-
-
-def run_population_sync_tick():
-    """Recurring population-refresh step, one pass over all sub-quarters (#156).
-
-    Polls every known sub-quarter's coarse directory so the capital's stored
-    populations — and therefore the member counts ``get_join_targets`` feeds to
-    the /join page — stay fresh without any external poker. Closes the stale-count
-    gap where a quarter kept gaining members but the capital advertised its old
-    (often 0) population.
-
-    Self-regulating: disables its own schedule when there are no sub-quarters to
-    poll (so a lone capital never busy-loops), and is re-seeded by
-    ``register_quarter`` / auto-scale provisioning the moment a quarter appears.
-    Invoked by the ``POP_SYNC_TASK_NAME`` TaskManager task via the codex shim in
-    ``POP_SYNC_STEP_CODE``.
-    """
-    try:
-        from _cdk import ic
-        from ggg import Quarter
-
-        self_id = ic.id().to_str()
-        peers = []
-        for q in Quarter.instances():
-            cid = q.canister_id or ""
-            if cid and cid != self_id and cid not in peers:
-                peers.append(cid)
-
-        if not peers:
-            disable_recurring_task(POP_SYNC_TASK_NAME)
-            return json.dumps({"success": True, "status": "idle", "peers": 0})
-
-        synced = 0
-        errors = []
-        for cid in peers:
-            try:
-                res = yield from sync_one_peer(cid)
-                if isinstance(res, dict) and res.get("success"):
-                    synced += 1
-                else:
-                    errors.append({"peer": cid, "error": (res or {}).get("error")})
-            except Exception as e:
-                errors.append({"peer": cid, "error": str(e)})
-
-        # Re-evaluate auto-scale with the freshly synced federation-wide
-        # populations. Joins land on the fullest *joinable* quarter, so the
-        # capital's own registration path never sees the threshold crossing —
-        # without this, ``should_scale`` stays true forever and no Quarter N+1
-        # is minted (issue #156).
-        scale_requested = False
-        try:
-            from core.autoscale import maybe_request_quarter_scale
-
-            scale_requested = bool(maybe_request_quarter_scale())
-            if scale_requested:
-                logger.info(
-                    "Quarter auto-scale requested after population sync "
-                    f"(synced={synced}/{len(peers)})"
-                )
-        except Exception as e:
-            logger.error(f"Auto-scale evaluation after population sync failed: {e}")
-
-        return json.dumps({
-            "success": True,
-            "status": "synced",
-            "peers": len(peers),
-            "synced": synced,
-            "errors": errors,
-            "scale_requested": scale_requested,
-        })
-    except Exception as e:
-        import traceback as _tb
-
-        logger.error(f"run_population_sync_tick failed: {e}\n{_tb.format_exc()}")
-        return json.dumps({"success": False, "error": str(e)})
 
 
 # ── TaskManager seeding / teardown (canister only) ──────────────────────────
@@ -695,6 +595,15 @@ def disable_recurring_task(name):
                 s.disabled = True
     except Exception as e:
         logger.error(f"Failed to disable recurring task {name}: {e}")
+
+
+# Retired (issue #156): populations refresh via join-time push instead.
+RETIRED_POP_SYNC_TASK_NAME = "quarter_population_sync"
+
+
+def disable_population_sync_task():
+    """Stop the retired quarter_population_sync task on upgraded capitals."""
+    disable_recurring_task(RETIRED_POP_SYNC_TASK_NAME)
 
 
 def seed_bootstrap_task(interval_s=BOOTSTRAP_INTERVAL_S):

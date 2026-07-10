@@ -9,8 +9,10 @@ import { IDL } from '@dfinity/candid';
 import { Principal } from '@dfinity/principal';
 import { initializeAuthClient } from './auth';
 
-const SMALL_FILE_THRESHOLD = 96 * 1024;
-const CHUNK_BYTES = 128 * 1024;
+// Match CLI publish limits (extension.py): 128 KiB raw chunks blow the IC
+// per-message instruction budget once JSON + base64 decode land in WASI Python.
+const SMALL_FILE_THRESHOLD = 64 * 1024;
+const CHUNK_BYTES = 64 * 1024;
 
 const fileRegistryIdlFactory = ({ IDL: idl }) =>
   idl.Service({

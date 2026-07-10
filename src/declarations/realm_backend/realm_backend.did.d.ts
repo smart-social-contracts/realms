@@ -120,6 +120,9 @@ export interface CanisterStatusResult {
   'settings' : DefiniteCanisterSettings,
   'module_hash' : [] | [Uint8Array | number[]],
 }
+export interface CapitalPopulationService {
+  'report_quarter_population' : ActorMethod<[bigint], string>,
+}
 export interface CasalsConfigView {
   'create_stand_baton' : boolean,
   'provision_via_casals' : boolean,
@@ -580,7 +583,7 @@ export interface QuarterInfoRecord {
   'status' : string,
   'name' : string,
   'canister_id' : string,
-  'is_capital' : boolean,
+  'is_capital' : [] | [boolean],
   'index' : bigint,
   'population' : bigint,
 }
@@ -1037,6 +1040,7 @@ export interface _SERVICE {
   >,
   'reload_codex' : ActorMethod<[string], string>,
   'reload_entity_method_overrides' : ActorMethod<[], string>,
+  'report_quarter_population' : ActorMethod<[bigint], string>,
   'request_upgrade' : ActorMethod<[string], string>,
   'resolve_ref' : ActorMethod<[string], string>,
   'revoke_delegation_json' : ActorMethod<[string], string>,
@@ -1062,9 +1066,9 @@ export interface _SERVICE {
   'set_quarter_provisioning_config' : ActorMethod<[string], string>,
   'start_task_manager' : ActorMethod<[], string>,
   'status' : ActorMethod<[], RealmResponse>,
+  'register_founder' : ActorMethod<[string], RealmResponse>,
   'store_admin_invite_hash' : ActorMethod<[string], RealmResponse>,
   'sync_quarters' : ActorMethod<[string], string>,
-  'report_quarter_population' : ActorMethod<[bigint], string>,
   'test_timer' : ActorMethod<[], string>,
   'uninstall_codex' : ActorMethod<[string], string>,
   'uninstall_extension' : ActorMethod<[string], string>,

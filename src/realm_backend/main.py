@@ -3513,6 +3513,7 @@ def create_foundational_objects() -> void:
     # Check if foundational objects already exist (for upgrades)
     if len(Realm.instances()) > 0:
         logger.info("Foundational objects already exist, skipping creation")
+        _ensure_root_organization()
         return
 
     try:
@@ -3654,12 +3655,25 @@ def create_foundational_objects() -> void:
             logger.warning(f"Could not register well-known tokens: {tok_err}")
 
         logger.info("✅ All foundational objects created successfully")
+        _ensure_root_organization()
 
     except Exception as e:
         logger.error(
             f"❌ Error creating foundational objects: {str(e)}\n{traceback.format_exc()}"
         )
         raise
+
+
+def _ensure_root_organization() -> void:
+    """Ensure the quarter ``root`` org exists (issue #240)."""
+    try:
+        from core.org_policy import ensure_root_org, grant_root_authority_over_local_orgs
+
+        ensure_root_org()
+        grant_root_authority_over_local_orgs()
+        logger.info("Ensured root organization (issue #240)")
+    except Exception as e:
+        logger.warning(f"Could not ensure root organization: {e}\n{traceback.format_exc()}")
 
 
 def _register_wallet_transfer_hook():

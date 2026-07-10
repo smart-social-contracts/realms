@@ -17,10 +17,10 @@ CORE_EXTENSION_IDS: FrozenSet[str] = frozenset({
     "admin_dashboard",
     "vault",
     "codex_viewer",
-    "llm_chat",
 })
 
-DEFAULT_ASSISTANT_CONSUMER_EXTENSION = "llm_chat"
+# Mundus-level RegistryAssistant owns the chat UI; no in-realm consumer extension.
+DEFAULT_ASSISTANT_CONSUMER_EXTENSION = ""
 
 
 def is_core_extension(ext_id: str) -> bool:

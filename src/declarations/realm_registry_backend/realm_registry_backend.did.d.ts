@@ -120,6 +120,9 @@ export interface CanisterStatusResult {
   'settings' : DefiniteCanisterSettings,
   'module_hash' : [] | [Uint8Array | number[]],
 }
+export interface CapitalPopulationService {
+  'report_quarter_population' : ActorMethod<[bigint], string>,
+}
 export interface CasalsConfigView {
   'create_stand_baton' : boolean,
   'provision_via_casals' : boolean,
@@ -580,6 +583,7 @@ export interface QuarterInfoRecord {
   'status' : string,
   'name' : string,
   'canister_id' : string,
+  'is_capital' : boolean,
   'index' : bigint,
   'population' : bigint,
 }
@@ -708,6 +712,8 @@ export type ResultEnqueue = { 'Ok' : EnqueueOk } |
 export type ResultJobCancel = { 'Ok' : JobStatusAck } |
   { 'Err' : InstallerError };
 export type ResultJobIdStatus = { 'Ok' : DeploymentJobView } |
+  { 'Err' : InstallerError };
+export type ResultJobManifest = { 'Ok' : string } |
   { 'Err' : InstallerError };
 export type ResultJobsList = { 'Ok' : JobsListOk } |
   { 'Err' : InstallerError };

@@ -59,7 +59,6 @@ LITE_EXTENSIONS = [
     "admin_dashboard",
     "vault",
     "codex_viewer",
-    "llm_chat",
     "welcome",
     "demo_simulator",
     "hello_world",

@@ -170,8 +170,8 @@ def quarter_populations(realm):
 def maybe_request_quarter_scale():
     """Evaluate the scaling policy and set an idempotent "scale in flight" flag.
 
-    Called after every successful user registration **and** after the capital's
-    population-sync tick refreshes peer counts. Non-blocking: it never
+    Called after every successful user registration on the capital **and** when a
+    quarter pushes an updated population via ``report_quarter_population``.
     performs the Casals provisioning itself (that needs an async endpoint);
     it only records intent so a separate task can act on it. Safe to call
     repeatedly — once the flag is set it is a no-op until cleared.

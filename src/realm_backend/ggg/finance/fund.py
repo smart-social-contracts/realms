@@ -2,6 +2,7 @@ from ic_python_db import (
     Entity,
     ManyToOne,
     OneToMany,
+    OneToOne,
     String,
     TimestampedMixin,
 )
@@ -38,8 +39,11 @@ class Fund(Entity, TimestampedMixin):
     - internal_service: Services to other departments
     - trust: Fiduciary resources
     - agency: Custodial resources
+
+    Optional ``department`` link (issue #240): budget envelope for one org.
     """
     __alias__ = "code"
+    __version__ = 2
     code = String(max_length=16)
     name = String(max_length=256)
     fund_type = String(max_length=32, default=FundType.GENERAL)
@@ -47,6 +51,11 @@ class Fund(Entity, TimestampedMixin):
     realm = ManyToOne("Realm", "funds")
     ledger_entries = OneToMany("LedgerEntry", "fund")
     budgets = OneToMany("Budget", "fund")
+    department = OneToOne("Department", "fund")
+
+    @classmethod
+    def migrate(cls, obj, from_version, to_version):
+        return obj
 
     def __repr__(self):
         return f"Fund(code={self.code!r}, name={self.name!r})"
