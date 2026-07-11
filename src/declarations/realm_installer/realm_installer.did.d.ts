@@ -97,7 +97,7 @@ export type Callback = ActorMethod<
 >;
 export interface CallbackStrategy {
   'token' : StreamingToken,
-  'callback' : [Principal, string],
+  'callback' : Callback,
 }
 export interface CanisterInfo {
   'canister_id' : string,
@@ -401,7 +401,7 @@ export interface HttpResponseIncoming {
   'status_code' : number,
 }
 export interface HttpTransform {
-  'function' : [Principal, string],
+  'function' : HttpTransformFunc,
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -610,7 +610,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : [Principal, string],
+  'callback' : QueryArchiveFn,
   'start' : bigint,
   'length' : bigint,
 }
