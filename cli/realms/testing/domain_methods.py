@@ -20,6 +20,7 @@ def registration_code_create(
     profile="member",
     max_uses=1,
     department="",
+    metadata="",
 ):
     """Mirror of RegistrationCode.create: plaintext code generated when no
     code_hash is supplied."""
@@ -48,6 +49,7 @@ def registration_code_create(
         frontend_url=frontend_url.rstrip("/") if frontend_url else "",
         profile=profile,
         department=department or "",
+        metadata=metadata or "",
         max_uses=max_uses,
         uses_count=0,
         principals_redeemed="",

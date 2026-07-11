@@ -238,6 +238,7 @@ Department = _entity("Department", alias="name", methods={
     "__relations__": ("members", "permissions", "extensions"),
 })
 DepartmentAuthority = _entity("DepartmentAuthority")
+ROOT_ORG_NAME = "root"
 
 RegistrationCode = _entity("RegistrationCode", alias="code_hash")
 RegistrationCode.create = classmethod(_dm.registration_code_create)

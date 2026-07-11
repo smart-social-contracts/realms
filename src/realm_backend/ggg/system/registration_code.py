@@ -58,6 +58,10 @@ class RegistrationCode(Entity, TimestampedMixin):
         department: Organization (Department.name) the redeemer is added to.
             Empty for plain member/citizen codes. Enables per-department
             staff invite URLs (issue #241).
+        metadata: JSON blob attached to the code (issue #241). For citizen
+            bulk imports (``{"kind": "citizen_import", ...}``) the single-use
+            code doubles as the provisional citizen record: name, quarter,
+            and imported fields are bound to the redeeming principal.
         max_uses: Maximum allowed redemptions.
         uses_count: Current redemption count.
         principals_redeemed: Comma-separated principals that redeemed.
@@ -78,6 +82,7 @@ class RegistrationCode(Entity, TimestampedMixin):
     frontend_url = String(max_length=512)
     profile = String(max_length=64, default="member")
     department = String(max_length=256, default="")
+    metadata = String(max_length=1024, default="")
     max_uses = Integer(default=1)
     uses_count = Integer(default=0)
     principals_redeemed = String(max_length=4096, default="")
@@ -87,6 +92,7 @@ class RegistrationCode(Entity, TimestampedMixin):
     def migrate(cls, obj, from_version, to_version):
         if from_version < 2:
             obj.setdefault("department", "")
+            obj.setdefault("metadata", "")
         return obj
 
     @classmethod
@@ -101,6 +107,7 @@ class RegistrationCode(Entity, TimestampedMixin):
         profile: str = "member",
         max_uses: int = 1,
         department: str = "",
+        metadata: str = "",
     ) -> "RegistrationCode":
         """Create a new registration code."""
         expires_timestamp = _now_ts() + expires_in_hours * 3600
@@ -124,6 +131,7 @@ class RegistrationCode(Entity, TimestampedMixin):
             frontend_url=frontend_url.rstrip("/") if frontend_url else "",
             profile=profile,
             department=department or "",
+            metadata=metadata or "",
             max_uses=max_uses,
             uses_count=0,
             principals_redeemed="",
@@ -204,6 +212,7 @@ def create_registration_code(
     frontend_url: str = "",
     email: str = "",
     department: str = "",
+    metadata: str = "",
 ) -> RegistrationCode:
     """Create and persist a new RegistrationCode, returning the entity."""
     return RegistrationCode.create(
@@ -216,6 +225,7 @@ def create_registration_code(
         profile=profile,
         max_uses=max_uses,
         department=department,
+        metadata=metadata,
     )
 
 
@@ -277,6 +287,7 @@ def consume_registration_code(code_hash_hex: str, principal: str) -> dict:
             "profile": reg_code.profile,
             "department": reg_code.department or "",
             "user_id": reg_code.user_id or "",
+            "metadata": reg_code.metadata or "",
         },
     }
 

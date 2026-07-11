@@ -548,6 +548,9 @@ def join_realm(
         # Organization the invite code links to (per-department staff invites,
         # issue #241). Applied after registration succeeds.
         invite_department = ""
+        # Full consume payload — carries citizen-import metadata for principal
+        # binding (issue #241). Empty for test-mode and codeless joins.
+        invite_consume_data = {}
 
         # --- Determine access ---
 
@@ -597,6 +600,7 @@ def join_realm(
                     )
                 granted_profile = invite_profile
                 invite_department = (consume_data.get("department") or "").strip()
+                invite_consume_data = consume_data
 
         elif is_controller:
             # Controllers can join with any profile without a code
@@ -670,6 +674,21 @@ def join_realm(
         if "profiles" in user and user["profiles"]:
             for p in user["profiles"]:
                 profiles.append(p)
+
+        # Citizen-import binding (issue #241): attach the imported census
+        # record (nickname, private data) to the redeeming principal. A
+        # pre-assigned quarter from the import wins over no preference.
+        if invite_consume_data:
+            try:
+                from core.citizen_import import bind_citizen
+
+                u = User[caller]
+                if u:
+                    imported_quarter = bind_citizen(u, invite_consume_data)
+                    if imported_quarter and not (preferred_quarter or "").strip():
+                        preferred_quarter = imported_quarter
+            except Exception as bind_err:
+                logger.error(f"Citizen binding failed for {caller}: {bind_err}")
 
         # Department-linked invite (issue #241): add the redeemer to the org so
         # the code's prepopulated permissions/extensions apply immediately.
