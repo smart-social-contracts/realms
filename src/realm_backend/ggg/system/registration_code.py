@@ -55,6 +55,9 @@ class RegistrationCode(Entity, TimestampedMixin):
         created_by: Principal of the admin who created the code.
         frontend_url: Base URL used to build the registration link.
         profile: Profile/role granted upon redemption.
+        department: Organization (Department.name) the redeemer is added to.
+            Empty for plain member/citizen codes. Enables per-department
+            staff invite URLs (issue #241).
         max_uses: Maximum allowed redemptions.
         uses_count: Current redemption count.
         principals_redeemed: Comma-separated principals that redeemed.
@@ -62,6 +65,7 @@ class RegistrationCode(Entity, TimestampedMixin):
     """
 
     __alias__ = "code_hash"
+    __version__ = 2
 
     code_hash = String(max_length=128)
     code = String(max_length=64)
@@ -73,10 +77,17 @@ class RegistrationCode(Entity, TimestampedMixin):
     created_by = String(max_length=64)
     frontend_url = String(max_length=512)
     profile = String(max_length=64, default="member")
+    department = String(max_length=256, default="")
     max_uses = Integer(default=1)
     uses_count = Integer(default=0)
     principals_redeemed = String(max_length=4096, default="")
     revoked = Integer(default=0)
+
+    @classmethod
+    def migrate(cls, obj, from_version, to_version):
+        if from_version < 2:
+            obj.setdefault("department", "")
+        return obj
 
     @classmethod
     def create(
@@ -89,6 +100,7 @@ class RegistrationCode(Entity, TimestampedMixin):
         code_hash: str = None,
         profile: str = "member",
         max_uses: int = 1,
+        department: str = "",
     ) -> "RegistrationCode":
         """Create a new registration code."""
         expires_timestamp = _now_ts() + expires_in_hours * 3600
@@ -111,6 +123,7 @@ class RegistrationCode(Entity, TimestampedMixin):
             created_by=created_by,
             frontend_url=frontend_url.rstrip("/") if frontend_url else "",
             profile=profile,
+            department=department or "",
             max_uses=max_uses,
             uses_count=0,
             principals_redeemed="",
@@ -171,6 +184,11 @@ class RegistrationCode(Entity, TimestampedMixin):
         """Return all codes targeted at *user_id*."""
         return [c for c in cls.instances() if c.user_id == user_id]
 
+    @classmethod
+    def find_by_department(cls, department: str) -> list["RegistrationCode"]:
+        """Return all codes linked to *department* (org staff invites)."""
+        return [c for c in cls.instances() if (c.department or "") == department]
+
 
 # ---------------------------------------------------------------------------
 # Module-level helpers (replace the extension entry-point functions)
@@ -185,6 +203,7 @@ def create_registration_code(
     user_id: str = "",
     frontend_url: str = "",
     email: str = "",
+    department: str = "",
 ) -> RegistrationCode:
     """Create and persist a new RegistrationCode, returning the entity."""
     return RegistrationCode.create(
@@ -196,6 +215,7 @@ def create_registration_code(
         code_hash=code_hash,
         profile=profile,
         max_uses=max_uses,
+        department=department,
     )
 
 
@@ -223,6 +243,7 @@ def validate_registration_code(code_hash_hex: str) -> dict:
         "data": {
             "valid": True,
             "profile": reg_code.profile,
+            "department": reg_code.department or "",
             "expires_at": datetime.fromtimestamp(reg_code.expires_at).isoformat(),
             "user_id": reg_code.user_id,
             "email": reg_code.email,
@@ -254,6 +275,8 @@ def consume_registration_code(code_hash_hex: str, principal: str) -> dict:
         "success": True,
         "data": {
             "profile": reg_code.profile,
+            "department": reg_code.department or "",
+            "user_id": reg_code.user_id or "",
         },
     }
 
@@ -294,6 +317,7 @@ def list_registration_codes(include_used: bool = False) -> list[dict]:
             "user_id": c.user_id,
             "email": c.email,
             "profile": c.profile,
+            "department": c.department or "",
             "expires_at": datetime.fromtimestamp(c.expires_at).isoformat(),
             "uses_count": c.uses_count,
             "max_uses": c.max_uses,

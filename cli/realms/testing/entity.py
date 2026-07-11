@@ -52,6 +52,18 @@ class EntityRegistry:
 _registry = EntityRegistry()
 
 
+class MockRelation(list):
+    """List-like stand-in for ManyToMany/OneToMany relation fields."""
+
+    def add(self, item):
+        if item not in self:
+            self.append(item)
+
+    def remove(self, item):
+        if item in self:
+            list.remove(self, item)
+
+
 class _EntityMeta(type):
     """Metaclass that provides Entity["alias_value"] bracket lookup."""
 
@@ -81,6 +93,10 @@ class MockEntity(metaclass=_EntityMeta):
         self.creator = "test-principal"
         self.updater = "test-principal"
         self.owner = "test-principal"
+        # Relation fields declared on the class get a list-like default so
+        # codex code can do `entity.rel.add(x)` / iterate without setup.
+        for rel in getattr(self, "__relations__", ()):
+            setattr(self, rel, MockRelation())
         for k, v in kwargs.items():
             setattr(self, k, v)
         _registry.store(self)

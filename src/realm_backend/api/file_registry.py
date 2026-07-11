@@ -205,6 +205,54 @@ def install_codex_from_registry(
     # Use codex_id as the package name (last component for nested ids like "syntropia/membership")
     package_name = codex_id.split("/")[-1] if "/" in codex_id else codex_id
 
+    # --- Dependency resolution (issue #241) ---
+    # A codex declares required extensions in its manifest. Install missing
+    # ones from the same registry *before* the package init runs, so init can
+    # rely on them (and the realm is never left with a half-working codex).
+    dependencies = []
+    try:
+        codex_manifest = json.loads(files.get("manifest.json", "{}"))
+        dependencies = list(codex_manifest.get("dependencies", []) or [])
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f"Codex '{codex_id}': unreadable manifest.json, skipping dependency check: {e}")
+
+    installed_deps = []
+    failed_deps = []
+    if dependencies:
+        from core.runtime_extensions import list_installed
+
+        already = set(list_installed())
+        missing = [d for d in dependencies if d not in already]
+        logger.info(
+            f"Codex '{codex_id}' dependencies: {dependencies} "
+            f"(missing: {missing or 'none'})"
+        )
+
+        frontend_canister_id = None
+        try:
+            from ggg import Realm
+
+            _realms = Realm.instances()
+            if _realms:
+                fid = (getattr(_realms[0], "frontend_canister_id", "") or "").strip()
+                frontend_canister_id = fid or None
+        except Exception:
+            pass
+
+        for dep in missing:
+            dep_raw = yield from install_extension_from_registry(
+                registry_canister_id, dep, None, frontend_canister_id
+            )
+            try:
+                dep_result = json.loads(dep_raw)
+            except (json.JSONDecodeError, TypeError):
+                dep_result = {"success": False, "error": dep_raw}
+            if dep_result.get("success"):
+                installed_deps.append(dep)
+            else:
+                failed_deps.append({"extension": dep, "error": dep_result.get("error", "unknown")})
+                logger.error(f"Codex '{codex_id}': dependency '{dep}' failed to install: {dep_result}")
+
     # Install via runtime_codex
     from core.runtime_codex import (
         apply_entity_method_overrides,
@@ -233,7 +281,11 @@ def install_codex_from_registry(
         "files_count": len(files),
         "source": "registry",
         "applied_overrides": applied_overrides,
+        "dependencies": dependencies,
+        "dependencies_installed": installed_deps,
     }
+    if failed_deps:
+        result["dependency_warnings"] = failed_deps
     if init_error:
         result["init_warning"] = init_error
     return json.dumps(result)

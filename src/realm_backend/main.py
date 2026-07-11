@@ -545,6 +545,9 @@ def join_realm(
         realm = Realm.load("1")
         has_invite = bool(invite_code_checksum_hex and invite_code_checksum_hex.strip())
         granted_profile = profile
+        # Organization the invite code links to (per-department staff invites,
+        # issue #241). Applied after registration succeeds.
+        invite_department = ""
 
         # --- Determine access ---
 
@@ -582,7 +585,9 @@ def join_realm(
                     )
 
                 consume_data = consume_result.get("data", {})
-                invite_profile = (consume_data if isinstance(consume_data, dict) else consume_result).get("profile", "member")
+                if not isinstance(consume_data, dict):
+                    consume_data = consume_result
+                invite_profile = consume_data.get("profile", "member")
                 if profile and profile != invite_profile:
                     return RealmResponse(
                         success=False,
@@ -591,6 +596,7 @@ def join_realm(
                         ),
                     )
                 granted_profile = invite_profile
+                invite_department = (consume_data.get("department") or "").strip()
 
         elif is_controller:
             # Controllers can join with any profile without a code
@@ -664,6 +670,28 @@ def join_realm(
         if "profiles" in user and user["profiles"]:
             for p in user["profiles"]:
                 profiles.append(p)
+
+        # Department-linked invite (issue #241): add the redeemer to the org so
+        # the code's prepopulated permissions/extensions apply immediately.
+        if invite_department:
+            try:
+                from ggg import Department
+
+                dept = Department[invite_department]
+                u = User[caller]
+                if dept and u and not any(m.id == u.id for m in dept.members):
+                    dept.members.add(u)
+                    logger.info(
+                        f"Invite code added {caller} to organization '{invite_department}'"
+                    )
+                elif not dept:
+                    logger.warning(
+                        f"Invite code references unknown organization '{invite_department}'"
+                    )
+            except Exception as dept_err:
+                logger.error(
+                    f"Failed to add {caller} to organization '{invite_department}': {dept_err}"
+                )
 
         assigned_quarter_canister_id = ""
         quarters = list(Quarter.instances()) if realm else []

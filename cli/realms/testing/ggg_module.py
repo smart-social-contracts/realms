@@ -232,7 +232,20 @@ Proposal = _entity("Proposal", alias="proposal_id", methods={
 Vote = _entity("Vote")
 Notification = _entity("Notification")
 Codex = _entity("Codex", alias="name")
-Permission = _entity("Permission")
+Permission = _entity("Permission", alias="name")
+
+Department = _entity("Department", alias="name", methods={
+    "__relations__": ("members", "permissions", "extensions"),
+})
+DepartmentAuthority = _entity("DepartmentAuthority")
+
+RegistrationCode = _entity("RegistrationCode", alias="code_hash")
+RegistrationCode.create = classmethod(_dm.registration_code_create)
+RegistrationCode.find_by_department = classmethod(
+    lambda cls, department: [
+        c for c in cls.instances() if (c.department or "") == department
+    ]
+)
 
 # --- Realm ---
 Realm = _entity("Realm", alias="name")

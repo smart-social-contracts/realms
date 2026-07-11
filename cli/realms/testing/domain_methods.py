@@ -6,6 +6,56 @@ These get attached to the appropriate entity classes in ggg_module.py.
 
 
 # ---------------------------------------------------------------------------
+# RegistrationCode
+# ---------------------------------------------------------------------------
+
+def registration_code_create(
+    cls,
+    user_id,
+    created_by="admin",
+    frontend_url="",
+    email="",
+    expires_in_hours=24,
+    code_hash=None,
+    profile="member",
+    max_uses=1,
+    department="",
+):
+    """Mirror of RegistrationCode.create: plaintext code generated when no
+    code_hash is supplied."""
+    import hashlib
+    import secrets
+    import string
+    import time
+
+    expires_at = int(time.time()) + expires_in_hours * 3600
+    if code_hash:
+        code = ""
+    else:
+        alphabet = string.ascii_letters + string.digits
+        code = "".join(secrets.choice(alphabet) for _ in range(16))
+        code_hash = hashlib.sha256(code.encode()).hexdigest()
+
+    return cls(
+        code_hash=code_hash,
+        code=code,
+        user_id=user_id,
+        email=email or "",
+        expires_at=expires_at,
+        used=0,
+        used_at=0,
+        created_by=created_by,
+        frontend_url=frontend_url.rstrip("/") if frontend_url else "",
+        profile=profile,
+        department=department or "",
+        max_uses=max_uses,
+        uses_count=0,
+        principals_redeemed="",
+        revoked=0,
+    )
+
+
+# ---------------------------------------------------------------------------
 # LedgerEntry
 # ---------------------------------------------------------------------------
 
