@@ -179,16 +179,29 @@ export async function buildRealmDeploymentManifest(
     manifesto,
     welcome_message,
     open_registration: !!formData.open_registration,
-    extensions: Array.isArray(formData.extensions) ? [...formData.extensions] : ['all'],
+    // The codex package is the single source of truth for which extensions
+    // get installed (issue #242); the wizard no longer picks extensions.
+    extensions: [],
   };
 
-  if (formData.codex_source === 'package' && formData.codex_package_name?.trim()) {
+  if (formData.codex_package_name?.trim()) {
     realm.codex = {
       package: formData.codex_package_name.trim(),
       version: (formData.codex_package_version || 'latest').trim(),
     };
   } else {
     realm.codex = { package: 'syntropia', version: 'latest' };
+  }
+
+  // Realm token choice: mint a new ledger, or adopt an existing shared one
+  // (REALMS / ckBTC / ckUSDC).
+  if (formData.token_mode === 'existing' && formData.token_existing) {
+    realm.token = { existing: String(formData.token_existing) };
+  } else if (formData.token_name?.trim() && formData.token_symbol?.trim()) {
+    realm.token = {
+      name: formData.token_name.trim(),
+      symbol: formData.token_symbol.trim().toUpperCase(),
+    };
   }
 
   if (formData.assistant) {

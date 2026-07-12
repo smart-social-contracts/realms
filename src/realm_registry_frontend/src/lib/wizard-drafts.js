@@ -32,13 +32,6 @@ export function serializeWizardFormData(formData) {
     ...clean,
     logo: null,
     background: null,
-    codex_file: null,
-    geo_file: null,
-    realm_data_file: null,
-    custom_extensions: (clean.custom_extensions || []).map((ext) => ({
-      ...ext,
-      file: null,
-    })),
   };
 }
 

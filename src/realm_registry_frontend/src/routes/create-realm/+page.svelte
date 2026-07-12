@@ -5,7 +5,6 @@
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { CONFIG } from '$lib/config.js';
-  import extensionsConfig from '$lib/extensions-config.json';
   import codicesConfig from '$lib/codices-config.json';
   import AuthControls from '$lib/components/AuthControls.svelte';
   import { deploymentJobUrl } from '$lib/deployment-tracker.js';
@@ -63,6 +62,8 @@
         if (loaded) {
           draftId = loaded.id;
           formData = { ...formData, ...loaded.formData };
+          // Older drafts may carry a URL/file codex source; packages only now.
+          formData.codex_source = 'package';
           if (loaded.deployVersion) formData.deploy_version = loaded.deployVersion;
           if (urlStep != null && urlStep !== '') {
             const stepNum = parseInt(urlStep, 10);
@@ -198,8 +199,59 @@
           } catch (e) { /* keep hardcoded fallback */ }
         }
       }
+
+      // Fetch codex manifests (dependencies, overrides, onboarding policy) so
+      // the wizard can show what each package actually installs and configures.
+      for (const codex of AVAILABLE_CODICES) {
+        loadCodexManifest(codex.id);
+      }
     }
   });
+
+  // Codex package manifests keyed by codex id (fetched from the codices repo).
+  let codexManifests = {};
+
+  async function loadCodexManifest(codexId) {
+    if (!codexId || codexManifests[codexId]) return;
+    try {
+      const url = `https://raw.githubusercontent.com/smart-social-contracts/realms-codices/main/codices/${codexId}/manifest.json`;
+      const res = await fetch(url);
+      if (res.ok) {
+        codexManifests = { ...codexManifests, [codexId]: await res.json() };
+      }
+    } catch (e) { /* details panel simply stays hidden */ }
+  }
+
+  /** Normalized view of a codex manifest for the details panel. */
+  function codexDetails(manifest) {
+    if (!manifest) return null;
+    const rawDeps = manifest.dependencies || [];
+    const dependencies = Array.isArray(rawDeps)
+      ? rawDeps.map((d) => ({ id: String(d), pin: '' }))
+      : Object.entries(rawDeps).map(([id, pin]) => ({ id, pin: String(pin || '') }));
+    const overrides = Object.entries(manifest.extension_overrides || {});
+    const reg = manifest.onboarding?.registration || {};
+    return {
+      version: manifest.version || '',
+      currency: manifest.currency?.symbol || '',
+      dependencies,
+      overrides,
+      openRegistration: reg.open_registration === true,
+      defaultProfile: reg.default_profile || 'member',
+      identityRequirements: manifest.onboarding?.identity_requirements || [],
+    };
+  }
+
+  $: selectedCodexDetails = codexDetails(codexManifests[formData.codex_package_name] || null);
+
+  // Registration default follows the selected codex until the user overrides it.
+  let registrationTouched = false;
+  function applyCodexRegistrationDefault(codexId, manifests) {
+    if (registrationTouched) return;
+    const details = codexDetails(manifests[codexId]);
+    if (details) formData.open_registration = details.openRegistration;
+  }
+  $: applyCodexRegistrationDefault(formData.codex_package_name, codexManifests);
 
   async function loadUserCredits() {
     if (!userPrincipal) return;
@@ -252,12 +304,6 @@
 
   async function handleAutomaticDeploy() {
     if (!userPrincipal || userCredits < REQUIRED_CREDITS) return;
-
-    if (formData.codex_source !== 'package') {
-      deployError =
-        'One-click deploy supports a package codex only. Select a package, or use CLI manual deploy for URL/file codex.';
-      return;
-    }
 
     isDeploying = true;
     deployError = null;
@@ -321,12 +367,12 @@
     }
   }
 
-  // Wizard steps
+  // Wizard steps. Extensions and initial data are codex-driven (issue #242):
+  // the codex package defines what gets installed; extensions can be added
+  // and citizens imported from inside the deployed realm.
   const STEPS = [
     { id: 'codex', label: 'Codex' },
-    { id: 'land', label: 'Land & Tokens' },
-    { id: 'extensions', label: 'Extensions' },
-    { id: 'data', label: 'Data' },
+    { id: 'token', label: 'Token' },
     { id: 'basics', label: 'Basics' },
     { id: 'branding', label: 'Branding' },
     { id: 'deploy', label: 'Deploy' }
@@ -359,20 +405,12 @@
     }
   ];
 
-  // Available extensions and categories (loaded from $lib/extensions-config.json)
-  const AVAILABLE_EXTENSIONS = extensionsConfig.extensions;
-  const defaultExtensionIds = AVAILABLE_EXTENSIONS
-    .filter((e) => e.default || e.tier === 'core' || e.mandatory)
-    .map((e) => e.id);
-  const EXTENSION_CATEGORIES = (() => {
-    const seen = new Map();
-    for (const ext of AVAILABLE_EXTENSIONS) {
-      if (!seen.has(ext.category)) {
-        seen.set(ext.category, { id: ext.category, name: ext.category_name || ext.category });
-      }
-    }
-    return Array.from(seen.values());
-  })();
+  // Existing shared token ledgers a realm can adopt instead of minting its own.
+  const EXISTING_TOKENS = [
+    { symbol: 'REALMS', name: 'REALMS Token', description: 'The shared mundus-wide token, common to all realms' },
+    { symbol: 'ckBTC', name: 'ckBTC', description: 'Chain-Key Bitcoin — IC-native Bitcoin twin' },
+    { symbol: 'ckUSDC', name: 'ckUSDC', description: 'Chain-Key USDC — IC-native USD stablecoin' },
+  ];
 
   // Available codices (loaded from $lib/codices-config.json)
   let AVAILABLE_CODICES = codicesConfig.codices;
@@ -386,11 +424,6 @@
     if (codexSortBy === 'oldest') return (a.created_at || '').localeCompare(b.created_at || '');
     return 0;
   });
-
-  // Helper to get extensions by category
-  function getExtensionsByCategory(categoryId) {
-    return AVAILABLE_EXTENSIONS.filter(ext => ext.category === categoryId);
-  }
 
   let currentStep = 0;
   let isSubmitting = false;
@@ -406,35 +439,18 @@
     background: null,
     backgroundPreview: '',
     welcome_messages: { en: '' }, // Language-keyed welcome messages
-    token_enabled: true,
+    // Token: create a new realm token, or adopt an existing shared ledger
+    token_mode: 'new', // 'new' | 'existing'
     token_name: '',
     token_symbol: '',
-    ckbtc_enabled: false,
-    human_id_required: false,
-    land_token_enabled: false,
-    land_token_name: '',
-    land_token_symbol: '',
-    land_token_description: '',
-    land_token_supply_cap: 10000,
-    // New: Geo coordinates
-    geo_file: null,
-    geo_file_name: '',
-    // New: Codex
-    codex_source: 'package', // 'package', 'file', 'url'
+    token_existing: 'REALMS', // when token_mode === 'existing'
+    // Codex (package only — codices are distro-style packages, issue #242)
+    codex_source: 'package',
     codex_package_name: '',
     codex_package_version: 'latest',
-    codex_file: null,
-    codex_file_name: '',
-    codex_url: '',
-    // New: Extensions (core + default extensions pre-selected)
-    extensions: defaultExtensionIds,
-    custom_extensions: [], // Array of { name, source: 'file'|'url', file, url }
-    // New: Governance Assistant
+    // Governance Assistant
     assistant: null, // null means no assistant, or assistant id
-    // New: Realm Data (users)
-    realm_data_file: null,
-    realm_data_file_name: '',
-    // Member registration type
+    // Member registration type (default follows the selected codex)
     open_registration: false,
     // Realm software version for Casals deploy (semver or main)
     deploy_version: CONFIG.default_deploy_version || 'main',
@@ -454,20 +470,14 @@
     
     // Step 0: Codex
     if (step === 0) {
-      if (formData.codex_source === 'package' && !formData.codex_package_name.trim()) {
-        errors.codex_package_name = 'Package name is required';
-      }
-      if (formData.codex_source === 'url' && !formData.codex_url.trim()) {
-        errors.codex_url = 'URL is required';
-      }
-      if (formData.codex_source === 'file' && !formData.codex_file) {
-        errors.codex_file = 'Please upload a codex zip file';
+      if (!formData.codex_package_name.trim()) {
+        errors.codex_package_name = 'Please select a codex';
       }
     }
     
-    // Step 1: Land & Tokens
+    // Step 1: Token
     if (step === 1) {
-      if (formData.token_enabled) {
+      if (formData.token_mode === 'new') {
         if (!formData.token_name.trim()) {
           errors.token_name = 'Token name is required';
         }
@@ -477,22 +487,10 @@
           errors.token_symbol = 'Symbol must be 10 characters or less';
         }
       }
-      
-      if (formData.land_token_enabled) {
-        if (!formData.land_token_name.trim()) {
-          errors.land_token_name = 'Land token name is required';
-        }
-        if (!formData.land_token_symbol.trim()) {
-          errors.land_token_symbol = 'Land token symbol is required';
-        }
-      }
     }
     
-    // Step 2: Extensions - no validation needed
-    // Step 3: Data - no validation needed
-    
-    // Step 4: Basics
-    if (step === 4) {
+    // Step 2: Basics
+    if (step === 2) {
       if (!formData.name.trim()) {
         errors.name = 'Realm name is required';
       } else if (formData.name.length < 3) {
@@ -512,8 +510,8 @@
       }
     }
     
-    // Step 5: Branding
-    if (step === 5) {
+    // Step 3: Branding
+    if (step === 3) {
       // Validate welcome messages for each language
       for (const langCode of formData.languages) {
         const msg = formData.welcome_messages[langCode] || '';
@@ -601,73 +599,6 @@
     }
   }
 
-  function handleGeoFileUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-      formData.geo_file = file;
-      formData.geo_file_name = file.name;
-    }
-  }
-
-  function handleCodexFileUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-      formData.codex_file = file;
-      formData.codex_file_name = file.name;
-    }
-  }
-
-  function toggleExtension(extId) {
-    // Prevent toggling mandatory or core extensions
-    const ext = AVAILABLE_EXTENSIONS.find(e => e.id === extId);
-    if (ext?.mandatory || ext?.tier === 'core') return;
-    
-    if (formData.extensions.includes(extId)) {
-      formData.extensions = formData.extensions.filter(id => id !== extId);
-    } else {
-      formData.extensions = [...formData.extensions, extId];
-    }
-  }
-
-  function addCustomExtension() {
-    formData.custom_extensions = [...formData.custom_extensions, { 
-      name: '', 
-      source: 'url', 
-      file: null, 
-      file_name: '',
-      url: '' 
-    }];
-  }
-
-  function removeCustomExtension(index) {
-    formData.custom_extensions = formData.custom_extensions.filter((_, i) => i !== index);
-  }
-
-  function handleCustomExtensionFile(event, index) {
-    const file = event.target.files[0];
-    if (file) {
-      formData.custom_extensions[index].file = file;
-      formData.custom_extensions[index].file_name = file.name;
-      if (!formData.custom_extensions[index].name) {
-        formData.custom_extensions[index].name = file.name.replace('.zip', '');
-      }
-      formData.custom_extensions = [...formData.custom_extensions];
-    }
-  }
-
-  function handleRealmDataUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-      formData.realm_data_file = file;
-      formData.realm_data_file_name = file.name;
-    }
-  }
-
-  function removeRealmDataFile() {
-    formData.realm_data_file = null;
-    formData.realm_data_file_name = '';
-  }
-
   function copyToClipboard(text) {
     if (browser) {
       navigator.clipboard.writeText(text);
@@ -684,69 +615,28 @@
       open_registration: formData.open_registration
     };
 
-    // Realm Token (optional)
-    if (formData.token_enabled) {
+    // Token: new realm-native ledger, or an existing shared one
+    if (formData.token_mode === 'existing') {
+      manifest.token = { existing: formData.token_existing };
+    } else {
       manifest.token = {
         name: formData.token_name,
         symbol: formData.token_symbol.toUpperCase()
       };
     }
 
-    // ckBTC Support
-    if (formData.ckbtc_enabled) {
-      manifest.ckbtc_enabled = true;
-    }
-
-    if (formData.land_token_enabled) {
-      manifest.land_token = {
-        name: formData.land_token_name,
-        symbol: formData.land_token_symbol.toUpperCase(),
-        description: formData.land_token_description || `Land ownership NFT for ${formData.name} realm`,
-        supply_cap: formData.land_token_supply_cap
-      };
-      
-      if (formData.geo_file) {
-        manifest.land_token.geo_file = formData.geo_file_name;
+    // Codex package — the codex defines the extension set, land/identity
+    // policy, and initial data (issue #242).
+    manifest.codex = {
+      package: {
+        name: formData.codex_package_name,
+        version: formData.codex_package_version || 'latest'
       }
-    }
-
-    // Codex configuration
-    if (formData.codex_source === 'package') {
-      manifest.codex = {
-        package: {
-          name: formData.codex_package_name,
-          version: formData.codex_package_version || 'latest'
-        }
-      };
-    } else if (formData.codex_source === 'url') {
-      manifest.codex = {
-        url: formData.codex_url
-      };
-    } else if (formData.codex_source === 'file') {
-      manifest.codex = {
-        file: formData.codex_file_name
-      };
-    }
-
-    // Extensions
-    if (formData.extensions.length > 0 || formData.custom_extensions.length > 0) {
-      manifest.extensions = {
-        enabled: formData.extensions,
-        custom: formData.custom_extensions.map(ext => ({
-          name: ext.name,
-          source: ext.source === 'url' ? ext.url : ext.file_name
-        })).filter(ext => ext.name && ext.source)
-      };
-    }
+    };
 
     // Governance Assistant
     if (formData.assistant) {
       manifest.assistant = formData.assistant;
-    }
-
-    // Realm Data
-    if (formData.realm_data_file) {
-      manifest.realm_data = formData.realm_data_file_name;
     }
 
     return manifest;
@@ -785,16 +675,6 @@
   // Auto-generate token symbol from name
   $: if (formData.name && !formData.token_symbol) {
     formData.token_symbol = formData.name.substring(0, 4).toUpperCase();
-  }
-
-  // Auto-generate land token name/symbol
-  $: if (formData.land_token_enabled && formData.name) {
-    if (!formData.land_token_name) {
-      formData.land_token_name = `${formData.name} Land`;
-    }
-    if (!formData.land_token_symbol) {
-      formData.land_token_symbol = `${formData.name.substring(0, 3).toUpperCase()}LAND`;
-    }
   }
 </script>
 
@@ -937,8 +817,8 @@
 
   <!-- Form Content -->
   <div class="form-container">
-    {#if currentStep === 4}
-      <!-- Step 5: Basics -->
+    {#if currentStep === 2}
+      <!-- Step 3: Basics -->
       <div class="form-step">
         <h2>Basic Information</h2>
         <p class="step-description">Give your realm a unique identity</p>
@@ -1025,13 +905,19 @@
 
         <div class="form-group">
           <label>Member Registration</label>
-          <p class="hint" style="margin-bottom: 0.75rem;">Choose how new members can join your realm</p>
+          <p class="hint" style="margin-bottom: 0.75rem;">
+            Choose how new members can join your realm
+            {#if selectedCodexDetails}
+              — the {AVAILABLE_CODICES.find(c => c.id === formData.codex_package_name)?.name || formData.codex_package_name} codex defaults to
+              <strong>{selectedCodexDetails.openRegistration ? 'open registration' : 'invitation only'}</strong>
+            {/if}
+          </p>
           <div class="registration-type-options">
             <button
               type="button"
               class="registration-option"
               class:selected={!formData.open_registration}
-              on:click={() => formData.open_registration = false}
+              on:click={() => { registrationTouched = true; formData.open_registration = false; }}
             >
               <div class="registration-option-icon">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1047,7 +933,7 @@
               type="button"
               class="registration-option"
               class:selected={formData.open_registration}
-              on:click={() => formData.open_registration = true}
+              on:click={() => { registrationTouched = true; formData.open_registration = true; }}
             >
               <div class="registration-option-icon">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1064,8 +950,8 @@
         </div>
       </div>
 
-    {:else if currentStep === 5}
-      <!-- Step 6: Branding -->
+    {:else if currentStep === 3}
+      <!-- Step 4: Branding -->
       <div class="form-step">
         <h2>Branding & Welcome</h2>
         <p class="step-description">Customize how your realm looks and feels</p>
@@ -1174,175 +1060,112 @@
       </div>
 
     {:else if currentStep === 1}
-      <!-- Step 2: Land & Tokens -->
+      <!-- Step 2: Token -->
       <div class="form-step">
-        <h2>Token Configuration</h2>
-        <p class="step-description">Configure the tokens for your realm</p>
+        <h2>Realm Token</h2>
+        <p class="step-description">Choose the token your realm will use for payments and treasury operations</p>
 
-        <!-- Realm Token Section -->
-        <div class="token-section">
-          <div class="form-group">
-            <label class="toggle-label">
-              <input type="checkbox" bind:checked={formData.token_enabled} />
-              <span class="toggle-switch"></span>
-              <span>Create Realm Token</span>
-            </label>
-            <p class="hint">Create a native token for governance and transactions within your realm</p>
-          </div>
-
-          {#if formData.token_enabled}
-            <div class="token-config">
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="token_name">Token Name <span class="required">*</span></label>
-                  <input 
-                    type="text" 
-                    id="token_name" 
-                    bind:value={formData.token_name}
-                    placeholder="e.g., Atlantis Token"
-                    class:error={errors.token_name}
-                  />
-                  {#if errors.token_name}
-                    <span class="error-message">{errors.token_name}</span>
-                  {/if}
-                </div>
-
-                <div class="form-group">
-                  <label for="token_symbol">Token Symbol <span class="required">*</span></label>
-                  <input 
-                    type="text" 
-                    id="token_symbol" 
-                    bind:value={formData.token_symbol}
-                    placeholder="e.g., ATL"
-                    maxlength="10"
-                    class:error={errors.token_symbol}
-                  />
-                  {#if errors.token_symbol}
-                    <span class="error-message">{errors.token_symbol}</span>
-                  {/if}
-                </div>
-              </div>
+        <div class="registration-type-options">
+          <button
+            type="button"
+            class="registration-option"
+            class:selected={formData.token_mode === 'new'}
+            on:click={() => formData.token_mode = 'new'}
+          >
+            <div class="registration-option-icon">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                <circle cx="12" cy="12" r="10" stroke-width="2" />
+              </svg>
             </div>
-          {/if}
+            <div class="registration-option-text">
+              <strong>Create a new token</strong>
+              <span>Mint a native token owned by your realm</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            class="registration-option"
+            class:selected={formData.token_mode === 'existing'}
+            on:click={() => formData.token_mode = 'existing'}
+          >
+            <div class="registration-option-icon">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="8" cy="12" r="6" stroke-width="2" />
+                <circle cx="16" cy="12" r="6" stroke-width="2" />
+              </svg>
+            </div>
+            <div class="registration-option-text">
+              <strong>Use an existing token</strong>
+              <span>Adopt a shared ledger like REALMS, ckBTC or ckUSDC</span>
+            </div>
+          </button>
         </div>
 
-        <div class="divider"></div>
-
-        <!-- ckBTC Support Section -->
-        <div class="token-section">
-          <div class="form-group">
-            <label class="toggle-label">
-              <input type="checkbox" bind:checked={formData.ckbtc_enabled} />
-              <span class="toggle-switch"></span>
-              <span>Enable ckBTC Support</span>
-            </label>
-            <p class="hint">Allow users to use ckBTC (Chain-Key Bitcoin) within your realm</p>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- Human ID Verification Section -->
-        <div class="token-section">
-          <div class="form-group">
-            <label class="toggle-label">
-              <input type="checkbox" bind:checked={formData.human_id_required} />
-              <span class="toggle-switch"></span>
-              <span>Require Human ID Verification</span>
-            </label>
-            <p class="hint">Require citizens to verify their humanity using a zero-knowledge proof system (currently supported: Rarimo ZKM)</p>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="form-group">
-          <label class="toggle-label">
-            <input type="checkbox" bind:checked={formData.land_token_enabled} />
-            <span class="toggle-switch"></span>
-            <span>Enable Land Token (NFT)</span>
-          </label>
-          <p class="hint">Land tokens represent ownership of parcels within your realm</p>
-        </div>
-
-        {#if formData.land_token_enabled}
-          <div class="land-token-config">
+        {#if formData.token_mode === 'new'}
+          <div class="token-config" style="margin-top: 1.5rem;">
             <div class="form-row">
               <div class="form-group">
-                <label for="land_token_name">Land Token Name <span class="required">*</span></label>
+                <label for="token_name">Token Name <span class="required">*</span></label>
                 <input 
                   type="text" 
-                  id="land_token_name" 
-                  bind:value={formData.land_token_name}
-                  placeholder="e.g., Atlantis Land"
-                  class:error={errors.land_token_name}
+                  id="token_name" 
+                  bind:value={formData.token_name}
+                  placeholder="e.g., Atlantis Token"
+                  class:error={errors.token_name}
                 />
-                {#if errors.land_token_name}
-                  <span class="error-message">{errors.land_token_name}</span>
+                {#if errors.token_name}
+                  <span class="error-message">{errors.token_name}</span>
                 {/if}
               </div>
 
               <div class="form-group">
-                <label for="land_token_symbol">Land Token Symbol <span class="required">*</span></label>
+                <label for="token_symbol">Token Symbol <span class="required">*</span></label>
                 <input 
                   type="text" 
-                  id="land_token_symbol" 
-                  bind:value={formData.land_token_symbol}
-                  placeholder="e.g., ATLAND"
+                  id="token_symbol" 
+                  bind:value={formData.token_symbol}
+                  placeholder="e.g., ATL"
                   maxlength="10"
-                  class:error={errors.land_token_symbol}
+                  class:error={errors.token_symbol}
                 />
-                {#if errors.land_token_symbol}
-                  <span class="error-message">{errors.land_token_symbol}</span>
+                {#if errors.token_symbol}
+                  <span class="error-message">{errors.token_symbol}</span>
                 {/if}
               </div>
-            </div>
-
-            <div class="form-group">
-              <label for="land_token_supply">Supply Cap</label>
-              <input 
-                type="number" 
-                id="land_token_supply" 
-                bind:value={formData.land_token_supply_cap}
-                min="100"
-                max="1000000"
-              />
-              <span class="hint">Maximum number of land parcels (100 - 1,000,000)</span>
-            </div>
-
-            <div class="divider"></div>
-
-            <div class="form-group">
-              <label for="geo_file">Geo Coordinates File</label>
-              <div class="upload-area file-upload" class:has-file={formData.geo_file}>
-                {#if formData.geo_file}
-                  <div class="file-info">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                    <span>{formData.geo_file_name}</span>
-                    <button type="button" class="remove-file-btn" on:click={() => { formData.geo_file = null; formData.geo_file_name = ''; }} aria-label="Remove file">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 6L6 18M6 6l12 12"/>
-                      </svg>
-                    </button>
-                  </div>
-                {:else}
-                  <input type="file" accept=".json,.geojson,.csv" on:change={handleGeoFileUpload} id="geo_file_input" />
-                  <div class="upload-placeholder">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                    <span>Upload Geo Coordinates</span>
-                    <span class="hint">GeoJSON, JSON, or CSV file</span>
-                  </div>
-                {/if}
-              </div>
-              <span class="hint">Define the geographic boundaries for land parcels</span>
             </div>
           </div>
+        {:else}
+          <div class="form-group" style="margin-top: 1.5rem;">
+            <label>Select Token</label>
+            <div class="codex-options">
+              {#each EXISTING_TOKENS as token}
+                <button
+                  type="button"
+                  class="codex-card"
+                  class:selected={formData.token_existing === token.symbol}
+                  on:click={() => formData.token_existing = token.symbol}
+                >
+                  <div class="codex-radio">
+                    {#if formData.token_existing === token.symbol}
+                      <div class="codex-radio-dot"></div>
+                    {/if}
+                  </div>
+                  <div class="codex-info">
+                    <span class="codex-name">{token.name} ({token.symbol})</span>
+                    <span class="codex-desc">{token.description}</span>
+                  </div>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        {#if selectedCodexDetails?.currency}
+          <p class="hint" style="margin-top: 1rem;">
+            The {AVAILABLE_CODICES.find(c => c.id === formData.codex_package_name)?.name || formData.codex_package_name} codex
+            uses <strong>{selectedCodexDetails.currency}</strong> as its accounting currency.
+          </p>
         {/if}
       </div>
 
@@ -1352,51 +1175,6 @@
         <h2>Codex Configuration <span class="info-tooltip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg><span class="info-tooltip-text">A codex is a set of governance rules implemented in Python code. It defines how your realm operates — including taxation, budgets, voting, and more.</span></span></h2>
         <p class="step-description">Configure the governance rules for your realm</p>
 
-        <div class="form-group">
-          <label>Codex Source</label>
-          <div class="source-tabs">
-            <button 
-              type="button"
-              class="source-tab" 
-              class:active={formData.codex_source === 'package'}
-              on:click={() => formData.codex_source = 'package'}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-              Package
-            </button>
-            <button 
-              type="button"
-              class="source-tab" 
-              class:active={formData.codex_source === 'url'}
-              on:click={() => formData.codex_source = 'url'}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-              </svg>
-              URL
-            </button>
-            <button 
-              type="button"
-              class="source-tab" 
-              class:active={formData.codex_source === 'file'}
-              on:click={() => formData.codex_source = 'file'}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-              </svg>
-              Upload
-            </button>
-          </div>
-        </div>
-
-        {#if formData.codex_source === 'package'}
           <div class="form-group">
             <label for="codex_package">Select Codex <span class="required">*</span></label>
             <div class="codex-sort-row">
@@ -1455,273 +1233,66 @@
           </div>
           <p class="hint">Select a pre-built codex package for your realm's governance rules</p>
 
-        {:else if formData.codex_source === 'url'}
-          <div class="form-group">
-            <label for="codex_url">Codex URL <span class="required">*</span></label>
-            <input 
-              type="text" 
-              id="codex_url" 
-              bind:value={formData.codex_url}
-              placeholder="https://example.com/my-codex.zip"
-              class:error={errors.codex_url}
-            />
-            {#if errors.codex_url}
-              <span class="error-message">{errors.codex_url}</span>
-            {/if}
-            <span class="hint">URL to a zip file containing Python codex files</span>
-          </div>
+          {#if selectedCodexDetails}
+            <div class="codex-manifest-details">
+              <h3>
+                What's included
+                {#if selectedCodexDetails.version}
+                  <span class="codex-version-badge">v{selectedCodexDetails.version}</span>
+                {/if}
+              </h3>
 
-        {:else if formData.codex_source === 'file'}
-          <div class="form-group">
-            <label for="codex_file">Codex Zip File <span class="required">*</span></label>
-            <div class="upload-area file-upload" class:has-file={formData.codex_file}>
-              {#if formData.codex_file}
-                <div class="file-info">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                  </svg>
-                  <span>{formData.codex_file_name}</span>
-                  <button type="button" class="remove-file-btn" on:click={() => { formData.codex_file = null; formData.codex_file_name = ''; }} aria-label="Remove file">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M18 6L6 18M6 6l12 12"/>
-                    </svg>
-                  </button>
-                </div>
-              {:else}
-                <input type="file" accept=".zip" on:change={handleCodexFileUpload} id="codex_file_input" />
-                <div class="upload-placeholder">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                  </svg>
-                  <span>Upload Codex Zip</span>
-                  <span class="hint">Zip file with Python codex files</span>
+              {#if selectedCodexDetails.dependencies.length > 0}
+                <div class="codex-detail-row">
+                  <span class="codex-detail-label">Extensions</span>
+                  <div class="codex-dep-chips">
+                    {#each selectedCodexDetails.dependencies as dep}
+                      <span class="codex-dep-chip">{dep.id}{dep.pin ? ` @ ${dep.pin}` : ''}</span>
+                    {/each}
+                  </div>
                 </div>
               {/if}
-            </div>
-            {#if errors.codex_file}
-              <span class="error-message">{errors.codex_file}</span>
-            {/if}
-          </div>
-        {/if}
-      </div>
 
-    {:else if currentStep === 2}
-      <!-- Step 3: Extensions -->
-      <div class="form-step">
-        <h2>Extensions</h2>
-        <p class="step-description">Select which extensions to enable for your realm</p>
-
-        <div class="select-all-row">
-          <span class="selected-count">{formData.extensions.length} of {AVAILABLE_EXTENSIONS.length} selected</span>
-          <button 
-            type="button" 
-            class="btn btn-small btn-outline"
-            on:click={() => {
-              const optional = AVAILABLE_EXTENSIONS.filter(e => !e.mandatory && e.tier !== 'core');
-              const allOptionalSelected = optional.every(e => formData.extensions.includes(e.id));
-              if (allOptionalSelected) {
-                formData.extensions = AVAILABLE_EXTENSIONS
-                  .filter(e => e.mandatory || e.tier === 'core')
-                  .map(e => e.id);
-              } else {
-                formData.extensions = AVAILABLE_EXTENSIONS.map(e => e.id);
-              }
-            }}
-          >
-            {#if AVAILABLE_EXTENSIONS.filter(e => !e.mandatory && e.tier !== 'core').every(e => formData.extensions.includes(e.id))}
-              Unselect All
-            {:else}
-              Select All
-            {/if}
-          </button>
-        </div>
-
-        {#each EXTENSION_CATEGORIES as category}
-          {@const categoryExtensions = getExtensionsByCategory(category.id)}
-          {#if categoryExtensions.length > 0}
-            <div class="extension-category">
-              <h3 class="category-title">{category.name}</h3>
-              <div class="extensions-grid">
-                {#each categoryExtensions as ext}
-                  <button 
-                    type="button"
-                    class="extension-card" 
-                    class:selected={formData.extensions.includes(ext.id)}
-                    class:mandatory={ext.mandatory || ext.tier === 'core'}
-                    on:click={() => toggleExtension(ext.id)}
-                    disabled={ext.mandatory || ext.tier === 'core'}
-                  >
-                    <div class="extension-check">
-                      {#if formData.extensions.includes(ext.id)}
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      {/if}
-                    </div>
-                    <div class="extension-info">
-                      <span class="extension-name">{ext.name}{#if ext.mandatory} <span class="mandatory-badge">Required</span>{:else if ext.tier === 'core'} <span class="mandatory-badge">Core</span>{/if}</span>
-                      <span class="extension-desc">{ext.description}</span>
-                      {#if ext.doc_url}
-                        <a href={ext.doc_url} target="_blank" rel="noopener" class="doc-link" on:click|stopPropagation>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <line x1="10" y1="14" x2="21" y2="3"></line>
-                          </svg>
-                          Docs
-                        </a>
-                      {/if}
-                    </div>
-                  </button>
-                {/each}
-              </div>
-            </div>
-          {/if}
-        {/each}
-
-        <div class="divider"></div>
-
-        <div class="custom-extensions-section">
-          <div class="section-header">
-            <h3>Custom Extensions</h3>
-            <button type="button" class="btn btn-small" on:click={addCustomExtension}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12h14"/>
-              </svg>
-              Add Extension
-            </button>
-          </div>
-
-          {#if formData.custom_extensions.length === 0}
-            <p class="empty-state">No custom extensions added. Click "Add Extension" to add your own.</p>
-          {:else}
-            {#each formData.custom_extensions as ext, index}
-              <div class="custom-extension-row">
-                <div class="form-group">
-                  <label for="ext_name_{index}">Name</label>
-                  <input 
-                    type="text" 
-                    id="ext_name_{index}"
-                    bind:value={ext.name}
-                    placeholder="Extension name"
-                  />
-                </div>
-                
-                <div class="form-group">
-                  <label>Source</label>
-                  <div class="mini-tabs">
-                    <button 
-                      type="button"
-                      class="mini-tab" 
-                      class:active={ext.source === 'url'}
-                      on:click={() => ext.source = 'url'}
-                    >URL</button>
-                    <button 
-                      type="button"
-                      class="mini-tab" 
-                      class:active={ext.source === 'file'}
-                      on:click={() => ext.source = 'file'}
-                    >File</button>
+              {#if selectedCodexDetails.overrides.length > 0}
+                <div class="codex-detail-row">
+                  <span class="codex-detail-label">Replaces system extensions</span>
+                  <div class="codex-dep-chips">
+                    {#each selectedCodexDetails.overrides as [base, override]}
+                      <span class="codex-dep-chip override">{base} → {override}</span>
+                    {/each}
                   </div>
                 </div>
+              {/if}
 
-                {#if ext.source === 'url'}
-                  <div class="form-group flex-grow">
-                    <label for="ext_url_{index}">URL</label>
-                    <input 
-                      type="text" 
-                      id="ext_url_{index}"
-                      bind:value={ext.url}
-                      placeholder="https://example.com/extension.zip"
-                    />
-                  </div>
-                {:else}
-                  <div class="form-group flex-grow">
-                    <label for="ext_file_{index}">File</label>
-                    {#if ext.file}
-                      <div class="file-pill">
-                        <span>{ext.file_name}</span>
-                        <button type="button" on:click={() => { ext.file = null; ext.file_name = ''; }} aria-label="Remove">×</button>
-                      </div>
-                    {:else}
-                      <input type="file" accept=".zip" on:change={(e) => handleCustomExtensionFile(e, index)} id="ext_file_{index}" />
-                    {/if}
-                  </div>
-                {/if}
-
-                <button type="button" class="remove-ext-btn" on:click={() => removeCustomExtension(index)} aria-label="Remove extension">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                  </svg>
-                </button>
+              <div class="codex-detail-row">
+                <span class="codex-detail-label">Registration</span>
+                <span class="codex-detail-value">
+                  {selectedCodexDetails.openRegistration
+                    ? `Open registration (new members join as ${selectedCodexDetails.defaultProfile})`
+                    : 'Invitation only'}
+                  {#if selectedCodexDetails.identityRequirements.length > 0}
+                    · identity checks: {selectedCodexDetails.identityRequirements.join(', ')}
+                  {/if}
+                </span>
               </div>
-            {/each}
-          {/if}
-        </div>
 
+              {#if selectedCodexDetails.currency}
+                <div class="codex-detail-row">
+                  <span class="codex-detail-label">Accounting currency</span>
+                  <span class="codex-detail-value">{selectedCodexDetails.currency}</span>
+                </div>
+              {/if}
+
+              <p class="codex-details-note">
+                The codex installs and configures everything above. You can add more
+                extensions later from inside your realm.
+              </p>
+            </div>
+          {/if}
       </div>
 
-    {:else if currentStep === 3}
-      <!-- Step 4: Data -->
-      <div class="form-step">
-        <h2>Realm Data</h2>
-        <p class="step-description">Optionally upload initial user data for your realm</p>
-
-        <div class="data-upload-section">
-          <div class="data-info-box">
-            <div class="data-info-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            </div>
-            <div class="data-info-text">
-              <strong>User Data File</strong>
-              <p>Upload a JSON file containing initial user records for your realm. This can include user profiles, memberships, and other user-related data.</p>
-            </div>
-          </div>
-
-          {#if formData.realm_data_file}
-            <div class="file-uploaded">
-              <div class="file-info">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-                <span>{formData.realm_data_file_name}</span>
-              </div>
-              <button type="button" class="remove-file-btn" on:click={removeRealmDataFile} aria-label="Remove file">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-          {:else}
-            <label class="file-upload-area">
-              <input type="file" accept=".json" on:change={handleRealmDataUpload} />
-              <div class="upload-content">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-                <span class="upload-text">Click to upload or drag and drop</span>
-                <span class="upload-hint">JSON file (realm_data.json)</span>
-              </div>
-            </label>
-          {/if}
-
-          <p class="optional-note">This step is optional. You can add users later through your realm's admin panel.</p>
-        </div>
-      </div>
-
-    {:else if currentStep === 6}
-      <!-- Step 7: Deploy -->
+    {:else if currentStep === 4}
+      <!-- Step 5: Deploy -->
       <div class="form-step">
         <h2>Deploy Your Realm</h2>
         <p class="step-description">Choose how you want to deploy your governance system</p>
@@ -3062,6 +2633,82 @@
 
   .doc-link:hover {
     text-decoration: underline;
+  }
+
+  /* Codex manifest details panel */
+  .codex-manifest-details {
+    margin-top: 1.25rem;
+    padding: 1.25rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+
+  .codex-manifest-details h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #171717;
+  }
+
+  .codex-version-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #4f46e5;
+    background: #eef2ff;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+  }
+
+  .codex-detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .codex-detail-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+  }
+
+  .codex-detail-value {
+    font-size: 0.85rem;
+    color: #334155;
+  }
+
+  .codex-dep-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .codex-dep-chip {
+    font-size: 0.75rem;
+    font-family: ui-monospace, monospace;
+    color: #334155;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+  }
+
+  .codex-dep-chip.override {
+    color: #92400e;
+    background: #fffbeb;
+    border-color: #fde68a;
+  }
+
+  .codex-details-note {
+    margin: 0.5rem 0 0;
+    font-size: 0.8rem;
+    color: #64748b;
   }
 
   /* Select all row */
