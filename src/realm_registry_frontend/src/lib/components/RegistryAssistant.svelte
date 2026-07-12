@@ -26,7 +26,7 @@
   import { goto } from '$app/navigation';
   import { portalDocumentFocus } from '$lib/portal-focus.js';
   import { assistantChrome } from '$lib/assistant-chrome.js';
-  import { assistantOpenRequest } from '$lib/assistant-open.js';
+  import { assistantOpenRequest, assistantToggleRequest } from '$lib/assistant-open.js';
   import { API_URL, CHAT_REQUEST_TIMEOUT_MS, geisterNetwork } from '$lib/geister/constants.js';
   import { renderMarkdown } from '$lib/geister/assistant-markdown.js';
   import { loadPrefs, loadPanelWidth, savePanelWidth } from '$lib/geister/assistant-prefs.js';
@@ -86,6 +86,8 @@
   let unsubPage;
   /** @type {(() => void) | undefined} */
   let unsubOpenRequest;
+  /** @type {(() => void) | undefined} */
+  let unsubToggleRequest;
   /** @type {(() => void) | undefined} */
   let unsubPrefsFocus;
 
@@ -322,7 +324,7 @@
     goto('/assistant/settings');
   }
 
-  $: showFab = !(docked && open);
+  $: showFab = !(docked && open) && $page.url.pathname !== '/';
 
   function applyPrefs() {
     const prefs = loadPrefs();
@@ -653,6 +655,9 @@
     unsubOpenRequest = assistantOpenRequest.subscribe((n) => {
       if (n > 0) setOpen(true);
     });
+    unsubToggleRequest = assistantToggleRequest.subscribe((n) => {
+      if (n > 0) setOpen(!open);
+    });
 
     await refreshAuth();
 
@@ -691,6 +696,7 @@
     unsubPage?.();
     unsubFocus?.();
     unsubOpenRequest?.();
+    unsubToggleRequest?.();
     unsubPrefsFocus?.();
     document.body.style.userSelect = '';
     document.body.style.cursor = '';

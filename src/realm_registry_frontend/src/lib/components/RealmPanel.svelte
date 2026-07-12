@@ -7,7 +7,7 @@
   export let realms = [];
   export let selectedRealmId = null;
   export let filterStage = '';
-  export let sortBy = 'name';
+  export let sortBy = 'users_desc';
   export let searchQuery = '';
 
   const dispatch = createEventDispatcher();
@@ -70,8 +70,8 @@
     </select>
 
     <select class="filter-select" bind:value={sortBy} on:change={() => dispatch('filter')}>
-      <option value="name">{$_('globe.sort_name')}</option>
       <option value="users_desc">{$_('globe.sort_users_desc')}</option>
+      <option value="name">{$_('globe.sort_name')}</option>
       <option value="users_asc">{$_('globe.sort_users_asc')}</option>
       <option value="newest">{$_('globe.sort_newest')}</option>
     </select>
@@ -114,17 +114,17 @@
 
   .realm-panel {
     position: fixed;
-    top: var(--header-height);
-    right: 0;
+    top: 0;
+    left: 0;
     bottom: 0;
     width: var(--panel-width);
     z-index: 160;
     display: flex;
     flex-direction: column;
     background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.06);
-    transform: translateX(100%);
+    border-right: 1px solid var(--border);
+    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.06);
+    transform: translateX(-100%);
     transition: transform 0.25s ease;
     font-family: var(--font-family);
   }

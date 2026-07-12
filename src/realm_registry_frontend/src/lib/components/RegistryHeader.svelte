@@ -1,7 +1,8 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { _, locale } from 'svelte-i18n';
   import { supportedLocales, setLocale } from '$lib/i18n';
+  import { requestAssistantToggle } from '$lib/assistant-open.js';
 
   export let searchQuery = '';
   export let isLoggedIn = false;
@@ -14,6 +15,8 @@
   const dispatch = createEventDispatcher();
 
   let showLanguageMenu = false;
+  let showSearch = false;
+  let showAuthMenu = false;
 
   function handleSearchInput() {
     dispatch('search');
@@ -21,35 +24,293 @@
       dispatch('openPanel');
     }
   }
+
+  function openSearch() {
+    showSearch = !showSearch;
+    showLanguageMenu = false;
+    showAuthMenu = false;
+    if (showSearch) {
+      dispatch('openPanel');
+      requestAnimationFrame(() => searchInput?.focus());
+    }
+  }
+
+  function closePopovers() {
+    showLanguageMenu = false;
+    showAuthMenu = false;
+    showSearch = false;
+  }
+
+  function cancelSearch() {
+    showSearch = false;
+  }
+
+  function handleSearchKeydown(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelSearch();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      dispatch('acceptSearch');
+      showSearch = false;
+    }
+  }
+
+  function onDocClick(e) {
+    const keepOpen = e.target?.closest?.('.icon-rail, .floating-menu, .search-stage');
+    if (!keepOpen) {
+      closePopovers();
+    }
+  }
+
+  function onDocKeydown(e) {
+    if (e.key !== 'Escape') return;
+    if (!showSearch && !showLanguageMenu && !showAuthMenu) return;
+    e.preventDefault();
+    closePopovers();
+  }
+
+  onMount(() => {
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onDocKeydown);
+    return () => {
+      document.removeEventListener('click', onDocClick);
+      document.removeEventListener('keydown', onDocKeydown);
+    };
+  });
 </script>
 
-<header class="registry-header">
-  <div class="header-left">
-    <a href="/" class="logo-link" aria-label="Realms">
-      <img src="/images/logo_horizontal.svg" alt="Realms" class="logo" />
-    </a>
+<nav class="icon-rail" aria-label="Main">
+  <a href="/" class="rail-btn rail-btn-logo" title="Realms" aria-label="Realms">
+    <img src="/images/logo_sphere_only.svg" alt="" class="rail-logo" />
+  </a>
+
+  <div class="rail-item">
+    <button
+      type="button"
+      class="rail-btn"
+      class:active={showSearch || Boolean(searchQuery)}
+      on:click|stopPropagation={openSearch}
+      title={$_('search.placeholder')}
+      aria-label={$_('search.placeholder')}
+      aria-expanded={showSearch}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+    </button>
   </div>
 
-  <div class="header-center">
-    <div class="search-wrapper">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+  <button
+    type="button"
+    class="rail-btn"
+    class:active={panelOpen}
+    on:click={() => {
+      closePopovers();
+      showSearch = false;
+      dispatch('togglePanel');
+    }}
+    title={$_('globe.browse_realms')}
+    aria-label={$_('globe.browse_realms')}
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <line x1="8" y1="6" x2="21" y2="6"></line>
+      <line x1="8" y1="12" x2="21" y2="12"></line>
+      <line x1="8" y1="18" x2="21" y2="18"></line>
+      <circle cx="4" cy="6" r="1.2" fill="currentColor" stroke="none"></circle>
+      <circle cx="4" cy="12" r="1.2" fill="currentColor" stroke="none"></circle>
+      <circle cx="4" cy="18" r="1.2" fill="currentColor" stroke="none"></circle>
+    </svg>
+  </button>
+
+  {#if marketplaceUrl}
+    <a
+      href={marketplaceUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="rail-btn"
+      title={$_('controls.marketplace')}
+      aria-label={$_('controls.marketplace')}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <path d="M16 10a4 4 0 0 1-8 0"></path>
+      </svg>
+    </a>
+  {/if}
+
+  <a
+    href="/create-realm"
+    class="rail-btn"
+    title={$_('controls.create_realm')}
+    aria-label={$_('controls.create_realm')}
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  </a>
+
+  <div class="rail-item">
+    <button
+      type="button"
+      class="rail-btn"
+      class:active={showLanguageMenu}
+      on:click|stopPropagation={() => {
+        showLanguageMenu = !showLanguageMenu;
+        showAuthMenu = false;
+        showSearch = false;
+      }}
+      title={$_('language.select')}
+      aria-label={$_('language.select')}
+      aria-expanded={showLanguageMenu}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="2" y1="12" x2="22" y2="12"></line>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+      </svg>
+    </button>
+  </div>
+
+  <button
+    type="button"
+    class="rail-btn rail-btn-ai"
+    on:click={() => {
+      closePopovers();
+      showSearch = false;
+      requestAssistantToggle();
+    }}
+    title={$_('assistant.toggle', { default: 'AI Assistant' })}
+    aria-label={$_('assistant.toggle', { default: 'AI Assistant' })}
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path>
+      <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"></path>
+      <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path>
+      <path d="M12 21v-3"></path>
+    </svg>
+  </button>
+
+  <div class="rail-item">
+    {#if authLoading}
+      <div class="rail-btn rail-loading" aria-hidden="true"></div>
+    {:else if isLoggedIn}
+      <button
+        type="button"
+        class="rail-btn"
+        class:active={showAuthMenu}
+        on:click|stopPropagation={() => {
+          showAuthMenu = !showAuthMenu;
+          showLanguageMenu = false;
+          showSearch = false;
+        }}
+        title={userPrincipal?.toText?.() || $_('auth.login')}
+        aria-label={$_('auth.login')}
+        aria-expanded={showAuthMenu}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </button>
+    {:else}
+      <button
+        type="button"
+        class="rail-btn"
+        on:click={() => dispatch('login')}
+        title={$_('auth.login')}
+        aria-label={$_('auth.login')}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </button>
+    {/if}
+  </div>
+</nav>
+
+{#if showLanguageMenu}
+  <div class="floating-menu language-menu" role="menu" on:mousedown|stopPropagation>
+    {#each supportedLocales as loc (loc.id)}
+      <button
+        type="button"
+        class="menu-option"
+        role="menuitem"
+        class:active={$locale === loc.id}
+        on:click={() => {
+          setLocale(loc.id);
+          showLanguageMenu = false;
+        }}
+      >
+        {loc.name}
+      </button>
+    {/each}
+  </div>
+{/if}
+
+{#if showAuthMenu && isLoggedIn}
+  <div class="floating-menu auth-menu" role="menu" on:mousedown|stopPropagation>
+    <a href="/my-dashboard" class="menu-option" role="menuitem" on:click={() => (showAuthMenu = false)}>
+      {$_('dashboard.title')}
+    </a>
+    <button
+      type="button"
+      class="menu-option"
+      role="menuitem"
+      on:click={() => {
+        showAuthMenu = false;
+        dispatch('logout');
+      }}
+    >
+      {$_('auth.logout')}
+    </button>
+  </div>
+{/if}
+
+{#if showSearch}
+  <div
+    class="search-stage"
+    role="presentation"
+    on:mousedown={() => {
+      showSearch = false;
+    }}
+  >
+    <div
+      class="search-popover search-popover-center"
+      role="search"
+      on:mousedown|stopPropagation
+    >
+      <svg class="search-field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <circle cx="11" cy="11" r="8"></circle>
         <path d="m21 21-4.35-4.35"></path>
       </svg>
       <input
         bind:this={searchInput}
-        type="search"
+        type="text"
         class="search-input"
         placeholder={$_('search.placeholder')}
         aria-label={$_('search.placeholder')}
         bind:value={searchQuery}
         on:input={handleSearchInput}
-        on:focus={() => dispatch('openPanel')}
+        on:keydown={handleSearchKeydown}
+        autocomplete="off"
+        spellcheck="false"
       />
       {#if searchQuery}
         <button
-          class="icon-btn search-clear"
-          on:click={() => { searchQuery = ''; dispatch('search'); }}
+          type="button"
+          class="clear-btn"
+          on:click={() => {
+            searchQuery = '';
+            dispatch('search');
+            searchInput?.focus();
+          }}
           aria-label={$_('search.clear')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -59,308 +320,342 @@
       {/if}
     </div>
   </div>
-
-  <div class="header-right">
-    <button
-      class="btn btn-ghost browse-btn"
-      class:active={panelOpen}
-      on:click={() => dispatch('togglePanel')}
-    >
-      {$_('globe.browse_realms')}
-    </button>
-
-    {#if marketplaceUrl}
-      <a href={marketplaceUrl} target="_blank" rel="noopener noreferrer" class="icon-btn" title={$_('controls.marketplace')} aria-label={$_('controls.marketplace')}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <path d="M16 10a4 4 0 0 1-8 0"></path>
-        </svg>
-      </a>
-    {/if}
-
-    <a href="/create-realm" class="btn btn-primary create-btn">{$_('controls.create_realm')}</a>
-
-    <div class="auth-section">
-      {#if authLoading}
-        <div class="auth-loading"></div>
-      {:else if isLoggedIn}
-        <a href="/my-dashboard" class="user-btn" title={userPrincipal?.toText()}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
-          </svg>
-          <span>{userPrincipal?.toText().slice(0, 5)}...{userPrincipal?.toText().slice(-3)}</span>
-        </a>
-        <button class="icon-btn" on:click={() => dispatch('logout')} title={$_('auth.logout')} aria-label={$_('auth.logout')}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-            <polyline points="16 17 21 12 16 7"></polyline>
-            <line x1="21" y1="12" x2="9" y2="12"></line>
-          </svg>
-        </button>
-      {:else}
-        <button class="icon-btn" on:click={() => dispatch('login')} title={$_('auth.login')} aria-label={$_('auth.login')}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
-          </svg>
-        </button>
-      {/if}
-    </div>
-
-    <div class="language-selector">
-      <button class="icon-btn" on:click={() => (showLanguageMenu = !showLanguageMenu)} aria-label={$_('language.select')}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-        </svg>
-      </button>
-      {#if showLanguageMenu}
-        <div class="language-menu">
-          {#each supportedLocales as loc}
-            <button
-              class="language-option"
-              class:active={$locale === loc.id}
-              on:click={() => { setLocale(loc.id); showLanguageMenu = false; }}
-            >
-              {loc.name}
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
-  </div>
-</header>
+{/if}
 
 <style>
-  .registry-header {
+  .icon-rail {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    height: var(--header-height);
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 1rem;
-    padding: 0 1rem;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--border);
-    font-family: var(--font-family);
-  }
-
-  .header-left {
-    flex-shrink: 0;
-  }
-
-  .logo-link {
-    display: flex;
-    align-items: center;
-  }
-
-  .logo {
-    height: 28px;
-    width: auto;
-  }
-
-  .header-center {
-    flex: 1;
-    max-width: 480px;
-    margin: 0 auto;
-  }
-
-  .search-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-
-  .search-icon {
-    position: absolute;
-    left: 0.75rem;
-    color: var(--text-faint);
+    gap: 0.75rem;
     pointer-events: none;
+    max-width: calc(100vw - 1.5rem);
+    overflow: visible;
   }
 
-  .search-input {
-    width: 100%;
-    height: 36px;
-    padding: 0 2rem 0 2.25rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text-primary);
-    font-size: 0.875rem;
-    font-family: inherit;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .search-input:focus {
-    border-color: var(--text-secondary);
-  }
-
-  .search-clear {
-    position: absolute;
-    right: 0.25rem;
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+  .rail-item {
+    position: relative;
+    pointer-events: auto;
     flex-shrink: 0;
   }
 
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.4375rem 0.75rem;
-    border-radius: 8px;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    font-family: inherit;
-    text-decoration: none;
-    cursor: pointer;
-    border: none;
-    transition: background 0.15s, color 0.15s;
-    white-space: nowrap;
-  }
-
-  .btn-ghost {
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-  }
-
-  .btn-ghost:hover,
-  .btn-ghost.active {
-    background: var(--surface-2);
-    color: var(--text-primary);
-  }
-
-  .btn-primary {
-    background: var(--text-primary);
-    color: var(--surface);
-  }
-
-  .btn-primary:hover {
-    background: var(--text-secondary);
-  }
-
-  .icon-btn {
+  .rail-btn {
+    pointer-events: auto;
+    flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 60px;
+    height: 60px;
     padding: 0;
     border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--text-secondary);
+    border-radius: 50%;
+    background: rgba(229, 229, 229, 0.55);
+    color: #171717;
     cursor: pointer;
     text-decoration: none;
-    transition: background 0.15s;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: background 0.15s ease, transform 0.15s ease, color 0.15s ease;
+    box-shadow: none;
   }
 
-  .icon-btn:hover {
-    background: var(--surface-2);
-    color: var(--text-primary);
+  .rail-btn :global(svg) {
+    width: 24px;
+    height: 24px;
   }
 
-  .user-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 8px;
-    font-size: 0.75rem;
-    font-family: ui-monospace, monospace;
-    color: var(--text-secondary);
-    text-decoration: none;
-    background: var(--surface-2);
+  .rail-btn:hover {
+    background: rgba(212, 212, 212, 0.72);
+    transform: scale(1.04);
   }
 
-  .user-btn:hover {
-    background: var(--border);
+  .rail-btn.active {
+    background: rgba(212, 212, 212, 0.8);
+    color: #0a0a0a;
   }
 
-  .auth-loading {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--surface-2);
+  .rail-btn-ai {
+    background: rgba(17, 17, 17, 0.82);
+    color: #ffffff;
+    animation: ai-glow 4.5s ease-in-out 1.2s infinite;
+  }
+
+  .rail-btn-ai:hover {
+    background: rgba(38, 38, 38, 0.9);
+    animation: none;
+  }
+
+  @keyframes ai-glow {
+    0%,
+    72%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(17, 17, 17, 0);
+      transform: scale(1);
+    }
+    80% {
+      box-shadow:
+        0 0 0 4px rgba(17, 17, 17, 0.12),
+        0 0 18px 2px rgba(17, 17, 17, 0.28);
+      transform: scale(1.04);
+    }
+    88% {
+      box-shadow:
+        0 0 0 8px rgba(17, 17, 17, 0.04),
+        0 0 28px 4px rgba(17, 17, 17, 0.18);
+      transform: scale(1.02);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rail-btn-ai {
+      animation: none;
+    }
+  }
+
+  .rail-btn-logo {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .rail-btn-logo:hover,
+  .rail-btn-logo.active {
+    background: transparent;
+    transform: scale(1.06);
+  }
+
+  .rail-logo {
+    width: 100%;
+    height: 100%;
+    max-width: 52px;
+    max-height: 52px;
+    object-fit: contain;
+    pointer-events: none;
+  }
+
+  .rail-loading {
+    opacity: 0.55;
     animation: pulse 1.2s ease-in-out infinite;
+    pointer-events: none;
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 0.85;
+    }
   }
 
-  .language-selector {
-    position: relative;
-  }
-
-  .language-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    min-width: 120px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    overflow: hidden;
-    z-index: 200;
-  }
-
-  .language-option {
-    display: block;
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: none;
-    background: transparent;
-    text-align: left;
-    font-size: 0.8125rem;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  .language-option:hover,
-  .language-option.active {
-    background: var(--surface-2);
-  }
-
-  .browse-btn {
+  .rail-popover {
     display: none;
   }
 
-  @media (min-width: 768px) {
-    .browse-btn {
-      display: inline-flex;
+  .floating-menu {
+    position: fixed;
+    top: calc(1rem + 60px + 0.75rem);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 230;
+    min-width: 160px;
+    padding: 0.35rem;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+  }
+
+  .menu-option {
+    display: block;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    color: #171717;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .menu-option:hover,
+  .menu-option.active {
+    background: #f5f5f5;
+  }
+
+  .search-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 220;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    background: transparent;
+  }
+
+  .search-popover {
+    display: flex;
+    align-items: center;
+    width: min(420px, calc(100vw - 2rem));
+    padding: 0.55rem 0.65rem 0.55rem 0.9rem;
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-radius: 16px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+  }
+
+  .search-popover-center {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+  }
+
+  .search-field-icon {
+    flex-shrink: 0;
+    color: #a3a3a3;
+    margin-right: 0.35rem;
+  }
+
+  .search-input {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 1rem;
+    font-family: inherit;
+    color: #171717;
+  }
+
+  .search-input::-webkit-search-cancel-button,
+  .search-input::-webkit-search-decoration,
+  .search-input::-ms-clear {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .clear-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #737373;
+    cursor: pointer;
+  }
+
+  .clear-btn:hover {
+    background: #f5f5f5;
+    color: #171717;
+  }
+
+  .menu-popover {
+    min-width: 140px;
+    padding: 0.35rem;
+    overflow: hidden;
+  }
+
+  .menu-option {
+    display: block;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    color: #171717;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .menu-option:hover,
+  .menu-option.active {
+    background: #f5f5f5;
+  }
+
+  @media (max-width: 900px) {
+    .floating-menu {
+      top: calc(1rem + 56px + 0.75rem);
     }
-    .create-btn span {
-      display: inline;
+
+    .rail-btn {
+      width: 56px;
+      height: 56px;
+    }
+
+    .rail-btn :global(svg) {
+      width: 24px;
+      height: 24px;
+    }
+
+    .rail-logo {
+      max-width: 48px;
+      max-height: 48px;
     }
   }
 
-  @media (max-width: 767px) {
-    .header-center {
+  @media (max-width: 480px) {
+    .icon-rail {
+      gap: 0.4rem;
+      top: 0.75rem;
+      left: 0.75rem;
+      right: 0.75rem;
+      transform: none;
+      width: auto;
       max-width: none;
+      pointer-events: auto;
+      padding: 0 2px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
     }
-    .create-btn {
-      padding: 0.4375rem 0.5rem;
-      font-size: 0.75rem;
-    }
-    .user-btn span {
+
+    .icon-rail::-webkit-scrollbar {
       display: none;
+    }
+
+    .floating-menu {
+      top: calc(0.75rem + 40px + 0.5rem);
+    }
+
+    .rail-btn {
+      width: 40px;
+      height: 40px;
+    }
+
+    .rail-btn :global(svg) {
+      width: 18px;
+      height: 18px;
+    }
+
+    .rail-logo {
+      max-width: 36px;
+      max-height: 36px;
     }
   }
 </style>

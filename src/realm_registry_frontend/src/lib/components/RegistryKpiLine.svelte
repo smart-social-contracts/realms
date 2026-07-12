@@ -59,9 +59,9 @@
 
   @media (max-width: 767px) {
     .kpi-line {
-      bottom: auto;
-      top: calc(var(--header-height) + 0.5rem);
-      left: 0.75rem;
+      top: auto;
+      bottom: 1rem;
+      left: 1rem;
       font-size: 0.75rem;
     }
   }
