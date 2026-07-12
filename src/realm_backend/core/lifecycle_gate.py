@@ -69,10 +69,9 @@ def readiness_checklist(realm) -> list:
     })
 
     def _member_count(dept) -> int:
-        try:
-            return sum(1 for _ in dept.members)
-        except Exception:
-            return 0
+        from core.membership import department_member_count
+
+        return department_member_count(dept)
 
     # Staffing: explicit Position seats when the codex seeded them (each open
     # position needs >=1 active appointment), member-count heuristic otherwise.
@@ -142,7 +141,10 @@ def readiness_checklist(realm) -> list:
         "detail": f"{zone_count} zones",
     })
 
-    deps = config.get("dependencies", []) or []
+    # Dependencies may be a list (latest) or a {name: version_pin} dict
+    # (issue #242); either way we only need the extension names here.
+    raw_deps = config.get("dependencies", []) or []
+    deps = list(raw_deps.keys()) if isinstance(raw_deps, dict) else list(raw_deps)
     try:
         from core.runtime_extensions import list_installed
 

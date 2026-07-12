@@ -278,6 +278,34 @@ def get_all_codex_manifests() -> dict:
     return manifests
 
 
+def get_extension_overrides() -> Dict[str, str]:
+    """Merged ``extension_overrides`` from all installed codex manifests.
+
+    A codex may replace a *system extension* (e.g. ``member_dashboard``) with
+    its own variant (issue #242)::
+
+        "extension_overrides": {"member_dashboard": "agora_member_dashboard"}
+
+    Returns {base_extension_id: override_extension_id}. Later-installed
+    packages win when several codices override the same extension.
+    """
+    overrides: Dict[str, str] = {}
+    for codex_id in list_installed():
+        manifest = _load_manifest(codex_id)
+        if not manifest:
+            continue
+        raw = manifest.get("extension_overrides") or {}
+        if not isinstance(raw, dict):
+            logger.warning(
+                f"Codex package {codex_id}: extension_overrides must be a dict, got {type(raw).__name__}"
+            )
+            continue
+        for base, override in raw.items():
+            if base and override and isinstance(override, str):
+                overrides[str(base)] = override
+    return overrides
+
+
 # ---------------------------------------------------------------------------
 # Entity method override application
 # ---------------------------------------------------------------------------

@@ -229,6 +229,80 @@ def _find_latest_version(namespaces: dict, prefix: str) -> str:
     return best_version
 
 
+def _published_versions(namespaces: dict, prefix: str) -> list:
+    """All published versions under a prefix, e.g. ['1.0.0', '1.1.2']."""
+    versions = []
+    for ns_name, ns_info in namespaces.items():
+        if ns_name.startswith(prefix) and _is_published(ns_info):
+            version = ns_name[len(prefix):]
+            if "/" not in version:
+                versions.append(version)
+    return versions
+
+
+def _spec_matches(spec: str, version: str) -> bool:
+    """Does *version* satisfy a pin spec? (issue #242 — codex-as-distro pins)
+
+    Supported specs:
+      - exact:   "1.2.3"
+      - wildcard: "1.2.x", "1.x", "1.2.*"
+      - caret:   "^1.2.3" (same major, >= spec)
+      - tilde:   "~1.2.3" (same major.minor, >= spec)
+    """
+    spec = (spec or "").strip()
+    vt = _parse_semver(version)
+
+    if spec.startswith("^") or spec.startswith("~"):
+        base = _parse_semver(spec[1:])
+        if vt < base:
+            return False
+        if vt[0] != base[0]:
+            return False
+        if spec.startswith("~") and (len(vt) < 2 or len(base) < 2 or vt[1] != base[1]):
+            return False
+        return True
+
+    if "x" in spec.lower() or "*" in spec:
+        spec_parts = spec.replace("*", "x").lower().split(".")
+        version_parts = version.split(".")
+        for i, sp in enumerate(spec_parts):
+            if sp == "x":
+                return True
+            if i >= len(version_parts) or sp != version_parts[i]:
+                return False
+        return len(spec_parts) == len(version_parts)
+
+    return spec == version
+
+
+def _is_range_spec(spec: str) -> bool:
+    s = (spec or "").strip().lower()
+    return s.startswith(("^", "~")) or "x" in s.split(".") or "*" in s
+
+
+def _resolve_version_spec(namespaces: dict, prefix: str, spec: str) -> str:
+    """Resolve a version spec to a concrete published version.
+
+    Empty / "latest" resolves to the highest published version; range specs
+    resolve to the highest published match; exact versions pass through
+    (existence is checked by the caller). Returns "" when nothing matches.
+    """
+    spec = (spec or "").strip()
+    if not spec or spec.lower() == "latest":
+        return _find_latest_version(namespaces, prefix)
+    if not _is_range_spec(spec):
+        return spec
+    best = ""
+    best_tuple = (-1,)
+    for version in _published_versions(namespaces, prefix):
+        if _spec_matches(spec, version):
+            vt = _parse_semver(version)
+            if vt > best_tuple:
+                best_tuple = vt
+                best = version
+    return best
+
+
 # ---------------------------------------------------------------------------
 # Access control
 # ---------------------------------------------------------------------------
@@ -681,14 +755,14 @@ def _get_backend_files_impl(category: str, item_id: str, version: str) -> str:
     else:
         return json.dumps({"error": f"Unknown category: {category}"})
 
-    # Realm manifests often use version "latest"; treat like empty → resolve semver.
-    if version and str(version).strip().lower() == "latest":
-        version = ""
-
-    if not version:
-        version = _find_latest_version(namespaces, prefix)
-        if not version:
-            return json.dumps({"error": f"No versions found for {category}/{item_id}"})
+    # Resolve the version spec: empty/"latest" → highest published; range pins
+    # ("1.2.x", "^1.0.0", "~1.2.3") → highest published match (issue #242).
+    resolved = _resolve_version_spec(namespaces, prefix, version or "")
+    if not resolved:
+        return json.dumps({
+            "error": f"No published version of {category}/{item_id} matches '{version or 'latest'}'"
+        })
+    version = resolved
 
     ns = f"{prefix}{version}".rstrip("/")
 

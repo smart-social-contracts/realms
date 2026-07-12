@@ -211,8 +211,9 @@ def apply_position_action(action: dict) -> dict:
 
             dept = pos.department
             if dept is not None:
-                if not any(getattr(m, "id", None) == principal for m in dept.members):
-                    dept.members.add(user)
+                from core.membership import add_department_member
+
+                add_department_member(dept, user)
 
             profile = pos.profile
             if profile is not None:

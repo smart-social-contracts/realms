@@ -27,7 +27,12 @@ class User(Entity, TimestampedMixin):
     # Private data (encrypted at rest via vetKeys + basilisk OS crypto)
     # JSON blob — schema defined in realm manifest
     private_data = EncryptedString()
-    profiles = ManyToMany(["UserProfile"], "users")
+    # Unidirectional (issue #242): profiles/extensions/departments fan out to
+    # every user, so the target side keeps only an O(1) counter
+    # (e.g. profile.reverse_count("users")) instead of an ID array that would
+    # be rewritten on each registration. Reverse *listing* is a paginated user
+    # scan — see core.membership.
+    profiles = ManyToMany(["UserProfile"], "users", unidirectional=True)
     human = OneToOne("Human", "user")
     member = OneToOne("Member", "user")
     proposals = OneToMany("Proposal", "proposer")
@@ -46,8 +51,8 @@ class User(Entity, TimestampedMixin):
     penalties_received = OneToMany("Penalty", "target_user")
     appeals_filed = OneToMany("Appeal", "appellant")
     permissions = ManyToMany(["Permission"], "users")
-    extensions = ManyToMany(["Extension"], "users")
-    departments = ManyToMany(["Department"], "members")
+    extensions = ManyToMany(["Extension"], "users", unidirectional=True)
+    departments = ManyToMany(["Department"], "members", unidirectional=True)
     headed_departments = OneToMany("Department", "head")
     # transfers_from = OneToMany("Transfer", "from_user")
     # transfers_to = OneToMany("Transfer", "to_user")

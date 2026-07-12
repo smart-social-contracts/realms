@@ -266,7 +266,9 @@ class UserProfile(Entity, TimestampedMixin):
     name = String(max_length=256)
     description = String(max_length=256)
     allowed_to = String()
-    users = ManyToMany(["User"], "profiles")
+    # The User→profiles relation is unidirectional (issue #242): use
+    # ``self.reverse_count("users")`` for the holder count; list holders by
+    # scanning users (core.membership.users_with_profile).
     permissions = ManyToMany(["Permission"], "profiles")
     extensions = ManyToMany(["Extension"], "profiles")
 

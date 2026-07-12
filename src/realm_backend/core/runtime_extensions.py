@@ -157,8 +157,33 @@ def _load_manifest(ext_id: str, force=False) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 
 
+def resolve_extension_id(ext_id: str) -> str:
+    """Resolve an extension id through codex overrides (issue #242).
+
+    Resolution order:
+      1. the codex override extension, when a codex declares one in
+         ``extension_overrides`` *and* the override is actually installed;
+      2. the extension id as given (default / system extension).
+    """
+    try:
+        from core.runtime_codex import get_extension_overrides
+
+        override = get_extension_overrides().get(ext_id)
+        if override and override in set(list_installed()):
+            return override
+    except Exception:
+        pass
+    return ext_id
+
+
 def get_func(extension_name: str, function_name: str) -> Optional[Callable]:
-    """Get a function from a runtime-loaded extension."""
+    """Get a function from a runtime-loaded extension.
+
+    The extension id is resolved through codex overrides first, so backend
+    calls addressed to a system extension (e.g. ``member_dashboard``) are
+    routed to the codex-specific replacement when one is installed.
+    """
+    extension_name = resolve_extension_id(extension_name)
     module = _load_module(extension_name)
 
     if module is None:

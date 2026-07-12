@@ -51,6 +51,7 @@ export async function loadSidebar(
 			mundusItems: parsed.mundus_items || [],
 			categories: parsed.categories || [],
 			defaultPath: parsed.default_path || '/extensions/member_dashboard',
+			extensionOverrides: parsed.extension_overrides || {},
 		};
 
 		sidebarConfig.set(config);

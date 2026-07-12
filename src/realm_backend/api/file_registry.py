@@ -205,14 +205,31 @@ def install_codex_from_registry(
     # Use codex_id as the package name (last component for nested ids like "syntropia/membership")
     package_name = codex_id.split("/")[-1] if "/" in codex_id else codex_id
 
-    # --- Dependency resolution (issue #241) ---
-    # A codex declares required extensions in its manifest. Install missing
-    # ones from the same registry *before* the package init runs, so init can
-    # rely on them (and the realm is never left with a half-working codex).
-    dependencies = []
+    # --- Dependency resolution (issues #241, #242) ---
+    # A codex is a distro-style package: its manifest declares required
+    # extensions, optionally version-pinned. Install missing ones from the
+    # same registry *before* the package init runs, so init can rely on them
+    # (and the realm is never left with a half-working codex).
+    #
+    # Manifest forms:
+    #   "dependencies": ["voting", "vault"]                      (latest)
+    #   "dependencies": {"voting": "1.1.x", "vault": "^2.0.0"}   (pinned)
+    # The registry resolves range pins to the highest published match.
+    dependencies = {}
     try:
         codex_manifest = json.loads(files.get("manifest.json", "{}"))
-        dependencies = list(codex_manifest.get("dependencies", []) or [])
+        raw_deps = codex_manifest.get("dependencies", []) or []
+        if isinstance(raw_deps, dict):
+            dependencies = {str(k): (str(v) if v else "") for k, v in raw_deps.items()}
+        else:
+            dependencies = {str(d): "" for d in raw_deps}
+        # Override extensions (issue #242) are implicit dependencies: a codex
+        # replacing a system extension must ship/install its replacement.
+        overrides = codex_manifest.get("extension_overrides") or {}
+        if isinstance(overrides, dict):
+            for override_ext in overrides.values():
+                if override_ext and str(override_ext) not in dependencies:
+                    dependencies[str(override_ext)] = ""
     except (json.JSONDecodeError, TypeError) as e:
         logger.error(f"Codex '{codex_id}': unreadable manifest.json, skipping dependency check: {e}")
 
@@ -222,10 +239,10 @@ def install_codex_from_registry(
         from core.runtime_extensions import list_installed
 
         already = set(list_installed())
-        missing = [d for d in dependencies if d not in already]
+        missing = {d: pin for d, pin in dependencies.items() if d not in already}
         logger.info(
             f"Codex '{codex_id}' dependencies: {dependencies} "
-            f"(missing: {missing or 'none'})"
+            f"(missing: {list(missing) or 'none'})"
         )
 
         frontend_canister_id = None
@@ -239,19 +256,21 @@ def install_codex_from_registry(
         except Exception:
             pass
 
-        for dep in missing:
+        for dep, pin in missing.items():
             dep_raw = yield from install_extension_from_registry(
-                registry_canister_id, dep, None, frontend_canister_id
+                registry_canister_id, dep, pin or None, frontend_canister_id
             )
             try:
                 dep_result = json.loads(dep_raw)
             except (json.JSONDecodeError, TypeError):
                 dep_result = {"success": False, "error": dep_raw}
             if dep_result.get("success"):
-                installed_deps.append(dep)
+                installed_deps.append(
+                    {"extension": dep, "version": dep_result.get("version", "")}
+                )
             else:
-                failed_deps.append({"extension": dep, "error": dep_result.get("error", "unknown")})
-                logger.error(f"Codex '{codex_id}': dependency '{dep}' failed to install: {dep_result}")
+                failed_deps.append({"extension": dep, "pin": pin, "error": dep_result.get("error", "unknown")})
+                logger.error(f"Codex '{codex_id}': dependency '{dep}' (pin={pin or 'latest'}) failed to install: {dep_result}")
 
     # Install via runtime_codex
     from core.runtime_codex import (

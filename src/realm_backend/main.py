@@ -506,11 +506,36 @@ def _assign_quarter(principal: str, realm, quarters, preferred_quarter: str) -> 
     return active_quarters[idx].canister_id
 
 
+def _default_registration_profile(realm) -> str:
+    """Codex-defined default profile for codeless open registration.
+
+    Read from ``Realm.manifest_data.onboarding.registration.default_profile``
+    (issue #242 — the platform no longer hardcodes user types); falls back
+    to ``member``.
+    """
+    try:
+        manifest = json.loads(getattr(realm, "manifest_data", "") or "{}")
+        default = (
+            (manifest.get("onboarding") or {}).get("registration") or {}
+        ).get("default_profile")
+        if default and isinstance(default, str):
+            return default.strip()
+    except Exception:
+        pass
+    return "member"
+
+
 @update
 def join_realm(
     profile: str, preferred_quarter: text, invite_code_checksum_hex: text
 ) -> Async[RealmResponse]:
     """Register the caller in the realm.
+
+    The granted profile is resolved server-side (issue #242): the invite
+    code's profile when a code is used, otherwise the codex-defined default
+    (``onboarding.registration.default_profile``, fallback ``member``). The
+    ``profile`` argument is optional and only validated for consistency —
+    pass "" to accept the resolved profile.
 
     Registration modes:
     - Code-based (default): caller must provide a valid invite_code.
@@ -661,6 +686,10 @@ def join_realm(
                     ),
                 )
 
+        # No explicit profile and no invite: codex-defined default (issue #242).
+        if not (granted_profile or "").strip():
+            granted_profile = _default_registration_profile(realm)
+
         # --- Register user and assign quarter ---
 
         was_new_user = False
@@ -694,12 +723,13 @@ def join_realm(
         # the code's prepopulated permissions/extensions apply immediately.
         if invite_department:
             try:
+                from core.membership import add_department_member
                 from ggg import Department
 
                 dept = Department[invite_department]
                 u = User[caller]
-                if dept and u and not any(m.id == u.id for m in dept.members):
-                    dept.members.add(u)
+                if dept and u:
+                    add_department_member(dept, u)
                     logger.info(
                         f"Invite code added {caller} to organization '{invite_department}'"
                     )
@@ -2521,9 +2551,15 @@ def _seeded_extension_names() -> set:
 
     seeded = set()
     try:
+        from core.membership import extension_user_grant_count
+
         for ext in Extension.instances():
             try:
-                if list(ext.users) or list(ext.departments) or list(ext.profiles):
+                if (
+                    extension_user_grant_count(ext) > 0
+                    or list(ext.departments)
+                    or list(ext.profiles)
+                ):
                     seeded.add(ext.name)
             except Exception:
                 continue
@@ -3009,22 +3045,29 @@ def list_share_audiences() -> RealmResponse:
             logger.warning(f"list_share_audiences: admins group unavailable: {e}")
 
         try:
+            from core.membership import iter_users
             from ggg import Department
 
-            for dept in Department.instances():
-                principals = []
+            # Single user scan building dept → principals (the reverse
+            # dept.members index no longer exists — issue #242).
+            by_dept: dict = {}
+            for u in iter_users():
+                pid = getattr(u, "id", None)
+                if not pid:
+                    continue
                 try:
-                    for m in dept.members:
-                        if getattr(m, "id", None):
-                            principals.append(m.id)
+                    for d in u.departments:
+                        by_dept.setdefault(d.name, []).append(pid)
                 except Exception:
-                    pass
+                    continue
+
+            for dept in Department.instances():
                 audiences.append(
                     {
                         "id": f"dept:{dept.name}",
                         "label": dept.name,
                         "type": "department",
-                        "principals": principals,
+                        "principals": by_dept.get(dept.name, []),
                     }
                 )
         except Exception as e:
@@ -5163,6 +5206,24 @@ def uninstall_extension(args: text) -> text:
                 ),
             })
 
+        # System extensions (manifest "system": true, e.g. member_dashboard)
+        # are part of the platform contract: codices may *override* them via
+        # extension_overrides but they cannot be plainly uninstalled (#242).
+        try:
+            from core.runtime_extensions import get_all_extension_manifests as _all_manifests
+
+            _m = _all_manifests().get(ext_id) or {}
+            if isinstance(_m, dict) and _m.get("system") is True:
+                return json.dumps({
+                    "success": False,
+                    "error": (
+                        f"Extension '{ext_id}' is a system extension and cannot be uninstalled. "
+                        "A codex may override it via extension_overrides instead."
+                    ),
+                })
+        except Exception:
+            pass
+
         from core.runtime_extensions import uninstall_extension as _uninstall
 
         ok = _uninstall(ext_id)
@@ -5241,9 +5302,15 @@ def get_sidebar_manifests() -> text:
         runtime_ids = set(_list_runtime_installed())
         manifests = get_all_extension_manifests()  # merged: runtime + bundled
 
+        # Codex overrides (issue #242): a base system extension is hidden when
+        # its codex-specific replacement is installed.
+        active_overrides = _active_extension_overrides(manifests)
+
         out = []
         for ext_id, m in manifests.items():
             if not isinstance(m, dict):
+                continue
+            if ext_id in active_overrides:
                 continue
             label_obj = m.get("sidebar_label")
             if isinstance(label_obj, str):
@@ -5272,9 +5339,33 @@ def get_sidebar_manifests() -> text:
             {"id": "other", "name": "Other", "order": 99, "show_header": True, "collapsible": True},
         ]
 
-        return json.dumps({"success": True, "manifests": out, "categories": categories_meta})
+        return json.dumps({
+            "success": True,
+            "manifests": out,
+            "categories": categories_meta,
+            "extension_overrides": active_overrides,
+        })
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
+
+
+def _active_extension_overrides(manifests: dict) -> dict:
+    """Codex extension overrides whose replacement is actually installed.
+
+    Returns {base_extension_id: override_extension_id} (issue #242). An
+    override only takes effect when the replacement extension exists in the
+    installed manifest set — otherwise the base (system) extension stays.
+    """
+    try:
+        from core.runtime_codex import get_extension_overrides
+
+        return {
+            base: override
+            for base, override in get_extension_overrides().items()
+            if override in manifests
+        }
+    except Exception:
+        return {}
 
 
 DEFAULT_CATEGORY_ORDER = [
@@ -5332,6 +5423,10 @@ def get_sidebar(args: text) -> text:
 
         manifests = get_all_extension_manifests()
 
+        # Codex overrides (issue #242): hide base system extensions whose
+        # codex-specific replacement is installed.
+        active_overrides = _active_extension_overrides(manifests)
+
         # Determine which extensions are visible to this user.
         #
         # Strict DB-based whitelist filtering is applied ONLY to extensions
@@ -5375,6 +5470,8 @@ def get_sidebar(args: text) -> text:
 
         for ext_id, m in manifests.items():
             if not isinstance(m, dict):
+                continue
+            if ext_id in active_overrides:
                 continue
             if m.get("show_in_sidebar", True) is False:
                 continue
@@ -5464,8 +5561,9 @@ def get_sidebar(args: text) -> text:
                 "items": [itm for _, itm in items],
             })
 
-        # Determine default path
-        default_path = "/extensions/member_dashboard"
+        # Determine default path (resolving the fallback through codex overrides)
+        fallback_dashboard = active_overrides.get("member_dashboard", "member_dashboard")
+        default_path = f"/extensions/{fallback_dashboard}"
         if welcome_items:
             default_path = welcome_items[0]["href"]
 
@@ -5475,6 +5573,7 @@ def get_sidebar(args: text) -> text:
             "mundus_items": mundus_items,
             "categories": categories_out,
             "default_path": default_path,
+            "extension_overrides": active_overrides,
         })
     except Exception as e:
         logger.error(f"Error building sidebar: {str(e)}\n{traceback.format_exc()}")

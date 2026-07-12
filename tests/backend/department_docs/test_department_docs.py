@@ -81,7 +81,8 @@ def env():
     member = User(id=f"member_{dept_name}")
     outsider = User(id=f"outsider_{dept_name}")
     dept = Department(name=dept_name, description="Money", head=head)
-    dept.members.add(member)
+    # Membership is stored one-way on the user (issue #242).
+    member.departments.add(dept)
 
     entry._auth_ctx = lambda: FakeCtx(
         admins={"admin1"}, heads={dept_name: head.id}

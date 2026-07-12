@@ -36,7 +36,9 @@ class Department(Entity, TimestampedMixin):
     name = String(max_length=256)
     description = String(max_length=512)
     head = ManyToOne("User", "headed_departments")
-    members = ManyToMany(["User"], "departments")
+    # The User→departments relation is unidirectional (issue #242): use
+    # ``self.reverse_count("members")`` for the member count; membership checks
+    # traverse forward (user.departments); list members via core.membership.
     permissions = ManyToMany(["Permission"], "departments")
     extensions = ManyToMany(["Extension"], "departments")
     # Deprecated: org nesting is forbidden (issue #240). Kept for schema

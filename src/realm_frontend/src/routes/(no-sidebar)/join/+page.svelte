@@ -30,7 +30,6 @@
   let error = '';
   let loading = false;
   let realmName = 'Realm';
-  let selectedProfile = ''; // No default - user must choose
   let inviteCode = '';
   let inviteProfile = '';
   let inviteValid = false;
@@ -51,39 +50,9 @@
   let embeddedInPortal = false;
   let forgotError = '';
   
-  // Available profiles with icon names (rendered as SVGs)
-  const allProfiles = [
-    { 
-      value: 'member', 
-      name: 'Member',
-      iconType: 'user',
-      description: 'Participate in governance, access community features'
-    },
-    { 
-      value: 'admin', 
-      name: 'Administrator',
-      iconType: 'cog',
-      description: 'Full access to manage realm settings and users'
-    },
-    { 
-      value: 'developer', 
-      name: 'Developer',
-      iconType: 'code',
-      description: 'System tools, extension development, and debugging'
-    },
-  ];
-
-  // In test mode (II bypass or self-registration), show all profiles. Otherwise only member
-  // is available unless an invite code grants a specific profile.
-  $: profiles = inviteValid && inviteProfile
-    ? allProfiles.filter(p => p.value === inviteProfile)
-    : ($testModeUserSelfRegistration || $testModeIIBypass)
-      ? allProfiles
-      : allProfiles.filter(p => p.value === 'member');
-
-  $: if (profiles.length === 1 && !selectedProfile) {
-    selectedProfile = profiles[0].value;
-  }
+  // The granted profile is resolved by the backend (issue #242): the invite
+  // code's profile when a code is used, otherwise the codex-defined default.
+  // There is no profile picker — user types are gone; only profiles exist.
 
   // Invite is required when registration is closed (not open) and user has no valid invite
   $: inviteRequired = !$realmOpenRegistration && !inviteValid && !$testModeUserSelfRegistration && !$testModeIIBypass;
@@ -111,7 +80,7 @@
   $: steps = [
     { id: 'auth', label: 'Sign In' },
     ...($testModeSkipTerms ? [] : [{ id: 'terms', label: 'Terms' }]),
-    { id: 'profile', label: 'Profile' },
+    { id: 'profile', label: 'Invitation' },
     { id: 'success', label: 'Welcome' },
   ];
   $: currentStepIndex = steps.findIndex((s) => s.id === currentStep);
@@ -475,10 +444,8 @@
       // Test mode shortcuts: "admin" / "member" / "dev" accepted client-side
       const trimmed = inviteCode.trim().toLowerCase();
       if (($testModeUserSelfRegistration || $testModeIIBypass) && (trimmed === 'admin' || trimmed === 'member' || trimmed === 'dev' || trimmed === 'developer')) {
-        const profile = trimmed === 'dev' || trimmed === 'developer' ? 'developer' : trimmed;
         inviteValid = true;
-        inviteProfile = profile;
-        selectedProfile = profile;
+        inviteProfile = trimmed === 'dev' || trimmed === 'developer' ? 'developer' : trimmed;
         return;
       }
 
@@ -494,7 +461,6 @@
       if (parsed.success && parsed.data) {
         inviteValid = true;
         inviteProfile = parsed.data.profile || 'member';
-        selectedProfile = inviteProfile;
       } else {
         inviteError = parsed.error || 'Invalid invitation code';
         inviteValid = false;
@@ -520,35 +486,27 @@
   
   async function resolveInviteChecksum() {
     if (inviteCode) return sha256Hex(inviteCode);
-    // Test mode shortcuts: backend accepts sha256("admin") / sha256("member") / sha256("dev") as invite codes
-    if (($testModeUserSelfRegistration || $testModeIIBypass) && selectedProfile === 'admin') {
-      return sha256Hex('admin');
-    }
-    if (($testModeUserSelfRegistration || $testModeIIBypass) && selectedProfile === 'member') {
-      return sha256Hex('member');
-    }
-    if (($testModeUserSelfRegistration || $testModeIIBypass) && selectedProfile === 'developer') {
-      return sha256Hex('dev');
-    }
     return '';
   }
 
   async function handleJoin() {
     error = '';
-    
-    if (!selectedProfile) {
-      error = 'Please select a profile type';
+
+    if (inviteRequired) {
+      error = 'Registration requires an invitation code';
       return;
     }
-    
+
     try {
       loading = true;
-      console.log(`Joining quarter ${targetQuarterId || '(capital)'} with profile: ${selectedProfile}`);
+      console.log(`Joining quarter ${targetQuarterId || '(capital)'}${inviteProfile ? ` as ${inviteProfile}` : ''}`);
       // Register directly on the resolved target quarter (single call). The
-      // invite code is consumed on that quarter, where it lives.
+      // invite code is consumed on that quarter, where it lives. The profile
+      // is resolved server-side (invite code profile or codex default); the
+      // first argument is only a consistency check.
       const inviteChecksum = await resolveInviteChecksum();
       const actor = targetActor || backend;
-      const response = await actor.join_realm(selectedProfile, '', inviteChecksum);
+      const response = await actor.join_realm(inviteValid ? inviteProfile : '', '', inviteChecksum);
       if (response.success) {
         // Point the app at the quarter we just joined and remember it.
         if (targetQuarterId && targetQuarterId !== capitalId) {
@@ -950,14 +908,22 @@
         {/if}
         <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <div class="flex items-center justify-between mb-2">
-            <h2 class="text-2xl font-bold text-gray-900">Select Profile</h2>
+            <h2 class="text-2xl font-bold text-gray-900">Join {realmName}</h2>
 {#if inviteValid}
               <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Invited as {inviteProfile}</span>
             {:else if $testMode}
               <span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">Test Mode</span>
             {/if}
           </div>
-          <p class="text-gray-500 mb-6">Choose how you want to participate</p>
+          <p class="text-gray-500 mb-6">
+            {#if inviteValid}
+              Your invitation determines your access.
+            {:else if $realmOpenRegistration}
+              Registration is open — join now, or enter an invitation code if you received one.
+            {:else}
+              Enter your invitation code to continue.
+            {/if}
+          </p>
 
           {#if showQuarterBanner}
             <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
@@ -968,49 +934,25 @@
             </div>
           {/if}
 
-          <div class="space-y-3 mb-6">
-            {#each profiles as profile (profile.value)}
-              <button
-                type="button"
-                on:click={() => selectedProfile = profile.value}
-                class={cn(
-                  "w-full p-4 rounded-xl border-2 text-left transition-all",
-                  selectedProfile === profile.value 
-                    ? "border-gray-900 bg-gray-50" 
-                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                )}
-              >
-                <div class="flex items-center gap-4">
-                  <div class={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center",
-                    selectedProfile === profile.value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
-                  )}>
-                    {#if selectedProfile === profile.value}
-                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                    {:else if profile.iconType === 'user'}
-                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    {:else if profile.iconType === 'cog'}
-                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    {:else if profile.iconType === 'code'}
-                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                      </svg>
-                    {/if}
-                  </div>
-                  <div class="flex-1">
-                    <div class="font-semibold text-gray-900">{profile.name}</div>
-                    <div class="text-sm text-gray-500">{profile.description}</div>
-                  </div>
-                </div>
-              </button>
-            {/each}
+          <!-- Access summary: the backend resolves the profile (invite code
+               profile, or the realm's default for open registration). -->
+          <div class="mb-6 p-4 rounded-xl border-2 border-gray-200 bg-gray-50">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-full flex items-center justify-center bg-gray-900 text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div class="flex-1">
+                {#if inviteValid}
+                  <div class="font-semibold text-gray-900 capitalize">{inviteProfile}</div>
+                  <div class="text-sm text-gray-500">Access granted by your invitation</div>
+                {:else}
+                  <div class="font-semibold text-gray-900">Member</div>
+                  <div class="text-sm text-gray-500">Standard access — an invitation code can grant a different profile</div>
+                {/if}
+              </div>
+            </div>
           </div>
 
           <!-- Invite code input -->
@@ -1039,7 +981,7 @@
               />
               {#if inviteValid}
                 <button
-                  on:click={() => { inviteCode = ''; inviteValid = false; inviteProfile = ''; inviteError = ''; selectedProfile = ''; }}
+                  on:click={() => { inviteCode = ''; inviteValid = false; inviteProfile = ''; inviteError = ''; }}
                   class="shrink-0 px-3 md:px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Clear
@@ -1081,15 +1023,6 @@
             {/if}
           </div>
           
-{#if $testMode}
-          <p class="text-xs text-gray-500 mb-6 p-3 bg-gray-100 rounded-lg flex items-start gap-2">
-            <svg class="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>In test mode, you can select any profile. In production, this would be determined by your organization role.</span>
-          </p>
-{/if}
-          
           <div class="flex gap-3">
             {#if prevStepId}
               <button
@@ -1101,7 +1034,7 @@
             {/if}
             <button
               on:click={handleJoin}
-              disabled={!selectedProfile || loading || inviteRequired}
+              disabled={loading || inviteRequired}
               class="flex-1 py-3 md:py-4 px-4 md:px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {#if loading}

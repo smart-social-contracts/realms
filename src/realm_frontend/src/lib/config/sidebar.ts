@@ -25,6 +25,8 @@ export interface SidebarConfig {
 	mundusItems: SidebarNavItem[];
 	categories: SidebarCategory[];
 	defaultPath: string;
+	/** Codex extension overrides: base system extension id -> replacement id. */
+	extensionOverrides?: Record<string, string>;
 }
 
 export interface TopUtilityItem {
@@ -43,13 +45,3 @@ export const topUtilityItems: TopUtilityItem[] = [
 export const SECTION_HEADER_ME = 'ME';
 export const SECTION_HEADER_REALM = 'MY REALM';
 export const SECTION_HEADER_MUNDUS = 'MY MUNDUS';
-
-/**
- * Determines the effective role from a list of user profiles.
- * Kept for backward compatibility with components that need a single role string.
- */
-export function resolveRole(profiles: string[]): string {
-	if (profiles.includes('developer')) return 'developer';
-	if (profiles.includes('admin')) return 'admin';
-	return 'member';
-}

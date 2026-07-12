@@ -225,6 +225,17 @@
 	$: id = $page.params.id;
 	$: loadingMessage = id ? extensionLoadingMessage(id, $sidebarConfig) : 'Loading...';
 
+	// Codex extension overrides (issue #242): navigating to a base system
+	// extension (e.g. /extensions/member_dashboard) redirects to its
+	// codex-specific replacement when one is installed.
+	$: {
+		const override = id ? $sidebarConfig?.extensionOverrides?.[id] : undefined;
+		if (browser && override && override !== id) {
+			const subpath = $page.params.subpath || '';
+			goto(`/extensions/${override}${subpath ? `/${subpath}` : ''}`, { replaceState: true });
+		}
+	}
+
 	let lastLoadedId: string | undefined;
 	$: if (browser && id && id !== lastLoadedId && mountPoint) {
 		lastLoadedId = id;

@@ -119,7 +119,9 @@ def ensure_root_org(head_user=None):
     if head_user is not None:
         root.head = head_user
         try:
-            root.members.add(head_user)
+            from core.membership import add_department_member
+
+            add_department_member(root, head_user)
         except Exception:
             pass
 
