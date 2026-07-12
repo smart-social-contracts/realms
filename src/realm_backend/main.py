@@ -822,6 +822,49 @@ def join_realm(
 
 @update
 @require_controller
+def register_founder(principal: text) -> RealmResponse:
+    """Register the deploying user as the realm's founding admin.
+
+    Called by the realm_installer (an IC controller of this canister) right
+    after provisioning, with the principal of the user who requested the
+    deployment. Idempotent — an existing user simply gains the admin profile.
+    """
+    try:
+        founder = (principal or "").strip()
+        if not founder or founder == "2vxsx-fae":
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(
+                    error="A non-anonymous founder principal is required"
+                ),
+            )
+
+        user = user_register(founder, "admin")
+        logger.info(f"Founder {founder} registered with admin profile")
+
+        profiles = Vec[text]()
+        for p in user.get("profiles", []):
+            profiles.append(p)
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                userGet=UserGetRecord(
+                    principal=Principal.from_str(user["principal"]),
+                    profiles=profiles,
+                    nickname=user.get("nickname", ""),
+                    avatar=user.get("avatar", ""),
+                    private_data=user.get("private_data", ""),
+                    assigned_quarter="",
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"register_founder failed: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require_controller
 def store_admin_invite_hash(args_json: text) -> RealmResponse:
     """Controller-only endpoint to store a pre-computed admin invite hash."""
     try:

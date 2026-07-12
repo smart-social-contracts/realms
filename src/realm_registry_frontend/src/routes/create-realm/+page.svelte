@@ -1284,8 +1284,10 @@
               {/if}
 
               <p class="codex-details-note">
-                The codex installs and configures everything above. You can add more
-                extensions later from inside your realm.
+                The codex installs and configures everything above, on top of the
+                standard system extensions every realm ships with (dashboards,
+                voting, census, vault, settings…). You can add more extensions
+                later from inside your realm.
               </p>
             </div>
           {/if}

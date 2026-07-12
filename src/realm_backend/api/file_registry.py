@@ -233,6 +233,19 @@ def install_codex_from_registry(
     except (json.JSONDecodeError, TypeError) as e:
         logger.error(f"Codex '{codex_id}': unreadable manifest.json, skipping dependency check: {e}")
 
+    # Core/system extensions (issue #242) ship with every standard realm —
+    # a codex builds on top of them, it never has to declare them. Installed
+    # here because the wizard no longer sends an extension list: the codex
+    # install is what provisions a new realm.
+    try:
+        from core.core_extensions import CORE_EXTENSION_IDS
+
+        for core_ext in CORE_EXTENSION_IDS:
+            if core_ext not in dependencies:
+                dependencies[core_ext] = ""
+    except Exception as e:
+        logger.error(f"Codex '{codex_id}': could not add core extensions: {e}")
+
     installed_deps = []
     failed_deps = []
     if dependencies:
