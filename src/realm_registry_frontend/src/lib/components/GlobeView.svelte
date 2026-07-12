@@ -16,6 +16,8 @@
     DoubleSide,
     Float32BufferAttribute,
     Group,
+    LinearFilter,
+    LinearMipmapLinearFilter,
     Mesh,
     MeshBasicMaterial,
     PerspectiveCamera,
@@ -90,7 +92,7 @@
     );
   }
 
-  async function loadEarthTexture() {
+  async function loadEarthTexture(maxAnisotropy = 4) {
     const paths = [GLOBE_IMAGE_URL_GRAY, GLOBE_IMAGE_URL];
     for (const path of paths) {
       try {
@@ -103,37 +105,46 @@
         canvas.width = bitmap.width;
         canvas.height = bitmap.height;
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(bitmap, 0, 0);
         bitmap.close();
         const texture = new CanvasTexture(canvas);
         texture.colorSpace = SRGBColorSpace;
+        texture.generateMipmaps = true;
+        texture.minFilter = LinearMipmapLinearFilter;
+        texture.magFilter = LinearFilter;
+        texture.anisotropy = maxAnisotropy;
         texture.needsUpdate = true;
-        status = path.split('/').pop();
+        status = `${path.split('/').pop()} ${canvas.width}x${canvas.height}`;
         return texture;
       } catch (e) {
         console.warn('Texture failed:', path, e);
       }
     }
     const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 512;
+    canvas.width = 2048;
+    canvas.height = 1024;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#E8E8E8';
-    ctx.fillRect(0, 0, 1024, 512);
+    ctx.fillRect(0, 0, 2048, 1024);
     ctx.fillStyle = '#8A8A8A';
     [
-      [200, 200, 100, 120],
-      [300, 300, 80, 150],
-      [550, 210, 110, 130],
-      [680, 170, 150, 100],
-      [820, 300, 70, 90],
-      [900, 380, 110, 55],
+      [400, 400, 200, 240],
+      [600, 600, 160, 300],
+      [1100, 420, 220, 260],
+      [1360, 340, 300, 200],
+      [1640, 600, 140, 180],
+      [1800, 760, 220, 110],
     ].forEach(([x, y, rx, ry]) => {
       ctx.beginPath();
       ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
       ctx.fill();
     });
     const texture = new CanvasTexture(canvas);
+    texture.generateMipmaps = true;
+    texture.minFilter = LinearMipmapLinearFilter;
+    texture.magFilter = LinearFilter;
     texture.needsUpdate = true;
     status = 'fallback';
     return texture;
@@ -322,16 +333,17 @@
     camera.position.set(0, 40, 260);
 
     renderer = new WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.setSize(container.clientWidth, container.clientHeight, false);
 
     // Lights unused by MeshBasicMaterial but harmless if we add any lit objects later
     scene.add(new AmbientLight(0xffffff, 1));
     scene.add(new DirectionalLight(0xffffff, 0.4));
 
-    const texture = await loadEarthTexture();
+    const maxAniso = renderer.capabilities.getMaxAnisotropy?.() || 8;
+    const texture = await loadEarthTexture(Math.min(maxAniso, 16));
     const earth = new Mesh(
-      new SphereGeometry(GLOBE_RADIUS, 64, 64),
+      new SphereGeometry(GLOBE_RADIUS, 96, 96),
       new MeshBasicMaterial({ map: texture, color: 0xffffff })
     );
     // Align prime meridian roughly like typical globe textures
