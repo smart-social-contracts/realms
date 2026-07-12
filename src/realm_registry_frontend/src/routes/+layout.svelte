@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
   import { browser } from '$app/environment';
   import { initI18n } from '$lib/i18n';
   import RegistryAssistant from '$lib/components/RegistryAssistant.svelte';
@@ -10,10 +11,27 @@
   // Flag to track if i18n is ready
   let i18nReady = false;
 
+  /** Full-viewport routes that must not scroll the document. */
+  function pathLocksScroll(pathname) {
+    return pathname === '/' || pathname.startsWith('/r/');
+  }
+
+  function syncBodyScroll(pathname) {
+    if (!browser) return;
+    // Inline style beats leftover route CSS (SPA navigations used to leave
+    // body { overflow: hidden } from the map/portal pages).
+    document.body.style.overflow = pathLocksScroll(pathname) ? 'hidden' : '';
+  }
+
   onMount(async () => {
     // Initialize i18n and wait for translations to load
     await initI18n();
     i18nReady = true;
+    if (browser) syncBodyScroll(window.location.pathname);
+  });
+
+  afterNavigate(({ to }) => {
+    syncBodyScroll(to?.url?.pathname || '/');
   });
 </script>
 
@@ -35,6 +53,12 @@
 {/if}
 
 <style>
+  :global(html),
+  :global(body) {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .app-shell {
     min-height: 100vh;
     transition: padding-right 0.25s ease;

@@ -328,7 +328,8 @@
     font-family: var(--font-family);
     background: var(--bg);
     color: var(--text-primary);
-    overflow: hidden;
+    /* Do not set overflow:hidden on body — it leaks across SPA navigations
+       and blocks scrolling on /create-realm and /my-dashboard. */
   }
 
   .registry-page {
@@ -336,6 +337,7 @@
     width: 100vw;
     height: 100vh;
     overflow: hidden;
+    overscroll-behavior: none;
     background: var(--bg);
   }
 
