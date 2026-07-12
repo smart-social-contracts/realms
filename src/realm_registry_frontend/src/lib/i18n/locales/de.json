@@ -27,13 +27,28 @@
     "visit": "Besuchen"
   },
   "map": {
-    "back_to_list": "Zurück zur Liste",
-    "showing_realms": "{count} Realms angezeigt",
+    "loading": "Kartendaten werden geladen...",
     "users_in_zone": "{count} Benutzer in dieser Zone",
     "realm_influence": "{count} Realm mit Einfluss",
     "realms_influence": "{count} Realms mit Einfluss",
     "hq": "HQ",
     "base": "Basis"
+  },
+  "globe": {
+    "loading": "Globus wird geladen…",
+    "browse_realms": "Realms durchsuchen",
+    "aria_label": "Interaktiver Globus mit Realm-Standorten",
+    "kpi_realms": "{count} Realms",
+    "kpi_users": "{count} Benutzer",
+    "kpi_locations": "{count} Standorte",
+    "zone_users": "{count} Benutzer in dieser Zone",
+    "realm_influence": "{count} Realm mit Einfluss",
+    "realms_influence": "{count} Realms mit Einfluss",
+    "filter_all_stages": "Alle Phasen",
+    "sort_name": "Sortieren: Name",
+    "sort_users_desc": "Meiste Benutzer",
+    "sort_users_asc": "Wenigste Benutzer",
+    "sort_newest": "Neueste zuerst"
   },
   "stats": {
     "showing": "Zeige {filtered} von {total} Realms",

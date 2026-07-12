@@ -5,6 +5,7 @@
   import RegistryAssistant from '$lib/components/RegistryAssistant.svelte';
   import { assistantChrome } from '$lib/assistant-chrome.js';
   import '../index.scss';
+  import '$lib/theme/tokens.css';
 
   // Flag to track if i18n is ready
   let i18nReady = false;

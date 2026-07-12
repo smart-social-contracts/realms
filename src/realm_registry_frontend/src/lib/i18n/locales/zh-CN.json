@@ -27,13 +27,28 @@
     "visit": "访问"
   },
   "map": {
-    "back_to_list": "返回列表",
-    "showing_realms": "显示 {count} 个领域",
+    "loading": "正在加载地图数据...",
     "users_in_zone": "该区域有 {count} 位用户",
     "realm_influence": "{count} 个领域具有影响力",
     "realms_influence": "{count} 个领域具有影响力",
     "hq": "总部",
     "base": "基地"
+  },
+  "globe": {
+    "loading": "正在加载地球仪…",
+    "browse_realms": "浏览领域",
+    "aria_label": "显示领域位置的可交互地球仪",
+    "kpi_realms": "{count} 个领域",
+    "kpi_users": "{count} 位用户",
+    "kpi_locations": "{count} 个位置",
+    "zone_users": "该区域有 {count} 位用户",
+    "realm_influence": "{count} 个领域具有影响力",
+    "realms_influence": "{count} 个领域具有影响力",
+    "filter_all_stages": "所有阶段",
+    "sort_name": "排序：名称",
+    "sort_users_desc": "用户最多",
+    "sort_users_asc": "用户最少",
+    "sort_newest": "最新优先"
   },
   "stats": {
     "showing": "显示 {filtered} / {total} 个领域",

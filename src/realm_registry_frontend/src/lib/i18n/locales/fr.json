@@ -27,13 +27,28 @@
     "visit": "Visiter"
   },
   "map": {
-    "back_to_list": "Retour à la Liste",
-    "showing_realms": "Affichage de {count} royaumes",
+    "loading": "Chargement des données cartographiques...",
     "users_in_zone": "{count} utilisateurs dans cette zone",
     "realm_influence": "{count} royaume avec influence",
     "realms_influence": "{count} royaumes avec influence",
     "hq": "QG",
     "base": "Base"
+  },
+  "globe": {
+    "loading": "Chargement du globe…",
+    "browse_realms": "Parcourir les royaumes",
+    "aria_label": "Globe interactif montrant les emplacements des royaumes",
+    "kpi_realms": "{count} royaumes",
+    "kpi_users": "{count} utilisateurs",
+    "kpi_locations": "{count} emplacements",
+    "zone_users": "{count} utilisateurs dans cette zone",
+    "realm_influence": "{count} royaume avec influence",
+    "realms_influence": "{count} royaumes avec influence",
+    "filter_all_stages": "Toutes les phases",
+    "sort_name": "Trier : Nom",
+    "sort_users_desc": "Plus d'utilisateurs",
+    "sort_users_asc": "Moins d'utilisateurs",
+    "sort_newest": "Plus récents"
   },
   "stats": {
     "showing": "Affichage de {filtered} sur {total} royaumes",

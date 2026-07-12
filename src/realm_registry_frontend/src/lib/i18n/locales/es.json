@@ -27,13 +27,28 @@
     "visit": "Visitar"
   },
   "map": {
-    "back_to_list": "Volver a la Lista",
-    "showing_realms": "Mostrando {count} reinos",
+    "loading": "Cargando datos del mapa...",
     "users_in_zone": "{count} usuarios en esta zona",
     "realm_influence": "{count} reino con influencia",
     "realms_influence": "{count} reinos con influencia",
     "hq": "Sede",
     "base": "Base"
+  },
+  "globe": {
+    "loading": "Cargando globo…",
+    "browse_realms": "Explorar reinos",
+    "aria_label": "Globo interactivo con ubicaciones de reinos",
+    "kpi_realms": "{count} reinos",
+    "kpi_users": "{count} usuarios",
+    "kpi_locations": "{count} ubicaciones",
+    "zone_users": "{count} usuarios en esta zona",
+    "realm_influence": "{count} reino con influencia",
+    "realms_influence": "{count} reinos con influencia",
+    "filter_all_stages": "Todas las fases",
+    "sort_name": "Ordenar: Nombre",
+    "sort_users_desc": "Más usuarios",
+    "sort_users_asc": "Menos usuarios",
+    "sort_newest": "Más recientes"
   },
   "stats": {
     "showing": "Mostrando {filtered} de {total} reinos",

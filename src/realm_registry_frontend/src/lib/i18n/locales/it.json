@@ -27,13 +27,28 @@
     "visit": "Visita"
   },
   "map": {
-    "back_to_list": "Torna all'Elenco",
-    "showing_realms": "Visualizzazione di {count} reami",
+    "loading": "Caricamento dati mappa...",
     "users_in_zone": "{count} utenti in questa zona",
     "realm_influence": "{count} reame con influenza",
     "realms_influence": "{count} reami con influenza",
     "hq": "QG",
     "base": "Base"
+  },
+  "globe": {
+    "loading": "Caricamento globo…",
+    "browse_realms": "Sfoglia i reami",
+    "aria_label": "Globo interattivo con le posizioni dei reami",
+    "kpi_realms": "{count} reami",
+    "kpi_users": "{count} utenti",
+    "kpi_locations": "{count} posizioni",
+    "zone_users": "{count} utenti in questa zona",
+    "realm_influence": "{count} reame con influenza",
+    "realms_influence": "{count} reami con influenza",
+    "filter_all_stages": "Tutte le fasi",
+    "sort_name": "Ordina: Nome",
+    "sort_users_desc": "Più utenti",
+    "sort_users_asc": "Meno utenti",
+    "sort_newest": "Più recenti"
   },
   "stats": {
     "showing": "Visualizzazione di {filtered} su {total} reami",

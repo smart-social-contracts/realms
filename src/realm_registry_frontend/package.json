@@ -16,11 +16,11 @@
     "@dfinity/candid": "^3.2.4",
     "@dfinity/identity": "^3.2.4",
     "@dfinity/principal": "^3.2.4",
-    "svelte-i18n": "^3.7.4",
     "@types/qrcode": "^1.5.5",
     "h3-js": "^4.1.0",
-    "leaflet": "^1.9.4",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "svelte-i18n": "^3.7.4",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.4",
