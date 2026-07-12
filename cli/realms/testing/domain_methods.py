@@ -20,6 +20,7 @@ def registration_code_create(
     profile="member",
     max_uses=1,
     department="",
+    position="",
     metadata="",
 ):
     """Mirror of RegistrationCode.create: plaintext code generated when no
@@ -49,11 +50,80 @@ def registration_code_create(
         frontend_url=frontend_url.rstrip("/") if frontend_url else "",
         profile=profile,
         department=department or "",
+        position=position or "",
         metadata=metadata or "",
         max_uses=max_uses,
         uses_count=0,
         principals_redeemed="",
         revoked=0,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Position / Appointment (issue #241)
+# ---------------------------------------------------------------------------
+
+def position_active_appointments(self):
+    """Mirror of Position.active_appointments (active holders of this seat)."""
+    from .ggg_module import Appointment
+
+    result = []
+    for a in Appointment.instances():
+        if (a.status or "active") != "active":
+            continue
+        pos = a.position
+        if pos is not None and getattr(pos, "key", None) == self.key:
+            result.append(a)
+    return result
+
+
+def position_filled_count(self):
+    return len(self.active_appointments())
+
+
+def position_vacancies(self):
+    return max(0, int(self.headcount or 1) - self.filled_count())
+
+
+def position_planned_cost(self):
+    return int(self.headcount or 1) * int(self.salary_amount or 0)
+
+
+def position_for_department(cls, department_name):
+    result = []
+    for pos in cls.instances():
+        dept = pos.department
+        if dept is not None and getattr(dept, "name", None) == department_name:
+            result.append(pos)
+    return result
+
+
+def appointment_end(self, ended_at=0):
+    import time
+
+    self.status = "ended"
+    self.ended_at = ended_at or int(time.time())
+
+
+def position_appoint(position, user):
+    """Mirror of ggg.appoint: idempotent, returns None when full/not open."""
+    from .ggg_module import Appointment
+    import time
+
+    if (position.status or "open") != "open":
+        return None
+    for a in position.active_appointments():
+        holder = a.user
+        if holder is not None and getattr(holder, "id", None) == getattr(user, "id", None):
+            return a
+    if position.vacancies() <= 0:
+        return None
+    return Appointment(
+        position=position,
+        user=user,
+        started_at=int(time.time()),
+        ended_at=0,
+        status="active",
     )
 
 

@@ -10,6 +10,15 @@ from .menu_department_visibility import MenuDepartmentVisibility
 from .menu_item_config import MenuItemConfig
 from .notification import Notification
 from .permission import Permission
+from .position import (
+    Appointment,
+    AppointmentStatus,
+    Position,
+    PositionStatus,
+    appoint,
+    department_personnel_cost,
+    position_key,
+)
 from .service import Service
 from .status import (
     ContractStatus,
@@ -33,6 +42,8 @@ from .user import User
 from .user_profile import Operations, Profiles, UserProfile
 
 __all__ = [
+    "Appointment",
+    "AppointmentStatus",
     "Call",
     "ContractStatus",
     "Department",
@@ -49,10 +60,15 @@ __all__ = [
     "Operations",
     "OrganizationStatus",
     "Permission",
+    "Position",
+    "PositionStatus",
     "Profiles",
     "ProposalStatus",
     "RegistrationCode",
     "Service",
+    "appoint",
+    "department_personnel_cost",
+    "position_key",
     "Task",
     "TaskExecution",
     "TaskExecutionStatus",

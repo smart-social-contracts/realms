@@ -1,10 +1,18 @@
 """Registration code entity and helpers for invite-based realm signup."""
 
 import hashlib
-import secrets
 import string
 import time
 from datetime import datetime, timedelta
+
+
+def _random_code(length: int = 16) -> str:
+    """Generate a plaintext invite code (IC-safe — secrets.choice unavailable in WASM)."""
+    from core.random import generate_unique_id
+
+    alphabet = string.ascii_letters + string.digits
+    seed = generate_unique_id(length=32)
+    return "".join(alphabet[int(seed[i : i + 2], 16) % len(alphabet)] for i in range(0, length * 2, 2))
 
 
 def _now_ts() -> int:
@@ -58,6 +66,9 @@ class RegistrationCode(Entity, TimestampedMixin):
         department: Organization (Department.name) the redeemer is added to.
             Empty for plain member/citizen codes. Enables per-department
             staff invite URLs (issue #241).
+        position: Position key (``<department>/<title>``) the redeemer is
+            appointed to on redemption. Empty when the invite is not bound
+            to a specific seat.
         metadata: JSON blob attached to the code (issue #241). For citizen
             bulk imports (``{"kind": "citizen_import", ...}``) the single-use
             code doubles as the provisional citizen record: name, quarter,
@@ -69,7 +80,7 @@ class RegistrationCode(Entity, TimestampedMixin):
     """
 
     __alias__ = "code_hash"
-    __version__ = 2
+    __version__ = 3
 
     code_hash = String(max_length=128)
     code = String(max_length=64)
@@ -82,6 +93,7 @@ class RegistrationCode(Entity, TimestampedMixin):
     frontend_url = String(max_length=512)
     profile = String(max_length=64, default="member")
     department = String(max_length=256, default="")
+    position = String(max_length=512, default="")
     metadata = String(max_length=1024, default="")
     max_uses = Integer(default=1)
     uses_count = Integer(default=0)
@@ -93,6 +105,8 @@ class RegistrationCode(Entity, TimestampedMixin):
         if from_version < 2:
             obj.setdefault("department", "")
             obj.setdefault("metadata", "")
+        if from_version < 3:
+            obj.setdefault("position", "")
         return obj
 
     @classmethod
@@ -107,6 +121,7 @@ class RegistrationCode(Entity, TimestampedMixin):
         profile: str = "member",
         max_uses: int = 1,
         department: str = "",
+        position: str = "",
         metadata: str = "",
     ) -> "RegistrationCode":
         """Create a new registration code."""
@@ -115,8 +130,7 @@ class RegistrationCode(Entity, TimestampedMixin):
         if code_hash:
             code = ""
         else:
-            alphabet = string.ascii_letters + string.digits
-            code = "".join(secrets.choice(alphabet) for _ in range(16))
+            code = _random_code(16)
             code_hash = hashlib.sha256(code.encode()).hexdigest()
 
         return cls(
@@ -131,6 +145,7 @@ class RegistrationCode(Entity, TimestampedMixin):
             frontend_url=frontend_url.rstrip("/") if frontend_url else "",
             profile=profile,
             department=department or "",
+            position=position or "",
             metadata=metadata or "",
             max_uses=max_uses,
             uses_count=0,
@@ -212,6 +227,7 @@ def create_registration_code(
     frontend_url: str = "",
     email: str = "",
     department: str = "",
+    position: str = "",
     metadata: str = "",
 ) -> RegistrationCode:
     """Create and persist a new RegistrationCode, returning the entity."""
@@ -225,6 +241,7 @@ def create_registration_code(
         profile=profile,
         max_uses=max_uses,
         department=department,
+        position=position,
         metadata=metadata,
     )
 
@@ -254,6 +271,7 @@ def validate_registration_code(code_hash_hex: str) -> dict:
             "valid": True,
             "profile": reg_code.profile,
             "department": reg_code.department or "",
+            "position": reg_code.position or "",
             "expires_at": datetime.fromtimestamp(reg_code.expires_at).isoformat(),
             "user_id": reg_code.user_id,
             "email": reg_code.email,
@@ -286,6 +304,7 @@ def consume_registration_code(code_hash_hex: str, principal: str) -> dict:
         "data": {
             "profile": reg_code.profile,
             "department": reg_code.department or "",
+            "position": reg_code.position or "",
             "user_id": reg_code.user_id or "",
             "metadata": reg_code.metadata or "",
         },
@@ -329,6 +348,7 @@ def list_registration_codes(include_used: bool = False) -> list[dict]:
             "email": c.email,
             "profile": c.profile,
             "department": c.department or "",
+            "position": c.position or "",
             "expires_at": datetime.fromtimestamp(c.expires_at).isoformat(),
             "uses_count": c.uses_count,
             "max_uses": c.max_uses,

@@ -120,7 +120,10 @@
 
 <div class="portal-shell">
   {#if loading}
-    <p class="status">Resolving realm…</p>
+    <div class="loading-state" role="status" aria-live="polite">
+      <div class="loading-spinner" aria-hidden="true"></div>
+      <p class="loading-label">Loading realm</p>
+    </div>
   {:else if error}
     <div class="error-box">
       <p>{error}</p>
@@ -159,23 +162,70 @@
 </div>
 
 <style>
+  :global(html),
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #fff;
+  }
+
   .portal-shell {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    background: #fff;
   }
   .frame-wrap {
     position: relative;
     flex: 1;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    min-height: 0;
   }
   .realm-frame {
     flex: 1;
     width: 100%;
-    min-height: 70vh;
+    height: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
     border: none;
-    background: #111;
+    display: block;
+    background: #fff;
+  }
+  .loading-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    background: #fff;
+  }
+  .loading-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 2px solid #e5e5e5;
+    border-top-color: #525252;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-label {
+    margin: 0;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #737373;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
   .login-overlay {
     position: absolute;
@@ -225,12 +275,9 @@
     color: #f87171;
     font-size: 0.85rem;
   }
-  .status,
   .error-box {
     padding: 2rem;
     text-align: center;
-  }
-  .error-box {
     color: #f87171;
   }
 </style>

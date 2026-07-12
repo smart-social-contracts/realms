@@ -7,6 +7,8 @@ not part of the core GGG standard.
 
 # System module - user management, permissions, tasks, and core services
 from .system import (
+    Appointment,
+    AppointmentStatus,
     Call,
     Department,
     DepartmentAuthority,
@@ -17,6 +19,8 @@ from .system import (
     Notification,
     Operations,
     Permission,
+    Position,
+    PositionStatus,
     Profiles,
     RegistrationCode,
     ROOT_ORG_NAME,
@@ -27,6 +31,9 @@ from .system import (
     TaskStep,
     User,
     UserProfile,
+    appoint,
+    department_personnel_cost,
+    position_key,
 )
 
 # Justice module - legal system, courts, cases, and verdicts
@@ -117,6 +124,8 @@ from .land import (
 )
 
 __all__ = [
+    "Appointment",
+    "AppointmentStatus",
     "Balance",
     "Calendar",
     "Budget",
@@ -184,6 +193,8 @@ __all__ = [
     "Organization",
     "PaymentAccount",
     "Permission",
+    "Position",
+    "PositionStatus",
     "Profiles",
     "Proposal",
     "Quarter",
@@ -206,6 +217,9 @@ __all__ = [
     "UserProfile",
     "Vote",
     "Zone",
+    "appoint",
+    "department_personnel_cost",
+    "position_key",
 ]
 
 
@@ -215,8 +229,10 @@ def classes() -> list[str]:
         'LandType', 'LandStatus', 'RealmStatus', 'Operations', 'Profiles', 'BudgetStatus',
         'FiscalPeriodStatus', 'FundType', 'EntryType', 'Category',
         'LicenseType', 'JusticeSystemType', 'CourtLevel', 'CaseStatus', 'QuarterStatus',
-        'PenaltyType', 'AppealStatus', 'case_file', 'case_assign_judges',
+        'PenaltyType', 'AppealStatus', 'PositionStatus', 'AppointmentStatus',
+        'case_file', 'case_assign_judges',
         'case_issue_verdict', 'case_close', 'verdict_prehook', 'verdict_posthook',
         'penalty_execute', 'penalty_waive', 'appeal_file', 'appeal_decide',
-        'license_issue', 'license_revoke'
+        'license_issue', 'license_revoke', 'appoint', 'department_personnel_cost',
+        'position_key'
     )]

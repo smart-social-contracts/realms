@@ -8,7 +8,8 @@ console UI, so creators see exactly what stands between them and beta.
 
 Milestones (computed live from GGG entities, no cached flags):
   - departments seeded (all template orgs exist)
-  - departments staffed (every org has members)
+  - departments staffed (every open Position has a holder; falls back to
+    "every org has members" when the codex defines no positions)
   - budgets linked (every org has a fund envelope)
   - citizens imported (population reached the codex target)
   - treasury configured (token canister linked)
@@ -73,13 +74,35 @@ def readiness_checklist(realm) -> list:
         except Exception:
             return 0
 
-    staffed = [d for d in non_root if _member_count(d) > 0]
-    items.append({
-        "id": "departments_staffed",
-        "label": "Civil servants onboarded",
-        "done": len(non_root) > 0 and len(staffed) == len(non_root),
-        "detail": f"{len(staffed)} of {len(non_root)} departments have members",
-    })
+    # Staffing: explicit Position seats when the codex seeded them (each open
+    # position needs >=1 active appointment), member-count heuristic otherwise.
+    open_positions = []
+    try:
+        from ggg import Position, PositionStatus
+
+        open_positions = [
+            p for p in Position.instances()
+            if (p.status or PositionStatus.OPEN) == PositionStatus.OPEN
+        ]
+    except Exception:
+        open_positions = []
+
+    if open_positions:
+        staffed_positions = [p for p in open_positions if p.filled_count() > 0]
+        items.append({
+            "id": "departments_staffed",
+            "label": "Civil servants onboarded",
+            "done": len(staffed_positions) == len(open_positions),
+            "detail": f"{len(staffed_positions)} of {len(open_positions)} positions staffed",
+        })
+    else:
+        staffed = [d for d in non_root if _member_count(d) > 0]
+        items.append({
+            "id": "departments_staffed",
+            "label": "Civil servants onboarded",
+            "done": len(non_root) > 0 and len(staffed) == len(non_root),
+            "detail": f"{len(staffed)} of {len(non_root)} departments have members",
+        })
 
     budgets = [d for d in non_root if getattr(d, "fund", None)]
     items.append({

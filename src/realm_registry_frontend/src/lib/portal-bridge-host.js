@@ -68,7 +68,8 @@ export function attachPortalBridge(iframe, realm, opts = {}) {
 			}
 			case 'resize:report':
 				if (typeof msg.payload?.height === 'number' && iframe) {
-					iframe.style.height = `${Math.min(Math.max(msg.payload.height, 320), 4000)}px`;
+					const viewportMin = Math.max(window.innerHeight, 320);
+					iframe.style.height = `${Math.min(Math.max(msg.payload.height, viewportMin), 4000)}px`;
 				}
 				break;
 			case 'focus:push':

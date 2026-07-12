@@ -248,6 +248,44 @@ RegistrationCode.find_by_department = classmethod(
     ]
 )
 
+
+class PositionStatus:
+    OPEN = "open"
+    FROZEN = "frozen"
+    CLOSED = "closed"
+
+
+class AppointmentStatus:
+    ACTIVE = "active"
+    ENDED = "ended"
+
+
+Position = _entity("Position", alias="key", methods={
+    "active_appointments": _dm.position_active_appointments,
+    "filled_count": _dm.position_filled_count,
+    "vacancies": _dm.position_vacancies,
+    "planned_cost": _dm.position_planned_cost,
+})
+Position.for_department = classmethod(_dm.position_for_department)
+
+Appointment = _entity("Appointment", methods={
+    "end": _dm.appointment_end,
+})
+
+appoint = _dm.position_appoint
+
+
+def position_key(department_name, title):
+    return f"{department_name}/{title}"
+
+
+def department_personnel_cost(department_name):
+    total = 0
+    for pos in Position.for_department(department_name):
+        if (pos.status or "open") == "open":
+            total += pos.planned_cost()
+    return total
+
 # --- Realm ---
 Realm = _entity("Realm", alias="name")
 Calendar = _entity("Calendar", alias="name")

@@ -1491,9 +1491,13 @@ def publish_codex_command(
 
     for root, _dirs, files in os.walk(source_dir):
         for fname in sorted(files):
-            if not fname.endswith(".py"):
+            # Include JSON data files (departments.json, zones.json, …) referenced
+            # by manifest.data_files — init.py reads them at install time.
+            if not (fname.endswith(".py") or fname.endswith(".json")):
                 continue
             local = os.path.join(root, fname)
+            if fname == "manifest.json" and os.path.dirname(local) == source_dir:
+                continue
             rel = os.path.relpath(local, source_dir).replace(os.sep, "/")
             _track(_upload_one_file(
                 registry, namespace, rel, local, network, identity,

@@ -1285,6 +1285,77 @@ class UserProfile(Entity):
 
 
 # ---------------------------------------------------------------------------
+# Position / Appointment (issue #241)
+# ---------------------------------------------------------------------------
+
+class PositionStatus:
+    OPEN: str
+    FROZEN: str
+    CLOSED: str
+
+
+class AppointmentStatus:
+    ACTIVE: str
+    ENDED: str
+
+
+class Position(Entity):
+    """Titled seat on a Department with headcount and salary line. Alias: ``key``"""
+
+    key: Optional[str]
+    """Unique alias ``<department>/<title>``"""
+    title: Optional[str]
+    description: Optional[str]
+    department: Optional["Department"]
+    profile: Optional[UserProfile]
+    """Capability profile granted to holders"""
+    headcount: Optional[int]
+    salary_amount: Optional[int]
+    """Cost per salary_period in accounting-currency units"""
+    salary_period: Optional[str]
+    status: Optional[str]
+    appointments: List["Appointment"]
+
+    def active_appointments(self) -> List["Appointment"]: ...
+    def filled_count(self) -> int: ...
+    def vacancies(self) -> int: ...
+    def planned_cost(self) -> int: ...
+
+    @classmethod
+    def for_department(cls, department_name: str) -> List["Position"]: ...
+
+    def __init__(self, *, key: Optional[str] = ..., title: Optional[str] = ..., description: Optional[str] = ..., department: Optional["Department"] = ..., profile: Optional[UserProfile] = ..., headcount: Optional[int] = ..., salary_amount: Optional[int] = ..., salary_period: Optional[str] = ..., status: Optional[str] = ..., **kwargs) -> None: ...
+    @classmethod
+    def instances(cls) -> List["Position"]: ...
+    @classmethod
+    def count(cls) -> int: ...
+    def __class_getitem__(cls, alias_value: str) -> Optional["Position"]: ...
+
+
+class Appointment(Entity):
+    """One user holding one Position for a period."""
+
+    position: Optional[Position]
+    user: Optional[User]
+    started_at: Optional[int]
+    ended_at: Optional[int]
+    status: Optional[str]
+
+    def end(self, ended_at: int = ...) -> None: ...
+
+    def __init__(self, *, position: Optional[Position] = ..., user: Optional[User] = ..., started_at: Optional[int] = ..., ended_at: Optional[int] = ..., status: Optional[str] = ..., **kwargs) -> None: ...
+    @classmethod
+    def instances(cls) -> List["Appointment"]: ...
+    @classmethod
+    def count(cls) -> int: ...
+
+
+def position_key(department_name: str, title: str) -> str: ...
+def appoint(position: Position, user: User) -> Optional[Appointment]: ...
+def department_personnel_cost(department_name: str) -> int: ...
+
+
+# ---------------------------------------------------------------------------
 # Task, TaskStep, TaskSchedule, TaskExecution, Call
 # ---------------------------------------------------------------------------
 

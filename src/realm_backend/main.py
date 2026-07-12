@@ -712,6 +712,30 @@ def join_realm(
                     f"Failed to add {caller} to organization '{invite_department}': {dept_err}"
                 )
 
+        # Position-linked invite (issue #241): appoint the redeemer to the seat.
+        # Best-effort — a full roster or closed position never fails the join.
+        invite_position = (invite_consume_data.get("position") or "").strip() if invite_consume_data else ""
+        if invite_position:
+            try:
+                from ggg import Position, appoint
+
+                pos = Position[invite_position]
+                u = User[caller]
+                if pos and u:
+                    appointment = appoint(pos, u)
+                    if appointment:
+                        logger.info(
+                            f"Invite code appointed {caller} to position '{invite_position}'"
+                        )
+                else:
+                    logger.warning(
+                        f"Invite code references unknown position '{invite_position}'"
+                    )
+            except Exception as pos_err:
+                logger.error(
+                    f"Failed to appoint {caller} to position '{invite_position}': {pos_err}"
+                )
+
         assigned_quarter_canister_id = ""
         quarters = list(Quarter.instances()) if realm else []
         if realm and quarters:
