@@ -71,7 +71,15 @@
   },
   "auth": {
     "login": "Log In",
-    "logout": "Log Out"
+    "logout": "Log Out",
+    "account": "Account",
+    "signed_in": "Signed in"
+  },
+  "about": {
+    "title": "About Realms",
+    "body": "You are seeing a map of Governance Operating Systems (GOS, for short).\n\nGOSs are decentralized digital implementations of governance that, as opposed to traditional governments, prevent the opacity that makes corruption and inefficiency of governments possible.\nWe believe that GOSs will play a paramount role in the development of human civilization.\n\nJoin us!",
+    "close": "Close",
+    "github": "GitHub"
   },
   "dashboard": {
     "title": "My Dashboard",

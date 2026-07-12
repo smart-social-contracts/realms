@@ -14,8 +14,11 @@
 
   const dispatch = createEventDispatcher();
 
+  let logoFailed = false;
+
   $: welcomeBg = resolveRealmAssetUrl(realm, '/custom/background.png');
   $: logoSrc = resolvedRealmLogoUrl(realm);
+  $: realm?.id, (logoFailed = false);
 
   function stageLabel(stage) {
     if (stage === 'production') return 'Live';
@@ -38,8 +41,13 @@
 
   <div class="realm-header">
     <div class="realm-logo-container">
-      {#if logoSrc}
-        <img src={logoSrc} alt="{realm.name} logo" class="realm-logo" />
+      {#if logoSrc && !logoFailed}
+        <img
+          src={logoSrc}
+          alt=""
+          class="realm-logo"
+          on:error={() => (logoFailed = true)}
+        />
       {:else}
         <div class="realm-logo-fallback">
           <span>{(realm.name || realm.realm_name || '?').charAt(0).toUpperCase()}</span>
@@ -139,7 +147,7 @@
     inset: 0;
     background-size: cover;
     background-position: center;
-    opacity: 0.06;
+    opacity: 0.28;
     pointer-events: none;
   }
 
@@ -150,9 +158,12 @@
     right: 0;
     height: 3px;
     background: var(--border);
+    z-index: 1;
   }
 
   .realm-header {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -213,6 +224,12 @@
 
   .user-badge.has-users {
     color: var(--text-secondary);
+  }
+
+  .realm-content,
+  .realm-actions {
+    position: relative;
+    z-index: 1;
   }
 
   .realm-name {
