@@ -115,3 +115,84 @@ export function stripPoliticalLayers(style) {
   delete next.light;
   return next;
 }
+
+/**
+ * Glass-like basemap for globe view.
+ *
+ * MapLibre still depth-occludes WebGL layers on the far hemisphere — fill opacity alone
+ * cannot reveal them. Softening here makes the *front* shell translucent so page
+ * background (and DOM markers with opacityWhenCovered) read through the planet.
+ * Oceans dominate Positron’s sphere fill, so water is pushed lower than land.
+ *
+ * @param {object} style
+ * @param {{ surfaceOpacity?: number }} [opts]
+ */
+export function softenGlobeBasemap(style, { surfaceOpacity = 0.18 } = {}) {
+  if (!style?.layers) return style;
+  const clamp = (v) => Math.max(0.04, Math.min(1, v));
+
+  /** Scale numeric outputs inside opacity expressions without nesting `zoom` illegally. */
+  function scaleOpacityExpr(expr, factor) {
+    if (expr == null) return clamp(factor);
+    if (typeof expr === 'number') return clamp(expr * factor);
+    if (!Array.isArray(expr) || expr.length === 0) return clamp(factor);
+
+    const op = expr[0];
+    if (op === 'interpolate' || op === 'interpolate-hcl' || op === 'interpolate-lab') {
+      // ['interpolate', type, input, stop0, out0, stop1, out1, ...]
+      const next = expr.slice();
+      for (let i = 4; i < next.length; i += 2) {
+        if (typeof next[i] === 'number') next[i] = clamp(next[i] * factor);
+      }
+      return next;
+    }
+    if (op === 'step') {
+      // ['step', input, default, stop0, out0, ...]
+      const next = expr.slice();
+      if (typeof next[2] === 'number') next[2] = clamp(next[2] * factor);
+      for (let i = 4; i < next.length; i += 2) {
+        if (typeof next[i] === 'number') next[i] = clamp(next[i] * factor);
+      }
+      return next;
+    }
+    if (op === 'literal' && typeof expr[1] === 'number') {
+      return ['literal', clamp(expr[1] * factor)];
+    }
+    // Unknown / compound expression — fall back to a flat opacity
+    return clamp(factor);
+  }
+
+  const layers = style.layers.map((layer) => {
+    const type = String(layer.type || '');
+    const id = String(layer.id || '').toLowerCase();
+    const paint = { ...(layer.paint || {}) };
+
+    if (type === 'background') {
+      // Land in Positron is mostly the background color — keep it very faint
+      paint['background-opacity'] = clamp(surfaceOpacity * 0.55);
+      return { ...layer, paint };
+    }
+
+    if (type === 'fill') {
+      // Water covers most of the sphere; keep it glassier than other fills
+      const factor = id.includes('water') ? surfaceOpacity * 0.75 : surfaceOpacity;
+      paint['fill-opacity'] = scaleOpacityExpr(paint['fill-opacity'], factor);
+      return { ...layer, paint };
+    }
+
+    if (type === 'line') {
+      const lineFactor = Math.min(0.55, surfaceOpacity + 0.22);
+      const existing = paint['line-opacity'];
+      if (existing == null || typeof existing === 'number') {
+        paint['line-opacity'] = clamp((typeof existing === 'number' ? existing : 1) * lineFactor);
+      } else {
+        paint['line-opacity'] = scaleOpacityExpr(existing, lineFactor);
+      }
+      return { ...layer, paint };
+    }
+
+    return layer;
+  });
+
+  return { ...style, layers };
+}

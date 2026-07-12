@@ -12,6 +12,7 @@
     h3ResolutionForZoom,
     influenceRingsForResolution,
     MAP_BG,
+    softenGlobeBasemap,
     stripPoliticalLayers,
   } from '$lib/globe/globe-config.js';
 
@@ -25,9 +26,8 @@
   const HEX_SOURCE = 'realm-hexes';
   const HEX_FILL = 'realm-hex-fill';
   const HEX_LINE = 'realm-hex-line';
-  const MARKER_SOURCE = 'realm-markers';
-  const MARKER_LAYER = 'realm-markers-circle';
-  const MARKER_HALO = 'realm-markers-halo';
+  /** Far-side pins use DOM Markers — MapLibre depth-occludes circle layers. */
+  const MARKER_COVERED_OPACITY = 0.48;
 
   let container;
   /** @type {import('maplibre-gl').Map | null} */
@@ -36,6 +36,8 @@
   let maplibregl = null;
   /** @type {import('h3-js') | null} */
   let h3 = null;
+  /** @type {Map<string, import('maplibre-gl').Marker>} */
+  let markerById = new Map();
   let ready = false;
   let currentH3Res = -1;
   let mapError = '';
@@ -75,30 +77,64 @@
     };
   }
 
-  function markersToGeoJSON(points) {
-    return {
-      type: 'FeatureCollection',
-      features: points.map((p) => ({
-        type: 'Feature',
-        properties: {
-          realmId: p.realmId,
-          name: p.realmName,
-          color: p.color,
-          users: p.users,
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: [p.lng, p.lat],
-        },
-      })),
-    };
+  function clearHtmlMarkers() {
+    for (const marker of markerById.values()) marker.remove();
+    markerById.clear();
+  }
+
+  function syncHtmlMarkers(points) {
+    if (!map || !maplibregl) return;
+    const seen = new Set();
+
+    for (const p of points) {
+      seen.add(p.realmId);
+      let marker = markerById.get(p.realmId);
+      const size = Math.round(12 * (p.size || 1));
+
+      if (!marker) {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'realm-globe-marker';
+        el.title = p.realmName || p.realmId;
+        el.setAttribute('aria-label', p.realmName || p.realmId);
+        el.style.backgroundColor = p.color;
+        el.style.width = `${size}px`;
+        el.style.height = `${size}px`;
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dispatch('select', { realmId: p.realmId });
+        });
+        marker = new maplibregl.Marker({
+          element: el,
+          anchor: 'center',
+          opacity: 1,
+          opacityWhenCovered: MARKER_COVERED_OPACITY,
+          subpixelPositioning: true,
+        })
+          .setLngLat([p.lng, p.lat])
+          .addTo(map);
+        markerById.set(p.realmId, marker);
+      } else {
+        marker.setLngLat([p.lng, p.lat]);
+        const el = marker.getElement();
+        el.style.backgroundColor = p.color;
+        el.style.width = `${size}px`;
+        el.style.height = `${size}px`;
+        el.title = p.realmName || p.realmId;
+      }
+    }
+
+    for (const [id, marker] of [...markerById.entries()]) {
+      if (seen.has(id)) continue;
+      marker.remove();
+      markerById.delete(id);
+    }
   }
 
   function ensureLayers() {
     if (!map || map.getSource(HEX_SOURCE)) return;
 
     map.addSource(HEX_SOURCE, { type: 'geojson', data: emptyFeatureCollection() });
-    map.addSource(MARKER_SOURCE, { type: 'geojson', data: emptyFeatureCollection() });
 
     map.addLayer({
       id: HEX_FILL,
@@ -118,49 +154,6 @@
         'line-color': ['get', 'stroke'],
         'line-width': ['get', 'weight'],
         'line-opacity': 0.85,
-      },
-    });
-
-    map.addLayer({
-      id: MARKER_HALO,
-      type: 'circle',
-      source: MARKER_SOURCE,
-      paint: {
-        'circle-radius': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          2,
-          10,
-          8,
-          8,
-          12,
-          6,
-        ],
-        'circle-color': '#F59E0B',
-        'circle-opacity': 0.18,
-      },
-    });
-
-    map.addLayer({
-      id: MARKER_LAYER,
-      type: 'circle',
-      source: MARKER_SOURCE,
-      paint: {
-        'circle-radius': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          2,
-          5,
-          8,
-          4.5,
-          12,
-          3.5,
-        ],
-        'circle-color': ['get', 'color'],
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#FFFFFF',
       },
     });
   }
@@ -185,9 +178,8 @@
     });
 
     const hexSource = map.getSource(HEX_SOURCE);
-    const markerSource = map.getSource(MARKER_SOURCE);
     if (hexSource) hexSource.setData(polygonsToGeoJSON(polygons));
-    if (markerSource) markerSource.setData(markersToGeoJSON(points));
+    syncHtmlMarkers(points);
   }
 
   function onZoomEnd() {
@@ -197,10 +189,8 @@
   }
 
   function onMapClick(e) {
-    if (!map) return;
-    const layers = [MARKER_LAYER, HEX_FILL].filter((id) => map.getLayer(id));
-    if (!layers.length) return;
-    const hits = map.queryRenderedFeatures(e.point, { layers });
+    if (!map || !map.getLayer(HEX_FILL)) return;
+    const hits = map.queryRenderedFeatures(e.point, { layers: [HEX_FILL] });
     const hit = hits.find((f) => f.properties?.realmId);
     if (hit?.properties?.realmId) {
       dispatch('select', { realmId: hit.properties.realmId });
@@ -236,9 +226,9 @@
           ['linear'],
           ['zoom'],
           0,
-          0.55,
+          0.12,
           4,
-          0.2,
+          0.04,
           6,
           0,
         ],
@@ -294,7 +284,8 @@
 
       const styleRes = await fetch(STYLE_URL);
       if (!styleRes.ok) throw new Error(`Basemap style HTTP ${styleRes.status}`);
-      const style = stripPoliticalLayers(await styleRes.json());
+      let style = stripPoliticalLayers(await styleRes.json());
+      style = softenGlobeBasemap(style, { surfaceOpacity: 0.18 });
       style.projection = { type: 'globe' };
       style.sky = {
         'atmosphere-blend': [
@@ -302,9 +293,9 @@
           ['linear'],
           ['zoom'],
           0,
-          0.55,
+          0.12,
           4,
-          0.2,
+          0.04,
           6,
           0,
         ],
@@ -364,12 +355,6 @@
       map.on('touchstart', pauseAutoRotate);
       map.on('wheel', pauseAutoRotate);
       map.on('click', onMapClick);
-      map.on('mouseenter', MARKER_LAYER, () => {
-        if (map) map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', MARKER_LAYER, () => {
-        if (map) map.getCanvas().style.cursor = 'grab';
-      });
       map.on('mouseenter', HEX_FILL, () => {
         if (map) map.getCanvas().style.cursor = 'pointer';
       });
@@ -384,6 +369,7 @@
     return () => {
       if (resumeTimer) clearTimeout(resumeTimer);
       if (rotateRaf) cancelAnimationFrame(rotateRaf);
+      clearHtmlMarkers();
       map?.remove();
       map = null;
     };
@@ -392,6 +378,7 @@
   onDestroy(() => {
     if (resumeTimer) clearTimeout(resumeTimer);
     if (rotateRaf) cancelAnimationFrame(rotateRaf);
+    clearHtmlMarkers();
     map?.remove();
     map = null;
   });
@@ -457,6 +444,62 @@
     line-height: 12px;
     padding: 0 4px;
     border-radius: 2px;
+  }
+
+  /* Realm pins — electric blue + glow; DOM so far-side ones show through */
+  .map-view :global(.realm-globe-marker) {
+    display: block;
+    padding: 0;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    border-radius: 50%;
+    background-color: #00e5ff;
+    box-shadow:
+      0 0 6px 2px rgba(0, 229, 255, 0.95),
+      0 0 14px 5px rgba(0, 180, 255, 0.55),
+      0 0 28px 10px rgba(0, 140, 255, 0.28);
+    cursor: pointer;
+    transform: translateZ(0);
+    animation: pin-glow 2.4s ease-in-out infinite;
+  }
+
+  .map-view :global(.realm-globe-marker.maplibregl-marker-covered) {
+    animation: none;
+    box-shadow:
+      0 0 4px 1px rgba(0, 229, 255, 0.55),
+      0 0 10px 3px rgba(0, 180, 255, 0.28);
+    cursor: pointer;
+  }
+
+  .map-view :global(.realm-globe-marker:hover),
+  .map-view :global(.realm-globe-marker:focus-visible) {
+    animation: none;
+    box-shadow:
+      0 0 8px 3px rgba(0, 229, 255, 1),
+      0 0 18px 7px rgba(0, 180, 255, 0.7),
+      0 0 36px 14px rgba(0, 140, 255, 0.35);
+    outline: none;
+  }
+
+  @keyframes pin-glow {
+    0%,
+    100% {
+      box-shadow:
+        0 0 6px 2px rgba(0, 229, 255, 0.95),
+        0 0 14px 5px rgba(0, 180, 255, 0.55),
+        0 0 28px 10px rgba(0, 140, 255, 0.28);
+    }
+    50% {
+      box-shadow:
+        0 0 8px 3px rgba(0, 229, 255, 1),
+        0 0 20px 8px rgba(0, 180, 255, 0.7),
+        0 0 36px 14px rgba(0, 140, 255, 0.4);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .map-view :global(.realm-globe-marker) {
+      animation: none;
+    }
   }
 
   .map-loading,

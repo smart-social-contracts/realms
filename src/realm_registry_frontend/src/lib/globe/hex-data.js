@@ -196,7 +196,7 @@ export function buildPointMarkers(
       lat: primary.center_lat,
       lng: primary.center_lng,
       users: primary.user_count,
-      color: isDimmed ? '#A3A3A3' : '#F59E0B',
+      color: isDimmed ? '#64748B' : '#00E5FF',
       size: isDimmed ? 0.7 : 1,
     });
   });
