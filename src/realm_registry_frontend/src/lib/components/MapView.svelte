@@ -334,6 +334,11 @@
         canvasContextAttributes: { antialias: true },
       });
 
+      map.addControl(
+        new maplibregl.ScaleControl({ maxWidth: 120, unit: 'metric' }),
+        'bottom-right'
+      );
+
       map.getCanvas().style.cursor = 'grab';
 
       map.on('style.load', () => {
@@ -438,6 +443,20 @@
   .map-view :global(.maplibregl-ctrl-attrib) {
     font-size: 10px;
     background: rgba(250, 250, 250, 0.85);
+  }
+
+  .map-view :global(.maplibregl-ctrl-scale) {
+    margin: 0 12px 28px 0;
+    border-color: #a3a3a3;
+    border-width: 1px 1px 2px;
+    background: rgba(250, 250, 250, 0.72);
+    color: #737373;
+    font-size: 10px;
+    font-family: var(--font-family, inherit);
+    height: 14px;
+    line-height: 12px;
+    padding: 0 4px;
+    border-radius: 2px;
   }
 
   .map-loading,
