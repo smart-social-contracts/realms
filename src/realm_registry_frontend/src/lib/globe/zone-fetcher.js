@@ -1,4 +1,4 @@
-import { H3_RESOLUTION } from './globe-config.js';
+import { ZONE_DATA_RESOLUTION } from './globe-config.js';
 
 export function isLocalDevelopment() {
   if (typeof window === 'undefined') return false;
@@ -123,7 +123,7 @@ export async function fetchZoneData(filteredRealms) {
           canisterId: Principal.fromText(realm.id),
         });
 
-        const response = await actor.get_zones(BigInt(H3_RESOLUTION));
+        const response = await actor.get_zones(BigInt(ZONE_DATA_RESOLUTION));
         const data = JSON.parse(response);
 
         if (data.success && data.zones?.length > 0) {

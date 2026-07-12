@@ -1,4 +1,9 @@
-import { H3_RESOLUTION, INFLUENCE_RINGS, grayHexStyle, DIM_OPACITY } from './globe-config.js';
+import {
+  DIM_OPACITY,
+  hexStyle,
+  hexCapForResolution,
+  influenceRingsForResolution,
+} from './globe-config.js';
 
 /**
  * @typedef {object} HexRealmEntry
@@ -16,26 +21,31 @@ import { H3_RESOLUTION, INFLUENCE_RINGS, grayHexStyle, DIM_OPACITY } from './glo
  * @property {HexRealmEntry[]} realms
  * @property {number} totalUsers
  * @property {string} fillColor
- * @property {string} sideColor
  * @property {string} strokeColor
- * @property {number} altitude
  * @property {number} opacity
- * @property {string} labelHtml
+ * @property {number} weight
  * @property {string[]} realmIds
+ * @property {number} minDistance
+ * @property {object} geometry
  */
 
 /**
  * @param {object[]} filteredRealms
  * @param {Record<string, { zones: object[] }>} realmZoneData
  * @param {object} h3
- * @param {{ matchingRealmIds?: Set<string> | null, dimNonMatching?: boolean, labelBuilder?: (data: object) => string }} [options]
+ * @param {{ matchingRealmIds?: Set<string> | null, dimNonMatching?: boolean, h3Resolution?: number, influenceRings?: number }} [options]
  * @returns {HexPolygon[]}
  */
 export function buildHexPolygons(
   filteredRealms,
   realmZoneData,
   h3,
-  { matchingRealmIds = null, dimNonMatching = false, labelBuilder } = {}
+  {
+    matchingRealmIds = null,
+    dimNonMatching = false,
+    h3Resolution = 4,
+    influenceRings = influenceRingsForResolution(h3Resolution),
+  } = {}
 ) {
   /** @type {Record<string, { realms: HexRealmEntry[], totalUsers: number }>} */
   const hexData = {};
@@ -47,16 +57,24 @@ export function buildHexPolygons(
     realZoneData.zones.forEach((zone) => {
       let centerHexIndex;
       try {
-        centerHexIndex = h3.latLngToCell(zone.center_lat, zone.center_lng, H3_RESOLUTION);
+        centerHexIndex = h3.latLngToCell(zone.center_lat, zone.center_lng, h3Resolution);
       } catch {
-        centerHexIndex = zone.h3_index;
+        try {
+          centerHexIndex = h3.cellToParent?.(zone.h3_index, h3Resolution) ?? zone.h3_index;
+        } catch {
+          centerHexIndex = zone.h3_index;
+        }
       }
 
       let influenceHexes;
       try {
-        influenceHexes = h3.gridDisk(centerHexIndex, INFLUENCE_RINGS);
+        influenceHexes =
+          influenceRings > 0 ? h3.gridDisk(centerHexIndex, influenceRings) : [centerHexIndex];
       } catch {
-        influenceHexes = h3.kRing ? h3.kRing(centerHexIndex, INFLUENCE_RINGS) : [centerHexIndex];
+        influenceHexes =
+          influenceRings > 0 && h3.kRing
+            ? h3.kRing(centerHexIndex, influenceRings)
+            : [centerHexIndex];
       }
 
       influenceHexes.forEach((hexIndex) => {
@@ -102,22 +120,26 @@ export function buildHexPolygons(
   const polygons = [];
 
   for (const [hexIndex, data] of Object.entries(hexData)) {
-    let boundary;
+    let ring;
     try {
-      boundary = h3.cellToBoundary(hexIndex);
+      // formatAsGeoJson=true → [lng, lat]
+      ring = h3.cellToBoundary(hexIndex, true).map(([lng, lat]) => [lng, lat]);
     } catch {
-      continue;
+      try {
+        ring = h3.cellToBoundary(hexIndex).map(([lat, lng]) => [lng, lat]);
+      } catch {
+        continue;
+      }
     }
-
-    const coords = boundary.map(([lat, lng]) => [lng, lat]);
-    coords.push(coords[0]);
+    if (ring.length) ring.push(ring[0]);
 
     const sortedRealms = [...data.realms].sort((a, b) => b.users - a.users);
     const minDistance = Math.min(...data.realms.map((r) => r.distance));
     const hasMultipleRealms = data.realms.length > 1;
-    const style = grayHexStyle(minDistance, {
+    const style = hexStyle(minDistance, {
       totalUsers: data.totalUsers,
       hasMultipleRealms,
+      h3Resolution,
     });
 
     const realmIds = data.realms.map((r) => r.realm.id);
@@ -132,18 +154,20 @@ export function buildHexPolygons(
       hexIndex,
       realms: sortedRealms,
       totalUsers: data.totalUsers,
-      geometry: { type: 'Polygon', coordinates: [coords] },
+      geometry: { type: 'Polygon', coordinates: [ring] },
       fillColor: style.fill,
-      sideColor: style.fill,
       strokeColor: style.stroke,
-      altitude: style.altitude,
       opacity,
-      labelHtml: labelBuilder ? labelBuilder({ hexIndex, ...data, realms: sortedRealms }) : '',
+      weight: style.weight,
+      minDistance,
       realmIds,
     });
   }
 
-  return polygons.slice(0, 2000);
+  const cap = hexCapForResolution(h3Resolution);
+  return polygons
+    .sort((a, b) => (a.minDistance ?? 99) - (b.minDistance ?? 99))
+    .slice(0, cap);
 }
 
 /**
@@ -151,7 +175,11 @@ export function buildHexPolygons(
  * @param {Record<string, { zones: object[] }>} realmZoneData
  * @param {{ matchingRealmIds?: Set<string> | null, dimNonMatching?: boolean }} [options]
  */
-export function buildPointMarkers(filteredRealms, realmZoneData, { matchingRealmIds = null, dimNonMatching = false } = {}) {
+export function buildPointMarkers(
+  filteredRealms,
+  realmZoneData,
+  { matchingRealmIds = null, dimNonMatching = false } = {}
+) {
   const markers = [];
 
   filteredRealms.forEach((realm) => {
@@ -160,9 +188,7 @@ export function buildPointMarkers(filteredRealms, realmZoneData, { matchingRealm
 
     const primary = [...zones].sort((a, b) => b.user_count - a.user_count)[0];
     const isDimmed =
-      dimNonMatching &&
-      matchingRealmIds &&
-      !matchingRealmIds.has(realm.id);
+      dimNonMatching && matchingRealmIds && !matchingRealmIds.has(realm.id);
 
     markers.push({
       realmId: realm.id,
@@ -170,8 +196,8 @@ export function buildPointMarkers(filteredRealms, realmZoneData, { matchingRealm
       lat: primary.center_lat,
       lng: primary.center_lng,
       users: primary.user_count,
-      color: isDimmed ? '#A3A3A3' : '#111111',
-      size: isDimmed ? 0.9 : 1.4,
+      color: isDimmed ? '#A3A3A3' : '#F59E0B',
+      size: isDimmed ? 0.7 : 1,
     });
   });
 

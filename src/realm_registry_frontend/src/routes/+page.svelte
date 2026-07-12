@@ -2,7 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { browser } from '$app/environment';
   import { _ } from 'svelte-i18n';
-  import GlobeView from '$lib/components/GlobeView.svelte';
+  import MapView from '$lib/components/MapView.svelte';
   import RegistryHeader from '$lib/components/RegistryHeader.svelte';
   import RegistryKpiLine from '$lib/components/RegistryKpiLine.svelte';
   import RealmPanel from '$lib/components/RealmPanel.svelte';
@@ -10,6 +10,7 @@
   import { fetchRealmDetails, fetchZoneData } from '$lib/globe/zone-fetcher.js';
   import { DUMMY_REALMS, DUMMY_ZONE_DATA } from '$lib/globe/dummy-realms.js';
   import { filterAndSortRealms } from '$lib/realm-utils.js';
+  import { realmPanelOpen } from '$lib/realm-panel-chrome.js';
   
   let backend;
   let realms = [];
@@ -21,7 +22,7 @@
   let searchQuery = '';
   let debouncedSearchQuery = '';
   let filterStage = '';
-  let sortBy = 'name';
+  let sortBy = 'users_desc';
   let panelOpen = false;
   let selectedRealmId = null;
   let activeManifestoRealm = null;
@@ -34,12 +35,14 @@
   let commitDatetime = '';
   let version = '';
   
-  /** @type {import('$lib/components/GlobeView.svelte').default | null} */
-  let globeView = null;
+  /** @type {import('$lib/components/MapView.svelte').default | null} */
+  let mapView = null;
   let searchInput = null;
 
   const marketplaceCanisterId = import.meta.env.CANISTER_ID_MARKETPLACE_FRONTEND || '';
   const casalsCanisterId = import.meta.env.CANISTER_ID_CASALS_FRONTEND || '';
+  // Fallback so the footer Casals icon always shows (local builds often lack the env id).
+  const CASALS_FALLBACK_URL = 'https://mcqbx-hyaaa-aaaaj-qsarq-cai.icp0.io';
 
   $: marketplaceUrl = isLocalDevelopment()
     ? `http://localhost:${(typeof window !== 'undefined' && window.location.port) || '4943'}/?canisterId=marketplace_frontend`
@@ -47,7 +50,9 @@
       ? `https://${marketplaceCanisterId}.icp0.io`
       : '';
 
-  $: casalsUrl = casalsCanisterId ? `https://${casalsCanisterId}.icp0.io` : '';
+  $: casalsUrl = casalsCanisterId
+    ? `https://${casalsCanisterId}.icp0.io`
+    : CASALS_FALLBACK_URL;
 
   function isLocalDevelopment() {
     return (
@@ -62,6 +67,7 @@
   }
 
   $: debouncedSearchQuery, filterStage, sortBy, realms, applyFilters();
+  $: realmPanelOpen.set(panelOpen);
 
   let searchDebounceTimer;
   $: {
@@ -121,12 +127,24 @@
     selectedRealmId = realmId;
     panelOpen = true;
     const realm = filteredRealms.find((r) => r.id === realmId);
-    if (realm && globeView) {
-      globeView.flyToRealm(realm);
+    if (realm && mapView) {
+      mapView.flyToRealm(realm);
     }
   }
 
-  function handleGlobeSelect(event) {
+  function acceptSearch() {
+    // Use live query (not debounced) so Enter matches what the user typed
+    const matches = filterAndSortRealms(realms, searchQuery, filterStage, sortBy);
+    filteredRealms = matches;
+    debouncedSearchQuery = searchQuery;
+    if (matches[0]) {
+      selectRealm(matches[0].id);
+    } else {
+      panelOpen = true;
+    }
+  }
+
+  function handleMapSelect(event) {
     selectRealm(event.detail.realmId);
   }
 
@@ -235,6 +253,7 @@
     {panelOpen}
     {marketplaceUrl}
     on:search={applyFilters}
+    on:acceptSearch={acceptSearch}
     on:openPanel={() => (panelOpen = true)}
     on:togglePanel={() => (panelOpen = !panelOpen)}
     on:login={handleLogin}
@@ -248,22 +267,22 @@
     </div>
   {/if}
 
-  <main class="globe-shell">
+  <main class="map-shell">
     {#if !loading}
-      <GlobeView
-        bind:this={globeView}
+      <MapView
+        bind:this={mapView}
         realms={filteredRealms}
         {realmZoneData}
         searchQuery={debouncedSearchQuery}
         loading={globeLoading}
-        on:select={handleGlobeSelect}
+        on:select={handleMapSelect}
       />
       <RegistryKpiLine realms={filteredRealms} {realmZoneData} />
-        {:else}
+    {:else}
       <div class="page-loading">
         <div class="spinner"></div>
       </div>
-              {/if}
+    {/if}
   </main>
 
   <RealmPanel
@@ -320,10 +339,9 @@
     background: var(--bg);
   }
 
-  .globe-shell {
+  .map-shell {
     position: absolute;
     inset: 0;
-    top: var(--header-height);
   }
 
   .page-loading {
@@ -351,7 +369,7 @@
 
   .error-banner {
     position: fixed;
-    top: calc(var(--header-height) + 0.5rem);
+    top: 1rem;
     left: 50%;
     transform: translateX(-50%);
     z-index: 200;

@@ -84,7 +84,7 @@ export default defineConfig({
     ...canisterDefines,
   },
   optimizeDeps: {
-    include: ['three', 'three/examples/jsm/controls/OrbitControls.js'],
+    include: ['maplibre-gl', 'h3-js'],
     esbuildOptions: {
       define: {
         global: "globalThis",
@@ -117,6 +117,6 @@ export default defineConfig({
       { find: '@icp-sdk/core/principal', replacement: '@dfinity/principal' },
       { find: '@icp-sdk/core/candid', replacement: '@dfinity/candid' },
     ],
-    dedupe: ['@dfinity/agent', 'three'],
+    dedupe: ['@dfinity/agent', 'maplibre-gl'],
   },
 });
