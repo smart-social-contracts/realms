@@ -213,6 +213,19 @@
 
   async function loadCodexManifest(codexId) {
     if (!codexId || codexManifests[codexId]) return;
+    // Source of truth is the file registry: that is the package a new realm
+    // actually installs. The codices git repo is only a fallback — it can be
+    // ahead of (or behind) what is published.
+    try {
+      const { fetchCodexManifest } = await import('$lib/file-registry-client.js');
+      const manifest = await fetchCodexManifest(CONFIG.file_registry_canister_id, codexId);
+      if (manifest) {
+        codexManifests = { ...codexManifests, [codexId]: manifest };
+        return;
+      }
+    } catch (e) {
+      console.warn(`Codex manifest for '${codexId}' unavailable from file registry:`, e);
+    }
     try {
       const url = `https://raw.githubusercontent.com/smart-social-contracts/realms-codices/main/codices/${codexId}/manifest.json`;
       const res = await fetch(url);

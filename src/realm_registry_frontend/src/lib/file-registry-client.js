@@ -20,6 +20,8 @@ const fileRegistryIdlFactory = ({ IDL: idl }) =>
     store_file_chunk: idl.Func([idl.Text], [idl.Text], []),
     finalize_chunked_file_step: idl.Func([idl.Text], [idl.Text], []),
     publish_namespace: idl.Func([idl.Text], [idl.Text], []),
+    list_codices: idl.Func([], [idl.Text], ['query']),
+    get_file: idl.Func([idl.Text], [idl.Text], ['query']),
   });
 
 async function getRegistryActor(canisterId) {
@@ -37,6 +39,49 @@ async function getRegistryActor(canisterId) {
     agent,
     canisterId: Principal.fromText(canisterId),
   });
+}
+
+/** Read-only actor: queries need no signature, so skip the auth client. */
+async function getQueryActor(canisterId) {
+  const agent = new HttpAgent({});
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.hostname.includes('localhost') ||
+      window.location.hostname.includes('127.0.0.1'))
+  ) {
+    try { await agent.fetchRootKey(); } catch (e) { /* local dev */ }
+  }
+  return Actor.createActor(fileRegistryIdlFactory, {
+    agent,
+    canisterId: Principal.fromText(canisterId),
+  });
+}
+
+/**
+ * Fetch a codex package manifest from the file registry — the package that a
+ * new realm will actually install, unlike the codices git repo which may be
+ * ahead of (or behind) what is published.
+ *
+ * @param {string} canisterId file_registry canister id
+ * @param {string} codexId lowercase package id (e.g. "syntropia")
+ * @returns {Promise<object|null>} parsed manifest.json, or null when unavailable
+ */
+export async function fetchCodexManifest(canisterId, codexId) {
+  const actor = await getQueryActor(canisterId);
+  const listing = JSON.parse(String(await actor.list_codices()));
+  const entry = Array.isArray(listing)
+    ? listing.find((c) => c.codex_id === codexId)
+    : null;
+  if (!entry?.latest) return null;
+  const resp = JSON.parse(
+    String(
+      await actor.get_file(
+        JSON.stringify({ namespace: `codex/${codexId}/${entry.latest}`, path: 'manifest.json' }),
+      ),
+    ),
+  );
+  if (resp?.error || !resp?.content_b64) return null;
+  return JSON.parse(atob(resp.content_b64));
 }
 
 function arrayBufferToBase64(buf) {
