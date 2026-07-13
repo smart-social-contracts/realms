@@ -196,6 +196,10 @@ export function buildPointMarkers(
       lat: primary.center_lat,
       lng: primary.center_lng,
       users: primary.user_count,
+      totalUsers: realm.users_count || primary.user_count,
+      location: primary.location_name,
+      stage: realm.realm_stage,
+      manifesto: realm.manifesto,
       color: isDimmed ? '#64748B' : '#00E5FF',
       size: isDimmed ? 0.7 : 1,
     });

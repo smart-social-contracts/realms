@@ -5,8 +5,13 @@
    */
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { get } from 'svelte/store';
   import { _ } from 'svelte-i18n';
   import { buildHexPolygons, buildPointMarkers } from '$lib/globe/hex-data.js';
+  import {
+    buildHexHoverPopupHtml,
+    buildMarkerHoverPopupHtml,
+  } from '$lib/globe/realm-hover-popup.js';
   import {
     FLY_TO_MS,
     h3ResolutionForZoom,
@@ -38,6 +43,12 @@
   let h3 = null;
   /** @type {Map<string, import('maplibre-gl').Marker>} */
   let markerById = new Map();
+  /** @type {Map<string, object>} */
+  let hexByIndex = new Map();
+  /** @type {import('maplibre-gl').Popup | null} */
+  let hoverPopup = null;
+  let hoveredHexIndex = '';
+  let hoveredMarkerId = '';
   let ready = false;
   let currentH3Res = -1;
   let mapError = '';
@@ -77,6 +88,40 @@
     };
   }
 
+  function translate(key, opts = {}) {
+    return get(_)(key, opts);
+  }
+
+  function clearHoverPopup() {
+    hoveredHexIndex = '';
+    hoveredMarkerId = '';
+    hoverPopup?.remove();
+  }
+
+  function showHoverPopup(lngLat, html) {
+    if (!map || !hoverPopup || !html) return;
+    hoverPopup.setLngLat(lngLat).setHTML(html).addTo(map);
+  }
+
+  function attachMarkerHover(el, point) {
+    const onEnter = () => {
+      if (!map) return;
+      hoveredMarkerId = point.realmId;
+      hoveredHexIndex = '';
+      showHoverPopup(
+        [point.lng, point.lat],
+        buildMarkerHoverPopupHtml(point, translate)
+      );
+    };
+    const onLeave = () => {
+      if (hoveredMarkerId === point.realmId) clearHoverPopup();
+    };
+    el.addEventListener('mouseenter', onEnter);
+    el.addEventListener('mouseleave', onLeave);
+    el.addEventListener('focus', onEnter);
+    el.addEventListener('blur', onLeave);
+  }
+
   function clearHtmlMarkers() {
     for (const marker of markerById.values()) marker.remove();
     markerById.clear();
@@ -95,7 +140,6 @@
         const el = document.createElement('button');
         el.type = 'button';
         el.className = 'realm-globe-marker';
-        el.title = p.realmName || p.realmId;
         el.setAttribute('aria-label', p.realmName || p.realmId);
         el.style.backgroundColor = p.color;
         el.style.width = `${size}px`;
@@ -104,6 +148,7 @@
           e.stopPropagation();
           dispatch('select', { realmId: p.realmId });
         });
+        attachMarkerHover(el, p);
         marker = new maplibregl.Marker({
           element: el,
           anchor: 'center',
@@ -120,7 +165,7 @@
         el.style.backgroundColor = p.color;
         el.style.width = `${size}px`;
         el.style.height = `${size}px`;
-        el.title = p.realmName || p.realmId;
+        el.setAttribute('aria-label', p.realmName || p.realmId);
       }
     }
 
@@ -176,6 +221,8 @@
       matchingRealmIds,
       dimNonMatching,
     });
+
+    hexByIndex = new Map(polygons.map((polygon) => [polygon.hexIndex, polygon]));
 
     const hexSource = map.getSource(HEX_SOURCE);
     if (hexSource) hexSource.setData(polygonsToGeoJSON(polygons));
@@ -285,7 +332,7 @@
       const styleRes = await fetch(STYLE_URL);
       if (!styleRes.ok) throw new Error(`Basemap style HTTP ${styleRes.status}`);
       let style = stripPoliticalLayers(await styleRes.json());
-      style = softenGlobeBasemap(style, { surfaceOpacity: 0.18 });
+      style = softenGlobeBasemap(style, { surfaceOpacity: 0.18, waterDarken: 0.45 });
       style.projection = { type: 'globe' };
       style.sky = {
         'atmosphere-blend': [
@@ -355,11 +402,41 @@
       map.on('touchstart', pauseAutoRotate);
       map.on('wheel', pauseAutoRotate);
       map.on('click', onMapClick);
+
+      hoverPopup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        maxWidth: '300px',
+        className: 'realm-hover-popup',
+        offset: 18,
+      });
+
+      map.on('mousemove', HEX_FILL, (e) => {
+        if (!map || !hoverPopup) return;
+        const hit = e.features?.find((f) => f.properties?.hexIndex);
+        if (!hit?.properties?.hexIndex) return;
+
+        const hexIndex = String(hit.properties.hexIndex);
+        map.getCanvas().style.cursor = 'pointer';
+
+        if (hexIndex !== hoveredHexIndex) {
+          hoveredHexIndex = hexIndex;
+          hoveredMarkerId = '';
+          const polygon = hexByIndex.get(hexIndex);
+          if (polygon) {
+            showHoverPopup(e.lngLat, buildHexHoverPopupHtml(polygon, translate));
+          }
+        } else {
+          hoverPopup.setLngLat(e.lngLat);
+        }
+      });
+
       map.on('mouseenter', HEX_FILL, () => {
         if (map) map.getCanvas().style.cursor = 'pointer';
       });
       map.on('mouseleave', HEX_FILL, () => {
         if (map) map.getCanvas().style.cursor = 'grab';
+        clearHoverPopup();
       });
     } catch (err) {
       console.error('Map init failed', err);
@@ -369,6 +446,8 @@
     return () => {
       if (resumeTimer) clearTimeout(resumeTimer);
       if (rotateRaf) cancelAnimationFrame(rotateRaf);
+      clearHoverPopup();
+      hoverPopup = null;
       clearHtmlMarkers();
       map?.remove();
       map = null;
@@ -378,6 +457,8 @@
   onDestroy(() => {
     if (resumeTimer) clearTimeout(resumeTimer);
     if (rotateRaf) cancelAnimationFrame(rotateRaf);
+    clearHoverPopup();
+    hoverPopup = null;
     clearHtmlMarkers();
     map?.remove();
     map = null;
@@ -508,6 +589,116 @@
     .map-view :global(.realm-globe-marker) {
       animation: none;
     }
+  }
+
+  .map-view :global(.realm-hover-popup .maplibregl-popup-content) {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    pointer-events: none;
+  }
+
+  .map-view :global(.realm-hover-popup .maplibregl-popup-tip) {
+    display: none;
+  }
+
+  .map-view :global(.realm-hover-card) {
+    min-width: 220px;
+    max-width: 280px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 229, 255, 0.28);
+    background: rgba(10, 14, 22, 0.94);
+    backdrop-filter: blur(14px);
+    box-shadow:
+      0 10px 28px rgba(0, 0, 0, 0.42),
+      0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+      0 0 24px rgba(0, 229, 255, 0.12);
+    color: #e8edf5;
+    font-family: var(--font-family, inherit);
+    line-height: 1.45;
+  }
+
+  .map-view :global(.realm-hover-header) {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .map-view :global(.realm-hover-title) {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #f8fafc;
+    letter-spacing: -0.01em;
+  }
+
+  .map-view :global(.realm-hover-stage) {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .map-view :global(.realm-hover-locations) {
+    margin-bottom: 6px;
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  .map-view :global(.realm-hover-stat) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 0.75rem;
+    color: #cbd5e1;
+  }
+
+  .map-view :global(.realm-hover-stat.muted) {
+    color: #94a3b8;
+  }
+
+  .map-view :global(.realm-hover-stat-icon) {
+    color: #00e5ff;
+    font-size: 0.5rem;
+  }
+
+  .map-view :global(.realm-hover-influence) {
+    margin-bottom: 6px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #67e8f9;
+  }
+
+  .map-view :global(.realm-hover-manifesto) {
+    margin: 8px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    font-size: 0.75rem;
+    color: #94a3b8;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .map-view :global(.realm-hover-footer) {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 229, 255, 0.14);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #67e8f9;
   }
 
   .map-loading,
