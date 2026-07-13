@@ -22,7 +22,7 @@
   })();
 </script>
 
-<div class="kpi-line" aria-live="polite">
+<div class="kpi-line registry-desktop-only" data-tour="desktop-stats" aria-live="polite">
   <span>
     {$_('globe.kpi_realms', { values: { count: kpis.totalRealms } })}
     ·
@@ -55,14 +55,5 @@
   .stage-line {
     font-size: 0.75rem;
     color: var(--text-faint);
-  }
-
-  @media (max-width: 767px) {
-    .kpi-line {
-      top: auto;
-      bottom: 1rem;
-      left: 1rem;
-      font-size: 0.75rem;
-    }
   }
 </style>

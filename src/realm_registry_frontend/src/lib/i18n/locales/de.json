@@ -10,7 +10,8 @@
     "list_view": "Listenansicht",
     "map_view": "Kartenansicht",
     "create_realm": "Realm erstellen",
-    "marketplace": "Marktplatz"
+    "marketplace": "Marktplatz",
+    "architecture": "Architektur"
   },
   "modal": {
     "title": "Ein Realm erstellen",
@@ -57,7 +58,27 @@
   "footer": {
     "built_on_ic": "Aufgebaut auf dem Internet Computer",
     "local_deployment": "Lokale Bereitstellung",
-    "casals": "Casals"
+    "casals": "Casals",
+    "map_attribution": "© OpenFreeMap · OpenMapTiles · OpenStreetMap"
+  },
+  "tour": {
+    "next": "Weiter",
+    "prev": "Zurück",
+    "done": "Fertig",
+    "progress": "{{current}} von {{total}}",
+    "replay": "Tour starten",
+    "globe_title": "Globus erkunden",
+    "globe_body": "Realms erscheinen auf dieser 3D-Karte. Klicken Sie auf einen leuchtenden Pin, um dorthin zu fliegen und Details zu öffnen.",
+    "rail_title": "Schnellzugriff",
+    "rail_body": "Logo und Info, Marktplatz, Realm erstellen, Casals-Architektur, Sprache und Ihr Konto.",
+    "browse_title": "Realms durchsuchen",
+    "browse_body": "Öffnen Sie den Realm-Browser zum Suchen, Filtern nach Phase und Scrollen der Liste.",
+    "panel_title": "Realm-Browser",
+    "panel_body": "Suchen nach Name oder ID, nach Lebenszyklus filtern, nach Nutzern sortieren und eine Karte auswählen.",
+    "assistant_title": "KI-Assistent",
+    "assistant_body": "Öffnen Sie den Realms-KI-Assistenten für Hilfe bei Registry, Deployments und Governance.",
+    "stats_title": "Live-Statistiken",
+    "stats_body": "Anzahl Realms, Nutzer, Standorte, Phasen und Build-Version auf einen Blick."
   },
   "time": {
     "just_now": "gerade eben",
@@ -101,7 +122,7 @@
     "processing": "Wird verarbeitet..."
   },
   "assistant": {
-    "title": "Realms Assistant",
+    "title": "Realms AI Assistant",
     "toggle": "AI Assistant",
     "empty": "Ask me anything about the realms in the registry — which to join, how to create one, or how Realms works.",
     "placeholder": "Type your message…",
@@ -116,7 +137,7 @@
     "history_empty": "No past conversations yet. Start chatting!",
     "history_empty_settings": "No conversations yet.",
     "settings": "Settings",
-    "settings_title": "Realms Assistant — Settings",
+    "settings_title": "Realms AI Assistant — Settings",
     "copy": "Copy",
     "copied": "Copied",
     "suggestions_loading": "Loading suggestions…",

@@ -8,6 +8,7 @@
     resolvedRealmLogoUrl,
     resolveRealmAssetUrl,
   } from '$lib/realm-utils.js';
+  import { stageLabel } from '$lib/realm-stages.js';
 
   export let realm;
   export let selected = false;
@@ -19,13 +20,6 @@
   $: welcomeBg = resolveRealmAssetUrl(realm, '/custom/background.png');
   $: logoSrc = resolvedRealmLogoUrl(realm);
   $: realm?.id, (logoFailed = false);
-
-  function stageLabel(stage) {
-    if (stage === 'production') return 'Live';
-    if (stage === 'deprecation') return 'Winding Down';
-    if (!stage) return 'Alpha';
-    return stage.charAt(0).toUpperCase() + stage.slice(1);
-  }
 </script>
 
 <button
@@ -209,9 +203,32 @@
     font-weight: 500;
     padding: 0.125rem 0.5rem;
     border-radius: 4px;
-    background: var(--surface-2);
-    color: var(--text-secondary);
     text-transform: capitalize;
+  }
+
+  .stage-alpha {
+    color: var(--stage-alpha-color);
+    background: var(--stage-alpha-bg);
+  }
+
+  .stage-beta {
+    color: var(--stage-beta-color);
+    background: var(--stage-beta-bg);
+  }
+
+  .stage-production {
+    color: var(--stage-live-color);
+    background: var(--stage-live-bg);
+  }
+
+  .stage-deprecation {
+    color: var(--stage-winding-color);
+    background: var(--stage-winding-bg);
+  }
+
+  .stage-terminated {
+    color: var(--stage-archived-color);
+    background: var(--stage-archived-bg);
   }
 
   .user-badge {

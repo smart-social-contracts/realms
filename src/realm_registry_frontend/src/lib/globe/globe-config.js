@@ -75,6 +75,31 @@ export function grayHexStyle(distance, opts = {}) {
   return hexStyle(distance, opts);
 }
 
+/** @param {string} color */
+function parseRgbColor(color) {
+  if (typeof color !== 'string') return null;
+  const rgb = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  const hex = color.match(/^#([0-9a-f]{6})$/i);
+  if (hex) {
+    const n = Number.parseInt(hex[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  return null;
+}
+
+/**
+ * Darken an rgb/hex color for subtler basemap tuning.
+ * @param {string} color
+ * @param {number} amount 0 = unchanged, 1 = black
+ */
+function darkenColor(color, amount = 0.2) {
+  const rgb = parseRgbColor(color);
+  if (!rgb) return color;
+  const factor = 1 - Math.max(0, Math.min(1, amount));
+  return `rgb(${rgb.map((channel) => Math.round(channel * factor)).join(', ')})`;
+}
+
 /**
  * Abstract Realms basemap: land / water / roads only.
  * Strips political borders, all place/water labels, and shields.
@@ -125,9 +150,9 @@ export function stripPoliticalLayers(style) {
  * Oceans dominate Positron’s sphere fill, so water is pushed lower than land.
  *
  * @param {object} style
- * @param {{ surfaceOpacity?: number }} [opts]
+ * @param {{ surfaceOpacity?: number, waterDarken?: number }} [opts]
  */
-export function softenGlobeBasemap(style, { surfaceOpacity = 0.18 } = {}) {
+export function softenGlobeBasemap(style, { surfaceOpacity = 0.18, waterDarken = 0.22 } = {}) {
   if (!style?.layers) return style;
   const clamp = (v) => Math.max(0.04, Math.min(1, v));
 
@@ -175,8 +200,14 @@ export function softenGlobeBasemap(style, { surfaceOpacity = 0.18 } = {}) {
 
     if (type === 'fill') {
       // Water covers most of the sphere; keep it glassier than other fills
-      const factor = id.includes('water') ? surfaceOpacity * 0.75 : surfaceOpacity;
-      paint['fill-opacity'] = scaleOpacityExpr(paint['fill-opacity'], factor);
+      if (id.includes('water')) {
+        const factor = surfaceOpacity * 0.75;
+        paint['fill-opacity'] = scaleOpacityExpr(paint['fill-opacity'], factor);
+        paint['fill-color'] = darkenColor(paint['fill-color'] ?? 'rgb(194, 200, 202)', waterDarken);
+        return { ...layer, paint };
+      }
+
+      paint['fill-opacity'] = scaleOpacityExpr(paint['fill-opacity'], surfaceOpacity);
       return { ...layer, paint };
     }
 

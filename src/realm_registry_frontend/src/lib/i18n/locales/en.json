@@ -10,7 +10,8 @@
     "list_view": "List view",
     "map_view": "Map view",
     "create_realm": "Create Realm",
-    "marketplace": "Marketplace"
+    "marketplace": "Marketplace",
+    "architecture": "Architecture"
   },
   "modal": {
     "title": "Create a Realm",
@@ -57,7 +58,27 @@
   "footer": {
     "built_on_ic": "Built on the Internet Computer",
     "local_deployment": "Local deployment",
-    "casals": "Casals"
+    "casals": "Casals",
+    "map_attribution": "© OpenFreeMap · OpenMapTiles · OpenStreetMap"
+  },
+  "tour": {
+    "next": "Next",
+    "prev": "Back",
+    "done": "Done",
+    "progress": "{{current}} of {{total}}",
+    "replay": "Take a tour",
+    "globe_title": "Explore the globe",
+    "globe_body": "Realms appear on this 3D map. Click a glowing pin to fly there and open its details.",
+    "rail_title": "Quick actions",
+    "rail_body": "Logo and about, marketplace, create a realm, Casals architecture, language, and your account.",
+    "browse_title": "Browse realms",
+    "browse_body": "Open the realm browser to search, filter by stage, and scroll the list of registered realms.",
+    "panel_title": "Realm browser",
+    "panel_body": "Search by name or ID, filter by lifecycle stage, sort by users, and pick a realm card to focus it on the map.",
+    "assistant_title": "AI assistant",
+    "assistant_body": "Open the Realms AI Assistant for help navigating the registry, deployments, and governance concepts.",
+    "stats_title": "Live registry stats",
+    "stats_body": "Realm count, users, locations, stage breakdown, and build version at a glance."
   },
   "time": {
     "just_now": "just now",
@@ -109,7 +130,7 @@
     "processing": "Processing..."
   },
   "assistant": {
-    "title": "Realms Assistant",
+    "title": "Realms AI Assistant",
     "toggle": "AI Assistant",
     "empty": "Ask me anything about the realms in the registry — which to join, how to create one, or how Realms works.",
     "placeholder": "Type your message…",
@@ -129,7 +150,7 @@
     "current_chat": "Current chat",
     "history_sign_in_save": "Sign in to save this conversation to your history.",
     "settings": "Settings",
-    "settings_title": "Realms Assistant — Settings",
+    "settings_title": "Realms AI Assistant — Settings",
     "copy": "Copy",
     "copied": "Copied",
     "suggestions_loading": "Loading suggestions…",

@@ -386,6 +386,7 @@
 
 <div
   class="map-view"
+  data-tour="globe"
   style="background: {MAP_BG}"
   aria-label={$_('globe.aria_label')}
   bind:this={container}
@@ -444,6 +445,13 @@
     line-height: 12px;
     padding: 0 4px;
     border-radius: 2px;
+  }
+
+  @media (max-width: 767px) {
+    .map-view :global(.maplibregl-ctrl-attrib),
+    .map-view :global(.maplibregl-ctrl-scale) {
+      display: none !important;
+    }
   }
 
   /* Realm pins — electric blue + glow; DOM so far-side ones show through */

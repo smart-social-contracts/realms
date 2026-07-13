@@ -4,13 +4,15 @@
   import { _ } from 'svelte-i18n';
   import MapView from '$lib/components/MapView.svelte';
   import RegistryHeader from '$lib/components/RegistryHeader.svelte';
+  import RegistryEdgeTabs from '$lib/components/RegistryEdgeTabs.svelte';
   import RegistryKpiLine from '$lib/components/RegistryKpiLine.svelte';
   import RealmPanel from '$lib/components/RealmPanel.svelte';
   import RegistryFooter from '$lib/components/RegistryFooter.svelte';
+  import RegistryMobileChrome from '$lib/components/RegistryMobileChrome.svelte';
+  import RegistryTour from '$lib/components/RegistryTour.svelte';
   import { fetchRealmDetails, fetchZoneData } from '$lib/globe/zone-fetcher.js';
   import { DUMMY_REALMS, DUMMY_ZONE_DATA } from '$lib/globe/dummy-realms.js';
   import { filterAndSortRealms } from '$lib/realm-utils.js';
-  import { realmPanelOpen } from '$lib/realm-panel-chrome.js';
   
   let backend;
   let realms = [];
@@ -41,7 +43,7 @@
 
   const marketplaceCanisterId = import.meta.env.CANISTER_ID_MARKETPLACE_FRONTEND || '';
   const casalsCanisterId = import.meta.env.CANISTER_ID_CASALS_FRONTEND || '';
-  // Fallback so the footer Casals icon always shows (local builds often lack the env id).
+  // Fallback so the Architecture rail link always resolves (local builds often lack the env id).
   const CASALS_FALLBACK_URL = 'https://mcqbx-hyaaa-aaaaj-qsarq-cai.icp0.io';
 
   $: marketplaceUrl = isLocalDevelopment()
@@ -67,7 +69,6 @@
   }
 
   $: debouncedSearchQuery, filterStage, sortBy, realms, applyFilters();
-  $: realmPanelOpen.set(panelOpen);
 
   let searchDebounceTimer;
   $: {
@@ -156,7 +157,7 @@
     if (e.key === '/' && document.activeElement !== searchInput) {
       e.preventDefault();
       panelOpen = true;
-      searchInput?.focus();
+      tick().then(() => searchInput?.focus());
     }
   }
 
@@ -245,19 +246,18 @@
 
 <div class="registry-page">
   <RegistryHeader
-    bind:searchQuery
-    bind:searchInput
     {isLoggedIn}
     {userPrincipal}
     {authLoading}
-    {panelOpen}
     {marketplaceUrl}
-    on:search={applyFilters}
-    on:acceptSearch={acceptSearch}
-    on:openPanel={() => (panelOpen = true)}
-    on:togglePanel={() => (panelOpen = !panelOpen)}
+    {casalsUrl}
     on:login={handleLogin}
     on:logout={handleLogout}
+  />
+
+  <RegistryEdgeTabs
+    {panelOpen}
+    on:togglePanel={() => (panelOpen = !panelOpen)}
   />
 
   {#if error}
@@ -291,14 +291,28 @@
     {selectedRealmId}
     bind:filterStage
     bind:sortBy
-    {searchQuery}
+    bind:searchQuery
+    bind:searchInput
     on:close={() => (panelOpen = false)}
     on:filter={applyFilters}
+    on:search={applyFilters}
+    on:acceptSearch={acceptSearch}
     on:select={handlePanelSelect}
     on:manifesto={(e) => (activeManifestoRealm = e.detail.realm)}
   />
 
-  <RegistryFooter {version} {commitHash} {commitDatetime} {casalsUrl} />
+  <RegistryMobileChrome
+    {panelOpen}
+    realms={filteredRealms}
+    {realmZoneData}
+    {version}
+    {commitHash}
+    on:togglePanel={() => (panelOpen = !panelOpen)}
+  />
+
+  <RegistryFooter {version} {commitHash} {commitDatetime} />
+
+  <RegistryTour ready={!loading && !globeLoading} bind:panelOpen />
               </div>
               
 {#if activeManifestoRealm}

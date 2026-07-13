@@ -23,6 +23,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { page } from '$app/stores';
+  import { get } from 'svelte/store';
   import { goto } from '$app/navigation';
   import { portalDocumentFocus } from '$lib/portal-focus.js';
   import { assistantChrome } from '$lib/assistant-chrome.js';
@@ -302,6 +303,9 @@
   function setOpen(value) {
     open = !!value;
     persistOpen(open);
+    if (open && isRegistryHome()) {
+      setDocked(true);
+    }
     syncChrome();
     if (open) {
       void refreshAuth().then(() => {
@@ -318,6 +322,10 @@
 
   function toggleDock() {
     setDocked(!docked);
+  }
+
+  function isRegistryHome() {
+    return ($page?.url?.pathname || '/') === '/';
   }
 
   function openSettings() {
@@ -638,16 +646,22 @@
       if (savedDocked !== null) docked = JSON.parse(savedDocked) === true;
       const savedOpen = localStorage.getItem(OPEN_KEY);
       if (savedOpen !== null) open = JSON.parse(savedOpen) === true;
-      showHistory = readShowHistory(docked);
+      showHistory = readShowHistory(false);
     } catch (e) {
       /* private mode */
     }
     panelWidth = clampWidth(loadPanelWidth(DEFAULT_WIDTH));
+    if (open && (get(page).url.pathname || '/') === '/') {
+      setDocked(true);
+    }
     applyPrefs();
     syncChrome();
 
     unsubPage = page.subscribe(($p) => {
       syncPortalRoute($p.url.pathname || '');
+      if (($p.url.pathname || '/') === '/' && open) {
+        setDocked(true);
+      }
     });
     unsubFocus = portalDocumentFocus.subscribe((focus) => {
       documentFocus = focus;
@@ -938,13 +952,15 @@
   </button>
 {/if}
 
-{#if open}
+{#if docked || open}
   <section
     class="assistant-panel"
     class:docked
+    class:open
     class:resizing={isResizing}
     style="width: {docked ? panelWidth + 'px' : 'min(' + panelWidth + 'px, calc(100vw - 48px))'}"
-    aria-label={$_('assistant.title', { default: 'Realms Assistant' })}
+    aria-hidden={!open}
+    aria-label={$_('assistant.title', { default: 'Realms AI Assistant' })}
   >
     {#if docked}
       <button
@@ -956,7 +972,7 @@
     {/if}
 
     <header class="assistant-header">
-      <span class="assistant-title">{$_('assistant.title', { default: 'Realms Assistant' })}</span>
+      <span class="assistant-title">{$_('assistant.title', { default: 'Realms AI Assistant' })}</span>
       <div class="assistant-header-actions">
         <button
           class="assistant-icon-btn"
@@ -1295,10 +1311,21 @@
     border-left: 1px solid #e5e5e5;
     box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
     z-index: 1100;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    pointer-events: none;
+  }
+
+  .assistant-panel.docked.open {
+    transform: translateX(0);
+    pointer-events: auto;
   }
 
   .assistant-panel.resizing {
     user-select: none;
+  }
+
+  .assistant-panel.docked.resizing {
     transition: none;
   }
 
