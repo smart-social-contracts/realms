@@ -1442,9 +1442,11 @@ def publish_codex_command(
     else:
         manifest = {}
 
+    # The codex id must be the machine id (lowercase, matches the wizard's
+    # package id and the directory name) — never the display "name", which is
+    # capitalized and would register the package under a different namespace.
     cid = (
         codex_id
-        or manifest.get("name")
         or manifest.get("id")
         or os.path.basename(source_dir)
     )
