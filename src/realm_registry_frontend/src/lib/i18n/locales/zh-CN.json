@@ -13,6 +13,16 @@
     "marketplace": "市场",
     "architecture": "架构"
   },
+  "hub": {
+    "open": "打开 Realms 菜单",
+    "close": "关闭 Realms 菜单",
+    "tour_title": "开始导览",
+    "tour_desc": "地球仪、浏览器与助手",
+    "marketplace_desc": "扩展与服务",
+    "create_realm_desc": "部署新 Realm",
+    "architecture_desc": "Casals 架构",
+    "language_desc": "界面语言"
+  },
   "modal": {
     "title": "创建领域",
     "subtitle": "几分钟内部署您自己的治理系统",
@@ -49,7 +59,10 @@
     "sort_name": "排序：名称",
     "sort_users_desc": "用户最多",
     "sort_users_asc": "用户最少",
-    "sort_newest": "最新优先"
+    "sort_newest": "最新优先",
+    "popup_click": "点击探索",
+    "popup_influence_zone": "影响区域",
+    "popup_total_users": "共 {count} 位用户"
   },
   "stats": {
     "showing": "显示 {filtered} / {total} 个领域",
@@ -71,7 +84,7 @@
     "globe_title": "探索地球仪",
     "globe_body": "Realm 显示在这张 3D 地图上。点击发光图钉可飞往该位置并查看详情。",
     "rail_title": "快捷操作",
-    "rail_body": "标志与关于、市场、创建 Realm、Casals 架构、语言和账户。",
+    "rail_body": "点击左上角 Realms 标志打开导览、市场、创建 Realm、架构和语言。右上角使用 Internet Identity 登录。",
     "browse_title": "浏览 Realm",
     "browse_body": "打开 Realm 浏览器以搜索、按阶段筛选并浏览列表。",
     "panel_title": "Realm 浏览器",
@@ -83,7 +96,7 @@
     "stats_title": "实时统计",
     "stats_body": "Realm 数量、用户、位置、阶段分布和版本信息一览。",
     "complete_title": "准备就绪",
-    "complete_body": "导览到此结束！您可以自由探索——旋转地球仪、浏览 Realm、向助手提问。随时点击 ? 可重新观看导览。"
+    "complete_body": "导览到此结束！您可以自由探索——旋转地球仪、浏览 Realm、向助手提问。随时打开 Realms 菜单可重新观看导览。"
   },
   "time": {
     "just_now": "刚刚",
@@ -97,7 +110,10 @@
   },
   "auth": {
     "login": "登录",
-    "logout": "退出"
+    "logout": "退出",
+    "account": "账户",
+    "signed_in": "已登录",
+    "sign_in_ii": "使用 Internet Identity 登录"
   },
   "dashboard": {
     "title": "我的仪表板",

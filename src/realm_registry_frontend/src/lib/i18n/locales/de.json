@@ -13,6 +13,16 @@
     "marketplace": "Marktplatz",
     "architecture": "Architektur"
   },
+  "hub": {
+    "open": "Realms-Menü öffnen",
+    "close": "Realms-Menü schließen",
+    "tour_title": "Tour starten",
+    "tour_desc": "Globus, Browser & Assistent",
+    "marketplace_desc": "Erweiterungen & Dienste",
+    "create_realm_desc": "Neues Realm starten",
+    "architecture_desc": "Casals-Architektur",
+    "language_desc": "Sprache der Oberfläche"
+  },
   "modal": {
     "title": "Ein Realm erstellen",
     "subtitle": "Stellen Sie Ihr eigenes Governance-System in Minuten bereit",
@@ -49,7 +59,10 @@
     "sort_name": "Sortieren: Name",
     "sort_users_desc": "Meiste Benutzer",
     "sort_users_asc": "Wenigste Benutzer",
-    "sort_newest": "Neueste zuerst"
+    "sort_newest": "Neueste zuerst",
+    "popup_click": "Klicken zum Erkunden",
+    "popup_influence_zone": "Einflusszone",
+    "popup_total_users": "{count} Benutzer gesamt"
   },
   "stats": {
     "showing": "Zeige {filtered} von {total} Realms",
@@ -71,7 +84,7 @@
     "globe_title": "Globus erkunden",
     "globe_body": "Realms erscheinen auf dieser 3D-Karte. Klicken Sie auf einen leuchtenden Pin, um dorthin zu fliegen und Details zu öffnen.",
     "rail_title": "Schnellzugriff",
-    "rail_body": "Logo und Info, Marktplatz, Realm erstellen, Casals-Architektur, Sprache und Ihr Konto.",
+    "rail_body": "Öffnen Sie das Realms-Logo (oben links) für Tour, Marktplatz, Realm erstellen, Architektur und Sprache. Mit Internet Identity oben rechts anmelden.",
     "browse_title": "Realms durchsuchen",
     "browse_body": "Öffnen Sie den Realm-Browser zum Suchen, Filtern nach Phase und Scrollen der Liste.",
     "panel_title": "Realm-Browser",
@@ -83,7 +96,7 @@
     "stats_title": "Live-Statistiken",
     "stats_body": "Anzahl Realms, Nutzer, Standorte, Phasen und Build-Version auf einen Blick.",
     "complete_title": "Alles erledigt",
-    "complete_body": "Das war's! Sie können jetzt frei erkunden — drehen Sie den Globus, durchsuchen Sie Realms und fragen Sie den Assistenten. Tippen Sie jederzeit auf ?, um die Tour zu wiederholen."
+    "complete_body": "Das war's! Sie können jetzt frei erkunden — drehen Sie den Globus, durchsuchen Sie Realms und fragen Sie den Assistenten. Öffnen Sie das Realms-Menü jederzeit, um die Tour zu wiederholen."
   },
   "time": {
     "just_now": "gerade eben",
@@ -97,7 +110,10 @@
   },
   "auth": {
     "login": "Anmelden",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "account": "Konto",
+    "signed_in": "Angemeldet",
+    "sign_in_ii": "Mit Internet Identity anmelden"
   },
   "dashboard": {
     "title": "Mein Dashboard",

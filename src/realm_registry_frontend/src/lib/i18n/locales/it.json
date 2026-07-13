@@ -13,6 +13,16 @@
     "marketplace": "Mercato",
     "architecture": "Architettura"
   },
+  "hub": {
+    "open": "Apri menu Realms",
+    "close": "Chiudi menu Realms",
+    "tour_title": "Fai un tour",
+    "tour_desc": "Globo, browser e assistente",
+    "marketplace_desc": "Estensioni e servizi",
+    "create_realm_desc": "Distribuisci un realm",
+    "architecture_desc": "Architettura Casals",
+    "language_desc": "Lingua dell'interfaccia"
+  },
   "modal": {
     "title": "Crea un Reame",
     "subtitle": "Distribuisci il tuo sistema di governance in pochi minuti",
@@ -49,7 +59,10 @@
     "sort_name": "Ordina: Nome",
     "sort_users_desc": "Più utenti",
     "sort_users_asc": "Meno utenti",
-    "sort_newest": "Più recenti"
+    "sort_newest": "Più recenti",
+    "popup_click": "Clicca per esplorare",
+    "popup_influence_zone": "Zona di influenza",
+    "popup_total_users": "{count} utenti totali"
   },
   "stats": {
     "showing": "Visualizzazione di {filtered} su {total} reami",
@@ -71,7 +84,7 @@
     "globe_title": "Esplora il globo",
     "globe_body": "I realm compaiono su questa mappa 3D. Clicca su un pin luminoso per volarci e aprire i dettagli.",
     "rail_title": "Azioni rapide",
-    "rail_body": "Logo e info, marketplace, crea realm, architettura Casals, lingua e account.",
+    "rail_body": "Apri il logo Realms (in alto a sinistra) per tour, marketplace, crea realm, architettura e lingua. Accedi con Internet Identity in alto a destra.",
     "browse_title": "Sfoglia i realm",
     "browse_body": "Apri il browser dei realm per cercare, filtrare per fase e scorrere l'elenco.",
     "panel_title": "Browser dei realm",
@@ -83,7 +96,7 @@
     "stats_title": "Statistiche live",
     "stats_body": "Conteggio realm, utenti, località, fasi e versione build a colpo d'occhio.",
     "complete_title": "Sei pronto",
-    "complete_body": "È tutto! Sei libero di esplorare — ruota il globo, sfoglia i realm e chiedi quello che vuoi all'assistente. Tocca ? in qualsiasi momento per ripetere il tour."
+    "complete_body": "È tutto! Sei libero di esplorare — ruota il globo, sfoglia i realm e chiedi quello che vuoi all'assistente. Apri il menu Realms in qualsiasi momento per ripetere il tour."
   },
   "time": {
     "just_now": "proprio ora",
@@ -97,7 +110,10 @@
   },
   "auth": {
     "login": "Accedi",
-    "logout": "Esci"
+    "logout": "Esci",
+    "account": "Account",
+    "signed_in": "Accesso effettuato",
+    "sign_in_ii": "Accedi con Internet Identity"
   },
   "dashboard": {
     "title": "La Mia Dashboard",
