@@ -1075,6 +1075,8 @@ export interface _SERVICE {
   'update_my_private_data' : ActorMethod<[string], RealmResponse>,
   'update_my_public_profile' : ActorMethod<[string, string], RealmResponse>,
   'update_realm_config' : ActorMethod<[string], string>,
+  'get_sandbox_config' : ActorMethod<[], string>,
+  'set_sandbox_config' : ActorMethod<[string], string>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

@@ -5106,6 +5106,80 @@ def update_realm_config(config_json: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@query
+def get_sandbox_config() -> str:
+    """Return the extension sandboxing policy plus the effective execution
+    mode of every installed extension (issue #245). Admin-only."""
+    try:
+        import json
+
+        caller = ic.caller().to_str()
+        if not _check_access(caller, Operations.REALM_CONFIGURE):
+            return json.dumps({
+                "success": False,
+                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE}'",
+                "denied_operation": Operations.REALM_CONFIGURE,
+            })
+
+        from core import runtime_sandbox
+
+        return json.dumps({"success": True, "data": runtime_sandbox.get_status()})
+    except Exception as e:
+        logger.error(f"get_sandbox_config failed: {e}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def set_sandbox_config(config_json: str) -> str:
+    """Update the extension sandboxing policy (issue #245). Partial updates
+    are merged into the stored config. Admin-only.
+
+    Accepted keys: enabled (bool), default_mode ("sandbox"|"in_process"),
+    extensions ({ext_id: mode, null clears an override}), budget (int >= 0),
+    fallback_in_process (bool). Core/system extensions cannot be sandboxed.
+    """
+    logger.info("🔧 set_sandbox_config() called")
+    try:
+        import json
+
+        caller = ic.caller().to_str()
+        if not _check_access(caller, Operations.REALM_CONFIGURE):
+            return json.dumps({
+                "success": False,
+                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE}'",
+                "denied_operation": Operations.REALM_CONFIGURE,
+            })
+
+        from core import runtime_sandbox
+
+        try:
+            patch = json.loads(config_json)
+        except json.JSONDecodeError as e:
+            return json.dumps({"success": False, "error": f"Invalid JSON: {e}"})
+
+        try:
+            new_config = runtime_sandbox.update_config(patch)
+        except ValueError as e:
+            return json.dumps({"success": False, "error": str(e)})
+
+        if new_config.get("enabled") and not runtime_sandbox.is_sandbox_available():
+            logger.warning(
+                "Sandboxing enabled but this canister image has no "
+                "_basilisk_sandbox — calls will use the fallback policy"
+            )
+
+        return json.dumps({
+            "success": True,
+            "data": {
+                "config": new_config,
+                "available": runtime_sandbox.is_sandbox_available(),
+            },
+        })
+    except Exception as e:
+        logger.error(f"set_sandbox_config failed: {e}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 @update
 @require(Operations.REALM_CONFIGURE_CODEX)
 def reload_entity_method_overrides() -> str:

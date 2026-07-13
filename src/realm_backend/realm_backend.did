@@ -306,6 +306,8 @@ service : {
   "mint_land_nft_for_parcel" : (text, text, nat, text) -> (text);
   "get_nft_config" : () -> (text) query;
   "update_realm_config" : (text) -> (text);
+  "get_sandbox_config" : () -> (text) query;
+  "set_sandbox_config" : (text) -> (text);
   "reload_entity_method_overrides" : () -> (text);
   "install_extension" : (text) -> (text);
   "uninstall_extension" : (text) -> (text);

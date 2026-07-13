@@ -50,7 +50,34 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
     logger.debug(f"Calling extension '{extension_name}' function '{function_name}'")
 
     try:
-        from core.runtime_extensions import get_func
+        from core import runtime_sandbox
+        from core.runtime_extensions import get_func, resolve_extension_id
+
+        resolved = resolve_extension_id(extension_name)
+        if runtime_sandbox.should_sandbox(resolved):
+            fallback = runtime_sandbox.get_config().get("fallback_in_process", True)
+            if not runtime_sandbox.is_sandbox_available():
+                if not fallback:
+                    raise RuntimeError(
+                        f"Extension '{resolved}' requires sandboxed execution "
+                        f"but this canister image has no sandbox support"
+                    )
+                logger.warning(
+                    f"Sandboxing enabled for '{resolved}' but _basilisk_sandbox "
+                    f"is unavailable in this image; running in-process"
+                )
+            else:
+                try:
+                    return runtime_sandbox.call_in_sandbox(
+                        resolved, function_name, args
+                    )
+                except Exception as sandbox_err:
+                    if not fallback:
+                        raise
+                    logger.warning(
+                        f"Sandboxed call {resolved}.{function_name} failed "
+                        f"({sandbox_err}); falling back to in-process execution"
+                    )
 
         func = get_func(extension_name, function_name)
         logger.debug(f"Got function from registry: {func}")

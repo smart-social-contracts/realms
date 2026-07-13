@@ -395,6 +395,8 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'update_realm_config' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'get_sandbox_config' : IDL.Func([], [IDL.Text], ['query']),
+    'set_sandbox_config' : IDL.Func([IDL.Text], [IDL.Text], []),
   });
 };
 export const init = ({ IDL }) => { return []; };
