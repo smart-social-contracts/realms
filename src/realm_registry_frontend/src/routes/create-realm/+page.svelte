@@ -230,28 +230,45 @@
       ? rawDeps.map((d) => ({ id: String(d), pin: '' }))
       : Object.entries(rawDeps).map(([id, pin]) => ({ id, pin: String(pin || '') }));
     const overrides = Object.entries(manifest.extension_overrides || {});
-    const reg = manifest.onboarding?.registration || {};
+    const reg = manifest.onboarding?.registration;
     return {
       version: manifest.version || '',
       currency: manifest.currency?.symbol || '',
+      currencyName: manifest.currency?.name || '',
       dependencies,
       overrides,
-      openRegistration: reg.open_registration === true,
-      defaultProfile: reg.default_profile || 'member',
+      // The wizard only asks what the codex leaves open: a manifest that
+      // defines a registration policy or a currency decides it for the realm.
+      hasRegistrationPolicy: !!reg,
+      openRegistration: reg?.open_registration === true,
+      defaultProfile: reg?.default_profile || 'member',
       identityRequirements: manifest.onboarding?.identity_requirements || [],
     };
   }
 
   $: selectedCodexDetails = codexDetails(codexManifests[formData.codex_package_name] || null);
 
-  // Registration default follows the selected codex until the user overrides it.
-  let registrationTouched = false;
-  function applyCodexRegistrationDefault(codexId, manifests) {
-    if (registrationTouched) return;
+  // Codex-decided settings are forced onto the form (their wizard controls
+  // render read-only); anything the manifest omits stays a user choice.
+  function applyCodexPins(codexId, manifests) {
     const details = codexDetails(manifests[codexId]);
-    if (details) formData.open_registration = details.openRegistration;
+    if (!details) return;
+    if (details.hasRegistrationPolicy) {
+      formData.open_registration = details.openRegistration;
+    }
+    if (details.currency) {
+      if (EXISTING_TOKENS.some((t) => t.symbol === details.currency)) {
+        formData.token_mode = 'existing';
+        formData.token_existing = details.currency;
+      } else {
+        // A codex-native currency (e.g. Dominion's DOM) means: mint it.
+        formData.token_mode = 'new';
+        formData.token_name = details.currencyName || details.currency;
+        formData.token_symbol = details.currency;
+      }
+    }
   }
-  $: applyCodexRegistrationDefault(formData.codex_package_name, codexManifests);
+  $: applyCodexPins(formData.codex_package_name, codexManifests);
 
   async function loadUserCredits() {
     if (!userPrincipal) return;
@@ -475,8 +492,8 @@
       }
     }
     
-    // Step 1: Token
-    if (step === 1) {
+    // Step 1: Token (skipped when the codex pins the currency)
+    if (step === 1 && !selectedCodexDetails?.currency) {
       if (formData.token_mode === 'new') {
         if (!formData.token_name.trim()) {
           errors.token_name = 'Token name is required';
@@ -905,19 +922,35 @@
 
         <div class="form-group">
           <label>Member Registration</label>
-          <p class="hint" style="margin-bottom: 0.75rem;">
-            Choose how new members can join your realm
-            {#if selectedCodexDetails}
-              — the {AVAILABLE_CODICES.find(c => c.id === formData.codex_package_name)?.name || formData.codex_package_name} codex defaults to
-              <strong>{selectedCodexDetails.openRegistration ? 'open registration' : 'invitation only'}</strong>
-            {/if}
-          </p>
+          {#if selectedCodexDetails?.hasRegistrationPolicy}
+            <div class="codex-manifest-details" style="margin-top: 0;">
+              <div class="codex-detail-row">
+                <span class="codex-detail-label">Set by the {AVAILABLE_CODICES.find(c => c.id === formData.codex_package_name)?.name || formData.codex_package_name} codex</span>
+                <span class="codex-detail-value">
+                  <strong>{selectedCodexDetails.openRegistration ? 'Open registration' : 'Invitation only'}</strong>
+                  {#if selectedCodexDetails.openRegistration}
+                    — anyone can join as {selectedCodexDetails.defaultProfile}
+                  {:else}
+                    — members need an invitation code or are imported by an admin
+                  {/if}
+                  {#if selectedCodexDetails.identityRequirements.length > 0}
+                    · identity checks: {selectedCodexDetails.identityRequirements.join(', ')}
+                  {/if}
+                </span>
+              </div>
+              <p class="codex-details-note">
+                The registration model is part of this codex's governance design,
+                so the wizard doesn't offer a choice here.
+              </p>
+            </div>
+          {:else}
+          <p class="hint" style="margin-bottom: 0.75rem;">Choose how new members can join your realm</p>
           <div class="registration-type-options">
             <button
               type="button"
               class="registration-option"
               class:selected={!formData.open_registration}
-              on:click={() => { registrationTouched = true; formData.open_registration = false; }}
+              on:click={() => formData.open_registration = false}
             >
               <div class="registration-option-icon">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -933,7 +966,7 @@
               type="button"
               class="registration-option"
               class:selected={formData.open_registration}
-              on:click={() => { registrationTouched = true; formData.open_registration = true; }}
+              on:click={() => formData.open_registration = true}
             >
               <div class="registration-option-icon">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -947,6 +980,7 @@
             </button>
           </div>
           <p class="hint" style="margin-top: 0.5rem;">Administrator registration always requires an invitation code regardless of this setting.</p>
+          {/if}
         </div>
       </div>
 
@@ -1063,6 +1097,27 @@
       <!-- Step 2: Token -->
       <div class="form-step">
         <h2>Realm Token</h2>
+        {#if selectedCodexDetails?.currency}
+          <p class="step-description">The selected codex decides the realm's token</p>
+
+          <div class="codex-manifest-details">
+            <div class="codex-detail-row">
+              <span class="codex-detail-label">Token (set by the {AVAILABLE_CODICES.find(c => c.id === formData.codex_package_name)?.name || formData.codex_package_name} codex)</span>
+              <span class="codex-detail-value">
+                <strong>{selectedCodexDetails.currencyName || selectedCodexDetails.currency} ({selectedCodexDetails.currency})</strong>
+                {#if formData.token_mode === 'existing'}
+                  — an existing shared ledger this realm will adopt
+                {:else}
+                  — a codex-native token minted for this realm
+                {/if}
+              </span>
+            </div>
+            <p class="codex-details-note">
+              This codex's fees, deposits and treasury operations are denominated in
+              {selectedCodexDetails.currency}, so the wizard doesn't offer a choice here.
+            </p>
+          </div>
+        {:else}
         <p class="step-description">Choose the token your realm will use for payments and treasury operations</p>
 
         <div class="registration-type-options">
@@ -1161,11 +1216,6 @@
           </div>
         {/if}
 
-        {#if selectedCodexDetails?.currency}
-          <p class="hint" style="margin-top: 1rem;">
-            The {AVAILABLE_CODICES.find(c => c.id === formData.codex_package_name)?.name || formData.codex_package_name} codex
-            uses <strong>{selectedCodexDetails.currency}</strong> as its accounting currency.
-          </p>
         {/if}
       </div>
 
@@ -1264,22 +1314,24 @@
                 </div>
               {/if}
 
-              <div class="codex-detail-row">
-                <span class="codex-detail-label">Registration</span>
-                <span class="codex-detail-value">
-                  {selectedCodexDetails.openRegistration
-                    ? `Open registration (new members join as ${selectedCodexDetails.defaultProfile})`
-                    : 'Invitation only'}
-                  {#if selectedCodexDetails.identityRequirements.length > 0}
-                    · identity checks: {selectedCodexDetails.identityRequirements.join(', ')}
-                  {/if}
-                </span>
-              </div>
+              {#if selectedCodexDetails.hasRegistrationPolicy}
+                <div class="codex-detail-row">
+                  <span class="codex-detail-label">Registration</span>
+                  <span class="codex-detail-value">
+                    {selectedCodexDetails.openRegistration
+                      ? `Open registration (new members join as ${selectedCodexDetails.defaultProfile})`
+                      : 'Invitation only'}
+                    {#if selectedCodexDetails.identityRequirements.length > 0}
+                      · identity checks: {selectedCodexDetails.identityRequirements.join(', ')}
+                    {/if}
+                  </span>
+                </div>
+              {/if}
 
               {#if selectedCodexDetails.currency}
                 <div class="codex-detail-row">
-                  <span class="codex-detail-label">Accounting currency</span>
-                  <span class="codex-detail-value">{selectedCodexDetails.currency}</span>
+                  <span class="codex-detail-label">Realm token</span>
+                  <span class="codex-detail-value">{selectedCodexDetails.currencyName || selectedCodexDetails.currency} ({selectedCodexDetails.currency})</span>
                 </div>
               {/if}
 
