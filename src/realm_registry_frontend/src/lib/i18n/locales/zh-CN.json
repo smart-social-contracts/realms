@@ -66,6 +66,7 @@
     "prev": "上一步",
     "done": "完成",
     "progress": "第 {{current}} 步，共 {{total}} 步",
+    "start": "开始导览",
     "replay": "开始导览",
     "globe_title": "探索地球仪",
     "globe_body": "Realm 显示在这张 3D 地图上。点击发光图钉可飞往该位置并查看详情。",
@@ -75,10 +76,14 @@
     "browse_body": "打开 Realm 浏览器以搜索、按阶段筛选并浏览列表。",
     "panel_title": "Realm 浏览器",
     "panel_body": "按名称或 ID 搜索、按生命周期筛选、按用户数排序，并选择卡片在地图上聚焦。",
-    "assistant_title": "AI 助手",
-    "assistant_body": "打开 Realms AI 助手，获取注册表、部署和治理方面的帮助。",
+    "assistant_title": "打开 AI 助手",
+    "assistant_body": "点击此标签打开 Realms AI 助手——了解 Realm、部署和治理的向导。",
+    "assistant_compose_title": "向助手提问",
+    "assistant_compose_body": "在输入框中输入问题并点击发送，或点选建议提示快速开始。",
     "stats_title": "实时统计",
-    "stats_body": "Realm 数量、用户、位置、阶段分布和版本信息一览。"
+    "stats_body": "Realm 数量、用户、位置、阶段分布和版本信息一览。",
+    "complete_title": "准备就绪",
+    "complete_body": "导览到此结束！您可以自由探索——旋转地球仪、浏览 Realm、向助手提问。随时点击 ? 可重新观看导览。"
   },
   "time": {
     "just_now": "刚刚",

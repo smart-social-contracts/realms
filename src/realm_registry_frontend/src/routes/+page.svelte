@@ -312,7 +312,7 @@
 
   <RegistryFooter {version} {commitHash} {commitDatetime} />
 
-  <RegistryTour ready={!loading && !globeLoading} bind:panelOpen />
+  <RegistryTour bind:panelOpen />
               </div>
               
 {#if activeManifestoRealm}

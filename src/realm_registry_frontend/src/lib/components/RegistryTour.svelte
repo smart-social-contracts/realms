@@ -3,17 +3,13 @@
   import { get } from 'svelte/store';
   import { browser } from '$app/environment';
   import { _ } from 'svelte-i18n';
-  import { assistantChrome } from '$lib/assistant-chrome.js';
+  import { requestAssistantOpen, requestAssistantClose } from '$lib/assistant-open.js';
   import { createRegistryTour, registerTourReplay } from '$lib/registry-tour.js';
-  import { isRegistryTourComplete, markRegistryTourComplete } from '$lib/registry-tour-prefs.js';
-
-  export let ready = false;
 
   /** Bound from parent so the tour can open/close the browse panel. */
   export let panelOpen = false;
 
   let activeTour = null;
-  let autoStarted = false;
 
   function isMobile() {
     return window.matchMedia('(max-width: 767px)').matches;
@@ -23,14 +19,14 @@
     return get(_)(key);
   }
 
-  async function runTour({ markComplete = true } = {}) {
+  async function runTour() {
     if (!browser) return;
 
     activeTour?.destroy();
     activeTour = null;
 
     panelOpen = false;
-    assistantChrome.update((state) => ({ ...state, open: false }));
+    requestAssistantClose();
     await tick();
 
     const tour = createRegistryTour({
@@ -46,12 +42,16 @@
           await tick();
         },
         closeAssistant: async () => {
-          assistantChrome.update((state) => ({ ...state, open: false }));
+          requestAssistantClose();
           await tick();
+        },
+        openAssistant: async () => {
+          requestAssistantOpen();
+          await tick();
+          await new Promise((resolve) => setTimeout(resolve, 450));
         },
       },
       onComplete: () => {
-        if (markComplete) markRegistryTourComplete();
         activeTour = null;
       },
     });
@@ -61,18 +61,13 @@
   }
 
   onMount(() => {
-    registerTourReplay(() => runTour({ markComplete: false }));
+    registerTourReplay(runTour);
   });
 
   onDestroy(() => {
     activeTour?.destroy();
     registerTourReplay(null);
   });
-
-  $: if (browser && ready && !autoStarted && !isRegistryTourComplete()) {
-    autoStarted = true;
-    setTimeout(() => runTour({ markComplete: true }), 900);
-  }
 </script>
 
 <style>

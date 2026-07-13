@@ -27,7 +27,7 @@
   import { goto } from '$app/navigation';
   import { portalDocumentFocus } from '$lib/portal-focus.js';
   import { assistantChrome } from '$lib/assistant-chrome.js';
-  import { assistantOpenRequest, assistantToggleRequest } from '$lib/assistant-open.js';
+  import { assistantOpenRequest, assistantToggleRequest, assistantCloseRequest } from '$lib/assistant-open.js';
   import { API_URL, CHAT_REQUEST_TIMEOUT_MS, geisterNetwork } from '$lib/geister/constants.js';
   import { renderMarkdown } from '$lib/geister/assistant-markdown.js';
   import { loadPrefs, loadPanelWidth, savePanelWidth } from '$lib/geister/assistant-prefs.js';
@@ -89,6 +89,8 @@
   let unsubOpenRequest;
   /** @type {(() => void) | undefined} */
   let unsubToggleRequest;
+  /** @type {(() => void) | undefined} */
+  let unsubCloseRequest;
   /** @type {(() => void) | undefined} */
   let unsubPrefsFocus;
 
@@ -672,6 +674,9 @@
     unsubToggleRequest = assistantToggleRequest.subscribe((n) => {
       if (n > 0) setOpen(!open);
     });
+    unsubCloseRequest = assistantCloseRequest.subscribe((n) => {
+      if (n > 0) setOpen(false);
+    });
 
     await refreshAuth();
 
@@ -711,6 +716,7 @@
     unsubFocus?.();
     unsubOpenRequest?.();
     unsubToggleRequest?.();
+    unsubCloseRequest?.();
     unsubPrefsFocus?.();
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
@@ -1226,7 +1232,7 @@
       {/if}
     </div>
 
-      <div class="assistant-input">
+      <div class="assistant-input" data-tour="assistant-compose">
         {#if showSuggestions && (suggestions.length > 0 || isLoadingSuggestions)}
           <div class="suggestions">
             {#if isLoadingSuggestions}

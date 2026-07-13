@@ -66,6 +66,7 @@
     "prev": "Back",
     "done": "Done",
     "progress": "{{current}} of {{total}}",
+    "start": "Take a tour",
     "replay": "Take a tour",
     "globe_title": "Explore the globe",
     "globe_body": "Realms appear on this 3D map. Click a glowing pin to fly there and open its details.",
@@ -75,10 +76,14 @@
     "browse_body": "Open the realm browser to search, filter by stage, and scroll the list of registered realms.",
     "panel_title": "Realm browser",
     "panel_body": "Search by name or ID, filter by lifecycle stage, sort by users, and pick a realm card to focus it on the map.",
-    "assistant_title": "AI assistant",
-    "assistant_body": "Open the Realms AI Assistant for help navigating the registry, deployments, and governance concepts.",
+    "assistant_title": "Open the AI assistant",
+    "assistant_body": "Use this tab to open the Realms AI Assistant — your guide to realms, deployments, and governance.",
+    "assistant_compose_title": "Ask the assistant",
+    "assistant_compose_body": "Type a question in the box and press Send, or tap one of the suggested prompts to get started quickly.",
     "stats_title": "Live registry stats",
-    "stats_body": "Realm count, users, locations, stage breakdown, and build version at a glance."
+    "stats_body": "Realm count, users, locations, stage breakdown, and build version at a glance.",
+    "complete_title": "You're all set",
+    "complete_body": "That's everything! You're free to explore — spin the globe, browse realms, and ask the assistant anything. Tap ? anytime to replay this tour."
   },
   "time": {
     "just_now": "just now",

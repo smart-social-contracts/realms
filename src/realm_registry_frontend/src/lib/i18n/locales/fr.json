@@ -66,6 +66,7 @@
     "prev": "Retour",
     "done": "Terminé",
     "progress": "{{current}} sur {{total}}",
+    "start": "Faire la visite",
     "replay": "Faire la visite",
     "globe_title": "Explorer le globe",
     "globe_body": "Les royaumes apparaissent sur cette carte 3D. Cliquez sur une épingle lumineuse pour vous y rendre et voir les détails.",
@@ -75,10 +76,14 @@
     "browse_body": "Ouvrez le navigateur pour rechercher, filtrer par phase et parcourir la liste.",
     "panel_title": "Navigateur de royaumes",
     "panel_body": "Recherchez par nom ou ID, filtrez par étape, triez par utilisateurs et choisissez une carte.",
-    "assistant_title": "Assistant IA",
-    "assistant_body": "Ouvrez l'assistant IA Realms pour de l'aide sur le registre, les déploiements et la gouvernance.",
+    "assistant_title": "Ouvrir l'assistant IA",
+    "assistant_body": "Utilisez cet onglet pour ouvrir l'assistant IA Realms — votre guide sur les royaumes, déploiements et gouvernance.",
+    "assistant_compose_title": "Poser une question",
+    "assistant_compose_body": "Tapez une question et appuyez sur Envoyer, ou touchez une suggestion pour démarrer rapidement.",
     "stats_title": "Statistiques en direct",
-    "stats_body": "Nombre de royaumes, utilisateurs, emplacements, phases et version en un coup d'œil."
+    "stats_body": "Nombre de royaumes, utilisateurs, emplacements, phases et version en un coup d'œil.",
+    "complete_title": "C'est parti",
+    "complete_body": "C'est tout ! Vous êtes libre d'explorer — faites tourner le globe, parcourez les royaumes et posez vos questions à l'assistant. Touchez ? à tout moment pour refaire la visite."
   },
   "time": {
     "just_now": "à l'instant",

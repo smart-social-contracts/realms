@@ -20,6 +20,7 @@ export function requestRegistryTour() {
  *     openPanel: () => Promise<void>,
  *     closePanel: () => Promise<void>,
  *     closeAssistant: () => Promise<void>,
+ *     openAssistant: () => Promise<void>,
  *   },
  *   onComplete?: () => void,
  * }} opts
@@ -87,12 +88,46 @@ export function createRegistryTour({ t, isMobile, actions, onComplete }) {
       },
     },
     {
+      element: '[data-tour="assistant-compose"]',
+      popover: {
+        title: t('tour.assistant_compose_title'),
+        description: t('tour.assistant_compose_body'),
+        side: mobile ? 'top' : 'left',
+        align: 'end',
+      },
+      onHighlightStarted: async (_el, _step, { driver: tour }) => {
+        await actions.closePanel();
+        await actions.openAssistant();
+        requestAnimationFrame(() => tour.refresh());
+      },
+      onDeselected: async () => {
+        await actions.closeAssistant();
+      },
+    },
+    {
       element: mobile ? '[data-tour="mobile-stats"]' : '[data-tour="desktop-stats"]',
       popover: {
         title: t('tour.stats_title'),
         description: t('tour.stats_body'),
         side: 'top',
         align: 'center',
+      },
+      onHighlightStarted: async (_el, _step, { driver: tour }) => {
+        await actions.closePanel();
+        await actions.closeAssistant();
+        requestAnimationFrame(() => tour.refresh());
+      },
+    },
+    {
+      popover: {
+        title: t('tour.complete_title'),
+        description: t('tour.complete_body'),
+        side: 'over',
+        align: 'center',
+      },
+      onHighlightStarted: async () => {
+        await actions.closePanel();
+        await actions.closeAssistant();
       },
     },
   ];

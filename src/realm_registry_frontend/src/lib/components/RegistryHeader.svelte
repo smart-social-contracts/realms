@@ -17,9 +17,6 @@
 
   let showLanguageMenu = false;
   let showAuthMenu = false;
-  let showAbout = false;
-
-  const GITHUB_URL = 'https://github.com/smart-social-contracts/realms';
 
   $: principalText = userPrincipal?.toText?.() || '';
   $: principalShort = principalText
@@ -31,26 +28,20 @@
     showAuthMenu = false;
   }
 
-  function openAbout() {
+  function openTour() {
     closePopovers();
-    showAbout = true;
+    requestRegistryTour();
   }
 
   function onDocClick(e) {
-    const keepOpen = e.target?.closest?.('.icon-rail, .about-modal');
+    const keepOpen = e.target?.closest?.('.icon-rail');
     if (!keepOpen) {
       closePopovers();
-      showAbout = false;
     }
   }
 
   function onDocKeydown(e) {
     if (e.key !== 'Escape') return;
-    if (showAbout) {
-      e.preventDefault();
-      showAbout = false;
-      return;
-    }
     if (!showLanguageMenu && !showAuthMenu) return;
     e.preventDefault();
     closePopovers();
@@ -69,14 +60,16 @@
 <nav class="icon-rail" aria-label="Main" data-tour="top-rail">
   <button
     type="button"
-    class="rail-btn rail-btn-logo"
-    title={$_('about.title')}
-    aria-label={$_('about.title')}
-    aria-haspopup="dialog"
-    aria-expanded={showAbout}
-    on:click|stopPropagation={openAbout}
+    class="rail-btn"
+    title={$_('tour.start')}
+    aria-label={$_('tour.start')}
+    on:click|stopPropagation={openTour}
   >
-    <img src="/images/logo_sphere_only.svg" alt="" class="rail-logo" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 2-3 4"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
   </button>
 
   {#if marketplaceUrl}
@@ -136,7 +129,6 @@
       on:click|stopPropagation={() => {
         showLanguageMenu = !showLanguageMenu;
         showAuthMenu = false;
-        showAbout = false;
       }}
       title={$_('language.select')}
       aria-label={$_('language.select')}
@@ -180,7 +172,6 @@
         on:click|stopPropagation={() => {
           showAuthMenu = !showAuthMenu;
           showLanguageMenu = false;
-          showAbout = false;
         }}
         title={principalText || $_('auth.account')}
         aria-label={$_('auth.account')}
@@ -229,64 +220,6 @@
     {/if}
   </div>
 </nav>
-
-{#if showAbout}
-  <div
-    class="about-overlay"
-    role="presentation"
-    on:mousedown={() => (showAbout = false)}
-  >
-    <div
-      class="about-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="about-title"
-      tabindex="-1"
-      on:mousedown|stopPropagation
-    >
-      <button
-        type="button"
-        class="about-close"
-        on:click={() => (showAbout = false)}
-        aria-label={$_('about.close')}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path d="M18 6L6 18M6 6l12 12"></path>
-        </svg>
-      </button>
-      <img src="/images/logo_sphere_only.svg" alt="" class="about-logo" />
-      <h2 id="about-title" class="about-title">{$_('about.title')}</h2>
-      <p class="about-body">{$_('about.body')}</p>
-      <div class="about-actions">
-        <button
-          type="button"
-          class="about-btn about-btn-secondary"
-          on:click={() => {
-            showAbout = false;
-            requestRegistryTour();
-          }}
-        >
-          {$_('tour.replay')}
-        </button>
-        <button type="button" class="about-btn" on:click={() => (showAbout = false)}>
-          {$_('about.close')}
-        </button>
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="about-github"
-          aria-label={$_('about.github')}
-          title={$_('about.github')}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.729.083-.729 1.205.085 1.84 1.237 1.84 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.418-1.305.76-1.605-2.665-.303-5.466-1.332-5.466-5.93 0-1.31.468-2.382 1.236-3.222-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.3 1.23.96-.267 1.98-.4 3-.405 1.02.005 2.04.138 3 .405 2.29-1.552 3.297-1.23 3.297-1.23.653 1.652.242 2.873.118 3.176.77.84 1.235 1.912 1.235 3.222 0 4.61-2.807 5.624-5.48 5.92.43.37.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .32.216.694.825.576C20.565 21.796 24 17.297 24 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-        </a>
-      </div>
-    </div>
-  </div>
-{/if}
 
 <style>
   .icon-rail {
@@ -346,54 +279,6 @@
     color: #0a0a0a;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .rail-btn-logo {
-      animation: none;
-    }
-  }
-
-  .rail-btn-logo {
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    animation: logo-glimpse 5.5s ease-in-out 1.5s infinite;
-  }
-
-  .rail-btn-logo:hover {
-    background: transparent;
-    transform: scale(1.08);
-    animation: none;
-  }
-
-  @keyframes logo-glimpse {
-    0%,
-    68%,
-    100% {
-      filter: brightness(1);
-      transform: scale(1);
-      opacity: 1;
-    }
-    76% {
-      filter: brightness(1.45);
-      transform: scale(1.1);
-      opacity: 1;
-    }
-    84% {
-      filter: brightness(1.15);
-      transform: scale(1.04);
-      opacity: 1;
-    }
-  }
-
-  .rail-logo {
-    width: 100%;
-    height: 100%;
-    max-width: 52px;
-    max-height: 52px;
-    object-fit: contain;
-    pointer-events: none;
-  }
-
   .rail-btn-logged {
     background: rgba(17, 17, 17, 0.88);
     color: #ffffff;
@@ -433,126 +318,6 @@
 
   .menu-option-danger {
     color: #b91c1c;
-  }
-
-  .about-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 300;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.18);
-  }
-
-  .about-modal {
-    position: relative;
-    width: min(420px, calc(100vw - 2rem));
-    padding: 1.75rem 1.5rem 1.35rem;
-    background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(229, 229, 229, 0.9);
-    border-radius: 16px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    text-align: center;
-    font-family: inherit;
-  }
-
-  .about-close {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: #737373;
-    cursor: pointer;
-  }
-
-  .about-close:hover {
-    background: #f5f5f5;
-    color: #171717;
-  }
-
-  .about-logo {
-    width: 56px;
-    height: 56px;
-    object-fit: contain;
-    margin: 0 auto 0.85rem;
-    display: block;
-  }
-
-  .about-title {
-    margin: 0 0 0.75rem;
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #171717;
-  }
-
-  .about-body {
-    margin: 0 0 1.25rem;
-    font-size: 0.9375rem;
-    line-height: 1.55;
-    color: #525252;
-    text-align: left;
-    white-space: pre-line;
-  }
-
-  .about-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-
-  .about-btn {
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
-    background: #f5f5f5;
-    color: #171717;
-    font-size: 0.8125rem;
-    font-family: inherit;
-    font-weight: 500;
-    padding: 0.5rem 0.9rem;
-    cursor: pointer;
-  }
-
-  .about-btn-secondary {
-    background: #171717;
-    border-color: #171717;
-    color: #ffffff;
-  }
-
-  .about-btn-secondary:hover {
-    background: #404040;
-    border-color: #404040;
-  }
-
-  .about-btn:hover {
-    background: #e5e5e5;
-  }
-
-  .about-github {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    color: #171717;
-    background: #f5f5f5;
-    text-decoration: none;
-  }
-
-  .about-github:hover {
-    background: #e5e5e5;
   }
 
   .rail-loading {
@@ -617,11 +382,6 @@
       width: 24px;
       height: 24px;
     }
-
-    .rail-logo {
-      max-width: 48px;
-      max-height: 48px;
-    }
   }
 
   @media (max-width: 480px) {
@@ -645,11 +405,6 @@
     .rail-btn :global(svg) {
       width: 18px;
       height: 18px;
-    }
-
-    .rail-logo {
-      max-width: 36px;
-      max-height: 36px;
     }
   }
 </style>

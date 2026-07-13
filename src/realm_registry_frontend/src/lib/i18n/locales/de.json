@@ -66,6 +66,7 @@
     "prev": "Zurück",
     "done": "Fertig",
     "progress": "{{current}} von {{total}}",
+    "start": "Tour starten",
     "replay": "Tour starten",
     "globe_title": "Globus erkunden",
     "globe_body": "Realms erscheinen auf dieser 3D-Karte. Klicken Sie auf einen leuchtenden Pin, um dorthin zu fliegen und Details zu öffnen.",
@@ -75,10 +76,14 @@
     "browse_body": "Öffnen Sie den Realm-Browser zum Suchen, Filtern nach Phase und Scrollen der Liste.",
     "panel_title": "Realm-Browser",
     "panel_body": "Suchen nach Name oder ID, nach Lebenszyklus filtern, nach Nutzern sortieren und eine Karte auswählen.",
-    "assistant_title": "KI-Assistent",
-    "assistant_body": "Öffnen Sie den Realms-KI-Assistenten für Hilfe bei Registry, Deployments und Governance.",
+    "assistant_title": "KI-Assistent öffnen",
+    "assistant_body": "Über diesen Tab öffnen Sie den Realms-KI-Assistenten — Ihr Guide zu Realms, Deployments und Governance.",
+    "assistant_compose_title": "Fragen stellen",
+    "assistant_compose_body": "Geben Sie eine Frage ein und drücken Sie Senden, oder tippen Sie auf einen Vorschlag, um schnell zu starten.",
     "stats_title": "Live-Statistiken",
-    "stats_body": "Anzahl Realms, Nutzer, Standorte, Phasen und Build-Version auf einen Blick."
+    "stats_body": "Anzahl Realms, Nutzer, Standorte, Phasen und Build-Version auf einen Blick.",
+    "complete_title": "Alles erledigt",
+    "complete_body": "Das war's! Sie können jetzt frei erkunden — drehen Sie den Globus, durchsuchen Sie Realms und fragen Sie den Assistenten. Tippen Sie jederzeit auf ?, um die Tour zu wiederholen."
   },
   "time": {
     "just_now": "gerade eben",
