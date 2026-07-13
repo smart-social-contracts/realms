@@ -542,12 +542,19 @@ def schedule_registration(job_id_val: str):
                     jlog(job_id_val).info("canister_ids.js uploaded to frontend")
 
             if backend_id and realm_info:
+                # Identity fields only. When a codex package is installed,
+                # init.py enforces onboarding.registration (issue #244) —
+                # sending open_registration here would overwrite that policy
+                # because registration runs before this call.
                 config = {
                     "name": realm_name,
                     "manifesto": realm_info.get("manifesto", ""),
                     "welcome_message": realm_info.get("welcome_message", ""),
-                    "open_registration": realm_info.get("open_registration", False),
                 }
+                if not realm_info.get("codex"):
+                    config["open_registration"] = realm_info.get(
+                        "open_registration", False
+                    )
                 config_json = json.dumps(config).replace('\\', '\\\\').replace('"', '\\"')
                 config_arg = '("' + config_json + '")'
                 config_result: CallResult = yield ic.call_raw(

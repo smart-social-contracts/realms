@@ -5049,8 +5049,25 @@ def update_realm_config(config_json: str) -> str:
             )
 
         if "open_registration" in config:
-            realm.open_registration = bool(config["open_registration"])
-            updated_fields.append(f"open_registration={realm.open_registration}")
+            # Codex init owns registration when manifest_data carries a policy
+            # (issue #244). Ignore wizard/installer overrides in that case.
+            codex_pins_registration = False
+            try:
+                md = json.loads(getattr(realm, "manifest_data", "") or "{}")
+                reg = (md.get("onboarding") or {}).get("registration") or {}
+                codex_pins_registration = "open_registration" in reg
+            except (json.JSONDecodeError, TypeError):
+                pass
+            if not codex_pins_registration:
+                realm.open_registration = bool(config["open_registration"])
+                updated_fields.append(
+                    f"open_registration={realm.open_registration}"
+                )
+            else:
+                logger.info(
+                    "Skipping open_registration update — codex registration "
+                    f"policy is authoritative ({realm.open_registration})"
+                )
 
         if "quarter_join_mode" in config:
             mode = str(config["quarter_join_mode"] or "auto").strip().lower()
