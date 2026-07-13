@@ -152,7 +152,7 @@ export function stripPoliticalLayers(style) {
  * @param {object} style
  * @param {{ surfaceOpacity?: number, waterDarken?: number }} [opts]
  */
-export function softenGlobeBasemap(style, { surfaceOpacity = 0.18, waterDarken = 0.22 } = {}) {
+export function softenGlobeBasemap(style, { surfaceOpacity = 0.18, waterDarken = 0.45 } = {}) {
   if (!style?.layers) return style;
   const clamp = (v) => Math.max(0.04, Math.min(1, v));
 
@@ -201,7 +201,7 @@ export function softenGlobeBasemap(style, { surfaceOpacity = 0.18, waterDarken =
     if (type === 'fill') {
       // Water covers most of the sphere; keep it glassier than other fills
       if (id.includes('water')) {
-        const factor = surfaceOpacity * 0.75;
+        const factor = surfaceOpacity * 0.65;
         paint['fill-opacity'] = scaleOpacityExpr(paint['fill-opacity'], factor);
         paint['fill-color'] = darkenColor(paint['fill-color'] ?? 'rgb(194, 200, 202)', waterDarken);
         return { ...layer, paint };
