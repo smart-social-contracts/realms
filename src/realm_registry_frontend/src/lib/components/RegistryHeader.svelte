@@ -19,6 +19,7 @@
   let showHub = false;
   let showLanguagePicker = false;
   let showAuthMenu = false;
+  let avatarFailed = false;
 
   $: principalText = userPrincipal?.toText?.() || '';
   $: principalShort = principalText
@@ -27,6 +28,10 @@
   $: avatarUrl = principalText
     ? `https://api.dicebear.com/9.x/glass/svg?seed=${encodeURIComponent(principalText)}`
     : '';
+
+  $: if (principalText) {
+    avatarFailed = false;
+  }
 
   function closePopovers() {
     showHub = false;
@@ -229,7 +234,21 @@
           aria-expanded={showAuthMenu}
         >
           {#if isLoggedIn}
-            <img src={avatarUrl} alt="" class="auth-avatar" width="40" height="40" />
+            {#if avatarUrl && !avatarFailed}
+              <img
+                src={avatarUrl}
+                alt=""
+                class="auth-avatar"
+                width="40"
+                height="40"
+                on:error={() => (avatarFailed = true)}
+              />
+            {:else}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            {/if}
           {:else}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -244,6 +263,14 @@
               {#if principalShort}
                 <div class="menu-meta" title={principalText}>{$_('auth.signed_in')}: {principalShort}</div>
               {/if}
+              <a
+                href="/my-dashboard"
+                class="menu-option"
+                role="menuitem"
+                on:click={() => (showAuthMenu = false)}
+              >
+                {$_('dashboard.title')}
+              </a>
               <button
                 type="button"
                 class="menu-option menu-option-danger"
