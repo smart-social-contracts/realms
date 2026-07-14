@@ -284,7 +284,7 @@
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 150;
+    z-index: 250;
     background: transparent;
     border: none;
     cursor: default;
@@ -295,7 +295,7 @@
     top: 0;
     left: 0;
     bottom: 0;
-    z-index: 160;
+    z-index: 260;
     display: flex;
     flex-direction: column;
     background: var(--surface);

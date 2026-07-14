@@ -1,11 +1,13 @@
 <script>
   import { _ } from 'svelte-i18n';
+  import { realmPanelOpen } from '$lib/realm-panel-chrome.js';
 
   export let version = '';
   export let commitHash = '';
   export let commitDatetime = '';
 </script>
 
+{#if !$realmPanelOpen}
 <footer class="registry-footer registry-desktop-only">
   <div class="footer-meta">
     <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer" class="github-link" aria-label="GitHub">
@@ -30,6 +32,7 @@
     </a>
   </div>
 </footer>
+{/if}
 
 <style>
   .registry-footer {
