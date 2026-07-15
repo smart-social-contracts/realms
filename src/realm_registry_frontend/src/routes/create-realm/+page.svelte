@@ -162,11 +162,12 @@
       }
       authLoading = false;
 
-      // Check invitation code mode
+      // Check invitation code mode (staging/test bypasses the platform gate)
       try {
         const { backend } = await import('$lib/canisters.js');
+        const { TEST_MODE_II_BYPASS } = await import('$lib/config.js');
         const modeResult = await backend.get_invitation_mode();
-        invitationMode = modeResult?.Ok === 'enabled';
+        invitationMode = modeResult?.Ok === 'enabled' && !TEST_MODE_II_BYPASS;
         if (invitationMode && isLoggedIn && userPrincipal) {
           const actResult = await backend.is_principal_activated(userPrincipal.toText());
           principalActivated = actResult?.Ok === 'activated' || actResult?.Ok === 'open';
@@ -992,7 +993,7 @@
               </div>
             </button>
           </div>
-          <p class="hint" style="margin-top: 0.5rem;">Administrator registration always requires an invitation code regardless of this setting.</p>
+          <p class="hint" style="margin-top: 0.5rem;">You are registered as admin automatically when the realm deploys. Additional administrators must join with an invitation code.</p>
           {/if}
         </div>
       </div>

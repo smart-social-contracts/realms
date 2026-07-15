@@ -121,12 +121,11 @@
   }
 
   function stepAfterProbe() {
+    // Founders registered at deploy time must not be sent back through invite.
+    if (userHasJoined) return 'already_joined';
     if ($testModeIIBypass) {
-      // II bypass: after probe, always continue to profile (re-join testing
-      // when membership was found; normal new-user path when not).
       return 'profile';
     }
-    if (userHasJoined) return 'already_joined';
     return $testModeSkipTerms ? 'profile' : 'terms';
   }
 
@@ -208,8 +207,7 @@
       await validateInvite();
     }
     // Always probe federation before deciding Terms/Profile vs welcome-back.
-    // II bypass must not skip this; it only changes the post-probe destination
-    // (found → still profile for re-join tests; not found → normal new-user path).
+    // II bypass only replaces Internet Identity — not membership detection.
     await ensureProbedAndAdvance();
   }
 
