@@ -3,11 +3,11 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { resolveSlug } from '$lib/slug-resolver.js';
-  import { realmIframeUrl, portalPath } from '$lib/federation.js';
+  import { realmIframeUrl } from '$lib/federation.js';
   import { attachPortalBridge } from '$lib/portal-bridge-host.js';
   import { portalDocumentFocus } from '$lib/portal-focus.js';
   import { requestAssistantOpen } from '$lib/assistant-open.js';
-  import { login, isAuthenticated } from '$lib/auth.js';
+  import { login } from '$lib/auth.js';
   import { CONFIG } from '$lib/config.js';
   import { fetchRealmRuntimeFlags } from '$lib/realm-runtime-flags.js';
 
@@ -23,25 +23,15 @@
   let needsLogin = false;
   let loggingIn = false;
   let loginError = '';
-  // Resolved once on mount: bare /r/<slug> loads the realm root (which
-  // routes members to their dashboard) when the portal already has a
-  // session; otherwise /join. Deep paths are always preserved.
-  let rootIframePath = '/join';
+  // Bare /r/<slug> always loads the realm root. The realm decides
+  // member-dashboard vs public-dashboard vs /join. Deep paths are preserved.
+  let rootIframePath = '/';
 
   $: slug = $page.params.slug;
   $: subPath = $page.url.pathname.replace(new RegExp(`^/r/${slug}`), '') || '/';
 
   onMount(async () => {
     if (!browser) return;
-    try {
-      if (await isAuthenticated()) {
-        // Member (or at least signed-in): let the realm root decide
-        // dashboard vs join. Avoids the refresh→/join loop.
-        rootIframePath = '/';
-      }
-    } catch {
-      rootIframePath = '/join';
-    }
     await loadRealm();
   });
 
