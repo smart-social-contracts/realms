@@ -77,6 +77,12 @@ function initializeBackendStore() {
 	_initBackendPromise = (async () => {
 		await initializeImports();
 
+		// Runtime flags (incl. test_mode_ii_bypass) come from backend status(), not
+		// canister_ids.js. Fetch before auth init so test-mode auto-login is not
+		// skipped while status is still loading (which leaves an anonymous actor).
+		const { realmInfo } = await import('$lib/stores/realmInfo');
+		await realmInfo.fetch();
+
 		// Try to use an existing authenticated session so the initial actor
 		// is not anonymous on page refresh (avoids race with initBackendWithIdentity).
 		try {

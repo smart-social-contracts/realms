@@ -1,5 +1,5 @@
 {
-  "description": "Staging test roster for the II-bypass picker (indices 0\u20133). Login uses the deterministic seeded identities; optional PEM overrides can be placed at config/staging-test-identities/identity-{1,2,3,4}.pem or STAGING_TEST_IDENTITY_PEM_{1,2,3,4} env vars (gitignored).",
+  "description": "Staging test roster for the II-bypass picker (indices 0–3). Login uses deterministic seeded identities; see config/deterministic-test-identity-principals.json for the principals each slot produces.",
   "identities": [
     {
       "number": 1,

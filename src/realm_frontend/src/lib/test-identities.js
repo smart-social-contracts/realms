@@ -7,8 +7,8 @@
  * Optional deploy-time overrides (via /canister_ids.js):
  *   - globalThis.__TEST_IDENTITY_PEms = string[] — PEM strings (or base64) used
  *     for login at that index instead of the deterministic seed.
- *   - globalThis.__TEST_IDENTITY_PRINCIPALS = string[] — documented roster
- *     principals (display/sanity only; login never requires them).
+ *
+ * Reference roster (indices 0–9): config/deterministic-test-identity-principals.json
  */
 
 import { Ed25519KeyIdentity, Secp256k1KeyIdentity } from '@dfinity/identity';
@@ -92,14 +92,17 @@ export function shortPrincipal(principal) {
 
 /**
  * Labels and principals for the join-page picker.
- * The principal shown is always the one login will actually produce.
- * @returns {{ index: number, label: string, principal: string, description: string, hasPem: boolean }[]}
+ * When a roster principal is configured for a slot (via
+ * __TEST_IDENTITY_PRINCIPALS), it is displayed as that slot's principal;
+ * otherwise the deterministic login principal is shown.
+ * @returns {{ index: number, label: string, principal: string, loginPrincipal: string, description: string, hasPem: boolean }[]}
  */
 export function listTestIdentities(maxIndex = TEST_IDENTITY_PICKER_MAX_INDEX) {
   const pems = globalThis.__TEST_IDENTITY_PEms;
   const items = [];
   for (let index = 0; index <= maxIndex; index++) {
     const hasPem = Array.isArray(pems) && !!pems[index];
+    const configured = expectedPrincipal(index);
     let loginPrincipal = '';
     try {
       loginPrincipal = testIdentityPrincipal(index);
@@ -109,7 +112,8 @@ export function listTestIdentities(maxIndex = TEST_IDENTITY_PICKER_MAX_INDEX) {
     items.push({
       index,
       label: testIdentityLabel(index),
-      principal: loginPrincipal,
+      principal: configured || loginPrincipal,
+      loginPrincipal,
       hasPem,
       description:
         index === 0

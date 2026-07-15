@@ -1,0 +1,66 @@
+{
+  "description": "Principals for the II-bypass deterministic test identities (indices 0–9). Each index uses a fixed 32-byte Ed25519 seed: [0xED, 0x57, index, 0, …] — see src/realm_frontend/src/lib/test-identities.js. Same seed always yields the same principal on every machine.",
+  "seed_layout": "bytes[0]=0xED, bytes[1]=0x57, bytes[2]=index (0–255), remainder zero",
+  "identities": [
+    {
+      "index": 0,
+      "number": 1,
+      "label": "Identity 1 (Creator)",
+      "principal": "2eqns-rmzes-7npxw-dxpw2-qdy2s-mw6ix-svdo2-oya7o-a6ldc-sqgwh-bqe"
+    },
+    {
+      "index": 1,
+      "number": 2,
+      "label": "Identity 2",
+      "principal": "z32zf-ic72u-jhtqq-ojjqp-jblhx-dxxin-vqelt-ljmo4-ymwmh-gcnzo-hae"
+    },
+    {
+      "index": 2,
+      "number": 3,
+      "label": "Identity 3",
+      "principal": "cybi7-lmxkc-lgijx-c6jqu-mzeh7-mamgq-vtorr-5qrvs-52frq-i6chg-2ae"
+    },
+    {
+      "index": 3,
+      "number": 4,
+      "label": "Identity 4",
+      "principal": "kmsvy-37fmb-ktmz5-b7c5m-36fp4-ausay-ewo76-zuusq-7uh7s-rczwk-kqe"
+    },
+    {
+      "index": 4,
+      "number": 5,
+      "label": "Identity 5",
+      "principal": "7qjc2-hqdzn-yb6cl-24zrj-jjwem-wvy3a-ueqex-ljumv-5hbod-2c3jz-rae"
+    },
+    {
+      "index": 5,
+      "number": 6,
+      "label": "Identity 6",
+      "principal": "eflss-jxr4f-2s3xx-i67yl-kswdw-ftjyn-6ybps-gnfvy-2qybb-u6hr5-dae"
+    },
+    {
+      "index": 6,
+      "number": 7,
+      "label": "Identity 7",
+      "principal": "z64wn-a5u3v-qtwos-gbmvi-jinzg-5vsy7-2d4v7-3tcoz-imkhq-e54t5-kqe"
+    },
+    {
+      "index": 7,
+      "number": 8,
+      "label": "Identity 8",
+      "principal": "v5yz5-guujn-qe7ku-cwf75-uozai-mqwy5-5lmso-vby7n-re6ja-hov2b-xqe"
+    },
+    {
+      "index": 8,
+      "number": 9,
+      "label": "Identity 9",
+      "principal": "hdkzq-ardfh-ogpne-2m5ys-qvcor-pi4iy-ozj2s-63zo7-4mme5-gcsiz-vqe"
+    },
+    {
+      "index": 9,
+      "number": 10,
+      "label": "Identity 10",
+      "principal": "ieurl-h66s4-hk7ia-bxwtv-vekzw-7sfsy-dqvjc-lqdq3-32d7c-pl2jx-iae"
+    }
+  ]
+}
