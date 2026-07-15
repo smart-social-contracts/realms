@@ -544,10 +544,14 @@ def join_realm(
       may join without a code. Admin always requires a code.
     - Controller bypass: IC controllers can join with any profile
       without a code (for manual dfx deploys).
-    - Test mode: when test_mode_user_self_registration (or
-      test_mode_ii_bypass) is True, the sha256-matched codes "admin",
-      "member", and "dev"/"developer" grant the respective profiles, so
-      a caller may self-register without a real invite code.
+    - Test mode (two flags):
+      - test_mode_user_self_registration: allows codeless member/developer
+        join (open-registration equivalent) and admin join without a code.
+        Internet Identity bypass alone does not enable codeless join.
+      - test_mode_ii_bypass: with an invite checksum present, sha256-matched
+        literals "admin", "member", and "dev"/"developer" grant the respective
+        profiles (staging can type those strings in the invite field).
+        user_self_registration also enables those checksum shortcuts.
 
     On a *new* registration against a quarter, pushes the live
     ``User.count()`` to the capital immediately so join-target populations
@@ -585,20 +589,20 @@ def join_realm(
         except Exception:
             pass
 
+        _self_reg_bypass = bool(getattr(realm, "test_mode_user_self_registration", False))
+        _test_code_bypass = _self_reg_bypass or bool(getattr(realm, "test_mode_ii_bypass", False))
+
         if has_invite:
             # Test mode shortcuts: sha256("admin") / sha256("member") / sha256("dev") / sha256("developer") grant respective profiles
             _ADMIN_TEST_CODE_CHECKSUM_HEX = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
             _MEMBER_TEST_CODE_CHECKSUM_HEX = "e31ab643c44f7a0ec824b59d1194d60dac334200d845e61d2d289daa0f087ea4"
             _DEV_TEST_CODE_CHECKSUM_HEX = "ef260e9aa3c673af240d17a2660480361a8e081d1ffeca2a5ed0e3219fc18567"
             _DEVELOPER_TEST_CODE_CHECKSUM_HEX = "88fa0d759f845b47c044c2cd44e29082cf6fea665c30c146374ec7c8f3d699e3"
-            _test_bypass = bool(getattr(realm, "test_mode_user_self_registration", False)) or bool(
-                getattr(realm, "test_mode_ii_bypass", False)
-            )
-            if _test_bypass and invite_code_checksum_hex == _ADMIN_TEST_CODE_CHECKSUM_HEX:
+            if _test_code_bypass and invite_code_checksum_hex == _ADMIN_TEST_CODE_CHECKSUM_HEX:
                 granted_profile = "admin"
-            elif _test_bypass and invite_code_checksum_hex == _MEMBER_TEST_CODE_CHECKSUM_HEX:
+            elif _test_code_bypass and invite_code_checksum_hex == _MEMBER_TEST_CODE_CHECKSUM_HEX:
                 granted_profile = "member"
-            elif _test_bypass and invite_code_checksum_hex in (_DEV_TEST_CODE_CHECKSUM_HEX, _DEVELOPER_TEST_CODE_CHECKSUM_HEX):
+            elif _test_code_bypass and invite_code_checksum_hex in (_DEV_TEST_CODE_CHECKSUM_HEX, _DEVELOPER_TEST_CODE_CHECKSUM_HEX):
                 granted_profile = "developer"
             else:
                 # Code-based path: validate and consume the invite code
@@ -632,10 +636,7 @@ def join_realm(
             pass
 
         elif profile == "admin":
-            _test_bypass = bool(getattr(realm, "test_mode_user_self_registration", False)) or bool(
-                getattr(realm, "test_mode_ii_bypass", False)
-            )
-            if not _test_bypass:
+            if not _self_reg_bypass:
                 return RealmResponse(
                     success=False,
                     data=RealmResponseData(
@@ -644,12 +645,9 @@ def join_realm(
                 )
 
         else:
-            # Member/developer join without code: allowed if open_registration is on or test bypass
+            # Member/developer join without code: allowed if open_registration is on or self-reg bypass
             open_reg = realm and realm.open_registration
-            _test_bypass = bool(getattr(realm, "test_mode_user_self_registration", False)) or bool(
-                getattr(realm, "test_mode_ii_bypass", False)
-            )
-            if not open_reg and not _test_bypass:
+            if not open_reg and not _self_reg_bypass:
                 return RealmResponse(
                     success=False,
                     data=RealmResponseData(
@@ -662,12 +660,10 @@ def join_realm(
         # >=1 active sub-quarter) it stops accepting brand-new members directly:
         # new members register on a quarter (the /join page routes them there).
         # Controllers and test-mode bypass stay exempt so admin tooling and demos
-        # still work, and existing members can idempotently re-join.
+        # still work (ii_bypass + typed test checksum counts), and existing members
+        # can idempotently re-join.
         _is_quarter_realm = bool(getattr(realm, "is_quarter", False))
-        _test_bypass_guard = bool(getattr(realm, "test_mode_user_self_registration", False)) or bool(
-            getattr(realm, "test_mode_ii_bypass", False)
-        )
-        if realm and not _is_quarter_realm and not is_controller and not _test_bypass_guard:
+        if realm and not _is_quarter_realm and not is_controller and not _test_code_bypass:
             own_id = ic.id().to_str()
             has_active_sub = any(
                 (q.canister_id and q.canister_id != own_id and (q.status or "active") == "active")

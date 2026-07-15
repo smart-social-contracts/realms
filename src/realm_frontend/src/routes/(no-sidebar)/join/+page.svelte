@@ -57,8 +57,9 @@
   // code's profile when a code is used, otherwise the codex-defined default.
   // There is no profile picker — user types are gone; only profiles exist.
 
-  // Invite is required when registration is closed (not open) and user has no valid invite
-  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !$testModeUserSelfRegistration && !$testModeIIBypass;
+  // Invite is required when registration is closed (not open) and user has no valid invite.
+  // II bypass replaces Internet Identity only — incumbent realms still need a registration code.
+  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !$testModeUserSelfRegistration;
 
   $: targetQuarterInfo = quarterDirectory.find((q) => q.canister_id === targetQuarterId) || null;
   // Assignment banner when federation has multiple quarters or target is a sub-quarter.
@@ -444,9 +445,9 @@
     inviteError = '';
     error = '';
     try {
-      // Test mode shortcuts: "admin" / "member" / "dev" accepted client-side
+      // Green-field test realms only: magic invite strings accepted client-side.
       const trimmed = inviteCode.trim().toLowerCase();
-      if (($testModeUserSelfRegistration || $testModeIIBypass) && (trimmed === 'admin' || trimmed === 'member' || trimmed === 'dev' || trimmed === 'developer')) {
+      if ($testModeUserSelfRegistration && (trimmed === 'admin' || trimmed === 'member' || trimmed === 'dev' || trimmed === 'developer')) {
         inviteValid = true;
         inviteProfile = trimmed === 'dev' || trimmed === 'developer' ? 'developer' : trimmed;
         return;
@@ -1028,7 +1029,7 @@
             {#if inviteError && !inviteChecking && !inviteValid}
               <p class="mt-2 text-sm text-red-600">{inviteError}</p>
             {/if}
-            {#if ($testModeUserSelfRegistration || $testModeIIBypass) && !inviteValid}
+            {#if $testModeUserSelfRegistration && !inviteValid}
               <p class="mt-2 text-xs text-gray-400 flex items-start gap-1.5">
                 <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
