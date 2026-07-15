@@ -14,6 +14,7 @@
   import { cn } from '$lib/theme/utilities';
   import { formatQuarterLabel } from '$lib/utils/quarterLabels';
   import { probeFederatedMembership, activateMembership } from '$lib/utils/federatedMembership';
+  import { listTestIdentities, shortPrincipal } from '$lib/test-identities.js';
   import { _ } from 'svelte-i18n';
   
   // Step management: 'auth' | 'already_joined' | 'terms' | 'profile' | 'success'
@@ -49,7 +50,9 @@
   let forgotLoading = false;
   let embeddedInPortal = false;
   let forgotError = '';
-  
+  /** @type {ReturnType<typeof listTestIdentities>} */
+  let testIdentities = listTestIdentities();
+  let selectedTestIdentityIndex = 0;
   // The granted profile is resolved by the backend (issue #242): the invite
   // code's profile when a code is used, otherwise the codex-defined default.
   // There is no profile picker — user types are gone; only profiles exist.
@@ -268,7 +271,7 @@
       targetsResolved = true;
       maybeAdvanceFromStores();
 
-      if (embeddedInPortal) {
+      if (embeddedInPortal && !$testModeIIBypass) {
         onPortalAuth = () => {
           if ($isAuthenticated) return;
           void handleLogin();
@@ -669,10 +672,40 @@
 
           {#if $testModeIIBypass}
             <div class="space-y-3">
+              <p class="text-sm text-gray-600 text-center mb-2">
+                Pick a test identity (Internet Identity is bypassed on staging).
+              </p>
+              {#each testIdentities as persona (persona.index)}
+                <button
+                  type="button"
+                  on:click={() => { selectedTestIdentityIndex = persona.index; }}
+                  class={cn(
+                    'w-full text-left p-4 rounded-xl border-2 transition-all',
+                    selectedTestIdentityIndex === persona.index
+                      ? 'border-gray-900 bg-gray-50'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  )}
+                  disabled={loading}
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="font-semibold text-gray-900">{persona.label}</span>
+                    {#if selectedTestIdentityIndex === persona.index}
+                      <span class="text-xs font-medium text-gray-700 bg-gray-200 px-2 py-0.5 rounded-full">Selected</span>
+                    {/if}
+                  </div>
+                  <p class="text-xs font-mono text-gray-500 mt-1 break-all">{persona.principal}</p>
+                  {#if persona.registeredFounder && persona.registeredFounder !== persona.principal}
+                    <p class="text-xs text-amber-700 mt-1">
+                      Registered founder: {shortPrincipal(persona.registeredFounder)}
+                    </p>
+                  {/if}
+                  <p class="text-xs text-gray-400 mt-1">{persona.description}</p>
+                </button>
+              {/each}
               <button
-                on:click={() => handleLogin()}
+                on:click={() => handleLogin({ identityIndex: selectedTestIdentityIndex })}
                 disabled={loading}
-                class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
               >
                 {#if loading}
                   <Spinner size="5" color="white" />
@@ -681,27 +714,9 @@
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  <span>Sign in as Default Test User</span>
+                  <span>Continue as {testIdentities[selectedTestIdentityIndex]?.label || 'Creator'}</span>
                 {/if}
               </button>
-              <button
-                on:click={() => handleLogin({ random: true })}
-                disabled={loading}
-                class="w-full py-4 px-6 bg-white hover:bg-gray-50 text-gray-900 font-medium rounded-xl border-2 border-gray-200 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {#if loading}
-                  <Spinner size="5" color="gray" />
-                  <span>Creating identity...</span>
-                {:else}
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                  </svg>
-                  <span>Create New Test Identity</span>
-                {/if}
-              </button>
-              <p class="text-center text-xs text-gray-400 mt-2">
-                Test mode: Internet Identity is bypassed. Each new identity gets a unique principal.
-              </p>
             </div>
           {:else}
             <button
@@ -934,8 +949,9 @@
             </div>
           {/if}
 
-          <!-- Access summary: the backend resolves the profile (invite code
-               profile, or the realm's default for open registration). -->
+          <!-- Access summary: only after a valid invite, or when open registration
+               advertises the codex default profile. Invite-only realms stay code-only. -->
+          {#if inviteValid || $realmOpenRegistration}
           <div class="mb-6 p-4 rounded-xl border-2 border-gray-200 bg-gray-50">
             <div class="flex items-center gap-4">
               <div class="w-12 h-12 rounded-full flex items-center justify-center bg-gray-900 text-white">
@@ -954,6 +970,7 @@
               </div>
             </div>
           </div>
+          {/if}
 
           <!-- Invite code input -->
           <div class="mb-6 p-3 md:p-4 border border-gray-200 rounded-xl">

@@ -12,7 +12,6 @@
 	import T from '$lib/components/T.svelte';
 	import { IconLogin } from '@tabler/icons-svelte';
 	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
-	import { testModeIIBypass } from '$lib/stores/realmInfo';
 
 	let principalText = '';
 	let showDropdown = false;
@@ -20,22 +19,12 @@
 	// Using the centralized profile loading function from the store
 
 	onMount(async () => {
-		// In test mode, auto-login immediately with deterministic identity
-		if ($testModeIIBypass) {
-			const restored = await restoreAuthSession();
-			if (!restored.authenticated) {
-				console.log('[TEST MODE] Auto-login triggered');
-				await handleLogin();
-			} else {
-				await loadUserProfilePicture();
-			}
-		} else {
-			const restored = await restoreAuthSession();
-			if (restored.authenticated) {
-				principalText = restored.principal;
-				console.log('Principal restored from existing session:', principalText);
-				await loadUserProfilePicture();
-			}
+		// In test mode, do not auto-login — the join page shows an identity picker.
+		const restored = await restoreAuthSession();
+		if (restored.authenticated) {
+			principalText = restored.principal;
+			console.log('Principal restored from existing session:', principalText);
+			await loadUserProfilePicture();
 		}
 		
 		// Add a click handler to close dropdown when clicking outside
@@ -52,8 +41,8 @@
 		};
 	});
 
-	async function handleLogin() {
-		const { principal: userPrincipal } = await login();
+	async function handleLogin(options = {}) {
+		const { principal: userPrincipal } = await login(options);
 		isAuthenticated.set(true);
 		principalText = userPrincipal.toText();
 

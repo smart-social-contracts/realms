@@ -9,12 +9,15 @@
   import { requestAssistantOpen } from '$lib/assistant-open.js';
   import { login, isAuthenticated } from '$lib/auth.js';
   import { CONFIG } from '$lib/config.js';
+  import { fetchRealmRuntimeFlags } from '$lib/realm-runtime-flags.js';
 
   let iframeEl;
   let loading = true;
   let error = '';
   let realm = null;
   let bridge = null;
+  /** When true the embedded realm handles auth locally (test-mode II bypass). */
+  let realmIIBypass = false;
   // The embedded realm asked for a delegation but the portal has no II
   // session — surface a sign-in UI on this (canonical) origin.
   let needsLogin = false;
@@ -81,6 +84,11 @@
         loaderProfile: data.loader_profile || 'realms-iframe-v1',
         env: CONFIG.deploy_queue_network
       };
+      const flags = await fetchRealmRuntimeFlags(data.backend_canister_id);
+      realmIIBypass = !!flags?.test_mode_ii_bypass;
+      if (realmIIBypass) {
+        needsLogin = false;
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -93,6 +101,10 @@
     bridge?.dispose?.();
     bridge = attachPortalBridge(iframeEl, realm, {
       onAuthState: (pending) => {
+        if (realmIIBypass) {
+          needsLogin = false;
+          return;
+        }
         needsLogin = pending;
         if (!pending) loginError = '';
       },
@@ -140,7 +152,7 @@
         on:load={onIframeLoad}
         class="realm-frame"
       ></iframe>
-      {#if needsLogin}
+      {#if needsLogin && !realmIIBypass}
         <div class="login-overlay">
           <div class="login-card">
             <h2>Sign in to Realms</h2>

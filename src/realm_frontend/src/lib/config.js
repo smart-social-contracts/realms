@@ -21,7 +21,11 @@ import { get } from 'svelte/store';
 import { realmInfo } from '$lib/stores/realmInfo';
 
 export function getTestMode() { return get(realmInfo).testMode; }
-export function getTestModeIIBypass() { return get(realmInfo).testModeIIBypass; }
+export function getTestModeIIBypass() {
+  if (get(realmInfo).testModeIIBypass) return true;
+  // Sync hint from /canister_ids.js before backend status() loads (portal iframe boot).
+  return !!globalThis.__CANISTER_IDS?.test_mode_ii_bypass;
+}
 export function getTestModeUserSelfRegistration() { return get(realmInfo).testModeUserSelfRegistration; }
 export function getTestModeDemoData() { return get(realmInfo).testModeDemoData; }
 export function getTestModeSkipTerms() { return get(realmInfo).testModeSkipTerms; }

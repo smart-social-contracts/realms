@@ -85,22 +85,40 @@ function _createPortalAuthClientMock() {
 }
 
 // --- Test mode support ---
-// In test mode we bypass Internet Identity entirely and use a deterministic
-// Ed25519 identity so Playwright tests can authenticate without WebAuthn.
+// In test mode we bypass Internet Identity entirely and use deterministic
+// Ed25519 identities (see test-identities.js) so E2E and manual QA can pick
+// Creator / Identity 0…N without WebAuthn.
 let _testIdentity = null;
 let _testLoggedIn = false;
+let _testIdentityIndex = null;
 
-async function _createTestIdentity(random = false) {
+async function _createTestIdentity({ random = false, identityIndex = null } = {}) {
+  const { createTestIdentityFromIndex } = await import('$lib/test-identities.js');
+  // createTestIdentityFromIndex is sync; dynamic import keeps the initial bundle small.
+  if (identityIndex != null && Number.isFinite(identityIndex)) {
+    const idx = Math.max(0, Math.min(255, Math.floor(identityIndex)));
+    _testIdentity = createTestIdentityFromIndex(idx);
+    _testIdentityIndex = idx;
+    console.log(
+      `[TEST MODE] Identity ${idx}: ${_testIdentity.getPrincipal().toText()}`,
+    );
+    return _testIdentity;
+  }
   if (_testIdentity && !random) return _testIdentity;
   const { Ed25519KeyIdentity } = await import('@dfinity/identity');
   const seed = new Uint8Array(32);
   if (random) {
     crypto.getRandomValues(seed);
+    _testIdentityIndex = null;
   } else {
-    seed[0] = 0xED; seed[1] = 0x57;
+    seed[0] = 0xED;
+    seed[1] = 0x57;
+    _testIdentityIndex = 0;
   }
   _testIdentity = Ed25519KeyIdentity.generate(seed);
-  console.log(`[TEST MODE] Generated ${random ? 'random' : 'default'} test identity: ${_testIdentity.getPrincipal().toText()}`);
+  console.log(
+    `[TEST MODE] Generated ${random ? 'random' : 'default'} test identity: ${_testIdentity.getPrincipal().toText()}`,
+  );
   return _testIdentity;
 }
 
@@ -112,6 +130,7 @@ function _createTestAuthClientMock() {
     logout: async () => {
       _testLoggedIn = false;
       _testIdentity = null;
+      _testIdentityIndex = null;
     },
   };
 }
@@ -149,14 +168,42 @@ export async function initializeAuthClient() {
   return authClient;
 }
 
-export async function login({ random = false } = {}) {
-  // Federation portal embed: ALWAYS authenticate via the host's scoped
-  // delegation. Never open Internet Identity from inside the iframe — the
-  // per-realm icp0.io origin is not in the canonical
-  // /.well-known/ii-alternative-origins (II caps that list at ~10 entries and
-  // wizard realms are unbounded), so an in-iframe II login with
-  // derivationOrigin fails with "Unverified origin". The single II login
-  // happens on the portal origin; the host bridges identity down to us.
+export async function login({ random = false, identityIndex = null } = {}) {
+  // Test-mode II bypass: pick a deterministic persona locally — even inside the
+  // portal iframe. Must run before the portal delegation branch.
+  if (getTestModeIIBypass()) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const asParam = urlParams.get('as');
+    const pemParam = urlParams.get('pem');
+
+    let identity;
+    if (asParam && pemParam) {
+      const { Secp256k1KeyIdentity } = await import('@dfinity/identity');
+      const decodedPem = decodeURIComponent(pemParam);
+      identity = Secp256k1KeyIdentity.fromPem(decodedPem);
+      _testIdentity = identity;
+      _testIdentityIndex = null;
+      console.log(`[TEST MODE] Logged in as ${asParam} with Secp256k1 PEM: ${identity.getPrincipal().toText()}`);
+    } else {
+      if (asParam) {
+        console.warn(`[TEST MODE] ?as=${asParam} present but ?pem= missing — using test identity index`);
+      }
+      identity = await _createTestIdentity({
+        random,
+        identityIndex: identityIndex ?? (random ? null : 0),
+      });
+    }
+    _testLoggedIn = true;
+    authClient = _createTestAuthClientMock();
+    authClientMode = 'test';
+    const principal = identity.getPrincipal();
+    console.log(`[TEST MODE] Logged in with principal: ${principal.toText()}`);
+    return { identity, principal };
+  }
+
+  // Federation portal embed: authenticate via the host's scoped delegation.
+  // Never open Internet Identity from inside the iframe — the per-realm icp0.io
+  // origin is not in the canonical /.well-known/ii-alternative-origins.
   if (isEmbeddedInPortal()) {
     let identity = getPortalDelegationIdentity();
     if (!identity) {
@@ -183,34 +230,6 @@ export async function login({ random = false } = {}) {
     }
     console.warn('[portal] No delegation from host — user must sign in on the portal origin');
     return { identity: null, principal: null };
-  }
-  if (getTestModeIIBypass()) {
-    // If ?as=swarm_agent_NNN and ?pem=<urlencoded-pem> are both present,
-    // create a Secp256k1 identity from the provided PEM so tests can log in
-    // as a specific geister member. If ?as= is present without ?pem=, warn
-    // and fall through to the default Ed25519 seed identity.
-    const urlParams = new URLSearchParams(window.location.search);
-    const asParam = urlParams.get('as');
-    const pemParam = urlParams.get('pem');
-
-    let identity;
-    if (asParam && pemParam) {
-      const { Secp256k1KeyIdentity } = await import('@dfinity/identity');
-      const decodedPem = decodeURIComponent(pemParam);
-      identity = Secp256k1KeyIdentity.fromPem(decodedPem);
-      _testIdentity = identity;
-      console.log(`[TEST MODE] Logged in as ${asParam} with Secp256k1 PEM: ${identity.getPrincipal().toText()}`);
-    } else {
-      if (asParam) {
-        console.warn(`[TEST MODE] ?as=${asParam} present but ?pem= missing — using default Ed25519 seed identity`);
-      }
-      identity = await _createTestIdentity(random);
-    }
-    _testLoggedIn = true;
-    authClient = _createTestAuthClientMock();
-    const principal = identity.getPrincipal();
-    console.log(`[TEST MODE] Logged in with principal: ${principal.toText()}`);
-    return { identity, principal };
   }
 
   const client = await initializeAuthClient();
@@ -262,6 +281,7 @@ export async function logout() {
   if (getTestModeIIBypass()) {
     _testLoggedIn = false;
     _testIdentity = null;
+    _testIdentityIndex = null;
     console.log('[TEST MODE] Logged out');
     return;
   }
@@ -270,11 +290,11 @@ export async function logout() {
 }
 
 export async function isAuthenticated() {
-  if (isEmbeddedInPortal() && getPortalDelegationIdentity()) {
-    return true;
-  }
   if (getTestModeIIBypass()) {
     return _testLoggedIn;
+  }
+  if (isEmbeddedInPortal() && getPortalDelegationIdentity()) {
+    return true;
   }
   const client = await initializeAuthClient();
   return client.isAuthenticated();
@@ -302,7 +322,28 @@ export async function restoreAuthSession() {
 }
 
 async function _restoreAuthSession() {
+  if (getTestModeIIBypass() && _testLoggedIn && _testIdentity) {
+    await initializeAuthClient();
+    const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
+      '$lib/stores/auth.js'
+    );
+    const principalText = _testIdentity.getPrincipal().toText();
+    isAuthenticatedStore.set(true);
+    userIdentity.set(principalText);
+    principal.set(principalText);
+    try {
+      const { initBackendWithIdentity } = await import('$lib/canisters.js');
+      await initBackendWithIdentity(_testIdentity);
+      const { loadUserProfiles } = await import('$lib/stores/profiles.js');
+      await loadUserProfiles();
+    } catch (e) {
+      console.warn('[TEST MODE] backend init deferred:', e);
+    }
+    return { authenticated: true, principal: principalText };
+  }
+
   const restorePortal = async () => {
+    if (getTestModeIIBypass()) return null;
     const portalId = isEmbeddedInPortal() ? getPortalDelegationIdentity() : null;
     if (!portalId) return null;
     // Swap the shared authClient to the portal mock so every later
