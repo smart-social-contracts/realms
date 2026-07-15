@@ -5,10 +5,10 @@
  *   - Index 0 = Identity 1 (Creator); indices 1…3 = Identity 2–4.
  *
  * Optional deploy-time overrides (via /canister_ids.js):
- *   - globalThis.__TEST_IDENTITY_PRINCIPALS = string[] — expected principals
- *     (must match real Internet Identity login on this federation).
  *   - globalThis.__TEST_IDENTITY_PEms = string[] — PEM strings (or base64) used
- *     for login at that index. Required when principals are overridden.
+ *     for login at that index instead of the deterministic seed.
+ *   - globalThis.__TEST_IDENTITY_PRINCIPALS = string[] — documented roster
+ *     principals (display/sanity only; login never requires them).
  */
 
 import { Ed25519KeyIdentity, Secp256k1KeyIdentity } from '@dfinity/identity';
@@ -65,15 +65,10 @@ function expectedPrincipal(index) {
 export function createTestIdentityFromIndex(index) {
   const pems = globalThis.__TEST_IDENTITY_PEms;
   const pemRaw = Array.isArray(pems) && pems[index] ? String(pems[index]) : '';
-  const expected = expectedPrincipal(index);
-  if (expected && !pemRaw) {
-    throw new Error(
-      `${testIdentityLabel(index)} is configured as ${expected} but no PEM is installed at __TEST_IDENTITY_PEms[${index}]`,
-    );
-  }
   if (pemRaw) {
     const pem = decodePem(pemRaw);
     const identity = Secp256k1KeyIdentity.fromPem(pem);
+    const expected = expectedPrincipal(index);
     if (expected && identity.getPrincipal().toText() !== expected) {
       throw new Error(
         `${testIdentityLabel(index)} PEM principal ${identity.getPrincipal().toText()} does not match configured ${expected}`,
@@ -97,42 +92,29 @@ export function shortPrincipal(principal) {
 
 /**
  * Labels and principals for the join-page picker.
- * @returns {{ index: number, label: string, principal: string, description: string, hasPem: boolean, configuredPrincipal: string }[]}
+ * The principal shown is always the one login will actually produce.
+ * @returns {{ index: number, label: string, principal: string, description: string, hasPem: boolean }[]}
  */
 export function listTestIdentities(maxIndex = TEST_IDENTITY_PICKER_MAX_INDEX) {
-  const principalOverrides = globalThis.__TEST_IDENTITY_PRINCIPALS;
   const pems = globalThis.__TEST_IDENTITY_PEms;
   const items = [];
   for (let index = 0; index <= maxIndex; index++) {
     const hasPem = Array.isArray(pems) && !!pems[index];
-    const configuredPrincipal =
-      Array.isArray(principalOverrides) && principalOverrides[index]
-        ? String(principalOverrides[index])
-        : '';
     let loginPrincipal = '';
     try {
-      loginPrincipal = hasPem || !configuredPrincipal ? testIdentityPrincipal(index) : configuredPrincipal;
+      loginPrincipal = testIdentityPrincipal(index);
     } catch {
-      loginPrincipal = configuredPrincipal || '';
+      loginPrincipal = '';
     }
     items.push({
       index,
       label: testIdentityLabel(index),
       principal: loginPrincipal,
-      configuredPrincipal,
       hasPem,
       description:
         index === 0
-          ? hasPem
-            ? 'Realm founder — same principal as Internet Identity login'
-            : configuredPrincipal
-              ? 'Internet Identity founder principal (PEM required for bypass login)'
-              : 'Realm founder persona — use admin invite code "admin" if not yet registered'
-          : hasPem
-            ? 'Same principal as Internet Identity login'
-            : configuredPrincipal
-              ? 'Internet Identity member (PEM required for bypass login)'
-              : `Deterministic test member ${testIdentityNumber(index)}`,
+          ? 'Realm founder persona — use admin invite code "admin" if not yet registered'
+          : `Deterministic test member ${testIdentityNumber(index)}`,
     });
   }
   return items;

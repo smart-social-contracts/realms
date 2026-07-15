@@ -83,9 +83,9 @@ def build_test_identity_js(config: dict | None = None, config_path: Path = DEFAU
             _verify_pem_principal(pem, principals[-1])
         pems.append(pem)
 
-    parts = [
-        f"globalThis.__TEST_IDENTITY_PRINCIPALS={json.dumps(principals)};",
-    ]
+    parts = []
+    if any(principals):
+        parts.append(f"globalThis.__TEST_IDENTITY_PRINCIPALS={json.dumps(principals)};")
     if any(pems):
         # JSON.parse keeps escaping safe for multiline PEM strings in JS.
         parts.append(
