@@ -1,0 +1,26 @@
+{
+  "description": "Canonical staging test roster — picker labels and expected Internet Identity principals (indices 0–3). PEM private keys are loaded at deploy time from config/staging-test-identities/identity-{1,2,3,4}.pem or STAGING_TEST_IDENTITY_PEM_{1,2,3,4} env vars (gitignored).",
+  "identities": [
+    {
+      "number": 1,
+      "label": "Identity 1 (Creator)",
+      "principal": "qmthq-dmd2y-jlyg4-d7tbr-ogxaq-rjfcs-dxon6-twat5-x6q23-77i3v-4qe",
+      "role": "creator"
+    },
+    {
+      "number": 2,
+      "label": "Identity 2",
+      "principal": "eg7tq-6huxv-leofl-7zaoj-y3w6y-t3hnw-5vb24-azfth-bdmiu-eziqe-nqe"
+    },
+    {
+      "number": 3,
+      "label": "Identity 3",
+      "principal": "vyqgi-jxpqa-o3mtw-54ltr-x3hil-h77q4-z2vdu-dwk5e-nzree-lp6sc-3qe"
+    },
+    {
+      "number": 4,
+      "label": "Identity 4",
+      "principal": "sz2ut-dzlh5-y3xtc-6rpmx-zkvsx-ugw6t-kdrnc-ttajs-46mah-lsjbb-2qe"
+    }
+  ]
+}

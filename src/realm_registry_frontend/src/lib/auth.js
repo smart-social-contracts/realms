@@ -1,6 +1,6 @@
 // src/lib/auth.js - Internet Identity authentication module
 import { AuthClient } from '@dfinity/auth-client';
-import { CONFIG, TEST_MODE_II_BYPASS } from '$lib/config.js';
+import { CONFIG, getTestModeIIBypass } from '$lib/config.js';
 
 const II_URL = CONFIG.internet_identity_url;
 console.log(`Using Identity Provider: ${II_URL}`);
@@ -42,7 +42,7 @@ function _createTestAuthClientMock() {
 }
 
 export async function initializeAuthClient() {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     if (!authClient) {
       authClient = _createTestAuthClientMock();
       console.log('[TEST MODE] Auth client initialized (mock)');
@@ -56,7 +56,7 @@ export async function initializeAuthClient() {
 }
 
 export async function login() {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     // If ?as=swarm_agent_NNN and ?pem=<urlencoded-pem> are both present,
     // create a Secp256k1 identity from the provided PEM so tests can log in
     // as a specific geister member. If ?as= is present without ?pem=, warn
@@ -110,7 +110,7 @@ export async function login() {
 }
 
 export async function logout() {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     _testLoggedIn = false;
     _testIdentity = null;
     console.log('[TEST MODE] Logged out');
@@ -121,7 +121,7 @@ export async function logout() {
 }
 
 export async function isAuthenticated() {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     return _testLoggedIn;
   }
   const client = await initializeAuthClient();
@@ -130,7 +130,7 @@ export async function isAuthenticated() {
 
 export async function getPrincipal() {
   const client = await initializeAuthClient();
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     return _testLoggedIn && _testIdentity ? _testIdentity.getPrincipal() : null;
   }
   if (await client.isAuthenticated()) {
@@ -141,7 +141,7 @@ export async function getPrincipal() {
 
 /** @returns {Promise<import('@dfinity/agent').Identity | null>} */
 export async function getIdentity() {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     return _testLoggedIn && _testIdentity ? _testIdentity : null;
   }
   const client = await initializeAuthClient();

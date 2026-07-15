@@ -508,8 +508,30 @@ def _upload_branding_to_canister(frontend_id: str, manifest_dir: Path, network: 
         console.print("  [dim]No branding files found in manifest directory[/dim]")
 
 
+def _staging_test_identity_js(network: str, infra: dict | None = None) -> str:
+    """Append staging roster globals for II-bypass picker (optional PEMs at deploy)."""
+    if network != "staging":
+        return ""
+    config_rel = (infra or {}).get("test_identities_config") or "config/staging-test-identities.json"
+    config_path = get_project_root() / config_rel
+    if not config_path.is_file():
+        return ""
+    script = get_project_root() / "scripts" / "staging_test_identities.py"
+    if not script.is_file():
+        return ""
+    try:
+        return subprocess.check_output(
+            [sys.executable, str(script), "--print-js", "--config", str(config_path)],
+            text=True,
+        ).strip()
+    except subprocess.CalledProcessError as e:
+        console.print(f"  [yellow]⚠ test identity JS build failed: {e}[/yellow]")
+        return ""
+
+
 def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
-                         file_registry_id: str = "", derivation_origin: str = "") -> None:
+                         file_registry_id: str = "", derivation_origin: str = "",
+                         infra: dict | None = None) -> None:
     """(Re)write /canister_ids.js onto the frontend canister.
 
     This file is NOT part of the built asset bundle — it carries the realm's
@@ -533,6 +555,7 @@ def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
     if derivation_origin:
         fields.append('derivation_origin:"' + derivation_origin + '"')
     js = 'globalThis.__CANISTER_IDS={' + ",".join(fields) + '};'
+    js += _staging_test_identity_js(network, infra)
     escaped = js.replace('\\', '\\\\').replace('"', '\\"')
     arg = ('(record { key = "/canister_ids.js"; content_type = "application/javascript"; '
            'content_encoding = "identity"; content = blob "' + escaped + '"; sha256 = null })')
@@ -628,7 +651,8 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
                 "test": "https://test.realmsgos.org",
             }.get(network, "")
         _store_canister_ids(frontend_id, backend_id, network,
-                            file_registry_id=fr_id, derivation_origin=deriv)
+                            file_registry_id=fr_id, derivation_origin=deriv,
+                            infra=infra)
 
 
 def _submit_and_poll(manifest: dict, network: str) -> bool:

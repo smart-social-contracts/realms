@@ -142,8 +142,8 @@
     if (browser) {
       try {
         const { isAuthenticated, getPrincipal, login: authLogin } = await import("$lib/auth");
-        const { TEST_MODE_II_BYPASS } = await import("$lib/config.js");
-        if (TEST_MODE_II_BYPASS) {
+        const { getTestModeIIBypass } = await import("$lib/config.js");
+        if (getTestModeIIBypass()) {
           const result = await authLogin();
           if (result.principal) {
             isLoggedIn = true;
@@ -165,9 +165,9 @@
       // Check invitation code mode (staging/test bypasses the platform gate)
       try {
         const { backend } = await import('$lib/canisters.js');
-        const { TEST_MODE_II_BYPASS } = await import('$lib/config.js');
+        const { getTestModeIIBypass } = await import('$lib/config.js');
         const modeResult = await backend.get_invitation_mode();
-        invitationMode = modeResult?.Ok === 'enabled' && !TEST_MODE_II_BYPASS;
+        invitationMode = modeResult?.Ok === 'enabled' && !getTestModeIIBypass();
         if (invitationMode && isLoggedIn && userPrincipal) {
           const actResult = await backend.is_principal_activated(userPrincipal.toText());
           principalActivated = actResult?.Ok === 'activated' || actResult?.Ok === 'open';

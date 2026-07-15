@@ -9,6 +9,8 @@ infra:
   # principal per human. Must list each realm frontend in its
   # /.well-known/ii-alternative-origins (served by the registry). See issue #233.
   ii_derivation_origin: https://staging.realmsgos.org
+  # Staging test identity roster (principals + optional PEMs at deploy) for II-bypass picker.
+  test_identities_config: config/staging-test-identities.json
 
 mundus:
   - name: dominion

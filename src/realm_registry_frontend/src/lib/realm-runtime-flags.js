@@ -9,22 +9,16 @@ export async function fetchRealmRuntimeFlags(backendCanisterId) {
     const { HttpAgent, Actor } = await import('@dfinity/agent');
     const { IDL } = await import('@dfinity/candid');
     const idlFactory = ({ IDL: I }) => {
-      const RuntimeFlags = I.Record({
-        test_mode: I.Bool,
-        test_mode_ii_bypass: I.Bool,
-        test_mode_user_self_registration: I.Bool,
-        test_mode_demo_data: I.Bool,
-        test_mode_skip_terms: I.Bool,
-        test_mode_skip_passport_zkproof: I.Bool,
-      });
       return I.Service({
-        get_runtime_flags: I.Func([], [RuntimeFlags], ['query']),
+        get_runtime_flags: I.Func([], [I.Text], ['query']),
       });
     };
     const agent = new HttpAgent({ host: 'https://icp0.io' });
     const actor = Actor.createActor(idlFactory, { agent, canisterId: backendCanisterId });
-    const flags = await actor.get_runtime_flags();
-    return flags || null;
+    const raw = await actor.get_runtime_flags();
+    const payload = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!payload?.success) return null;
+    return payload;
   } catch (e) {
     console.warn('[portal] could not fetch realm runtime flags:', e);
     return null;

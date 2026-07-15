@@ -91,10 +91,10 @@
     if (!browser) return;
 
     const { isAuthenticated, getPrincipal, login: authLogin } = await import('$lib/auth.js');
-    const { TEST_MODE_II_BYPASS } = await import('$lib/config.js');
+    const { getTestModeIIBypass } = await import('$lib/config.js');
 
     let authenticated = false;
-    if (TEST_MODE_II_BYPASS) {
+    if (getTestModeIIBypass()) {
       const result = await authLogin();
       authenticated = !!result.principal;
     } else {

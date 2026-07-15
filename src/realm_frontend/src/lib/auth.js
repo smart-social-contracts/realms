@@ -100,7 +100,7 @@ async function _createTestIdentity({ random = false, identityIndex = null } = {}
     _testIdentity = createTestIdentityFromIndex(idx);
     _testIdentityIndex = idx;
     console.log(
-      `[TEST MODE] Identity ${idx}: ${_testIdentity.getPrincipal().toText()}`,
+      `[TEST MODE] ${(await import('$lib/test-identities.js')).testIdentityLabel(idx)}: ${_testIdentity.getPrincipal().toText()}`,
     );
     return _testIdentity;
   }

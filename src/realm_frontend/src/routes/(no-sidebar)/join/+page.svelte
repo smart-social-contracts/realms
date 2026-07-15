@@ -672,7 +672,7 @@
           {#if $testModeIIBypass}
             <div class="space-y-3">
               <p class="text-sm text-gray-600 text-center mb-2">
-                Pick a test identity (Internet Identity is bypassed on staging).
+                Pick a test identity (Internet Identity is bypassed on the test network).
               </p>
               {#each testIdentities as persona (persona.index)}
                 <button
@@ -713,7 +713,7 @@
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  <span>Continue as {testIdentities[selectedTestIdentityIndex]?.label || 'Creator'}</span>
+                  <span>Continue as {testIdentities[selectedTestIdentityIndex]?.label || 'Identity 1 (Creator)'}</span>
                 {/if}
               </button>
             </div>

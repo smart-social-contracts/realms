@@ -108,9 +108,7 @@ function networkTestFlags(network) {
       test_mode: true,
       user_self_registration: true,
       demo_data: false,
-      // II bypass enables agent/Playwright E2E on staging without a real
-      // Internet Identity delegation flow.
-      ii_bypass: true,
+      ii_bypass: false,
       skip_terms: false,
     };
   }

@@ -218,8 +218,8 @@
     }
 
     const { isAuthenticated, getPrincipal, login: authLogin } = await import('$lib/auth');
-    const { TEST_MODE_II_BYPASS } = await import('$lib/config.js');
-    if (TEST_MODE_II_BYPASS) {
+    const { getTestModeIIBypass } = await import('$lib/config.js');
+    if (getTestModeIIBypass()) {
       const result = await authLogin();
       if (result.principal) {
         isLoggedIn = true;

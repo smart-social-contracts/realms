@@ -1024,3 +1024,38 @@ def list_activated_principals() -> text:
         return json.dumps({"success": True, "principals": principals, "count": len(principals)})
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_runtime_flags() -> text:
+    """Lightweight runtime test-mode flags for the registry frontend."""
+    try:
+        from core.runtime_flags import get_runtime_flags_payload
+
+        return json.dumps(get_runtime_flags_payload())
+    except Exception as e:
+        logger.error(f"get_runtime_flags error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def set_canister_config_json(args: text) -> text:
+    """JSON text-in / text-out runtime config (mirrors realm ``set_canister_config_json``).
+
+    Args (JSON, all optional): {network, test_flags_json (string), test_flags (object)}.
+    test_flags keys: test_mode, ii_bypass, user_self_registration, demo_data,
+    skip_terms, skip_passport_zkproof, skip_authentication.
+
+    Controller-only. Returns: {"success": bool, "message"?: str, "error"?: str}.
+    """
+    try:
+        if not ic.is_controller(ic.caller()):
+            return json.dumps({"success": False, "error": "Only controllers can set registry config"})
+        from core.runtime_flags import set_canister_config_from_json
+
+        result = set_canister_config_from_json(args)
+        logger.info(f"set_canister_config_json: {result}")
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"set_canister_config_json error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})

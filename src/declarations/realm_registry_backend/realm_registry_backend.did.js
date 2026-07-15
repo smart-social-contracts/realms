@@ -97,6 +97,7 @@ export const idlFactory = ({ IDL }) => {
     'get_invitation_mode' : IDL.Func([], [GenericResult], ['query']),
     'get_latest_version' : IDL.Func([], [UpgradeResult], ['query']),
     'get_realm' : IDL.Func([IDL.Text], [GetRealmResult], ['query']),
+    'get_runtime_flags' : IDL.Func([], [IDL.Text], ['query']),
     'get_transactions' : IDL.Func(
         [IDL.Text, IDL.Nat64],
         [TransactionHistoryResult],
@@ -121,6 +122,7 @@ export const idlFactory = ({ IDL }) => {
     'request_upgrade' : IDL.Func([IDL.Text], [IDL.Text], []),
     'resolve_slug' : IDL.Func([IDL.Text], [GenericResult], []),
     'revoke_invitation_code' : IDL.Func([IDL.Text], [GenericResult], []),
+    'set_canister_config_json' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_invitation_mode' : IDL.Func([IDL.Text], [GenericResult], []),
     'set_pretty_hostname_status' : IDL.Func(
         [IDL.Text, IDL.Text],

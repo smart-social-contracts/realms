@@ -203,7 +203,12 @@ deploy_frontend() {
     fi
 
     echo -e "${GREEN}🔨 Building frontend ($workspace) for $NETWORK${NC}"
-    (cd "$REPO_ROOT" && export DFX_NETWORK="$NETWORK" && npm run build --workspace="$workspace")
+    # Test-mode VITE_* must not be baked into staging/demo/ic builds — flags come
+    # from the backend at runtime via get_runtime_flags / set_canister_config_json.
+    (cd "$REPO_ROOT" && export DFX_NETWORK="$NETWORK" && \
+        unset VITE_TEST_MODE VITE_TEST_MODE_II_BYPASS VITE_TEST_MODE_USER_SELF_REGISTRATION \
+              VITE_TEST_MODE_DEMO_DATA VITE_TEST_MODE_SKIP_TERMS VITE_TEST_MODE_SKIP_PASSPORT_ZKPROOF && \
+        npm run build --workspace="$workspace")
 
     if [[ ! -d "$dist_dir" ]]; then
         echo -e "${RED}Build did not produce $dist_dir${NC}"
