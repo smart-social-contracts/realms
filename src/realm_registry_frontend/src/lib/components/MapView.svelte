@@ -315,7 +315,11 @@
     flyTo(primary.center_lat, primary.center_lng, 11);
   }
 
-  $: if (ready && (realms, realmZoneData, searchQuery)) {
+  // Comma-op truthiness is unsafe here: empty searchQuery is falsy and skipped repaints.
+  $: if (ready) {
+    void realms;
+    void realmZoneData;
+    void searchQuery;
     updateLayers();
   }
 

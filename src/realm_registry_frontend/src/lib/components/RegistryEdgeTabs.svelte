@@ -3,6 +3,7 @@
   import { _ } from 'svelte-i18n';
   import { assistantChrome } from '$lib/assistant-chrome.js';
   import { requestAssistantToggle } from '$lib/assistant-open.js';
+  import BrowseEarIcon from '$lib/components/BrowseEarIcon.svelte';
 
   export let panelOpen = false;
 
@@ -29,14 +30,7 @@
     aria-label={$_('globe.browse_realms')}
     aria-expanded={false}
   >
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-      <line x1="8" y1="6" x2="21" y2="6"></line>
-      <line x1="8" y1="12" x2="21" y2="12"></line>
-      <line x1="8" y1="18" x2="21" y2="18"></line>
-      <circle cx="4" cy="6" r="1.2" fill="currentColor" stroke="none"></circle>
-      <circle cx="4" cy="12" r="1.2" fill="currentColor" stroke="none"></circle>
-      <circle cx="4" cy="18" r="1.2" fill="currentColor" stroke="none"></circle>
-    </svg>
+    <BrowseEarIcon variant="compass" />
   </button>
 {/if}
 
@@ -70,9 +64,9 @@
     width: 32px;
     height: 88px;
     padding: 0;
-    border: 1px solid rgba(229, 229, 229, 0.9);
-    background: rgba(250, 250, 250, 0.82);
-    color: #171717;
+    border: 1px solid rgba(38, 38, 38, 0.9);
+    background: rgba(17, 17, 17, 0.88);
+    color: #ffffff;
     cursor: pointer;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -94,10 +88,13 @@
     transform: translateY(-50%);
     border-left: none;
     border-radius: 0 12px 12px 0;
+    background: rgba(17, 17, 17, 0.88);
+    color: #ffffff;
+    border-color: rgba(38, 38, 38, 0.9);
   }
 
   .edge-tab-left:hover {
-    background: rgba(245, 245, 245, 0.95);
+    background: rgba(38, 38, 38, 0.95);
   }
 
   .edge-tab-right {

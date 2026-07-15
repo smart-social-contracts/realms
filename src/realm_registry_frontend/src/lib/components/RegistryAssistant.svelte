@@ -31,6 +31,7 @@
   import { API_URL, CHAT_REQUEST_TIMEOUT_MS, geisterNetwork } from '$lib/geister/constants.js';
   import { renderMarkdown } from '$lib/geister/assistant-markdown.js';
   import { loadPrefs, loadPanelWidth, savePanelWidth } from '$lib/geister/assistant-prefs.js';
+  import { clampPanelWidth, defaultPanelWidth } from '$lib/panel-width.js';
   import {
     fetchConversations,
     createConversation,
@@ -48,12 +49,10 @@
   const OPEN_KEY = 'mundus_assistant_open';
   const LAST_CONV_KEY = 'mundus_assistant_last_conv';
   const HISTORY_KEY = 'mundus_assistant_history_open';
-  const DEFAULT_WIDTH = 380;
-  const MIN_WIDTH = 280;
 
   let open = false;
   let docked = false;
-  let panelWidth = DEFAULT_WIDTH;
+  let panelWidth = defaultPanelWidth();
   /** @type {{ text: string, isUser: boolean }[]} */
   let messages = [];
   let newMessage = '';
@@ -295,11 +294,6 @@
     } catch (e) {
       /* private mode */
     }
-  }
-
-  function clampWidth(w) {
-    const max = Math.floor(window.innerWidth * 0.5);
-    return Math.max(MIN_WIDTH, Math.min(max, Math.round(w)));
   }
 
   function setOpen(value) {
@@ -620,7 +614,7 @@
 
     const onMove = (e) => {
       const delta = startX - e.clientX;
-      panelWidth = clampWidth(startWidth + delta);
+      panelWidth = clampPanelWidth(startWidth + delta);
       syncChrome();
     };
 
@@ -628,7 +622,7 @@
       isResizing = false;
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
-      panelWidth = clampWidth(panelWidth);
+      panelWidth = clampPanelWidth(panelWidth);
       savePanelWidth(panelWidth);
       syncChrome();
       handle.releasePointerCapture(e.pointerId);
@@ -652,7 +646,7 @@
     } catch (e) {
       /* private mode */
     }
-    panelWidth = clampWidth(loadPanelWidth(DEFAULT_WIDTH));
+    panelWidth = clampPanelWidth(loadPanelWidth(defaultPanelWidth()));
     if (open && (get(page).url.pathname || '/') === '/') {
       setDocked(true);
     }

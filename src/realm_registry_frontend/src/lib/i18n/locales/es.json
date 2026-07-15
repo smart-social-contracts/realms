@@ -46,7 +46,7 @@
     "base": "Base"
   },
   "globe": {
-    "loading": "Cargando globo…",
+    "loading": "Cargando mundo…",
     "browse_realms": "Explorar reinos",
     "aria_label": "Globo interactivo con ubicaciones de reinos",
     "kpi_realms": "{count} reinos",

@@ -46,7 +46,7 @@
     "base": "Base"
   },
   "globe": {
-    "loading": "Loading globe…",
+    "loading": "Loading world…",
     "browse_realms": "Browse realms",
     "aria_label": "Interactive globe showing realm locations",
     "kpi_realms": "{count} realms",

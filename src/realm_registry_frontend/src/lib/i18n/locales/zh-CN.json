@@ -46,7 +46,7 @@
     "base": "基地"
   },
   "globe": {
-    "loading": "正在加载地球仪…",
+    "loading": "正在加载世界…",
     "browse_realms": "浏览领域",
     "aria_label": "显示领域位置的可交互地球仪",
     "kpi_realms": "{count} 个领域",

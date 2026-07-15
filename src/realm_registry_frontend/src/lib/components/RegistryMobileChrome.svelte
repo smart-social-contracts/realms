@@ -3,6 +3,7 @@
   import { _ } from 'svelte-i18n';
   import { assistantChrome } from '$lib/assistant-chrome.js';
   import { requestAssistantToggle } from '$lib/assistant-open.js';
+  import BrowseEarIcon from '$lib/components/BrowseEarIcon.svelte';
   import { computeKpis } from '$lib/globe/hex-data.js';
 
   export let panelOpen = false;
@@ -62,14 +63,7 @@
         aria-label={$_('globe.browse_realms')}
         aria-expanded={false}
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <line x1="8" y1="6" x2="21" y2="6"></line>
-          <line x1="8" y1="12" x2="21" y2="12"></line>
-          <line x1="8" y1="18" x2="21" y2="18"></line>
-          <circle cx="4" cy="6" r="1.2" fill="currentColor" stroke="none"></circle>
-          <circle cx="4" cy="12" r="1.2" fill="currentColor" stroke="none"></circle>
-          <circle cx="4" cy="18" r="1.2" fill="currentColor" stroke="none"></circle>
-        </svg>
+        <BrowseEarIcon variant="compass" />
       </button>
     {:else}
       <div class="ear-spacer ear-slot-left" aria-hidden="true"></div>
@@ -277,9 +271,10 @@
   }
 
   .ear-left {
-    background: rgba(250, 250, 250, 0.96);
-    color: #171717;
+    background: rgba(17, 17, 17, 0.9);
+    color: #ffffff;
     border-left: none;
+    border-color: rgba(38, 38, 38, 0.9);
     border-radius: 0 12px 0 0;
   }
 

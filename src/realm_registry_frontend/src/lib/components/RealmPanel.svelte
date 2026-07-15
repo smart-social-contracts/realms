@@ -4,6 +4,7 @@
   import RealmCard from './RealmCard.svelte';
   import { realmPanelChrome } from '$lib/realm-panel-chrome.js';
   import { loadRealmPanelWidth, saveRealmPanelWidth } from '$lib/realm-panel-prefs.js';
+  import { clampPanelWidth, defaultPanelWidth } from '$lib/panel-width.js';
   import { REALM_STAGES, stageMeta } from '$lib/realm-stages.js';
 
   export let open = false;
@@ -17,12 +18,9 @@
 
   const dispatch = createEventDispatcher();
 
-  const DEFAULT_WIDTH = 360;
-  const MIN_WIDTH = 280;
-
   let panelEl;
   let listEl;
-  let panelWidth = DEFAULT_WIDTH;
+  let panelWidth = defaultPanelWidth();
   let isResizing = false;
   let showStageMenu = false;
 
@@ -36,12 +34,6 @@
 
   function syncPanelChrome() {
     realmPanelChrome.set({ open, width: panelWidth, resizing: isResizing });
-  }
-
-  function clampWidth(w) {
-    if (typeof window === 'undefined') return w;
-    const max = Math.floor(window.innerWidth * 0.5);
-    return Math.max(MIN_WIDTH, Math.min(max, Math.round(w)));
   }
 
   async function scrollToSelected() {
@@ -96,7 +88,7 @@
 
     const onMove = (e) => {
       const delta = e.clientX - startX;
-      panelWidth = clampWidth(startWidth + delta);
+      panelWidth = clampPanelWidth(startWidth + delta);
       syncPanelChrome();
     };
 
@@ -104,7 +96,7 @@
       isResizing = false;
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
-      panelWidth = clampWidth(panelWidth);
+      panelWidth = clampPanelWidth(panelWidth);
       saveRealmPanelWidth(panelWidth);
       syncPanelChrome();
       handle.releasePointerCapture(e.pointerId);
@@ -119,7 +111,7 @@
   }
 
   onMount(() => {
-    panelWidth = clampWidth(loadRealmPanelWidth(DEFAULT_WIDTH));
+    panelWidth = clampPanelWidth(loadRealmPanelWidth(defaultPanelWidth()));
     syncPanelChrome();
     window.addEventListener('keydown', handleKeydown);
     document.addEventListener('click', onStageMenuDocClick);

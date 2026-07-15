@@ -46,7 +46,7 @@
     "base": "Base"
   },
   "globe": {
-    "loading": "Chargement du globe…",
+    "loading": "Chargement du monde…",
     "browse_realms": "Parcourir les royaumes",
     "aria_label": "Globe interactif montrant les emplacements des royaumes",
     "kpi_realms": "{count} royaumes",

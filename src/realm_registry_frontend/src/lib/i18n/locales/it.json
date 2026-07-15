@@ -46,7 +46,7 @@
     "base": "Base"
   },
   "globe": {
-    "loading": "Caricamento globo…",
+    "loading": "Caricamento mondo…",
     "browse_realms": "Sfoglia i reami",
     "aria_label": "Globo interattivo con le posizioni dei reami",
     "kpi_realms": "{count} reami",
