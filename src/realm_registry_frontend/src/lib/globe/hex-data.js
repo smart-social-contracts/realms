@@ -4,6 +4,7 @@ import {
   hexCapForResolution,
   influenceRingsForResolution,
 } from './globe-config.js';
+import { stageMarkerColor } from '../realm-stages.js';
 
 /**
  * @typedef {object} HexRealmEntry
@@ -165,20 +166,170 @@ export function buildHexPolygons(
   }
 
   const cap = hexCapForResolution(h3Resolution);
-  return polygons
-    .sort((a, b) => (a.minDistance ?? 99) - (b.minDistance ?? 99))
-    .slice(0, cap);
+  // Always keep every HQ / capital cell (distance 0). Only influence-ring
+  // hexes are subject to the performance cap — otherwise dense realms
+  // (e.g. Dominion) crowd out smaller Live realms like the E2E capitals.
+  const hq = polygons.filter((p) => (p.minDistance ?? 99) === 0);
+  const influence = polygons
+    .filter((p) => (p.minDistance ?? 99) > 0)
+    .sort((a, b) => (a.minDistance ?? 99) - (b.minDistance ?? 99));
+  const influenceBudget = Math.max(0, cap - hq.length);
+  return hq.concat(influence.slice(0, influenceBudget));
+}
+
+/**
+ * Capital / HQ zone for a realm: highest user_count, stable tie-break on name.
+ * @param {object[]} zones
+ */
+export function resolveCapitalZone(zones) {
+  if (!zones?.length) return null;
+  return [...zones].sort((a, b) => {
+    const byUsers = (b.user_count || 0) - (a.user_count || 0);
+    if (byUsers !== 0) return byUsers;
+    return String(a.location_name || '').localeCompare(String(b.location_name || ''));
+  })[0];
+}
+
+/**
+ * Geometric center of the capital hex at the current display resolution.
+ * Falls back to stored lat/lng when H3 cannot resolve the cell.
+ * @param {object} zone
+ * @param {object | null} h3
+ * @param {number} h3Resolution
+ * @returns {{ lat: number, lng: number, hexIndex: string | null }}
+ */
+export function capitalHexCenter(zone, h3, h3Resolution) {
+  const fallback = {
+    lat: Number(zone.center_lat),
+    lng: Number(zone.center_lng),
+    hexIndex: zone.h3_index || null,
+  };
+  if (!h3 || !Number.isFinite(fallback.lat) || !Number.isFinite(fallback.lng)) {
+    return fallback;
+  }
+
+  let hexIndex = null;
+  try {
+    hexIndex = h3.latLngToCell(fallback.lat, fallback.lng, h3Resolution);
+  } catch {
+    try {
+      if (zone.h3_index && h3.cellToParent) {
+        hexIndex = h3.cellToParent(zone.h3_index, h3Resolution);
+      } else {
+        hexIndex = zone.h3_index || null;
+      }
+    } catch {
+      hexIndex = zone.h3_index || null;
+    }
+  }
+
+  if (!hexIndex) return fallback;
+
+  try {
+    const [lat, lng] = h3.cellToLatLng(hexIndex);
+    return { lat, lng, hexIndex };
+  } catch {
+    return { ...fallback, hexIndex };
+  }
+}
+
+/**
+ * Prefer a distinct capital hex when several realms would otherwise stack on
+ * the same cell. Falls back to a small screen-pixel fan only if no alternate
+ * zone hex is available — pins stay at true hex centers whenever possible.
+ * @param {object[]} markers
+ * @param {Record<string, { zones: object[] }>} realmZoneData
+ * @param {object | null} h3
+ * @param {number} h3Resolution
+ * @param {number} [radiusPx]
+ */
+export function separateCoincidentMarkers(
+  markers,
+  realmZoneData,
+  h3,
+  h3Resolution,
+  radiusPx = 12
+) {
+  const keyOf = (m) =>
+    m.hexIndex || `${Number(m.lat).toFixed(5)},${Number(m.lng).toFixed(5)}`;
+
+  /** @type {Map<string, object[]>} */
+  let groups = new Map();
+  const regroup = () => {
+    groups = new Map();
+    for (const marker of markers) {
+      const key = keyOf(marker);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(marker);
+    }
+  };
+  regroup();
+
+  for (const group of [...groups.values()]) {
+    if (group.length < 2) continue;
+    // Keep the first realm on the shared capital; move the rest to another
+    // of their zones whose display hex differs.
+    for (let i = 1; i < group.length; i++) {
+      const marker = group[i];
+      const zones = realmZoneData[marker.realmId]?.zones || [];
+      const occupied = new Set(
+        markers.filter((m) => m !== marker).map((m) => keyOf(m))
+      );
+      const ranked = [...zones].sort((a, b) => {
+        const byUsers = (b.user_count || 0) - (a.user_count || 0);
+        if (byUsers !== 0) return byUsers;
+        return String(a.location_name || '').localeCompare(
+          String(b.location_name || '')
+        );
+      });
+      const alternate = ranked.find((zone) => {
+        const center = capitalHexCenter(zone, h3, h3Resolution);
+        const key = center.hexIndex ||
+          `${center.lat.toFixed(5)},${center.lng.toFixed(5)}`;
+        return !occupied.has(key);
+      });
+      if (!alternate) continue;
+      const center = capitalHexCenter(alternate, h3, h3Resolution);
+      marker.lat = center.lat;
+      marker.lng = center.lng;
+      marker.hexIndex = center.hexIndex;
+      marker.location = alternate.location_name;
+      marker.users = alternate.user_count;
+    }
+  }
+
+  regroup();
+  for (const group of groups.values()) {
+    if (group.length < 2) {
+      group[0].pixelOffset = [0, 0];
+      continue;
+    }
+    group.forEach((marker, index) => {
+      const angle = (2 * Math.PI * index) / group.length - Math.PI / 2;
+      marker.pixelOffset = [
+        Math.round(Math.cos(angle) * radiusPx),
+        Math.round(Math.sin(angle) * radiusPx),
+      ];
+    });
+  }
+
+  return markers;
 }
 
 /**
  * @param {object[]} filteredRealms
  * @param {Record<string, { zones: object[] }>} realmZoneData
- * @param {{ matchingRealmIds?: Set<string> | null, dimNonMatching?: boolean }} [options]
+ * @param {{ matchingRealmIds?: Set<string> | null, dimNonMatching?: boolean, h3?: object | null, h3Resolution?: number }} [options]
  */
 export function buildPointMarkers(
   filteredRealms,
   realmZoneData,
-  { matchingRealmIds = null, dimNonMatching = false } = {}
+  {
+    matchingRealmIds = null,
+    dimNonMatching = false,
+    h3 = null,
+    h3Resolution = 4,
+  } = {}
 ) {
   const markers = [];
 
@@ -186,26 +337,36 @@ export function buildPointMarkers(
     const zones = realmZoneData[realm.id]?.zones;
     if (!zones?.length) return;
 
-    const primary = [...zones].sort((a, b) => b.user_count - a.user_count)[0];
+    const capital = resolveCapitalZone(zones);
+    if (!capital) return;
+
+    const center = capitalHexCenter(capital, h3, h3Resolution);
     const isDimmed =
       dimNonMatching && matchingRealmIds && !matchingRealmIds.has(realm.id);
 
     markers.push({
       realmId: realm.id,
       realmName: realm.name || realm.realm_name,
-      lat: primary.center_lat,
-      lng: primary.center_lng,
-      users: primary.user_count,
-      totalUsers: realm.users_count || primary.user_count,
-      location: primary.location_name,
+      lat: center.lat,
+      lng: center.lng,
+      hexIndex: center.hexIndex,
+      users: capital.user_count,
+      totalUsers: realm.users_count || capital.user_count,
+      location: capital.location_name,
       stage: realm.realm_stage,
       manifesto: realm.manifesto,
-      color: isDimmed ? '#64748B' : '#00E5FF',
+      color: stageMarkerColor(realm.realm_stage, { dimmed: isDimmed }),
       size: isDimmed ? 0.7 : 1,
+      pixelOffset: [0, 0],
     });
   });
 
-  return markers;
+  return separateCoincidentMarkers(
+    markers,
+    realmZoneData,
+    h3,
+    h3Resolution
+  );
 }
 
 /**

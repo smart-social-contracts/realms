@@ -1,30 +1,46 @@
 /** Zoom-adaptive H3 + map styling for the registry map. */
 
-/** Base resolution used when fetching zone data from backends. */
+/**
+ * Resolution used when fetching zone data from realm backends.
+ * Also the finest H3 cell the browse map will *display* — average edge
+ * ≈ 3.2 km (~3,230 m) / area ≈ 35 km². Finer display cells (res 7–8)
+ * were disappearing under MapLibre's globe→mercator transition.
+ */
 export const ZONE_DATA_RESOLUTION = 6;
+
+/** Do not render browse hexes finer than the zone-data resolution. */
+export const MAX_H3_DISPLAY_RESOLUTION = ZONE_DATA_RESOLUTION;
 
 export const MAP_BG = '#FAFAFA';
 export const FLY_TO_MS = 900;
 export const DIM_OPACITY = 0.35;
 
+/**
+ * Zoom where MapLibre's globe projection starts flattening toward mercator.
+ * Above this we force mercator so GeoJSON hex fills stay visible.
+ */
+export const MERCATOR_PROJECTION_MIN_ZOOM = 6;
+
 /** Leaflet/MapLibre zoom → H3 display resolution (coarse far, fine near). */
 export function h3ResolutionForZoom(zoom) {
-  if (zoom < 3) return 2;
-  if (zoom < 5) return 3;
-  if (zoom < 7) return 4;
-  if (zoom < 9) return 5;
-  if (zoom < 11) return 6;
-  if (zoom < 13) return 7;
-  return 8;
+  let res = 2;
+  if (zoom >= 3) res = 3;
+  if (zoom >= 5) res = 4;
+  if (zoom >= 7) res = 5;
+  if (zoom >= 9) res = 6;
+  // Previously climbed to 7–8; cap at zone-data resolution so capital hexes
+  // remain a stable ~3 km cell when zoomed in.
+  return Math.min(res, MAX_H3_DISPLAY_RESOLUTION);
 }
 
-/** Fewer influence rings when hexes are already large. */
+/** Fewer influence rings when hexes are already large / fine. */
 export function influenceRingsForResolution(resolution) {
   if (resolution <= 2) return 0;
   if (resolution <= 3) return 1;
-  if (resolution <= 5) return 2;
-  if (resolution <= 7) return 3;
-  return 2;
+  if (resolution <= 4) return 2;
+  // At city zoom (res 5–6) keep rings small so the HQ cap stays headroom-rich.
+  if (resolution <= 6) return 1;
+  return 1;
 }
 
 /** Max hex polygons to render at each resolution (performance). */
@@ -32,10 +48,11 @@ export function hexCapForResolution(resolution) {
   if (resolution <= 2) return 80;
   if (resolution <= 3) return 160;
   if (resolution <= 4) return 320;
-  if (resolution <= 5) return 500;
-  if (resolution <= 6) return 800;
-  if (resolution <= 7) return 1200;
-  return 1600;
+  if (resolution <= 5) return 800;
+  // Headroom for every capital cell + a ring of influence.
+  if (resolution <= 6) return 4000;
+  if (resolution <= 7) return 4000;
+  return 4000;
 }
 
 /**
@@ -49,9 +66,9 @@ export function hexStyle(distance, { totalUsers = 0, hasMultipleRealms = false, 
   if (distance === 0) {
     return {
       fill: hasMultipleRealms ? '#5B8A8A' : '#6BA3A3',
-      stroke: '#1A1A1A',
-      opacity: Math.min((fine ? 0.42 : 0.34) + userBoost, 0.65),
-      weight: fine ? 1.6 : 1.2,
+      // Slightly stronger when fine so capital hexes stay obvious at city zoom.
+      opacity: Math.min((fine ? 0.52 : 0.34) + userBoost, 0.72),
+      weight: fine ? 2 : 1.2,
     };
   }
   if (distance === 1) {

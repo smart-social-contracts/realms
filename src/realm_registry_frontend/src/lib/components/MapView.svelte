@@ -7,7 +7,13 @@
   import { browser } from '$app/environment';
   import { get } from 'svelte/store';
   import { _ } from 'svelte-i18n';
-  import { buildHexPolygons, buildPointMarkers } from '$lib/globe/hex-data.js';
+  import {
+    buildHexPolygons,
+    buildPointMarkers,
+    capitalHexCenter,
+    resolveCapitalZone,
+  } from '$lib/globe/hex-data.js';
+
   import {
     buildHexHoverPopupHtml,
     buildMarkerHoverPopupHtml,
@@ -17,6 +23,7 @@
     h3ResolutionForZoom,
     influenceRingsForResolution,
     MAP_BG,
+    MERCATOR_PROJECTION_MIN_ZOOM,
     softenGlobeBasemap,
     stripPoliticalLayers,
   } from '$lib/globe/globe-config.js';
@@ -127,6 +134,33 @@
     markerById.clear();
   }
 
+  /** @param {string} hex */
+  function pinGlowVars(hex) {
+    const raw = String(hex || '#22c55e').replace('#', '');
+    if (raw.length !== 6) {
+      return { r: 34, g: 197, b: 94 };
+    }
+    return {
+      r: parseInt(raw.slice(0, 2), 16),
+      g: parseInt(raw.slice(2, 4), 16),
+      b: parseInt(raw.slice(4, 6), 16),
+    };
+  }
+
+  /** @param {HTMLElement} el @param {object} p */
+  function styleMarkerElement(el, p) {
+    const size = Math.round(12 * (p.size || 1));
+    const { r, g, b } = pinGlowVars(p.color);
+    el.style.backgroundColor = p.color;
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    el.style.setProperty('--pin-r', String(r));
+    el.style.setProperty('--pin-g', String(g));
+    el.style.setProperty('--pin-b', String(b));
+    el.dataset.stage = p.stage || '';
+    el.setAttribute('aria-label', p.realmName || p.realmId);
+  }
+
   function syncHtmlMarkers(points) {
     if (!map || !maplibregl) return;
     const seen = new Set();
@@ -134,16 +168,13 @@
     for (const p of points) {
       seen.add(p.realmId);
       let marker = markerById.get(p.realmId);
-      const size = Math.round(12 * (p.size || 1));
+      const offset = Array.isArray(p.pixelOffset) ? p.pixelOffset : [0, 0];
 
       if (!marker) {
         const el = document.createElement('button');
         el.type = 'button';
         el.className = 'realm-globe-marker';
-        el.setAttribute('aria-label', p.realmName || p.realmId);
-        el.style.backgroundColor = p.color;
-        el.style.width = `${size}px`;
-        el.style.height = `${size}px`;
+        styleMarkerElement(el, p);
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           dispatch('select', { realmId: p.realmId });
@@ -152,6 +183,7 @@
         marker = new maplibregl.Marker({
           element: el,
           anchor: 'center',
+          offset,
           opacity: 1,
           opacityWhenCovered: MARKER_COVERED_OPACITY,
           subpixelPositioning: true,
@@ -161,11 +193,8 @@
         markerById.set(p.realmId, marker);
       } else {
         marker.setLngLat([p.lng, p.lat]);
-        const el = marker.getElement();
-        el.style.backgroundColor = p.color;
-        el.style.width = `${size}px`;
-        el.style.height = `${size}px`;
-        el.setAttribute('aria-label', p.realmName || p.realmId);
+        marker.setOffset(offset);
+        styleMarkerElement(marker.getElement(), p);
       }
     }
 
@@ -177,36 +206,82 @@
   }
 
   function ensureLayers() {
-    if (!map || map.getSource(HEX_SOURCE)) return;
+    if (!map) return;
 
-    map.addSource(HEX_SOURCE, { type: 'geojson', data: emptyFeatureCollection() });
+    if (!map.getSource(HEX_SOURCE)) {
+      // tolerance:0 keeps ~3 km hex edges from being simplified away when
+      // overzoomed; high maxzoom keeps geojson-vt tiles available past z12.
+      map.addSource(HEX_SOURCE, {
+        type: 'geojson',
+        data: emptyFeatureCollection(),
+        tolerance: 0,
+        maxzoom: 22,
+      });
+    }
 
-    map.addLayer({
-      id: HEX_FILL,
-      type: 'fill',
-      source: HEX_SOURCE,
-      paint: {
-        'fill-color': ['get', 'fill'],
-        'fill-opacity': ['get', 'opacity'],
-      },
-    });
+    if (!map.getLayer(HEX_FILL)) {
+      map.addLayer({
+        id: HEX_FILL,
+        type: 'fill',
+        source: HEX_SOURCE,
+        paint: {
+          'fill-color': ['get', 'fill'],
+          'fill-opacity': ['get', 'opacity'],
+        },
+      });
+    }
 
-    map.addLayer({
-      id: HEX_LINE,
-      type: 'line',
-      source: HEX_SOURCE,
-      paint: {
-        'line-color': ['get', 'stroke'],
-        'line-width': ['get', 'weight'],
-        'line-opacity': 0.85,
-      },
-    });
+    if (!map.getLayer(HEX_LINE)) {
+      map.addLayer({
+        id: HEX_LINE,
+        type: 'line',
+        source: HEX_SOURCE,
+        paint: {
+          'line-color': ['get', 'stroke'],
+          'line-width': ['get', 'weight'],
+          'line-opacity': 0.85,
+        },
+      });
+    }
+
+    // Keep hex overlays above basemap tiles after projection/style churn.
+    try {
+      if (map.getLayer(HEX_FILL)) map.moveLayer(HEX_FILL);
+      if (map.getLayer(HEX_LINE)) map.moveLayer(HEX_LINE);
+    } catch {
+      // ignore
+    }
+  }
+
+  function desiredProjection(zoom = map?.getZoom?.() ?? 0) {
+    return zoom >= MERCATOR_PROJECTION_MIN_ZOOM ? 'mercator' : 'globe';
+  }
+
+  function syncProjectionForZoom() {
+    if (!map) return false;
+    const next = desiredProjection();
+    try {
+      const current = map.getProjection?.()?.type || 'globe';
+      if (current === next) return false;
+      map.setProjection({ type: next });
+      return true;
+    } catch {
+      try {
+        map.setProjection({ type: next });
+        return true;
+      } catch {
+        return false;
+      }
+    }
   }
 
   function updateLayers() {
     if (!ready || !map || !h3) return;
 
     const zoom = map.getZoom();
+    const projectionChanged = syncProjectionForZoom();
+    // Projection / style reloads can drop custom sources — always re-bind.
+    ensureLayers();
     currentH3Res = h3ResolutionForZoom(zoom);
     const influenceRings = influenceRingsForResolution(currentH3Res);
 
@@ -220,6 +295,8 @@
     const points = buildPointMarkers(realms, realmZoneData, {
       matchingRealmIds,
       dimNonMatching,
+      h3,
+      h3Resolution: currentH3Res,
     });
 
     hexByIndex = new Map(polygons.map((polygon) => [polygon.hexIndex, polygon]));
@@ -227,12 +304,22 @@
     const hexSource = map.getSource(HEX_SOURCE);
     if (hexSource) hexSource.setData(polygonsToGeoJSON(polygons));
     syncHtmlMarkers(points);
+
+    // If setProjection deferred a style rebuild, push data again after it settles.
+    if (projectionChanged) {
+      map.once('idle', () => {
+        ensureLayers();
+        const src = map.getSource(HEX_SOURCE);
+        if (src) src.setData(polygonsToGeoJSON(polygons));
+      });
+    }
   }
 
   function onZoomEnd() {
     if (!map) return;
-    const next = h3ResolutionForZoom(map.getZoom());
-    if (next !== currentH3Res) updateLayers();
+    // Always refresh hexes on zoom end — res may be unchanged (capped at 6)
+    // while projection or geojson tiles still need a rebuild.
+    updateLayers();
   }
 
   function onMapClick(e) {
@@ -264,7 +351,9 @@
 
   function applyGlobeLook() {
     if (!map) return;
-    map.setProjection({ type: 'globe' });
+    // Respect zoom: do NOT force globe when zoomed in — that undoes the
+    // mercator switch and makes GeoJSON hex fills vanish past ~z12.
+    map.setProjection({ type: desiredProjection() });
     // Soft atmosphere that fades as you zoom into regional detail
     try {
       map.setSky?.({
@@ -310,9 +399,11 @@
   export function flyToRealm(realm) {
     const zones = realmZoneData[realm.id]?.zones;
     if (!zones?.length) return;
-    const primary = [...zones].sort((a, b) => b.user_count - a.user_count)[0];
+    const capital = resolveCapitalZone(zones);
+    if (!capital) return;
+    const center = capitalHexCenter(capital, h3, currentH3Res || 6);
     // Zoom in far enough that fine H3 (res 6–7) becomes visible
-    flyTo(primary.center_lat, primary.center_lng, 11);
+    flyTo(center.lat, center.lng, 11);
   }
 
   // Comma-op truthiness is unsafe here: empty searchQuery is falsy and skipped repaints.
@@ -385,6 +476,10 @@
 
       map.on('style.load', () => {
         applyGlobeLook();
+        if (ready) {
+          ensureLayers();
+          updateLayers();
+        }
       });
 
       map.on('load', () => {
@@ -398,6 +493,12 @@
         }
       });
 
+      map.on('zoom', () => {
+        if (syncProjectionForZoom()) {
+          // Projection change can drop sources; rebuild immediately.
+          ensureLayers();
+        }
+      });
       map.on('zoomend', onZoomEnd);
       map.on('moveend', () => {
         onZoomEnd();
@@ -539,17 +640,20 @@
     }
   }
 
-  /* Realm pins — electric blue + glow; DOM so far-side ones show through */
+  /* Realm pins — stage-colored + glow; DOM so far-side ones show through */
   .map-view :global(.realm-globe-marker) {
+    --pin-r: 34;
+    --pin-g: 197;
+    --pin-b: 94;
     display: block;
     padding: 0;
     border: 2px solid rgba(255, 255, 255, 0.95);
     border-radius: 50%;
-    background-color: #00e5ff;
+    background-color: rgb(var(--pin-r), var(--pin-g), var(--pin-b));
     box-shadow:
-      0 0 6px 2px rgba(0, 229, 255, 0.95),
-      0 0 14px 5px rgba(0, 180, 255, 0.55),
-      0 0 28px 10px rgba(0, 140, 255, 0.28);
+      0 0 6px 2px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.95),
+      0 0 14px 5px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.55),
+      0 0 28px 10px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.28);
     cursor: pointer;
     transform: translateZ(0);
     animation: pin-glow 2.4s ease-in-out infinite;
@@ -558,8 +662,8 @@
   .map-view :global(.realm-globe-marker.maplibregl-marker-covered) {
     animation: none;
     box-shadow:
-      0 0 4px 1px rgba(0, 229, 255, 0.55),
-      0 0 10px 3px rgba(0, 180, 255, 0.28);
+      0 0 4px 1px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.55),
+      0 0 10px 3px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.28);
     cursor: pointer;
   }
 
@@ -567,9 +671,9 @@
   .map-view :global(.realm-globe-marker:focus-visible) {
     animation: none;
     box-shadow:
-      0 0 8px 3px rgba(0, 229, 255, 1),
-      0 0 18px 7px rgba(0, 180, 255, 0.7),
-      0 0 36px 14px rgba(0, 140, 255, 0.35);
+      0 0 8px 3px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 1),
+      0 0 18px 7px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.7),
+      0 0 36px 14px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.35);
     outline: none;
   }
 
@@ -577,15 +681,15 @@
     0%,
     100% {
       box-shadow:
-        0 0 6px 2px rgba(0, 229, 255, 0.95),
-        0 0 14px 5px rgba(0, 180, 255, 0.55),
-        0 0 28px 10px rgba(0, 140, 255, 0.28);
+        0 0 6px 2px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.95),
+        0 0 14px 5px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.55),
+        0 0 28px 10px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.28);
     }
     50% {
       box-shadow:
-        0 0 8px 3px rgba(0, 229, 255, 1),
-        0 0 20px 8px rgba(0, 180, 255, 0.7),
-        0 0 36px 14px rgba(0, 140, 255, 0.4);
+        0 0 8px 3px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 1),
+        0 0 20px 8px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.7),
+        0 0 36px 14px rgba(var(--pin-r), var(--pin-g), var(--pin-b), 0.4);
     }
   }
 
