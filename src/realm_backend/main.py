@@ -5095,6 +5095,39 @@ def update_realm_config(config_json: str) -> str:
             realm.marketplace_canister_id = config["marketplace_canister_id"] or ""
             updated_fields.append(f"marketplace_canister_id={realm.marketplace_canister_id}")
 
+        if "accounting_currency" in config:
+            symbol = str(config["accounting_currency"] or "").strip()
+            if not symbol:
+                return json.dumps({
+                    "success": False,
+                    "error": "accounting_currency must be a non-empty symbol (e.g. ckBTC)",
+                })
+            if len(symbol) > 16:
+                return json.dumps({
+                    "success": False,
+                    "error": "accounting_currency must be at most 16 characters",
+                })
+            realm.accounting_currency = symbol
+            updated_fields.append(f"accounting_currency={realm.accounting_currency}")
+
+        if "accounting_currency_decimals" in config:
+            try:
+                decimals = int(config["accounting_currency_decimals"])
+            except (TypeError, ValueError):
+                return json.dumps({
+                    "success": False,
+                    "error": "accounting_currency_decimals must be an integer",
+                })
+            if decimals < 0 or decimals > 18:
+                return json.dumps({
+                    "success": False,
+                    "error": "accounting_currency_decimals must be between 0 and 18",
+                })
+            realm.accounting_currency_decimals = decimals
+            updated_fields.append(
+                f"accounting_currency_decimals={realm.accounting_currency_decimals}"
+            )
+
         logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
         return json.dumps({"success": True, "updated_fields": updated_fields})
     except Exception as e:
