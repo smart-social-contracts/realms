@@ -65,15 +65,24 @@ class User(Entity, TimestampedMixin):
 
     @staticmethod
     def user_register_posthook(user: "User"):
-        """Hook called after user registration. Dynamically loads codex override if available.
+        """Named posthook point called after user registration (issue #244).
 
-        Looks for a Codex entity named ``user_registration_hook`` (preferred)
-        or ``user_registration_hook_codex`` (legacy naming).  The manifest-based
-        override mechanism in runtime_codex.apply_entity_method_overrides will
-        monkey-patch this method with a proxy when the codex is installed, so
-        this fallback only runs when the override wasn't applied (e.g. first
-        deploy before extension init).
+        Dispatch order:
+          1. the active hook-API codex's ``on_user_register`` hook — the
+             standard integration point for ``kind: codex`` packages;
+          2. legacy fallback — a Codex entity named ``user_registration_hook``
+             (or ``user_registration_hook_codex``), exec'd directly. The old
+             manifest-based ``entity_method_overrides`` monkey-patch replaces
+             this method entirely, so pre-hook codices bypass this body.
         """
+        try:
+            from core.codex_hooks import dispatch_on_user_register
+
+            if dispatch_on_user_register(user.id):
+                return
+        except Exception as e:
+            logger.error(f"Codex on_user_register dispatch failed: {e}")
+
         try:
             from ggg.governance.codex import Codex
 

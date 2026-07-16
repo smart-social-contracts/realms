@@ -173,8 +173,11 @@ def _list_codices(codices_root: Path, only: Optional[List[str]]) -> List[Path]:
             continue
         if only and child.name not in only:
             continue
-        # Only include codex dirs that have at least one .py file.
-        if not any(p.suffix == ".py" for p in child.iterdir()):
+        # Only include real codex packages: unified layout ships backend/
+        # (entry.py hooks, issue #244); legacy layout has loose .py files.
+        has_backend = (child / "backend").is_dir()
+        has_loose_py = any(p.suffix == ".py" for p in child.iterdir())
+        if not (has_backend or has_loose_py):
             continue
         out.append(child)
     return out

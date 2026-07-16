@@ -73,10 +73,16 @@ export async function fetchCodexManifest(canisterId, codexId) {
     ? listing.find((c) => c.codex_id === codexId)
     : null;
   if (!entry?.latest) return null;
+  // Unified codex packages (kind: codex, issue #244) live under ext/;
+  // legacy packages under codex/. list_codices tells us which.
+  const prefix = entry.namespace_prefix || 'codex';
   const resp = JSON.parse(
     String(
       await actor.get_file(
-        JSON.stringify({ namespace: `codex/${codexId}/${entry.latest}`, path: 'manifest.json' }),
+        JSON.stringify({
+          namespace: `${prefix}/${codexId}/${entry.latest}`,
+          path: 'manifest.json',
+        }),
       ),
     ),
   );

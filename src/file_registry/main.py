@@ -329,6 +329,48 @@ def _require_publisher(namespace: str) -> str | None:
     return json.dumps({"error": f"Unauthorized: not a publisher for namespace '{namespace}'"})
 
 
+# Curated-publishers ACL key for privileged package classifications. A codex
+# is a privileged system extension (issue #244): only controllers and
+# principals on this list may publish a manifest declaring "kind": "codex"
+# (or the "codex/" legacy namespace) — an arbitrary marketplace upload must
+# not be able to claim codex powers.
+CODEX_CURATORS_ACL_KEY = "_codex_curators"
+
+
+def _require_codex_curator() -> str | None:
+    if ic.is_controller(ic.caller()):
+        return None
+    caller = ic.caller().to_str()
+    acl = _load_acl()
+    if caller in acl.get(CODEX_CURATORS_ACL_KEY, []):
+        return None
+    return json.dumps({
+        "error": (
+            "Unauthorized: publishing a codex package (kind: codex) requires "
+            "codex-curator rights on this registry"
+        )
+    })
+
+
+def _codex_manifest_gate(namespace: str, path: str, content: bytes) -> str | None:
+    """Reject uncurated uploads that claim the privileged codex classification.
+
+    Applies to any manifest.json declaring ``"kind": "codex"`` and to all
+    writes under the legacy ``codex/`` namespace.
+    """
+    if namespace.startswith(NS_PREFIX_CODEX):
+        return _require_codex_curator()
+    if path.split("/")[-1] != "manifest.json":
+        return None
+    try:
+        manifest = json.loads(content.decode("utf-8"))
+    except Exception:
+        return None
+    if isinstance(manifest, dict) and manifest.get("kind") == "codex":
+        return _require_codex_curator()
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Base query endpoints
 # ---------------------------------------------------------------------------
@@ -631,14 +673,29 @@ def list_extensions() -> text:
     return json.dumps(result)
 
 
+def _manifest_declares_codex(ns: str) -> bool:
+    """True when a namespace's manifest.json declares ``"kind": "codex"``."""
+    fp = _file_path(ns, "manifest.json")
+    try:
+        with open(fp, "r") as f:
+            manifest = json.loads(f.read())
+        return isinstance(manifest, dict) and manifest.get("kind") == "codex"
+    except Exception:
+        return False
+
+
 @query
 def list_codices() -> text:
     """List all codex packages with their available versions.
 
-    Namespace convention: codex/{codex_id}/{version}
+    Covers both namespace conventions:
+      - ``ext/{codex_id}/{version}`` where the manifest declares
+        ``"kind": "codex"`` (unified pipeline, issue #244) — preferred;
+      - ``codex/{codex_id}/{version}`` (legacy, deprecated).
 
     Returns JSON: [
-        {"codex_id": str, "versions": [str], "latest": str},
+        {"codex_id": str, "versions": [str], "latest": str,
+         "namespace_prefix": "ext"|"codex"},
         ...
     ]
     """
@@ -646,28 +703,36 @@ def list_codices() -> text:
     codices = {}
 
     for ns_name, ns_info in namespaces.items():
-        if not ns_name.startswith(NS_PREFIX_CODEX):
-            continue
         if not _is_published(ns_info):
             continue
-        # Parse "codex/{codex_id}/{version}"
-        rest = ns_name[len(NS_PREFIX_CODEX):]
+        if ns_name.startswith(NS_PREFIX_CODEX):
+            prefix = "codex"
+            rest = ns_name[len(NS_PREFIX_CODEX):]
+        elif ns_name.startswith(NS_PREFIX_EXT):
+            prefix = "ext"
+            rest = ns_name[len(NS_PREFIX_EXT):]
+            if not _manifest_declares_codex(ns_name):
+                continue
+        else:
+            continue
         parts = rest.split("/", 1)
         if len(parts) != 2:
             continue
         codex_id, version = parts
 
-        if codex_id not in codices:
-            codices[codex_id] = {
-                "codex_id": codex_id,
-                "versions": [],
-            }
-        codices[codex_id]["versions"].append(version)
+        entry = codices.setdefault(
+            codex_id, {"codex_id": codex_id, "versions": [], "_prefixes": {}}
+        )
+        entry["versions"].append(version)
+        entry["_prefixes"][version] = prefix
 
     result = []
     for key, info in sorted(codices.items()):
         info["versions"].sort(key=_parse_semver)
-        info["latest"] = info["versions"][-1] if info["versions"] else ""
+        latest = info["versions"][-1] if info["versions"] else ""
+        info["latest"] = latest
+        # Namespace prefix of the latest version — what clients should read.
+        info["namespace_prefix"] = info.pop("_prefixes").get(latest, "codex")
         result.append(info)
 
     return json.dumps(result)
@@ -910,6 +975,10 @@ def store_file(args: text) -> text:
         content = base64.b64decode(content_b64)
     except Exception as e:
         return json.dumps({"error": f"Invalid base64: {e}"})
+
+    err = _codex_manifest_gate(namespace, path, content)
+    if err:
+        return err
 
     caller_str = ic.caller().to_str()
     _ensure_namespace_exists(namespace, caller_str)
@@ -1368,6 +1437,17 @@ def finalize_chunked_file(args: text) -> text:
         if not os.path.exists(_chunk_file_path(namespace, path, i)):
             return json.dumps({"error": f"Missing chunk {i} of {total_chunks}"})
 
+    # Codex curation gate (issue #244) — a chunked manifest.json must not
+    # bypass the kind: codex classification check in store_file.
+    if path.split("/")[-1] == "manifest.json" or namespace.startswith(NS_PREFIX_CODEX):
+        assembled = bytearray()
+        for i in range(total_chunks):
+            with open(_chunk_file_path(namespace, path, i), "rb") as cf:
+                assembled.extend(cf.read())
+        err = _codex_manifest_gate(namespace, path, bytes(assembled))
+        if err:
+            return err
+
     caller_str = ic.caller().to_str()
     _ensure_namespace_exists(namespace, caller_str)
 
@@ -1485,6 +1565,16 @@ def finalize_chunked_file_step(args: text) -> text:
         for i in range(total_chunks):
             if not os.path.exists(_chunk_file_path(namespace, path, i)):
                 return json.dumps({"error": f"Missing chunk {i} of {total_chunks}"})
+        # Codex curation gate (issue #244) — manifests are small, so
+        # assembling the chunks for inspection here is cheap.
+        if path.split("/")[-1] == "manifest.json" or namespace.startswith(NS_PREFIX_CODEX):
+            assembled = bytearray()
+            for i in range(total_chunks):
+                with open(_chunk_file_path(namespace, path, i), "rb") as cf:
+                    assembled.extend(cf.read())
+            gate_err = _codex_manifest_gate(namespace, path, bytes(assembled))
+            if gate_err:
+                return gate_err
         caller_str = ic.caller().to_str()
         _ensure_namespace_exists(namespace, caller_str)
         os.makedirs(os.path.dirname(fp), exist_ok=True)

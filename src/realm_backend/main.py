@@ -509,14 +509,16 @@ def _assign_quarter(principal: str, realm, quarters, preferred_quarter: str) -> 
 def _default_registration_profile(realm) -> str:
     """Codex-defined default profile for codeless open registration.
 
-    Read from ``Realm.manifest_data.onboarding.registration.default_profile``
-    (issue #242 — the platform no longer hardcodes user types); falls back
-    to ``member``.
+    Read through the codex hook API (issue #244) — ``get_config`` merges the
+    active codex's declared configuration over ``Realm.manifest_data`` — so
+    the platform never hardcodes user types (issue #242); falls back to
+    ``member``.
     """
     try:
-        manifest = json.loads(getattr(realm, "manifest_data", "") or "{}")
+        from core.codex_hooks import get_config
+
         default = (
-            (manifest.get("onboarding") or {}).get("registration") or {}
+            (get_config().get("onboarding") or {}).get("registration") or {}
         ).get("default_profile")
         if default and isinstance(default, str):
             return default.strip()
@@ -5372,6 +5374,8 @@ def uninstall_extension(args: text) -> text:
         # System extensions (manifest "system": true, e.g. member_dashboard)
         # are part of the platform contract: codices may *override* them via
         # extension_overrides but they cannot be plainly uninstalled (#242).
+        # A codex package (manifest "kind": "codex", #244) can likewise only
+        # be replaced by installing another version, never removed.
         try:
             from core.runtime_extensions import get_all_extension_manifests as _all_manifests
 
@@ -5382,6 +5386,14 @@ def uninstall_extension(args: text) -> text:
                     "error": (
                         f"Extension '{ext_id}' is a system extension and cannot be uninstalled. "
                         "A codex may override it via extension_overrides instead."
+                    ),
+                })
+            if isinstance(_m, dict) and _m.get("kind") == "codex":
+                return json.dumps({
+                    "success": False,
+                    "error": (
+                        f"'{ext_id}' is this realm's codex and cannot be uninstalled — "
+                        "install another version to replace it."
                     ),
                 })
         except Exception:
@@ -5518,9 +5530,11 @@ def _active_extension_overrides(manifests: dict) -> dict:
     Returns {base_extension_id: override_extension_id} (issue #242). An
     override only takes effect when the replacement extension exists in the
     installed manifest set — otherwise the base (system) extension stays.
+    Sourced through the codex hook API (issue #244), which also covers
+    legacy /codex_packages manifests.
     """
     try:
-        from core.runtime_codex import get_extension_overrides
+        from core.codex_hooks import get_extension_overrides
 
         return {
             base: override
@@ -5948,6 +5962,10 @@ def get_extension_frontend_info(args: text) -> text:
 def install_codex(args: text) -> text:
     """Install a codex package from uploaded files.
 
+    .. deprecated:: issue #244 — codices are ``kind: codex`` extension
+        packages now; use install_extension / install_extension_from_registry.
+        Kept for one release for already-published legacy packages.
+
     Args (JSON): {
         "codex_id": str,
         "files": {"filename": "content", ...},
@@ -6050,12 +6068,29 @@ def reload_codex(args: text) -> text:
 
 @query
 def list_codex_packages() -> text:
-    """List all installed codex packages with their manifests."""
+    """List all installed codex packages with their manifests.
+
+    Includes both legacy /codex_packages installs and the unified
+    ``kind: codex`` extension package (issue #244).
+    """
     try:
         from core.runtime_codex import list_installed, get_all_codex_manifests
 
         installed = list_installed()
         manifests = get_all_codex_manifests()
+
+        try:
+            from core.codex_hooks import get_active_codex
+            from core.runtime_extensions import get_all_extension_manifests
+
+            active = get_active_codex()
+            if active and active not in installed:
+                installed = sorted(installed + [active])
+                manifests = dict(manifests)
+                manifests[active] = get_all_extension_manifests().get(active) or {}
+        except Exception:
+            pass
+
         return json.dumps({
             "success": True,
             "codex_packages": installed,
@@ -6127,11 +6162,16 @@ def install_extension_from_registry(args: text) -> Async[text]:
 def install_codex_from_registry(args: text) -> Async[text]:
     """Install a codex package by pulling files from the file registry.
 
+    Unified pipeline (issue #244): resolves the codex as a ``kind: codex``
+    extension package under ``ext/`` first (dependency resolution, singleton
+    enforcement, init hook), falling back to the deprecated ``codex/``
+    namespace for legacy packages.
+
     Args (JSON): {
         "registry_canister_id": str,
-        "codex_id": str,           ("realm_type/codex_id" e.g. "syntropia/membership")
+        "codex_id": str,           (e.g. "syntropia")
         "version": str|null,       (null = latest)
-        "run_init": bool           (optional, default true)
+        "run_init": bool           (optional, default true; legacy path only)
     }
     """
     try:

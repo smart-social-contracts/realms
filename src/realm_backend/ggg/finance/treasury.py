@@ -56,22 +56,31 @@ class Treasury(Entity, TimestampedMixin):
         raise NotImplementedError("Treasury send hook has not been implemented")
 
     def send(self, to_principal: str, amount: int) -> Async[str]:
-        """Send tokens from treasury to a principal using embedded vault extension"""
+        """Send tokens from treasury to a principal.
+
+        Dispatch order (issue #244): the active hook-API codex's
+        ``on_treasury_send`` hook when implemented, else the legacy
+        ``send_hook`` (monkey-patched by pre-hook codices).
+        """
 
         logger.info(f"Treasury '{self.name}' sending {amount} tokens to {to_principal}")
 
-        # # Use already imported extension_async_call
-        # # Use embedded vault extension API
-        # args = json.dumps(
-        #     {
-        #         "to_principal": to_principal,
-        #         "amount": amount,
-        #     }
-        # )
+        try:
+            from core.codex_hooks import get_hook
 
-        # result = yield extension_async_call("vault", "transfer", args)
+            hook = get_hook("on_treasury_send")
+        except Exception:
+            hook = None
+        if hook is not None:
+            result = yield hook(json.dumps({
+                "treasury_name": self.name,
+                "to_principal": to_principal,
+                "amount": amount,
+            }))
+            return result
+
         result = yield self.send_hook(self, to_principal, amount)
-        
+
         return result
 
     # def sync_balance(self) -> Async[None]:

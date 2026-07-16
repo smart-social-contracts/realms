@@ -161,12 +161,13 @@ def resolve_extension_id(ext_id: str) -> str:
     """Resolve an extension id through codex overrides (issue #242).
 
     Resolution order:
-      1. the codex override extension, when a codex declares one in
-         ``extension_overrides`` *and* the override is actually installed;
+      1. the codex override extension, when the active codex declares one
+         (hook API or manifest, issue #244) *and* the override is actually
+         installed;
       2. the extension id as given (default / system extension).
     """
     try:
-        from core.runtime_codex import get_extension_overrides
+        from core.codex_hooks import get_extension_overrides
 
         override = get_extension_overrides().get(ext_id)
         if override and override in set(list_installed()):
@@ -312,6 +313,12 @@ def install_extension(
 
     _loaded_modules.pop(ext_id, None)
     _loaded_manifests.pop(ext_id, None)
+    try:
+        from core.codex_hooks import invalidate_cache
+
+        invalidate_cache()
+    except Exception:
+        pass
 
     manifest = _load_manifest(ext_id, force=True)
     if manifest is None:
@@ -372,6 +379,12 @@ def uninstall_extension(ext_id: str) -> bool:
     # Clear caches
     _loaded_modules.pop(ext_id, None)
     _loaded_manifests.pop(ext_id, None)
+    try:
+        from core.codex_hooks import invalidate_cache
+
+        invalidate_cache()
+    except Exception:
+        pass
 
     # Remove from sys.modules
     module_name = f"_runtime_ext_{ext_id}"

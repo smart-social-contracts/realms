@@ -12,6 +12,7 @@ Refs: https://github.com/smart-social-contracts/realms/issues/168
 
 import base64
 import json
+from typing import Dict
 
 from _cdk import (
     Async,
@@ -64,6 +65,135 @@ class AssetCanisterService(Service):
     def store(self, arg: _AssetStoreArg) -> void: ...
 
 
+def _resolve_codex_dependencies(manifest: dict, codex_id: str) -> Dict[str, str]:
+    """Full dependency set of a codex manifest (issues #241/#242/#244).
+
+    A codex is a distro-style package: its manifest declares required
+    extensions (optionally version-pinned), its extension overrides are
+    implicit dependencies (a codex replacing a system extension must install
+    its replacement), and core/system extensions ship with every standard
+    realm so the codex never has to declare them.
+
+    Manifest forms:
+      "dependencies": ["voting", "vault"]                      (latest)
+      "dependencies": {"voting": "1.1.x", "vault": "^2.0.0"}   (pinned)
+    """
+    dependencies: Dict[str, str] = {}
+    raw_deps = manifest.get("dependencies", []) or []
+    if isinstance(raw_deps, dict):
+        dependencies = {str(k): (str(v) if v else "") for k, v in raw_deps.items()}
+    else:
+        dependencies = {str(d): "" for d in raw_deps}
+
+    overrides = manifest.get("extension_overrides") or {}
+    if isinstance(overrides, dict):
+        for override_ext in overrides.values():
+            if override_ext and str(override_ext) not in dependencies:
+                dependencies[str(override_ext)] = ""
+
+    try:
+        from core.core_extensions import CORE_EXTENSION_IDS
+
+        for core_ext in CORE_EXTENSION_IDS:
+            if core_ext not in dependencies:
+                dependencies[core_ext] = ""
+    except Exception as e:
+        logger.error(f"Codex '{codex_id}': could not add core extensions: {e}")
+
+    return dependencies
+
+
+def _get_realm_frontend_canister_id() -> str:
+    try:
+        from ggg import Realm
+
+        _realms = Realm.instances()
+        if _realms:
+            return (getattr(_realms[0], "frontend_canister_id", "") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _install_codex_dependencies(
+    registry_canister_id: str, codex_id: str, dependencies: Dict[str, str],
+) -> Async[tuple]:
+    """Install a codex's missing dependency extensions from the registry.
+
+    Returns (installed: [{extension, version}], failed: [{extension, pin, error}]).
+    """
+    installed_deps = []
+    failed_deps = []
+    if not dependencies:
+        return installed_deps, failed_deps
+
+    from core.runtime_extensions import list_installed
+
+    already = set(list_installed())
+    missing = {d: pin for d, pin in dependencies.items() if d not in already}
+    logger.info(
+        f"Codex '{codex_id}' dependencies: {dependencies} "
+        f"(missing: {list(missing) or 'none'})"
+    )
+
+    frontend_canister_id = _get_realm_frontend_canister_id() or None
+
+    for dep, pin in missing.items():
+        dep_raw = yield from install_extension_from_registry(
+            registry_canister_id, dep, pin or None, frontend_canister_id
+        )
+        try:
+            dep_result = json.loads(dep_raw)
+        except (json.JSONDecodeError, TypeError):
+            dep_result = {"success": False, "error": dep_raw}
+        if dep_result.get("success"):
+            installed_deps.append(
+                {"extension": dep, "version": dep_result.get("version", "")}
+            )
+        else:
+            failed_deps.append({"extension": dep, "pin": pin, "error": dep_result.get("error", "unknown")})
+            logger.error(
+                f"Codex '{codex_id}': dependency '{dep}' (pin={pin or 'latest'}) "
+                f"failed to install: {dep_result}"
+            )
+    return installed_deps, failed_deps
+
+
+def _seed_codex_module_entities(ext_id: str, files: Dict[str, str]) -> list:
+    """Create/update Codex DB entities from a codex package's module files.
+
+    Governance modules (proposal targets, TaskManager shims) ship under
+    ``modules/`` in the package; each becomes a ``Codex`` entity named after
+    its file stem — same contract the legacy /codex_packages path provided,
+    so ``codex_change`` proposals and scheduled tasks keep working.
+    """
+    seeded = []
+    try:
+        from ggg import Codex
+    except Exception as e:
+        logger.warning(f"Codex {ext_id}: cannot seed module entities — {e}")
+        return seeded
+
+    for path, content in files.items():
+        if not (path.startswith("modules/") and path.endswith(".py")):
+            continue
+        name = path[len("modules/"):-3]
+        if not name or "/" in name:
+            continue
+        try:
+            existing = Codex[name]
+            if existing:
+                existing.code = content
+            else:
+                Codex(name=name, code=content)
+            seeded.append(name)
+        except Exception as e:
+            logger.error(f"Codex {ext_id}: failed to seed module entity '{name}' — {e}")
+    if seeded:
+        logger.info(f"Codex {ext_id}: seeded module entities: {seeded}")
+    return seeded
+
+
 def install_extension_from_registry(
     registry_canister_id: str, ext_id: str, version: str = None,
     frontend_canister_id: str = None,
@@ -71,6 +201,11 @@ def install_extension_from_registry(
     """Pull extension backend files from the file registry and install them.
     If frontend_canister_id is provided, also copies frontend bundles to
     the realm's frontend asset canister for same-origin loading.
+
+    Codex packages (manifest ``"kind": "codex"``, issue #244) install through
+    this same path with three extra steps: privileged-caller check, singleton
+    enforcement, and dependency-extension installation before the codex's
+    ``init`` hook runs.
 
     Args:
         registry_canister_id: Canister ID of the file registry
@@ -123,6 +258,61 @@ def install_extension_from_registry(
 
     logger.info(f"Got {len(files)} files from registry (version {resolved_version})")
 
+    # --- Codex package classification (issue #244) ---
+    try:
+        manifest = json.loads(files.get("manifest.json", "{}"))
+        if not isinstance(manifest, dict):
+            manifest = {}
+    except (json.JSONDecodeError, TypeError):
+        manifest = {}
+    is_codex = manifest.get("kind") == "codex"
+
+    installed_deps = []
+    failed_deps = []
+    if is_codex:
+        from core import codex_hooks
+
+        # 1. Privileged classification: codex install requires the codex.install
+        #    permission. Controllers (e.g. the realm installer) bypass via
+        #    _check_access. Internal contexts are trusted: self-calls and timer
+        #    executions (quarter self-bootstrap) originate from this canister's
+        #    own code — external callers can only reach this function through
+        #    @require-gated endpoints, where anonymous is already rejected.
+        try:
+            from core.access import _check_access
+            from ggg.system.user_profile import Operations
+
+            caller = ic.caller().to_str()
+            is_internal = caller == ic.id().to_str() or caller == "2vxsx-fae"
+            if not is_internal and not _check_access(caller, Operations.CODEX_INSTALL):
+                return json.dumps({
+                    "success": False,
+                    "error": (
+                        f"'{ext_id}' is a codex package; installing it requires "
+                        f"the {Operations.CODEX_INSTALL} permission"
+                    ),
+                })
+        except ImportError:
+            pass  # test harness without access-control stack
+
+        # 2. Hook API version gate.
+        version_error = codex_hooks.unsupported_api_version(manifest)
+        if version_error:
+            return json.dumps({"success": False, "error": f"Codex '{ext_id}': {version_error}"})
+
+        # 3. Singleton: exactly one codex per realm (same-id upgrade allowed).
+        conflict = codex_hooks.singleton_violation(ext_id)
+        if conflict:
+            return json.dumps({"success": False, "error": conflict})
+
+        # 4. Distro behavior: install dependency extensions first so the codex
+        #    init hook can rely on them (and the realm is never left with a
+        #    half-working codex).
+        dependencies = _resolve_codex_dependencies(manifest, ext_id)
+        installed_deps, failed_deps = yield from _install_codex_dependencies(
+            registry_canister_id, ext_id, dependencies
+        )
+
     from core.runtime_extensions import install_extension as _install
 
     ok = _install(
@@ -137,13 +327,24 @@ def install_extension_from_registry(
             "error": f"Failed to load extension '{ext_id}' after install",
         })
 
+    init_error = None
+    seeded_modules = []
+    if is_codex:
+        from core import codex_hooks
+
+        # Governance module files become Codex DB entities (proposal targets).
+        seeded_modules = _seed_codex_module_entities(ext_id, files)
+        # Post-install realm setup — the codex enforces its realm settings
+        # server-side here, so no wizard bug can contradict the codex.
+        init_error = codex_hooks.run_init(ext_id)
+
     frontend_copied = 0
     if frontend_canister_id:
         frontend_copied = yield from _copy_frontend_to_asset_canister(
             registry_canister_id, ext_id, resolved_version, frontend_canister_id,
         )
 
-    return json.dumps({
+    result = {
         "success": True,
         "extension_id": ext_id,
         "version": resolved_version,
@@ -151,26 +352,65 @@ def install_extension_from_registry(
         "frontend_files_copied": frontend_copied,
         "source": "registry",
         "registry_canister_id": registry_canister_id,
-    })
+    }
+    if is_codex:
+        result["kind"] = "codex"
+        result["dependencies_installed"] = installed_deps
+        result["codex_modules"] = seeded_modules
+        if failed_deps:
+            result["dependency_warnings"] = failed_deps
+        if init_error:
+            result["init_warning"] = init_error
+    return json.dumps(result)
 
 
 def install_codex_from_registry(
     registry_canister_id: str, codex_id: str, version: str = None, run_init: bool = True
 ) -> Async[str]:
-    """Pull codex package files from the file registry and install them.
+    """Install a codex, preferring the unified extension pipeline (issue #244).
+
+    Resolution order:
+      1. ``ext/<id>/<ver>`` — the codex published as a ``kind: codex``
+         extension package; installed via install_extension_from_registry
+         (dependency resolution, singleton check, init hook).
+      2. ``codex/<id>/<ver>`` — legacy codex namespace (deprecated; kept as
+         a read fallback for one release).
 
     Args:
         registry_canister_id: Canister ID of the file registry
-        codex_id: Codex identifier (e.g. "syntropia/membership")
+        codex_id: Codex identifier (e.g. "syntropia")
         version: Specific version or None for latest
-        run_init: Whether to run init.py after install
+        run_init: Whether to run init after install (legacy path only —
+            the unified path always runs the init hook)
 
     Returns (via yield):
         JSON string with result
     """
     logger.info(
         f"Installing codex '{codex_id}' (version={version or 'latest'}) "
-        f"from registry {registry_canister_id}"
+        f"from registry {registry_canister_id} — trying unified ext/ namespace first"
+    )
+
+    frontend_id = _get_realm_frontend_canister_id() or None
+    unified_raw = yield from install_extension_from_registry(
+        registry_canister_id, codex_id, version, frontend_canister_id=frontend_id
+    )
+    try:
+        unified = json.loads(unified_raw)
+    except (json.JSONDecodeError, TypeError):
+        unified = {"success": False}
+    if unified.get("success"):
+        return unified_raw
+    unified_error = str(unified.get("error") or "")
+    if "No published version" not in unified_error and "not found" not in unified_error.lower():
+        # The package exists under ext/ but failed for a real reason
+        # (singleton conflict, unsupported API version, load failure) —
+        # surface that instead of silently installing a stale legacy copy.
+        return unified_raw
+
+    logger.info(
+        f"Codex '{codex_id}' not found under ext/ ({unified_error}); "
+        f"falling back to legacy codex/ namespace"
     )
 
     registry = FileRegistryService(Principal.from_str(registry_canister_id))
@@ -205,85 +445,28 @@ def install_codex_from_registry(
     # Use codex_id as the package name (last component for nested ids like "syntropia/membership")
     package_name = codex_id.split("/")[-1] if "/" in codex_id else codex_id
 
-    # --- Dependency resolution (issues #241, #242) ---
-    # A codex is a distro-style package: its manifest declares required
-    # extensions, optionally version-pinned. Install missing ones from the
-    # same registry *before* the package init runs, so init can rely on them
+    # Singleton (issue #244): exactly one codex per realm, legacy path included.
+    from core import codex_hooks
+
+    conflict = codex_hooks.singleton_violation(package_name)
+    if conflict:
+        return json.dumps({"success": False, "error": conflict})
+
+    # Dependency resolution (issues #241, #242): install missing dependency
+    # extensions *before* the package init runs, so init can rely on them
     # (and the realm is never left with a half-working codex).
-    #
-    # Manifest forms:
-    #   "dependencies": ["voting", "vault"]                      (latest)
-    #   "dependencies": {"voting": "1.1.x", "vault": "^2.0.0"}   (pinned)
-    # The registry resolves range pins to the highest published match.
-    dependencies = {}
     try:
         codex_manifest = json.loads(files.get("manifest.json", "{}"))
-        raw_deps = codex_manifest.get("dependencies", []) or []
-        if isinstance(raw_deps, dict):
-            dependencies = {str(k): (str(v) if v else "") for k, v in raw_deps.items()}
-        else:
-            dependencies = {str(d): "" for d in raw_deps}
-        # Override extensions (issue #242) are implicit dependencies: a codex
-        # replacing a system extension must ship/install its replacement.
-        overrides = codex_manifest.get("extension_overrides") or {}
-        if isinstance(overrides, dict):
-            for override_ext in overrides.values():
-                if override_ext and str(override_ext) not in dependencies:
-                    dependencies[str(override_ext)] = ""
+        if not isinstance(codex_manifest, dict):
+            codex_manifest = {}
     except (json.JSONDecodeError, TypeError) as e:
         logger.error(f"Codex '{codex_id}': unreadable manifest.json, skipping dependency check: {e}")
+        codex_manifest = {}
 
-    # Core/system extensions (issue #242) ship with every standard realm —
-    # a codex builds on top of them, it never has to declare them. Installed
-    # here because the wizard no longer sends an extension list: the codex
-    # install is what provisions a new realm.
-    try:
-        from core.core_extensions import CORE_EXTENSION_IDS
-
-        for core_ext in CORE_EXTENSION_IDS:
-            if core_ext not in dependencies:
-                dependencies[core_ext] = ""
-    except Exception as e:
-        logger.error(f"Codex '{codex_id}': could not add core extensions: {e}")
-
-    installed_deps = []
-    failed_deps = []
-    if dependencies:
-        from core.runtime_extensions import list_installed
-
-        already = set(list_installed())
-        missing = {d: pin for d, pin in dependencies.items() if d not in already}
-        logger.info(
-            f"Codex '{codex_id}' dependencies: {dependencies} "
-            f"(missing: {list(missing) or 'none'})"
-        )
-
-        frontend_canister_id = None
-        try:
-            from ggg import Realm
-
-            _realms = Realm.instances()
-            if _realms:
-                fid = (getattr(_realms[0], "frontend_canister_id", "") or "").strip()
-                frontend_canister_id = fid or None
-        except Exception:
-            pass
-
-        for dep, pin in missing.items():
-            dep_raw = yield from install_extension_from_registry(
-                registry_canister_id, dep, pin or None, frontend_canister_id
-            )
-            try:
-                dep_result = json.loads(dep_raw)
-            except (json.JSONDecodeError, TypeError):
-                dep_result = {"success": False, "error": dep_raw}
-            if dep_result.get("success"):
-                installed_deps.append(
-                    {"extension": dep, "version": dep_result.get("version", "")}
-                )
-            else:
-                failed_deps.append({"extension": dep, "pin": pin, "error": dep_result.get("error", "unknown")})
-                logger.error(f"Codex '{codex_id}': dependency '{dep}' (pin={pin or 'latest'}) failed to install: {dep_result}")
+    dependencies = _resolve_codex_dependencies(codex_manifest, codex_id)
+    installed_deps, failed_deps = yield from _install_codex_dependencies(
+        registry_canister_id, codex_id, dependencies
+    )
 
     # Install via runtime_codex
     from core.runtime_codex import (

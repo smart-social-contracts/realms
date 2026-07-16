@@ -45,6 +45,14 @@ def _run_single_test(test_file, codex_dir, reset_fn, verbose=False):
         paths_to_add.append(codex_root)
     if codex_dir not in sys.path and codex_dir != codex_root:
         paths_to_add.append(codex_dir)
+    # Unified package layout (issue #244): hook entry + helpers live in
+    # backend/, governance modules in backend/modules/ — make both flat-
+    # importable so tests keep doing `import membership`, `import entry`.
+    for base in {codex_root, codex_dir}:
+        for sub in ("backend", os.path.join("backend", "modules")):
+            p = os.path.join(base, sub)
+            if os.path.isdir(p) and p not in sys.path:
+                paths_to_add.append(p)
 
     for p in paths_to_add:
         sys.path.insert(0, p)

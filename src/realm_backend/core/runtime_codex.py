@@ -1,6 +1,15 @@
 """
 Runtime Codex Manager — install/uninstall/reload codex packages at runtime.
 
+.. deprecated:: issue #244
+    Legacy compat shim. Codices are now privileged system extensions
+    (manifest ``"kind": "codex"``) installed through the unified extension
+    pipeline (``api.file_registry.install_extension_from_registry``) and
+    integrated via the hook API (``core.codex_hooks``) instead of exec'd
+    ``init.py`` files and ``entity_method_overrides`` monkey-patching.
+    This module keeps already-deployed /codex_packages realms working for
+    one release and will then be removed.
+
 Codex packages are directories of Python files (using the ggg library) stored
 in the file registry.  This module handles:
 
@@ -153,6 +162,12 @@ def install_codex_package(codex_id: str, files: Dict[str, str]) -> bool:
     # Clear manifest cache
     _installed_manifests.pop(codex_id, None)
     manifest = _load_manifest(codex_id, force=True)
+    try:
+        from core.codex_hooks import invalidate_cache
+
+        invalidate_cache()
+    except Exception:
+        pass
 
     logger.info(
         f"Codex package {codex_id}: installed ({len(files)} files, "
@@ -225,6 +240,12 @@ def uninstall_codex_package(codex_id: str) -> bool:
 
     # Clear cache
     _installed_manifests.pop(codex_id, None)
+    try:
+        from core.codex_hooks import invalidate_cache
+
+        invalidate_cache()
+    except Exception:
+        pass
 
     logger.info(f"Codex package {codex_id}: uninstalled")
     return True

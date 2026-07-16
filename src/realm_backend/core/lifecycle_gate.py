@@ -26,6 +26,19 @@ logger = get_logger("core.lifecycle_gate")
 
 
 def _manifest(realm) -> dict:
+    """Realm configuration through the codex hook API (issue #244).
+
+    ``codex_hooks.get_config`` merges the active codex's declared config
+    over ``Realm.manifest_data``, so this module never digs into raw
+    manifests. Falls back to ``manifest_data`` alone if the hook layer is
+    unavailable (e.g. minimal test harness).
+    """
+    try:
+        from core.codex_hooks import get_config
+
+        return get_config()
+    except Exception:
+        pass
     try:
         data = json.loads(realm.manifest_data or "{}")
         return data if isinstance(data, dict) else {}
@@ -177,7 +190,21 @@ def readiness_checklist(realm) -> list:
 
 
 def alpha_to_beta_ready(realm):
-    """Return ``(ready, missing_labels)`` for the alpha→beta hard gate."""
+    """Return ``(ready, missing_labels)`` for the alpha→beta hard gate.
+
+    A codex implementing the ``check_lifecycle_transition`` hook (issue
+    #244) is authoritative; the built-in readiness checklist is the
+    default for codices that only declare a checklist mode.
+    """
+    try:
+        from core.codex_hooks import check_lifecycle_transition
+
+        verdict = check_lifecycle_transition("alpha", "beta")
+        if verdict is not None:
+            return (verdict["allowed"], verdict["missing"])
+    except Exception as e:
+        logger.warning(f"codex check_lifecycle_transition failed, using checklist: {e}")
+
     checklist = readiness_checklist(realm)
     missing = [i["label"] for i in checklist if not i["done"]]
     return (not missing, missing)

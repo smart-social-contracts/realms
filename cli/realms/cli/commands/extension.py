@@ -1300,7 +1300,16 @@ def publish_extension_command(
     with open(manifest_path, "r") as fh:
         manifest = json.load(fh)
 
-    ext_id = extension_id or manifest.get("name") or os.path.basename(source_dir)
+    # Registry key: machine id first ("id", lowercase — matches wizard and
+    # installer requests), then legacy "name" (older extension manifests use
+    # it as the id), then the directory name. Never a capitalized display
+    # name — that registers the package under a different namespace (#244).
+    ext_id = (
+        extension_id
+        or manifest.get("id")
+        or manifest.get("name")
+        or os.path.basename(source_dir)
+    )
     ver = version or manifest.get("version") or "0.0.0"
     namespace = f"{namespace_prefix}/{ext_id}/{ver}"
 
@@ -1327,12 +1336,14 @@ def publish_extension_command(
     # Manifest
     _upload("manifest.json", manifest_path)
 
-    # Backend Python files (flattened — backend/foo.py → backend/foo.py)
+    # Backend Python files (flattened — backend/foo.py → backend/foo.py).
+    # JSON data files ship too (codex packages reference them via
+    # manifest.data_files — departments.json, zones.json, …; issue #244).
     backend_dir = os.path.join(source_dir, "backend")
     if os.path.isdir(backend_dir):
         for root, _dirs, files in os.walk(backend_dir):
             for fname in sorted(files):
-                if not fname.endswith(".py"):
+                if not fname.endswith((".py", ".json")):
                     continue
                 local = os.path.join(root, fname)
                 rel = os.path.relpath(local, backend_dir).replace(os.sep, "/")
@@ -1429,7 +1440,17 @@ def publish_codex_command(
     network: str = "ic",
     identity: Optional[str] = None,
 ):
-    """Publish a codex package (manifest + .py files) to a file_registry canister."""
+    """Publish a codex package to a file_registry canister.
+
+    Unified pipeline (issue #244): a codex whose manifest declares
+    ``"kind": "codex"`` and ships a ``backend/`` directory is an extension
+    package — it is published through ``publish_extension_command`` under
+    ``ext/<id>/<version>``, exactly like any other extension.
+
+    Legacy layout (loose ``*.py`` at the package root, no ``kind``) still
+    publishes to the deprecated ``codex/<id>/<version>`` namespace; this
+    path is kept for one release and will be removed.
+    """
     source_dir = os.path.abspath(source_dir)
     if not os.path.isdir(source_dir):
         console.print(f"[red]Error: source dir not found: {source_dir}[/red]")
@@ -1441,6 +1462,24 @@ def publish_codex_command(
             manifest = json.load(fh)
     else:
         manifest = {}
+
+    if manifest.get("kind") == "codex" and os.path.isdir(
+        os.path.join(source_dir, "backend")
+    ):
+        return publish_extension_command(
+            registry=registry,
+            source_dir=source_dir,
+            extension_id=codex_id or manifest.get("id"),
+            version=version,
+            skip_publish=skip_publish,
+            network=network,
+            identity=identity,
+        )
+
+    console.print(
+        "[yellow]⚠ legacy codex layout (no kind: codex / backend/): publishing to "
+        "the deprecated codex/ namespace[/yellow]"
+    )
 
     # The codex id must be the machine id (lowercase, matches the wizard's
     # package id and the directory name) — never the display "name", which is
