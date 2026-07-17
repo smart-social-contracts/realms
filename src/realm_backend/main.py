@@ -1060,6 +1060,31 @@ def get_canister_id() -> text:
     return ic.id().to_str()
 
 
+def _realm_response_to_json_dict(resp) -> dict:
+    """Convert a RealmResponse to {"success", "message"?/"error"?}.
+
+    Records/Variants are TypedDicts at build time but runtime instances may be
+    dict-like or attribute-based depending on the canister runtime — read both ways.
+    """
+
+    def _field(obj, key):
+        try:
+            return obj[key]
+        except Exception:
+            return getattr(obj, key, None)
+
+    out = {"success": bool(_field(resp, "success"))}
+    data = _field(resp, "data")
+    if data is not None:
+        message = _field(data, "message")
+        error = _field(data, "error")
+        if message is not None:
+            out["message"] = message
+        elif error is not None:
+            out["error"] = error
+    return out
+
+
 def _set_canister_config_impl(
     frontend_canister_id=None,
     token_canister_id=None,
@@ -1211,16 +1236,51 @@ def set_canister_config_json(args: text) -> text:
             network=params.get("network"),
             test_flags_json=flags,
         )
-        out = {"success": bool(resp.success)}
-        data = resp.data
-        if data is not None:
-            if data.message is not None:
-                out["message"] = data.message
-            elif data.error is not None:
-                out["error"] = data.error
-        return json.dumps(out)
+        return json.dumps(_realm_response_to_json_dict(resp))
     except Exception as e:
         logger.error(f"set_canister_config_json error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def set_test_flags_json(args: text) -> text:
+    """Edit runtime test-mode flags without admin rights — only while test_mode is on.
+
+    Backs the footer "test flags" editor in the frontend: any user of a realm
+    that is already in test mode may view and flip the flags (including turning
+    test_mode off, which hides the editor and locks further edits back to
+    admins). Enabling flags on mainnet is rejected by the shared network gate in
+    _set_canister_config_impl.
+
+    Args (JSON): {"test_flags": {...}} or a bare flags object with keys
+    test_mode, ii_bypass, user_self_registration, demo_data, skip_terms,
+    skip_passport_zkproof.
+
+    Returns: {"success": bool, "message"?: str, "error"?: str}.
+    """
+    try:
+        from core.runtime_flags import is_test_mode
+
+        if not is_test_mode():
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": "Test flags can only be edited while test_mode is enabled",
+                }
+            )
+        params = json.loads(args) if args else {}
+        flags = params.get("test_flags")
+        if not isinstance(flags, dict):
+            flags = params if isinstance(params, dict) else {}
+        if not flags:
+            return json.dumps({"success": False, "error": "No test_flags provided"})
+        # skip_authentication disables every permission check — never allow the
+        # unauthenticated editor to set it.
+        flags.pop("skip_authentication", None)
+        resp = _set_canister_config_impl(test_flags_json=json.dumps(flags))
+        return json.dumps(_realm_response_to_json_dict(resp))
+    except Exception as e:
+        logger.error(f"set_test_flags_json error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

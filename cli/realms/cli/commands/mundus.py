@@ -529,8 +529,47 @@ def _staging_test_identity_js(network: str, infra: dict | None = None) -> str:
         return ""
 
 
+def _normalize_slug(raw: str) -> str:
+    """Mirror the registry's slug normalization (api/slugs.py normalize_slug)."""
+    s = (raw or "").strip().lower()
+    out: list[str] = []
+    prev_hyphen = False
+    for ch in s:
+        if "a" <= ch <= "z" or "0" <= ch <= "9":
+            out.append(ch)
+            prev_hyphen = False
+        elif not prev_hyphen and out:
+            out.append("-")
+            prev_hyphen = True
+    return "".join(out).strip("-")[:48]
+
+
+def _resolve_portal_url(realm: dict, network: str, derivation_origin: str) -> str:
+    """Canonical portal page for this realm (drives the raw-origin → portal redirect).
+
+    Asks the registry to resolve the realm's slug; falls back to
+    ``<derivation_origin>/r/<slug>`` when the lookup fails. Empty when there is
+    no portal origin (e.g. local dev).
+    """
+    slug = _normalize_slug(realm.get("display_name") or realm.get("name") or "")
+    if not slug or not derivation_origin:
+        return ""
+    registry_id = _REGISTRY_IDS.get(network, "")
+    if registry_id:
+        try:
+            raw = _dfx_call(registry_id, "resolve_slug", f'("{slug}")', network)
+            payload = json.loads(raw)
+            inner = json.loads(payload.get("Ok", "{}"))
+            if inner.get("success") and inner.get("portal_url"):
+                return str(inner["portal_url"]).rstrip("/")
+        except Exception as e:
+            console.print(f"  [dim]resolve_slug({slug}) failed, using fallback portal_url: {e}[/dim]")
+    return f"{derivation_origin.rstrip('/')}/r/{slug}"
+
+
 def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
                          file_registry_id: str = "", derivation_origin: str = "",
+                         portal_url: str = "",
                          infra: dict | None = None) -> None:
     """(Re)write /canister_ids.js onto the frontend canister.
 
@@ -554,6 +593,11 @@ def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
         fields.append('file_registry:"' + file_registry_id + '"')
     if derivation_origin:
         fields.append('derivation_origin:"' + derivation_origin + '"')
+    if portal_url:
+        # Drives the raw-origin → portal redirect in the SPA (auth.js
+        # getPortalRedirectUrl); without it a direct icp0.io visit tries II
+        # login on the raw origin and fails with "Unverified origin".
+        fields.append('portal_url:"' + portal_url + '"')
     js = 'globalThis.__CANISTER_IDS={' + ",".join(fields) + '};'
     js += _staging_test_identity_js(network, infra)
     escaped = js.replace('\\', '\\\\').replace('"', '\\"')
@@ -650,8 +694,10 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
                 "demo": "https://demo.realmsgos.org",
                 "test": "https://test.realmsgos.org",
             }.get(network, "")
+        portal_url = _resolve_portal_url(realm, network, deriv)
         _store_canister_ids(frontend_id, backend_id, network,
                             file_registry_id=fr_id, derivation_origin=deriv,
+                            portal_url=portal_url,
                             infra=infra)
 
 

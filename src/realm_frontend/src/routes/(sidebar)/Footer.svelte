@@ -9,6 +9,10 @@
 		XSolid,
 	} from 'flowbite-svelte-icons';
 	import type { ComponentType } from 'svelte';
+	import { testMode } from '$lib/stores/realmInfo';
+	import TestFlagsModal from '$lib/components/TestFlagsModal.svelte';
+
+	let testFlagsOpen = false;
 	
 	// Get commit hash from meta tag
 	let commitHash = '';
@@ -103,6 +107,19 @@
 			Realms GOS {version} ({commitHash}) - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ' - Local deployment' : ''}
 		</span>
 	</div>
+
+	{#if $testMode}
+		<div class="mt-2 text-center">
+			<button
+				type="button"
+				class="rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-400 dark:hover:bg-gray-700"
+				on:click={() => (testFlagsOpen = true)}
+			>
+				Test flags
+			</button>
+		</div>
+		<TestFlagsModal bind:open={testFlagsOpen} />
+	{/if}
 	
 	<!-- Built on Internet Computer section -->
 	<div class="flex justify-center mt-3">

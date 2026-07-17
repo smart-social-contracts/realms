@@ -283,6 +283,7 @@ service : {
   "get_canister_id" : () -> (text) query;
   "set_canister_config" : (opt text, opt text, opt text, opt text, opt text, opt text, opt text, opt text) -> (RealmResponse);
   "set_canister_config_json" : (text) -> (text);
+  "set_test_flags_json" : (text) -> (text);
   "register_quarter" : (text, text) -> (RealmResponse);
   "deregister_quarter" : (text) -> (RealmResponse);
   "set_quarter_config" : (text) -> (RealmResponse);

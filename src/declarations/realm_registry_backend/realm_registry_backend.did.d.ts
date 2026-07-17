@@ -1168,6 +1168,7 @@ export interface _SERVICE {
   'set_canister_config_json' : ActorMethod<[string], string>,
   'set_invitation_mode' : ActorMethod<[string], GenericResult>,
   'set_pretty_hostname_status' : ActorMethod<[string, string], GenericResult>,
+  'set_test_flags_json' : ActorMethod<[string], string>,
   'status' : ActorMethod<[], GetStatusResult>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

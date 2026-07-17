@@ -1059,3 +1059,45 @@ def set_canister_config_json(args: text) -> text:
     except Exception as e:
         logger.error(f"set_canister_config_json error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def set_test_flags_json(args: text) -> text:
+    """Edit runtime test-mode flags without controller rights — only while test_mode is on.
+
+    Backs the footer "test flags" editor in the registry frontend: any user may
+    view and flip the flags while the registry is already in test mode (including
+    turning test_mode off, which hides the editor and locks further edits back to
+    controllers). Enabling flags on mainnet is rejected by apply_test_flags.
+
+    Args (JSON): {"test_flags": {...}} or a bare flags object with keys
+    test_mode, ii_bypass, user_self_registration, demo_data, skip_terms,
+    skip_passport_zkproof.
+
+    Returns: {"success": bool, "message"?: str, "error"?: str}.
+    """
+    try:
+        from core.runtime_flags import apply_test_flags, get_flag
+
+        if not get_flag("test_mode", False):
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": "Test flags can only be edited while test_mode is enabled",
+                }
+            )
+        params = json.loads(args) if args else {}
+        flags = params.get("test_flags")
+        if not isinstance(flags, dict):
+            flags = params if isinstance(params, dict) else {}
+        if not flags:
+            return json.dumps({"success": False, "error": "No test_flags provided"})
+        # skip_authentication disables every permission check — never allow the
+        # unauthenticated editor to set it.
+        flags.pop("skip_authentication", None)
+        apply_test_flags(flags)
+        logger.info(f"set_test_flags_json applied: {flags}")
+        return json.dumps({"success": True, "message": "Test flags updated"})
+    except Exception as e:
+        logger.error(f"set_test_flags_json error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})

@@ -129,6 +129,7 @@ export const idlFactory = ({ IDL }) => {
         [GenericResult],
         [],
       ),
+    'set_test_flags_json' : IDL.Func([IDL.Text], [IDL.Text], []),
     'status' : IDL.Func([], [GetStatusResult], ['query']),
   });
 };

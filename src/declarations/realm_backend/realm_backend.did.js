@@ -7,7 +7,7 @@ export const idlFactory = ({ IDL }) => {
     'status' : IDL.Text,
     'name' : IDL.Text,
     'canister_id' : IDL.Text,
-    'is_capital' : IDL.Opt(IDL.Bool),
+    'is_capital' : IDL.Bool,
     'index' : IDL.Nat,
     'population' : IDL.Nat,
   });
@@ -131,6 +131,13 @@ export const idlFactory = ({ IDL }) => {
   const ExtensionCallResponse = IDL.Record({
     'response' : IDL.Text,
     'success' : IDL.Bool,
+  });
+  const PublicLogEntry = IDL.Record({
+    'id' : IDL.Nat,
+    'level' : IDL.Text,
+    'logger_name' : IDL.Text,
+    'message' : IDL.Text,
+    'timestamp' : IDL.Nat,
   });
   const Header = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -277,6 +284,16 @@ export const idlFactory = ({ IDL }) => {
     'get_available_upgrade' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_bootstrap_status' : IDL.Func([], [IDL.Text], ['query']),
     'get_canister_id' : IDL.Func([], [IDL.Text], ['query']),
+    'get_canister_logs' : IDL.Func(
+        [
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
+        ],
+        [IDL.Vec(PublicLogEntry)],
+        ['query'],
+      ),
     'get_extension_frontend_info' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_extensions' : IDL.Func([], [RealmResponse], ['query']),
     'get_join_targets' : IDL.Func([], [IDL.Text], ['query']),
@@ -304,6 +321,7 @@ export const idlFactory = ({ IDL }) => {
     'get_realm_credits' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_realm_registry_info' : IDL.Func([], [IDL.Text], ['query']),
     'get_runtime_flags' : IDL.Func([], [IDL.Text], ['query']),
+    'get_sandbox_config' : IDL.Func([], [IDL.Text], ['query']),
     'get_scale_status' : IDL.Func([], [IDL.Text], ['query']),
     'get_sharing_root_public_key' : IDL.Func([], [RealmResponse], []),
     'get_sidebar' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
@@ -342,6 +360,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'record_migration' : IDL.Func([IDL.Text], [IDL.Text], []),
     'refresh_invoice' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'register_founder' : IDL.Func([IDL.Text], [RealmResponse], []),
     'register_quarter' : IDL.Func([IDL.Text, IDL.Text], [RealmResponse], []),
     'register_realm_from_registry' : IDL.Func([IDL.Text], [IDL.Text], []),
     'register_realm_with_registry' : IDL.Func(
@@ -380,9 +399,10 @@ export const idlFactory = ({ IDL }) => {
     'set_menu_visibility' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_quarter_config' : IDL.Func([IDL.Text], [RealmResponse], []),
     'set_quarter_provisioning_config' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'set_sandbox_config' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'set_test_flags_json' : IDL.Func([IDL.Text], [IDL.Text], []),
     'start_task_manager' : IDL.Func([], [IDL.Text], []),
     'status' : IDL.Func([], [RealmResponse], ['query']),
-    'register_founder' : IDL.Func([IDL.Text], [RealmResponse], []),
     'store_admin_invite_hash' : IDL.Func([IDL.Text], [RealmResponse], []),
     'sync_quarters' : IDL.Func([IDL.Text], [IDL.Text], []),
     'test_timer' : IDL.Func([], [IDL.Text], []),
@@ -395,8 +415,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'update_realm_config' : IDL.Func([IDL.Text], [IDL.Text], []),
-    'get_sandbox_config' : IDL.Func([], [IDL.Text], ['query']),
-    'set_sandbox_config' : IDL.Func([IDL.Text], [IDL.Text], []),
   });
 };
 export const init = ({ IDL }) => { return []; };

@@ -1,16 +1,19 @@
-<footer class="px-4 py-6 md:flex md:items-center md:justify-between md:py-10 2xl:px-0">
-	<!-- <p class="mb-4 text-center text-sm text-gray-500 md:mb-0">
-		© 2019-2023 <a href="https://flowbite.com//" class="hover:underline" target="_blank">
-			Flowbite.com
-		</a>. All rights reserved
-	</p> -->
-	<!-- <ul class="flex flex-wrap items-center justify-center gap-6">
-		{#each ['Terms', 'Licensing', 'Cookie Policy', 'Contact'] as elem}
-			<li>
-				<a href="/" class="text-sm font-normal text-gray-500 hover:underline dark:text-gray-400"
-					>{elem}</a
-				>
-			</li>
-		{/each}
-	</ul> -->
+<script>
+	import { testMode } from '$lib/stores/realmInfo';
+	import TestFlagsModal from '$lib/components/TestFlagsModal.svelte';
+
+	let testFlagsOpen = false;
+</script>
+
+<footer class="px-4 py-6 md:flex md:items-center md:justify-center md:py-10 2xl:px-0">
+	{#if $testMode}
+		<button
+			type="button"
+			class="rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-400 dark:hover:bg-gray-700"
+			on:click={() => (testFlagsOpen = true)}
+		>
+			Test flags
+		</button>
+		<TestFlagsModal bind:open={testFlagsOpen} />
+	{/if}
 </footer>

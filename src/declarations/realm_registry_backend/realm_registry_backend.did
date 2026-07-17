@@ -300,5 +300,6 @@ service : {
   "list_activated_principals" : () -> (text) query;
   "get_runtime_flags" : () -> (text) query;
   "set_canister_config_json" : (text) -> (text);
+  "set_test_flags_json" : (text) -> (text);
   "__get_candid_interface_tmp_hack" : () -> (text) query;
 }

@@ -1,10 +1,14 @@
 <script>
   import { _ } from 'svelte-i18n';
   import { realmPanelOpen } from '$lib/realm-panel-chrome.js';
+  import { testMode } from '$lib/stores/registryRuntimeFlags.js';
+  import TestFlagsModal from '$lib/components/TestFlagsModal.svelte';
 
   export let version = '';
   export let commitHash = '';
   export let commitDatetime = '';
+
+  let testFlagsOpen = false;
 </script>
 
 {#if !$realmPanelOpen}
@@ -30,8 +34,17 @@
       <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="20" height="20" class="ic-logo" />
       <span>{$_('footer.built_on_ic')}</span>
     </a>
+    {#if $testMode}
+      <button type="button" class="test-flags-btn" on:click={() => (testFlagsOpen = true)}>
+        Test flags
+      </button>
+    {/if}
   </div>
 </footer>
+{/if}
+
+{#if $testMode}
+  <TestFlagsModal bind:open={testFlagsOpen} />
 {/if}
 
 <style>
@@ -86,5 +99,21 @@
 
   .github-link:hover {
     color: var(--text-tertiary);
+  }
+
+  .test-flags-btn {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid #d97706;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #d97706;
+    font-family: var(--font-family);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .test-flags-btn:hover {
+    background: rgba(217, 119, 6, 0.1);
   }
 </style>
