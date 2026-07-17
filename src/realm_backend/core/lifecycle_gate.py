@@ -19,6 +19,7 @@ Milestones (computed live from GGG entities, no cached flags):
 """
 
 import json
+from typing import Optional
 
 from ic_python_logging import get_logger
 
@@ -189,6 +190,43 @@ def readiness_checklist(realm) -> list:
     return items
 
 
+def auto_milestones_ready(realm, from_stage: str = "alpha", to_stage: str = "beta"):
+    """Return ``(ready, missing_labels)`` for an ``auto_milestones`` transition.
+
+    The codex declares the transition as
+    ``{"mode": "auto_milestones", "milestones": [...]}``. Known milestone ids:
+
+      - ``critical_mass`` — population reached ``lifecycle.critical_mass``
+        (or ``lifecycle.population_target`` as fallback).
+      - anything else — a truthy boolean flag of the same name in the
+        ``lifecycle`` config block (e.g. ``land_acquired``).
+    """
+    from ggg import User
+
+    config = _manifest(realm)
+    lifecycle = config.get("lifecycle", {}) or {}
+    transitions = lifecycle.get("transitions", {}) or {}
+    entry = transitions.get(f"{from_stage}_to_{to_stage}", {}) or {}
+    milestones = entry.get("milestones") or []
+
+    missing = []
+    for milestone in milestones:
+        if milestone == "critical_mass":
+            target = int(
+                lifecycle.get("critical_mass")
+                or lifecycle.get("population_target")
+                or 0
+            )
+            population = User.count()
+            if target > 0 and population < target:
+                missing.append(
+                    f"Critical mass not reached ({population} of {target} citizens)"
+                )
+        elif not lifecycle.get(milestone):
+            missing.append(f"Milestone '{milestone}' not met")
+    return (not missing, missing)
+
+
 def alpha_to_beta_ready(realm):
     """Return ``(ready, missing_labels)`` for the alpha→beta hard gate.
 
@@ -207,4 +245,113 @@ def alpha_to_beta_ready(realm):
 
     checklist = readiness_checklist(realm)
     missing = [i["label"] for i in checklist if not i["done"]]
+    return (not missing, missing)
+
+
+def _now_seconds() -> int:
+    try:
+        from _cdk import ic
+
+        t = int(ic.time())
+        if t > 0:
+            return t // 1_000_000_000
+    except Exception:
+        pass
+    import time
+
+    return int(time.time())
+
+
+def _stage_entered_at(realm, stage: str) -> int:
+    """Unix seconds when the realm entered *stage* (0 if unknown).
+
+    Read from the timestamped lifecycle history that ``set_realm_stage``
+    appends to ``manifest_data``.
+    """
+    try:
+        raw = json.loads(getattr(realm, "manifest_data", "{}") or "{}")
+        history = (raw.get("lifecycle", {}) or {}).get("history", []) or []
+    except (json.JSONDecodeError, TypeError):
+        return 0
+    for entry in reversed(history):
+        if isinstance(entry, dict) and entry.get("stage") == stage:
+            return int(entry.get("at") or 0)
+    return 0
+
+
+def beta_to_production_ready(realm, approvals: Optional[list] = None):
+    """Return ``(ready, missing_labels)`` for the beta→production gate.
+
+    Two conditions (issue #253):
+
+    1. **Proving period** — ``lifecycle.beta_proving_days`` must have elapsed
+       since the realm entered beta (0/absent disables the requirement).
+    2. **Governance vote** — root must have been handed over (root org has
+       members beyond the creator) and the recorded approvals must satisfy
+       the root organization's policy among its member principals.
+
+    ``approvals`` defaults to ``lifecycle.stage_approvals.production`` in
+    ``manifest_data`` (written by realm_settings ``approve_stage_transition``).
+    """
+    from ggg import Department, ROOT_ORG_NAME
+
+    missing = []
+    config = _manifest(realm)
+    lifecycle = config.get("lifecycle", {}) or {}
+
+    proving_days = float(lifecycle.get("beta_proving_days") or 0)
+    if proving_days > 0:
+        entered = _stage_entered_at(realm, "beta")
+        if entered <= 0:
+            missing.append(
+                f"Proving period unknown: no timestamped beta entry in history "
+                f"(requires {proving_days} days in beta)"
+            )
+        else:
+            elapsed_days = (_now_seconds() - entered) / 86400.0
+            if elapsed_days < proving_days:
+                missing.append(
+                    f"Proving period not elapsed ({elapsed_days:.2f} of "
+                    f"{proving_days} days in beta)"
+                )
+
+    root = next(
+        (
+            d for d in Department.instances()
+            if getattr(d, "is_root", False) or d.name == ROOT_ORG_NAME
+        ),
+        None,
+    )
+    from core.membership import department_member_count, department_member_principals
+
+    if root is None or department_member_count(root) < 1:
+        missing.append("Root not handed to governance authority")
+        return (False, missing)
+
+    if approvals is None:
+        try:
+            raw = json.loads(getattr(realm, "manifest_data", "{}") or "{}")
+            approvals = (
+                (raw.get("lifecycle", {}) or {})
+                .get("stage_approvals", {})
+                .get("production", [])
+            ) or []
+        except (json.JSONDecodeError, TypeError):
+            approvals = []
+
+    eligible = department_member_principals(root)
+    from core.org_policy import policy_satisfied
+
+    ok, reason = policy_satisfied(
+        approvals=approvals,
+        vetoes=[],
+        eligible=eligible,
+        threshold_m=int(getattr(root, "policy_threshold_m", 1) or 1),
+        threshold_n=int(getattr(root, "policy_threshold_n", 1) or 1),
+        quorum_percent=int(getattr(root, "policy_quorum_percent", 0) or 0),
+        veto_principals=[],
+    )
+    if not ok:
+        missing.append(f"Governance vote not passed: {reason}")
+
     return (not missing, missing)

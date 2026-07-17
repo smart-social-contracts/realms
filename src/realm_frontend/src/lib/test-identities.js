@@ -1,7 +1,11 @@
 /**
  * Deterministic test identities for II-bypass mode.
  *
- * Seed layout (32 bytes): [0xED, 0x57, index, 0, …]
+ * Seed layout (32 bytes): [0xED, 0x57, index₀, index₁, index₂, index₃, 0, …]
+ *   - The identity index is encoded little-endian across 4 bytes (seed[2..5]),
+ *     supporting ~4.3 billion distinct identities for large-scale E2E load
+ *     tests. Indices 0–255 produce byte-identical seeds to the original
+ *     1-byte layout, so existing rosters/principals are unaffected.
  *   - Index 0 = Identity 1 (Creator); indices 1…3 = Identity 2–4.
  *
  * Optional deploy-time overrides (via /canister_ids.js):
@@ -35,7 +39,11 @@ export function testIdentitySeed(index) {
   const seed = new Uint8Array(32);
   seed[0] = TEST_IDENTITY_MAGIC[0];
   seed[1] = TEST_IDENTITY_MAGIC[1];
+  // 4-byte little-endian index (backward compatible: 0–255 only sets seed[2]).
   seed[2] = index & 0xff;
+  seed[3] = (index >>> 8) & 0xff;
+  seed[4] = (index >>> 16) & 0xff;
+  seed[5] = (index >>> 24) & 0xff;
   return seed;
 }
 

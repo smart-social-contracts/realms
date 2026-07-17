@@ -1,6 +1,6 @@
 {
-  "description": "Principals for the II-bypass deterministic test identities (indices 0–9). Each index uses a fixed 32-byte Ed25519 seed: [0xED, 0x57, index, 0, …] — see src/realm_frontend/src/lib/test-identities.js. Same seed always yields the same principal on every machine.",
-  "seed_layout": "bytes[0]=0xED, bytes[1]=0x57, bytes[2]=index (0–255), remainder zero",
+  "description": "Principals for the II-bypass deterministic test identities (indices 0–9). Each index uses a fixed 32-byte Ed25519 seed: [0xED, 0x57, index (4 bytes LE), 0, …] — see src/realm_frontend/src/lib/test-identities.js. Same seed always yields the same principal on every machine.",
+  "seed_layout": "bytes[0]=0xED, bytes[1]=0x57, bytes[2..5]=index (little-endian, 0–4294967295), remainder zero",
   "identities": [
     {
       "index": 0,
