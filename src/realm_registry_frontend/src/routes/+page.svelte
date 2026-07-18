@@ -153,12 +153,14 @@
     }
   }
 
-  function selectRealm(realmId) {
+  async function selectRealm(realmId) {
     selectedRealmId = realmId;
+    const panelWasOpen = panelOpen;
     panelOpen = true;
+    await tick();
     const realm = filteredRealms.find((r) => r.id === realmId);
     if (realm && mapView) {
-      mapView.flyToRealm(realm);
+      mapView.flyToRealm(realm, { waitForInset: !panelWasOpen });
     }
   }
 

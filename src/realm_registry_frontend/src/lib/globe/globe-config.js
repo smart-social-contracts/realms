@@ -15,6 +15,12 @@ export const MAP_BG = '#FAFAFA';
 export const FLY_TO_MS = 900;
 export const DIM_OPACITY = 0.35;
 
+/** Max display footprint vs true res-6 zone union (area ratio). */
+export const HEX_AREA_INFLATION_MAX = 1.45;
+
+/** Realms with more res-6 zone cells skip influence rings (perf guard). */
+export const HEX_INFLUENCE_MAX_TRUTH_CELLS = 24;
+
 /**
  * Zoom where MapLibre's globe projection starts flattening toward mercator.
  * Above this we force mercator so GeoJSON hex fills stay visible.
@@ -33,14 +39,19 @@ export function h3ResolutionForZoom(zoom) {
   return Math.min(res, MAX_H3_DISPLAY_RESOLUTION);
 }
 
-/** Fewer influence rings when hexes are already large / fine. */
+/**
+ * Stable key for hex display — only changes when fidelity / coarse-res rules change.
+ * @param {number} zoom
+ */
+export function hexDisplayZoomKey(zoom) {
+  const coarse = h3ResolutionForZoom(zoom);
+  const maxFine = zoom >= 7 ? ZONE_DATA_RESOLUTION : coarse;
+  return `${coarse}:${maxFine}`;
+}
+
+/** Influence rings only at full zone resolution (res 6). */
 export function influenceRingsForResolution(resolution) {
-  if (resolution <= 2) return 0;
-  if (resolution <= 3) return 1;
-  if (resolution <= 4) return 2;
-  // At city zoom (res 5–6) keep rings small so the HQ cap stays headroom-rich.
-  if (resolution <= 6) return 1;
-  return 1;
+  return resolution >= ZONE_DATA_RESOLUTION ? 1 : 0;
 }
 
 /** Max hex polygons to render at each resolution (performance). */

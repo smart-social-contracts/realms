@@ -2,7 +2,10 @@ import {
   DIM_OPACITY,
   hexStyle,
   hexCapForResolution,
-  influenceRingsForResolution,
+  HEX_AREA_INFLATION_MAX,
+  HEX_INFLUENCE_MAX_TRUTH_CELLS,
+  h3ResolutionForZoom,
+  ZONE_DATA_RESOLUTION,
 } from './globe-config.js';
 import { stageMarkerColor } from '../realm-stages.js';
 
@@ -31,10 +34,220 @@ import { stageMarkerColor } from '../realm-stages.js';
  */
 
 /**
+ * Res-6 H3 cells that represent a realm's true zone footprint.
+ * @param {object[]} zones
+ * @param {object} h3
+ * @returns {Set<string>}
+ */
+export function realmTruthCells(zones, h3) {
+  const cells = new Set();
+  if (!zones?.length || !h3) return cells;
+
+  for (const zone of zones) {
+    let idx = null;
+    try {
+      if (zone.h3_index) {
+        const res = h3.getResolution?.(zone.h3_index);
+        if (res === ZONE_DATA_RESOLUTION) {
+          idx = zone.h3_index;
+        } else if (typeof res === 'number' && res > ZONE_DATA_RESOLUTION && h3.cellToParent) {
+          idx = h3.cellToParent(zone.h3_index, ZONE_DATA_RESOLUTION);
+        }
+      }
+      if (!idx) {
+        idx = h3.latLngToCell(zone.center_lat, zone.center_lng, ZONE_DATA_RESOLUTION);
+      }
+    } catch {
+      try {
+        idx = h3.latLngToCell(zone.center_lat, zone.center_lng, ZONE_DATA_RESOLUTION);
+      } catch {
+        /* skip zone */
+      }
+    }
+    if (idx) cells.add(idx);
+  }
+
+  return cells;
+}
+
+/** @param {Iterable<string>} cells @param {object} h3 */
+function totalCellsArea(cells, h3) {
+  let sum = 0;
+  for (const cell of cells) {
+    try {
+      sum += h3.cellArea(cell, 'km2');
+    } catch {
+      try {
+        sum += h3.cellArea(cell);
+      } catch {
+        sum += 1;
+      }
+    }
+  }
+  return sum || 1;
+}
+
+/** @param {Set<string>} truthCells @param {object} h3 @param {number} resolution */
+function parentCellsAtResolution(truthCells, h3, resolution) {
+  const out = new Set();
+  for (const cell of truthCells) {
+    try {
+      if (resolution >= ZONE_DATA_RESOLUTION) {
+        out.add(cell);
+      } else {
+        out.add(h3.cellToParent(cell, resolution));
+      }
+    } catch {
+      out.add(cell);
+    }
+  }
+  return out;
+}
+
+/** @param {Set<string>} cells @param {object} h3 @param {number} rings */
+function expandWithInfluenceRings(cells, h3, rings) {
+  const out = new Set(cells);
+  if (rings <= 0) return out;
+  for (const cell of cells) {
+    try {
+      for (const hex of h3.gridDisk(cell, rings)) {
+        out.add(hex);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return out;
+}
+
+/** @param {Set<string>} displayCells @param {Set<string>} truthCells @param {object} h3 @param {number} displayRes */
+function areaInflationRatio(displayCells, truthCells, h3, displayRes) {
+  try {
+    const truthArea =
+      h3.getHexagonAreaAvg(ZONE_DATA_RESOLUTION, 'km2') * Math.max(1, truthCells.size);
+    const displayArea =
+      h3.getHexagonAreaAvg(displayRes, 'km2') * Math.max(1, displayCells.size);
+    return displayArea / truthArea;
+  } catch {
+    return totalCellsArea(displayCells, h3) / totalCellsArea(truthCells, h3);
+  }
+}
+
+/**
+ * Pick per-realm display resolution: coarsest zoom-allowed res whose footprint
+ * stays within HEX_AREA_INFLATION_MAX of the true res-6 union, or null → markers only.
+ * @param {object[]} zones
+ * @param {object} h3
+ * @param {number} zoom
+ */
+export function chooseRealmHexResolution(zones, h3, zoom) {
+  const truthCells = realmTruthCells(zones, h3);
+  if (!truthCells.size) return null;
+
+  const targetCoarse = h3ResolutionForZoom(zoom);
+  const maxFine = zoom >= 7 ? ZONE_DATA_RESOLUTION : targetCoarse;
+
+  for (let resolution = targetCoarse; resolution <= maxFine; resolution++) {
+    const displayCells = parentCellsAtResolution(truthCells, h3, resolution);
+    if (areaInflationRatio(displayCells, truthCells, h3, resolution) > HEX_AREA_INFLATION_MAX) {
+      continue;
+    }
+
+    if (resolution >= ZONE_DATA_RESOLUTION && truthCells.size <= HEX_INFLUENCE_MAX_TRUTH_CELLS) {
+      const withRing = expandWithInfluenceRings(truthCells, h3, 1);
+      if (
+        areaInflationRatio(withRing, truthCells, h3, ZONE_DATA_RESOLUTION) <=
+        HEX_AREA_INFLATION_MAX
+      ) {
+        return { resolution, truthCells, influenceRings: 1 };
+      }
+    }
+
+    return { resolution, truthCells, influenceRings: 0 };
+  }
+
+  return null;
+}
+
+/** @param {object[]} zones @param {object} h3 */
+function zoneStatsByTruthCell(zones, h3) {
+  /** @type {Map<string, number>} */
+  const users = new Map();
+  /** @type {Map<string, string[]>} */
+  const locations = new Map();
+
+  for (const zone of zones) {
+    try {
+      const truthCell = h3.latLngToCell(zone.center_lat, zone.center_lng, ZONE_DATA_RESOLUTION);
+      users.set(truthCell, (users.get(truthCell) || 0) + (zone.user_count || 0));
+      if (!locations.has(truthCell)) locations.set(truthCell, []);
+      locations.get(truthCell).push(zone.location_name || 'Zone');
+    } catch {
+      /* skip */
+    }
+  }
+
+  return { users, locations };
+}
+
+/** @param {Set<string>} truthCells @param {object} h3 @param {number} rings */
+function buildCellDistanceMap(truthCells, h3, rings) {
+  /** @type {Map<string, number>} */
+  const out = new Map();
+  for (const truthCell of truthCells) {
+    out.set(truthCell, 0);
+    if (rings <= 0) continue;
+    try {
+      for (const hex of h3.gridDisk(truthCell, rings)) {
+        if (out.has(hex)) continue;
+        out.set(hex, h3.gridDistance(truthCell, hex));
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return out;
+}
+
+/** @param {Set<string>} truthCells @param {object} h3 @param {number} resolution */
+function truthToDisplayParents(truthCells, h3, resolution) {
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  for (const truthCell of truthCells) {
+    try {
+      out.set(
+        truthCell,
+        resolution >= ZONE_DATA_RESOLUTION ? truthCell : h3.cellToParent(truthCell, resolution)
+      );
+    } catch {
+      out.set(truthCell, truthCell);
+    }
+  }
+  return out;
+}
+
+function statsForDisplayHex(hexIndex, zoneStats, truthToDisplay, truthCells, distance) {
+  if (distance > 0) {
+    return { users: 0, locations: [] };
+  }
+
+  let users = 0;
+  const locs = [];
+  for (const truthCell of truthCells) {
+    if (truthToDisplay.get(truthCell) !== hexIndex && truthCell !== hexIndex) continue;
+    users += zoneStats.users.get(truthCell) || 0;
+    const names = zoneStats.locations.get(truthCell);
+    if (names) locs.push(...names);
+  }
+
+  return { users, locations: locs };
+}
+
+/**
  * @param {object[]} filteredRealms
  * @param {Record<string, { zones: object[] }>} realmZoneData
  * @param {object} h3
- * @param {{ matchingRealmIds?: Set<string> | null, dimNonMatching?: boolean, h3Resolution?: number, influenceRings?: number }} [options]
+ * @param {{ matchingRealmIds?: Set<string> | null, dimNonMatching?: boolean, zoom?: number }} [options]
  * @returns {HexPolygon[]}
  */
 export function buildHexPolygons(
@@ -44,78 +257,72 @@ export function buildHexPolygons(
   {
     matchingRealmIds = null,
     dimNonMatching = false,
-    h3Resolution = 4,
-    influenceRings = influenceRingsForResolution(h3Resolution),
+    zoom = 9,
   } = {}
 ) {
   /** @type {Record<string, { realms: HexRealmEntry[], totalUsers: number }>} */
   const hexData = {};
+  let finestResolution = h3ResolutionForZoom(zoom);
 
   filteredRealms.forEach((realm) => {
     const realZoneData = realmZoneData[realm.id];
     if (!realZoneData?.zones?.length) return;
 
-    realZoneData.zones.forEach((zone) => {
-      let centerHexIndex;
-      try {
-        centerHexIndex = h3.latLngToCell(zone.center_lat, zone.center_lng, h3Resolution);
-      } catch {
-        try {
-          centerHexIndex = h3.cellToParent?.(zone.h3_index, h3Resolution) ?? zone.h3_index;
-        } catch {
-          centerHexIndex = zone.h3_index;
-        }
+    const choice = chooseRealmHexResolution(realZoneData.zones, h3, zoom);
+    if (!choice) return;
+
+    const { resolution: h3Resolution, truthCells, influenceRings } = choice;
+    finestResolution = Math.max(finestResolution, h3Resolution);
+
+    const zoneStats = zoneStatsByTruthCell(realZoneData.zones, h3);
+    const truthToDisplay = truthToDisplayParents(truthCells, h3, h3Resolution);
+
+    /** @type {Map<string, number>} */
+    const cellDistances =
+      influenceRings > 0
+        ? buildCellDistanceMap(truthCells, h3, influenceRings)
+        : new Map([...new Set(truthToDisplay.values())].map((hex) => [hex, 0]));
+
+    for (const [hexIndex, distance] of cellDistances) {
+      const { users, locations } = statsForDisplayHex(
+        hexIndex,
+        zoneStats,
+        truthToDisplay,
+        truthCells,
+        distance
+      );
+
+      if (!hexData[hexIndex]) {
+        hexData[hexIndex] = { realms: [], totalUsers: 0 };
       }
 
-      let influenceHexes;
-      try {
-        influenceHexes =
-          influenceRings > 0 ? h3.gridDisk(centerHexIndex, influenceRings) : [centerHexIndex];
-      } catch {
-        influenceHexes =
-          influenceRings > 0 && h3.kRing
-            ? h3.kRing(centerHexIndex, influenceRings)
-            : [centerHexIndex];
+      const existingEntry = hexData[hexIndex].realms.find((r) => r.realm.id === realm.id);
+      if (existingEntry) {
+        if (distance < existingEntry.distance) {
+          existingEntry.distance = distance;
+          existingEntry.isCenter = distance === 0;
+          existingEntry.isHQ = distance === 0;
+          existingEntry.users = users;
+          existingEntry.locations = locations;
+        } else if (distance === existingEntry.distance && distance === 0) {
+          existingEntry.users += users;
+          existingEntry.locations = [...new Set([...existingEntry.locations, ...locations])];
+        }
+      } else {
+        hexData[hexIndex].realms.push({
+          realm,
+          users,
+          distance,
+          isCenter: distance === 0,
+          isHQ: distance === 0,
+          locations,
+        });
       }
 
-      influenceHexes.forEach((hexIndex) => {
-        let distance;
-        try {
-          distance = h3.gridDistance(centerHexIndex, hexIndex);
-        } catch {
-          distance = hexIndex === centerHexIndex ? 0 : 1;
-        }
-
-        if (!hexData[hexIndex]) {
-          hexData[hexIndex] = { realms: [], totalUsers: 0 };
-        }
-
-        const existingEntry = hexData[hexIndex].realms.find((r) => r.realm.id === realm.id);
-        if (existingEntry) {
-          if (distance < existingEntry.distance) {
-            existingEntry.distance = distance;
-            existingEntry.isCenter = distance === 0;
-            existingEntry.isHQ = distance === 0;
-          }
-          if (distance === 0) {
-            existingEntry.users += zone.user_count;
-          }
-        } else {
-          hexData[hexIndex].realms.push({
-            realm,
-            users: distance === 0 ? zone.user_count : 0,
-            distance,
-            isCenter: distance === 0,
-            isHQ: distance === 0,
-            locations: distance === 0 ? [zone.location_name || 'Zone'] : [],
-          });
-        }
-
-        if (distance === 0) {
-          hexData[hexIndex].totalUsers += zone.user_count;
-        }
-      });
-    });
+      if (distance === 0) {
+        hexData[hexIndex].totalUsers += users;
+      }
+    }
   });
 
   const polygons = [];
@@ -140,7 +347,7 @@ export function buildHexPolygons(
     const style = hexStyle(minDistance, {
       totalUsers: data.totalUsers,
       hasMultipleRealms,
-      h3Resolution,
+      h3Resolution: finestResolution,
     });
 
     const realmIds = data.realms.map((r) => r.realm.id);
@@ -165,7 +372,7 @@ export function buildHexPolygons(
     });
   }
 
-  const cap = hexCapForResolution(h3Resolution);
+  const cap = hexCapForResolution(finestResolution);
   // Always keep every HQ / capital cell (distance 0). Only influence-ring
   // hexes are subject to the performance cap — otherwise dense realms
   // (e.g. Dominion) crowd out smaller Live realms like the E2E capitals.
@@ -178,9 +385,59 @@ export function buildHexPolygons(
 }
 
 /**
- * Capital / HQ zone for a realm: highest user_count, stable tie-break on name.
+ * Geographic bounds of a realm's true res-6 zone footprint (for map fit).
  * @param {object[]} zones
+ * @param {object | null} h3
+ * @returns {[[number, number], [number, number]] | null} [[west, south], [east, north]]
  */
+export function realmDisplayBounds(zones, h3) {
+  if (!zones?.length || !h3) return null;
+
+  const truthCells = realmTruthCells(zones, h3);
+  if (!truthCells.size) return null;
+
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+
+  const extend = (lng, lat) => {
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+    minLng = Math.min(minLng, lng);
+    minLat = Math.min(minLat, lat);
+    maxLng = Math.max(maxLng, lng);
+    maxLat = Math.max(maxLat, lat);
+  };
+
+  for (const hexIndex of truthCells) {
+    try {
+      const boundary = h3.cellToBoundary(hexIndex, true);
+      for (const [lng, lat] of boundary) {
+        extend(lng, lat);
+      }
+    } catch {
+      try {
+        const [lat, lng] = h3.cellToLatLng(hexIndex);
+        extend(lng, lat);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  if (!Number.isFinite(minLng)) return null;
+
+  const lngSpan = maxLng - minLng;
+  const latSpan = maxLat - minLat;
+  const lngPad = Math.max(lngSpan * 0.14, 0.018);
+  const latPad = Math.max(latSpan * 0.14, 0.018);
+
+  return [
+    [minLng - lngPad, minLat - latPad],
+    [maxLng + lngPad, maxLat + latPad],
+  ];
+}
+
 export function resolveCapitalZone(zones) {
   if (!zones?.length) return null;
   return [...zones].sort((a, b) => {
@@ -328,7 +585,7 @@ export function buildPointMarkers(
     matchingRealmIds = null,
     dimNonMatching = false,
     h3 = null,
-    h3Resolution = 4,
+    h3Resolution = ZONE_DATA_RESOLUTION,
   } = {}
 ) {
   const markers = [];

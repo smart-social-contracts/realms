@@ -11,6 +11,7 @@
     buildHexPolygons,
     buildPointMarkers,
     capitalHexCenter,
+    realmDisplayBounds,
     resolveCapitalZone,
   } from '$lib/globe/hex-data.js';
 
@@ -20,12 +21,13 @@
   } from '$lib/globe/realm-hover-popup.js';
   import {
     FLY_TO_MS,
+    hexDisplayZoomKey,
     h3ResolutionForZoom,
-    influenceRingsForResolution,
     MAP_BG,
     MERCATOR_PROJECTION_MIN_ZOOM,
     softenGlobeBasemap,
     stripPoliticalLayers,
+    ZONE_DATA_RESOLUTION,
   } from '$lib/globe/globe-config.js';
   import GlobeWireframeLoader from '$lib/components/GlobeWireframeLoader.svelte';
 
@@ -59,6 +61,9 @@
   let hoveredMarkerId = '';
   let ready = false;
   let currentH3Res = -1;
+  let lastHexZoomKey = '';
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let zoomUpdateTimer = null;
   let mapError = '';
   let reducedMotion = false;
   let overlayShown = true;
@@ -74,6 +79,9 @@
   const AUTO_ROTATE_RESUME_MS = 5000;
   /** Below this zoom the view is globe-like; above it MapLibre flattens toward mercator. */
   const GLOBE_VIEW_MAX_ZOOM = 5.5;
+  /** Keep selected realm hexes clear of fixed header / KPI chrome. */
+  const REALM_FIT_PADDING = { top: 88, bottom: 64, left: 48, right: 48 };
+  const MAP_SHELL_INSET_MS = 280;
 
   // Realms prop is already filtered by search; never dim the globe while typing.
   $: matchingRealmIds = null;
@@ -282,28 +290,33 @@
     }
   }
 
-  function updateLayers() {
+  function updateLayers({ force = false } = {}) {
     if (!ready || !map || !h3) return;
 
     const zoom = map.getZoom();
+    const zoomKey = hexDisplayZoomKey(zoom);
     const projectionChanged = syncProjectionForZoom();
+
+    if (!force && !projectionChanged && zoomKey === lastHexZoomKey) {
+      return;
+    }
+
+    lastHexZoomKey = zoomKey;
     // Projection / style reloads can drop custom sources — always re-bind.
     ensureLayers();
     currentH3Res = h3ResolutionForZoom(zoom);
-    const influenceRings = influenceRingsForResolution(currentH3Res);
 
     const polygons = buildHexPolygons(realms, realmZoneData, h3, {
       matchingRealmIds,
       dimNonMatching,
-      h3Resolution: currentH3Res,
-      influenceRings,
+      zoom,
     });
 
     const points = buildPointMarkers(realms, realmZoneData, {
       matchingRealmIds,
       dimNonMatching,
       h3,
-      h3Resolution: currentH3Res,
+      h3Resolution: ZONE_DATA_RESOLUTION,
     });
 
     hexByIndex = new Map(polygons.map((polygon) => [polygon.hexIndex, polygon]));
@@ -324,9 +337,11 @@
 
   function onZoomEnd() {
     if (!map) return;
-    // Always refresh hexes on zoom end — res may be unchanged (capped at 6)
-    // while projection or geojson tiles still need a rebuild.
-    updateLayers();
+    if (zoomUpdateTimer) clearTimeout(zoomUpdateTimer);
+    zoomUpdateTimer = setTimeout(() => {
+      zoomUpdateTimer = null;
+      updateLayers();
+    }, 48);
   }
 
   function onMapClick(e) {
@@ -403,14 +418,44 @@
     });
   }
 
-  export function flyToRealm(realm) {
+  /**
+   * @param {object} realm
+   * @param {{ waitForInset?: boolean }} [opts]
+   */
+  export function flyToRealm(realm, { waitForInset = false } = {}) {
     const zones = realmZoneData[realm.id]?.zones;
-    if (!zones?.length) return;
-    const capital = resolveCapitalZone(zones);
-    if (!capital) return;
-    const center = capitalHexCenter(capital, h3, currentH3Res || 6);
-    // Zoom in far enough that fine H3 (res 6–7) becomes visible
-    flyTo(center.lat, center.lng, 11);
+    if (!zones?.length || !map) return;
+    pauseAutoRotate();
+
+    const fit = () => {
+      if (!map) return;
+      map.resize();
+
+      const bounds = h3 ? realmDisplayBounds(zones, h3) : null;
+
+      if (bounds) {
+        map.fitBounds(bounds, {
+          padding: REALM_FIT_PADDING,
+          duration: FLY_TO_MS,
+          maxZoom: 13,
+          essential: true,
+        });
+        return;
+      }
+
+      const capital = resolveCapitalZone(zones);
+      if (!capital) return;
+      const center = capitalHexCenter(capital, h3, currentH3Res || ZONE_DATA_RESOLUTION);
+      flyTo(center.lat, center.lng, 11);
+    };
+
+    if (waitForInset) {
+      requestAnimationFrame(fit);
+      setTimeout(fit, MAP_SHELL_INSET_MS);
+      return;
+    }
+
+    fit();
   }
 
   // Comma-op truthiness is unsafe here: empty searchQuery is falsy and skipped repaints.
@@ -418,7 +463,8 @@
     void realms;
     void realmZoneData;
     void searchQuery;
-    updateLayers();
+    lastHexZoomKey = '';
+    updateLayers({ force: true });
   }
 
   $: needsLoaderOverlay = !ready || loading;
@@ -525,9 +571,6 @@
         }
       });
       map.on('zoomend', onZoomEnd);
-      map.on('moveend', () => {
-        onZoomEnd();
-      });
       map.on('mousedown', pauseAutoRotate);
       map.on('touchstart', pauseAutoRotate);
       map.on('wheel', pauseAutoRotate);
@@ -596,6 +639,7 @@
 
   onDestroy(() => {
     if (overlayFadeTimer) clearTimeout(overlayFadeTimer);
+    if (zoomUpdateTimer) clearTimeout(zoomUpdateTimer);
     resizeObserver?.disconnect();
     resizeObserver = null;
     if (resumeTimer) clearTimeout(resumeTimer);
