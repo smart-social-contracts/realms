@@ -840,6 +840,29 @@ def register_founder(principal: text) -> RealmResponse:
         user = user_register(founder, "admin")
         logger.info(f"Founder {founder} registered with admin profile")
 
+        # Seat the founder in the root org (head + member). Root authority is
+        # what lets the creator act directly on any organization (root policy
+        # is 1/1 while the founder alone holds it); without this the root org
+        # stays empty and creator actions fall back to target-org proposals.
+        try:
+            from core.membership import add_department_member
+            from core.org_policy import (
+                ensure_root_org,
+                grant_root_authority_over_local_orgs,
+            )
+            from ggg import User as _GGGUser
+
+            root = ensure_root_org()
+            grant_root_authority_over_local_orgs()
+            founder_user = _GGGUser[founder]
+            if founder_user:
+                if not root.head:
+                    root.head = founder_user
+                add_department_member(root, founder_user)
+                logger.info(f"Founder {founder} seated as root org head/member")
+        except Exception as root_err:
+            logger.warning(f"Could not seat founder in root org: {root_err}")
+
         profiles = Vec[text]()
         for p in user.get("profiles", []):
             profiles.append(p)
