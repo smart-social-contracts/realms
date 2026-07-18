@@ -103,3 +103,10 @@ def test_flags_default_false_when_realm_load_raises(fake_ggg, monkeypatch):
     monkeypatch.setattr(_FakeRealm, "load", classmethod(lambda cls, k: _boom(k)))
     assert fake_ggg.is_demo_data_active() is False
     assert fake_ggg.skip_passport_zkproof() is False
+
+
+def test_runtime_flags_payload_includes_realm_stage(fake_ggg):
+    _set_realm(status="beta", name="Demo Realm")
+    payload = fake_ggg.get_runtime_flags_payload()
+    assert payload["success"] is True
+    assert payload["realm_stage"] == "beta"

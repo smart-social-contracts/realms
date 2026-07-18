@@ -71,7 +71,7 @@ from realm_registry_backend.api.registry import (
     search_registered_realms,
 )
 from realm_registry_backend.api.status import get_status
-from realm_registry_backend.core.models import RealmRecord, UserCredits
+from realm_registry_backend.core.models import RealmRecord, SlugRecord, UserCredits
 
 # Color formatting for terminal output
 GREEN = "\033[92m"
@@ -93,12 +93,12 @@ def print_failure(message, error=None):
 def clear_database():
     """Clear all realm records from the database"""
     try:
-        # Delete all existing realms
+        for slug in list(SlugRecord.instances()):
+            slug.delete()
         all_realms = list(RealmRecord.instances())
         for realm in all_realms:
             realm.delete()
     except Exception:
-        # If no realms exist, that's fine
         pass
 
 
@@ -222,6 +222,32 @@ def test_remove_realm():
         return True
     except Exception as e:
         print_failure("remove_realm tests failed", str(e))
+        return False
+
+
+def test_remove_realm_cleans_slugs():
+    """Removing a realm also deletes federation slug records."""
+    try:
+        clear_database()
+        backend_id = "backend-canister-1"
+        add_test_realm(backend_id, "Slug Realm", "https://slug.example")
+
+        SlugRecord(
+            slug="slug-realm",
+            realm_id=backend_id,
+            frontend_canister_id="fe-canister",
+            claimed_by=backend_id,
+            claimed_at=time.time(),
+        )
+
+        result = remove_registered_realm(backend_id)
+        assert result["success"], result.get("error")
+        assert SlugRecord["slug-realm"] is None
+
+        print_success("remove_realm slug cleanup tests passed")
+        return True
+    except Exception as e:
+        print_failure("remove_realm slug cleanup tests failed", str(e))
         return False
 
 
@@ -401,6 +427,7 @@ def run_tests():
         test_get_realm,
         test_list_realms,
         test_remove_realm,
+        test_remove_realm_cleans_slugs,
         test_search_realms,
         test_count_realms,
         test_status,

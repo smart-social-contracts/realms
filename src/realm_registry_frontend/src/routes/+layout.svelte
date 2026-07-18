@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { afterNavigate } from '$app/navigation';
+  import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import { initI18n } from '$lib/i18n';
   import { ensureRegistryRuntimeFlags } from '$lib/stores/registryRuntimeFlags.js';
@@ -11,6 +12,11 @@
 
   // Flag to track if i18n is ready
   let i18nReady = false;
+
+  /** Registry map page insets the globe itself; avoid double-shrinking via shell padding. */
+  $: registryMapRoute = $page.url.pathname === '/';
+  $: assistantDockPadding =
+    $assistantChrome.open && $assistantChrome.docked && !registryMapRoute;
 
   /** Full-viewport routes that must not scroll the document. */
   function pathLocksScroll(pathname) {
@@ -40,7 +46,7 @@
 {#if browser && i18nReady}
   <div
     class="app-shell"
-    class:assistant-docked={$assistantChrome.open && $assistantChrome.docked}
+    class:assistant-docked={assistantDockPadding}
     class:assistant-resizing={$assistantChrome.resizing}
     style="--assistant-width: {$assistantChrome.width}px"
   >

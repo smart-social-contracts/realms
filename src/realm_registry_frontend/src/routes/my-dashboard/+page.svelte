@@ -12,9 +12,25 @@
     findDraftForDeployment,
     draftResumeUrl,
     isFailedDeployment,
+    canDestroyRealm,
   } from '$lib/wizard-drafts.js';
+  import { stageLabel } from '$lib/realm-stages.js';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
   import ConnectClaude from '$lib/components/ConnectClaude.svelte';
+  import {
+    indexCreatedRealmsByBackend,
+    preferredVisitUrl,
+    registryEntryForDeployment,
+  } from '$lib/user-created-realms.js';
+  import {
+    buildDashboardDeploymentCards,
+    deploymentToDestroyRecord,
+  } from '$lib/realm-destroy-progress.js';
+  import {
+    dismissDestroyRecord,
+    loadDestroyRecords,
+    saveDestroyRecord,
+  } from '$lib/realm-destroy-records.js';
 
   let userPrincipal = null;
   let loading = true;
@@ -43,17 +59,38 @@
   let purchases = [];
   let loadingCredits = true;
   
-  // Realms data
+  // Registry rows keyed by backend canister (merged into deployment cards)
   let createdRealms = [];
-  let loadingRealms = true;
 
   // Deployments data
   let deployments = [];
+  /** Full installer job list (before dedupe) for created-realms resolution. */
+  let rawDeploymentJobs = [];
+  let totalDeploymentJobCount = 0;
   let loadingDeployments = true;
   let deploymentPollInterval = null;
   let deletingDeploymentId = null;
   let deploymentDeleteError = null;
   let deleteConfirmDeployment = null;
+  let destroyConfirmDeployment = null;
+  /** @type {Record<string, { deployment: object, stageIndex: number, startedAt: number, error?: string, complete?: boolean }>} */
+  let activeDestroys = {};
+  /** @type {object[]} persisted destroyed-realm cards */
+  let destroyRecords = [];
+  let dismissingDestroyedId = null;
+  let deploymentDestroyError = null;
+  /** @type {Record<string, string>} job_id -> lifecycle stage */
+  let deploymentRealmStages = {};
+  /** Expanded redeploy history panels (canonical job id). */
+  let expandedJobHistory = {};
+
+  $: dashboardCards = buildDashboardDeploymentCards(
+    deployments,
+    destroyRecords,
+    activeDestroys,
+  );
+  $: hasVisibleRealms =
+    dashboardCards.length > 0 || loadingDeployments || destroyRecords.length > 0;
 
   // Wizard drafts
   let wizardDrafts = [];
@@ -95,6 +132,7 @@
       }
       
       userPrincipal = await getPrincipal();
+      destroyRecords = loadDestroyRecords(userPrincipal.toText());
       loading = false;
 
       // Check invitation activation status
@@ -114,7 +152,7 @@
       loadWizardDrafts();
       
       loadVouchers();
-      await loadRealms();
+      await loadCredits();
       
       // Start polling for deployment status updates
       startDeploymentPolling();
@@ -154,18 +192,19 @@
     }
   }
 
-  async function loadRealms() {
+  async function refreshRegistryEntries({ refreshCredits = true } = {}) {
     if (!userPrincipal) return;
-    loadingRealms = true;
     try {
       const { fetchCreatedRealmsForUser } = await import('$lib/user-created-realms.js');
-      createdRealms = await fetchCreatedRealmsForUser(userPrincipal.toText(), deployments);
-      await loadCredits();
+      const next = await fetchCreatedRealmsForUser(
+        userPrincipal.toText(),
+        rawDeploymentJobs.length ? rawDeploymentJobs : deployments,
+      );
+      createdRealms = next;
+      if (refreshCredits) await loadCredits();
     } catch (err) {
-      console.error('Failed to load realms:', err);
-      createdRealms = [];
-    } finally {
-      loadingRealms = false;
+      console.error('Failed to load registry entries:', err);
+      // Keep previous createdRealms — avoids list flicker on transient errors.
     }
   }
 
@@ -199,6 +238,41 @@
   }
 
   $: visibleDrafts = filterVisibleDrafts(wizardDrafts, deployments);
+  $: registryByBackend = indexCreatedRealmsByBackend(createdRealms);
+
+  function registryEntryFor(deployment) {
+    return registryEntryForDeployment(deployment, registryByBackend);
+  }
+
+  function visitUrlFor(deployment) {
+    return preferredVisitUrl(deployment, registryEntryFor(deployment));
+  }
+
+  function toggleJobHistory(deploymentId) {
+    if (!deploymentId) return;
+    expandedJobHistory = {
+      ...expandedJobHistory,
+      [deploymentId]: !expandedJobHistory[deploymentId],
+    };
+  }
+
+  function jobHistoryStatusLabel(rawStatus) {
+    const st = (rawStatus || '').toLowerCase();
+    if (st === 'completed') return 'Complete';
+    if (st === 'failed' || st === 'failed_verification') return 'Failed';
+    if (st === 'cancelled') return 'Cancelled';
+    if (
+      st === 'pending' ||
+      st === 'provisioning' ||
+      st === 'deploying' ||
+      st === 'verifying' ||
+      st === 'extensions' ||
+      st === 'registering'
+    ) {
+      return 'In progress';
+    }
+    return rawStatus || 'Unknown';
+  }
 
   function editDraftUrlForDeployment(deployment) {
     const draft = findDraftForDeployment(wizardDrafts, deployment);
@@ -241,21 +315,137 @@
     }
   }
 
+  function requestDestroyDeployment(deployment) {
+    if (!deployment?.deployment_id || activeDestroys[deployment.deployment_id]) return;
+    destroyConfirmDeployment = deployment;
+  }
+
+  function cancelDestroyDeployment() {
+    destroyConfirmDeployment = null;
+  }
+
+  async function runDestroyForDeployment(deployment) {
+    const jobId = deployment?.deployment_id;
+    if (!jobId || !userPrincipal) return;
+
+    activeDestroys = {
+      ...activeDestroys,
+      [jobId]: {
+        deployment: { ...deployment },
+        stageIndex: 0,
+        startedAt: Date.now(),
+        error: null,
+        complete: false,
+      },
+    };
+
+    try {
+      const { destroyRealmJob } = await import('$lib/installer-queue.js');
+      await destroyRealmJob(jobId, {
+        backendCanisterId: deployment.backend_canister_id || '',
+        onProgress: (update) => {
+          const current = activeDestroys[jobId];
+          if (!current) return;
+          activeDestroys = {
+            ...activeDestroys,
+            [jobId]: {
+              ...current,
+              stageIndex: update.stageIndex ?? current.stageIndex,
+              complete: update.complete ?? current.complete,
+              error: null,
+            },
+          };
+        },
+      });
+
+      const finished = activeDestroys[jobId];
+      if (finished) {
+        saveDestroyRecord(
+          userPrincipal.toText(),
+          deploymentToDestroyRecord(finished.deployment, Date.now()),
+        );
+        destroyRecords = loadDestroyRecords(userPrincipal.toText());
+      }
+
+      const { [jobId]: _removed, ...restDestroys } = activeDestroys;
+      activeDestroys = restDestroys;
+      const { [jobId]: _stage, ...restStages } = deploymentRealmStages;
+      deploymentRealmStages = restStages;
+
+      await loadWizardDrafts();
+      await loadDeployments();
+    } catch (err) {
+      console.error('Failed to destroy realm:', err);
+      const current = activeDestroys[jobId];
+      if (current) {
+        activeDestroys = {
+          ...activeDestroys,
+          [jobId]: {
+            ...current,
+            error: err?.message || 'Failed to destroy realm.',
+          },
+        };
+      }
+    }
+  }
+
+  function confirmDestroyDeployment() {
+    const deployment = destroyConfirmDeployment;
+    if (!deployment) return;
+    destroyConfirmDeployment = null;
+    deploymentDestroyError = null;
+    runDestroyForDeployment(deployment);
+  }
+
+  function dismissDestroyedCard(deployment) {
+    const jobId = deployment?.deployment_id;
+    if (!jobId || !userPrincipal || dismissingDestroyedId) return;
+    dismissingDestroyedId = jobId;
+    dismissDestroyRecord(userPrincipal.toText(), jobId);
+    destroyRecords = loadDestroyRecords(userPrincipal.toText());
+    dismissingDestroyedId = null;
+  }
+
+  function retryDestroyDeployment(deployment) {
+    if (!deployment?.deployment_id || activeDestroys[deployment.deployment_id]) return;
+    deploymentDestroyError = null;
+    runDestroyForDeployment(deployment);
+  }
+
+  function deploymentStage(deployment) {
+    return deploymentRealmStages[deployment?.deployment_id] || null;
+  }
+
+  async function loadDeploymentRealmStages(rows = deployments) {
+    try {
+      const { fetchDeploymentRealmStages } = await import('$lib/realm-stage-client.js');
+      deploymentRealmStages = await fetchDeploymentRealmStages(rows);
+    } catch (err) {
+      console.warn('Failed to load realm stages:', err);
+      deploymentRealmStages = {};
+    }
+  }
+
   async function loadDeployments() {
     if (!userPrincipal) return;
     loadingDeployments = true;
     try {
-      const { fetchDeploymentJobsFromInstaller, installerJobToDeploymentRow } = await import(
+      const { fetchDeploymentJobsFromInstaller, prepareDashboardDeploymentRows } = await import(
         '$lib/installer-queue.js'
       );
       const jobs = await fetchDeploymentJobsFromInstaller();
-      const principalText = userPrincipal.toText();
-      const mine = jobs.filter((j) => (j.caller_principal || '') === principalText);
-      deployments = mine.map(installerJobToDeploymentRow);
-      deployments.sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
+      const { rawJobs, deployments: rows, totalJobCount } = prepareDashboardDeploymentRows(
+        jobs,
+        userPrincipal.toText(),
+      );
+      rawDeploymentJobs = rawJobs;
+      totalDeploymentJobCount = totalJobCount;
+      deployments = rows;
+      await loadDeploymentRealmStages(deployments);
+      await refreshRegistryEntries({ refreshCredits: false });
     } catch (err) {
       console.error('Failed to load deployments:', err);
-      deployments = [];
+      if (!deployments.length) deployments = [];
     } finally {
       loadingDeployments = false;
     }
@@ -268,11 +458,6 @@
       if (hasActiveDeployments) {
         await loadDeployments();
         await loadWizardDrafts();
-        const justCompleted = deployments.some((d) => d.raw_status === 'completed');
-        if (justCompleted) {
-          await loadCredits();
-          await loadRealms();
-        }
       }
     }, 10000);
   }
@@ -683,49 +868,6 @@
               </a>
             </div>
 
-            <!-- Created Realms (on-chain registry — not the same as queued installer jobs) -->
-            <div class="realms-group created-realms-group">
-              <h3>{$_('dashboard.created_realms')}</h3>
-              {#if loadingRealms}
-                <div class="loading-placeholder"></div>
-              {:else if createdRealms.length === 0}
-                <div class="empty-state">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                  </svg>
-                  <p>{$_('dashboard.no_created_realms')}</p>
-                  {#if deployments.some((d) => d.raw_status === 'completed')}
-                    <p class="empty-hint">Your completed deployment may still be registering. Refresh in a moment or check the homepage directory.</p>
-                  {:else if deployments.length > 0}
-                    <p class="empty-hint">Active deployments are listed below. This section updates when your realm is registered on-chain.</p>
-                  {/if}
-                  <a href="/create-realm" class="create-realm-btn">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 5v14M5 12h14"/>
-                    </svg>
-                    Create Realm
-                  </a>
-                </div>
-              {:else}
-                <ul class="realm-list">
-                  {#each createdRealms as realm}
-                    <li class="realm-item">
-                      <div class="realm-info">
-                        <span class="realm-name">{realm.name}</span>
-                        <span class="realm-id">{realm.id}</span>
-                      </div>
-                      {#if realm.url}
-                        <a href={realm.url} target="_blank" rel="noopener noreferrer" class="realm-visit-link">
-                          Visit →
-                        </a>
-                      {/if}
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-            </div>
-
             <!-- Wizard drafts (in-progress realm creation) -->
             <div class="realms-group drafts-group">
               <h3>Drafts</h3>
@@ -761,34 +903,88 @@
               {/if}
             </div>
 
-            <!-- Active Deployments -->
-            {#if deployments.length > 0}
+            <!-- Realms (deployment jobs + on-chain registry status) -->
+            {#if loadingDeployments && deployments.length === 0}
               <div class="realms-group deployments-group">
-                <h3>Deployments</h3>
+                <h3>{$_('dashboard.your_realms')}</h3>
+                <div class="loading-placeholder"></div>
+              </div>
+            {:else if hasVisibleRealms}
+              <div class="realms-group deployments-group">
+                <h3>
+                  {$_('dashboard.your_realms')}
+                  {#if totalDeploymentJobCount > 0}
+                    <span class="deployments-summary subtle">
+                      {dashboardCards.length} shown
+                      {#if totalDeploymentJobCount > deployments.length}
+                        · {totalDeploymentJobCount} total jobs
+                      {/if}
+                    </span>
+                  {/if}
+                </h3>
                 {#if deploymentDeleteError}
                   <p class="deployment-delete-error">{deploymentDeleteError}</p>
                 {/if}
+                {#if deploymentDestroyError}
+                  <p class="deployment-delete-error">{deploymentDestroyError}</p>
+                {/if}
                 <ul class="deployment-list">
-                  {#each deployments as deployment}
-                    <li class="deployment-item">
+                  {#each dashboardCards as deployment (deployment.deployment_id)}
+                    {@const registryEntry = deployment.cardKind === 'live' ? registryEntryFor(deployment) : null}
+                    {@const visitUrl = deployment.cardKind === 'live' ? visitUrlFor(deployment) : null}
+                    {@const isDestroyCard = deployment.cardKind === 'destroying' || deployment.cardKind === 'destroyed' || deployment.cardKind === 'destroy_failed'}
+                    <li
+                      class="deployment-item"
+                      class:destroying={deployment.cardKind === 'destroying'}
+                      class:destroyed={deployment.cardKind === 'destroyed'}
+                      class:destroy-failed={deployment.cardKind === 'destroy_failed'}
+                    >
                       <div class="deployment-info">
-                        <span class="deployment-name">{deployment.realm_name}</span>
-                        <span class="deployment-date">{formatDate(deployment.created_at)}</span>
+                        <div class="deployment-title-row">
+                          <span class="deployment-name">{deployment.realm_name}</span>
+                          {#if deployment.cardKind === 'destroyed'}
+                            <span class="registry-badge destroyed">{$_('dashboard.destroyed_realm')}</span>
+                          {:else if deployment.cardKind === 'destroying'}
+                            <span class="registry-badge destroying">{$_('dashboard.destroying_live_realm')}</span>
+                          {:else if registryEntry}
+                            <span class="registry-badge">{$_('dashboard.on_registry')}</span>
+                          {:else if deployment.raw_status === 'completed'}
+                            <span class="registry-badge pending">{$_('dashboard.registering_realm')}</span>
+                          {/if}
+                        </div>
+                        <span class="deployment-meta subtle">
+                          {#if deployment.backend_canister_id}
+                            {deployment.backend_canister_id}
+                          {/if}
+                          {#if deployment.destroyed_at}
+                            · {$_('dashboard.destroyed_realm')} {formatDate(deployment.destroyed_at)}
+                          {:else if deployment.created_at}
+                            · {formatDate(deployment.created_at)}
+                          {/if}
+                        </span>
                       </div>
 
-                      <DeploymentProgress
-                        progress={deployment.progress}
-                        variant={deployment.progress?.isActive ? 'full' : 'compact'}
-                        showSteps={deployment.progress?.isActive}
-                      />
+                      {#if isDestroyCard && deployment.destroyProgress}
+                        <DeploymentProgress
+                          progress={deployment.destroyProgress}
+                          variant={deployment.cardKind === 'destroying' ? 'full' : 'compact'}
+                          showSteps={deployment.cardKind === 'destroying'}
+                        />
+                      {:else}
+                        <DeploymentProgress
+                          progress={deployment.progress}
+                          variant={deployment.progress?.isActive ? 'full' : 'compact'}
+                          showSteps={deployment.progress?.isActive}
+                        />
+                      {/if}
 
                       <div class="deployment-status-row">
-                        {#if deployment.deployment_id}
+                        {#if deployment.cardKind === 'live' && deployment.deployment_id}
                           <a href={deploymentJobUrl(deployment.deployment_id)} class="track-btn">
                             {deployment.progress?.isActive ? 'Track deployment →' : 'View details →'}
                           </a>
                         {/if}
-                        {#if isFailedDeployment(deployment)}
+                        {#if deployment.cardKind === 'live' && isFailedDeployment(deployment)}
                           <a href={editDraftUrlForDeployment(deployment)} class="track-btn">Edit draft →</a>
                           <a href={retryDeployUrlForDeployment(deployment)} class="track-btn">Retry deploy →</a>
                           <button
@@ -797,21 +993,112 @@
                             disabled={deletingDeploymentId === deployment.deployment_id}
                             on:click={() => requestDeleteDeployment(deployment)}
                           >
-                            {deletingDeploymentId === deployment.deployment_id ? 'Deleting…' : 'Delete'}
+                            {deletingDeploymentId === deployment.deployment_id
+                              ? $_('dashboard.removing_failed_job')
+                              : $_('dashboard.remove_failed_job')}
                           </button>
                         {/if}
-                        {#if deployment.raw_status === 'completed' && deployment.realm_url}
-                          <a href={deployment.realm_url} target="_blank" rel="noopener noreferrer" class="visit-btn">
+                        {#if deployment.cardKind === 'live' && deployment.raw_status === 'completed' && visitUrl}
+                          <a href={visitUrl} target="_blank" rel="noopener noreferrer" class="visit-btn">
                             Visit Realm →
                           </a>
                         {/if}
+                        {#if deployment.cardKind === 'live' && deployment.raw_status === 'completed' && deploymentStage(deployment)}
+                          <span class="deployment-stage-badge">{stageLabel(deploymentStage(deployment))}</span>
+                        {/if}
+                        {#if deployment.cardKind === 'live' && canDestroyRealm(deployment, deploymentStage(deployment))}
+                          <button
+                            type="button"
+                            class="delete-deployment-btn"
+                            disabled={!!activeDestroys[deployment.deployment_id]}
+                            on:click={() => requestDestroyDeployment(deployment)}
+                          >
+                            {$_('dashboard.destroy_live_realm')}
+                          </button>
+                        {/if}
+                        {#if deployment.cardKind === 'destroyed'}
+                          <button
+                            type="button"
+                            class="delete-deployment-btn"
+                            disabled={dismissingDestroyedId === deployment.deployment_id}
+                            on:click={() => dismissDestroyedCard(deployment)}
+                          >
+                            {dismissingDestroyedId === deployment.deployment_id
+                              ? $_('dashboard.removing_destroyed_realm')
+                              : $_('dashboard.remove_destroyed_realm')}
+                          </button>
+                        {/if}
+                        {#if deployment.cardKind === 'destroy_failed'}
+                          <button
+                            type="button"
+                            class="delete-deployment-btn"
+                            on:click={() => retryDestroyDeployment(deployment)}
+                          >
+                            {$_('dashboard.destroy_failed_retry')}
+                          </button>
+                        {/if}
                       </div>
-                      {#if deployment.deployment_id}
+                      {#if deployment.cardKind === 'live' && deployment.earlier_deploy_count > 0}
+                        <div class="deployment-history">
+                          <button
+                            type="button"
+                            class="deployment-history-toggle"
+                            aria-expanded={expandedJobHistory[deployment.deployment_id] ? 'true' : 'false'}
+                            on:click={() => toggleJobHistory(deployment.deployment_id)}
+                          >
+                            {#if expandedJobHistory[deployment.deployment_id]}
+                              {$_('dashboard.hide_earlier_jobs')}
+                            {:else}
+                              + {deployment.earlier_deploy_count} earlier redeploy{deployment.earlier_deploy_count === 1 ? '' : 's'}
+                              · {$_('dashboard.show_earlier_jobs')}
+                            {/if}
+                          </button>
+                          {#if expandedJobHistory[deployment.deployment_id] && deployment.earlier_jobs?.length}
+                            <p class="deployment-history-heading">{$_('dashboard.earlier_jobs_heading')}</p>
+                            <ul class="deployment-history-list">
+                              {#each deployment.earlier_jobs as job (job.deployment_id)}
+                                <li class="deployment-history-item">
+                                  <a
+                                    href={deploymentJobUrl(job.deployment_id)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="deployment-history-link"
+                                  >
+                                    {job.deployment_id}
+                                  </a>
+                                  <span class="deployment-history-status">{jobHistoryStatusLabel(job.raw_status)}</span>
+                                  <span class="deployment-history-date">{formatDate(job.created_at)}</span>
+                                </li>
+                              {/each}
+                            </ul>
+                          {/if}
+                        </div>
+                      {/if}
+                      {#if deployment.deployment_id && deployment.cardKind === 'live'}
+                        <div class="deployment-id subtle">
+                          Job:
+                          <a
+                            href={deploymentJobUrl(deployment.deployment_id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="deployment-id-link"
+                          >
+                            {deployment.deployment_id}
+                          </a>
+                        </div>
+                      {:else if deployment.deployment_id && deployment.cardKind === 'destroyed'}
                         <div class="deployment-id subtle">Job: {deployment.deployment_id}</div>
                       {/if}
                     </li>
                   {/each}
                 </ul>
+              </div>
+            {:else if !loadingDrafts && visibleDrafts.length === 0}
+              <div class="realms-group deployments-group">
+                <h3>{$_('dashboard.your_realms')}</h3>
+                <div class="empty-state compact">
+                  <p>{$_('dashboard.no_realms_yet')}</p>
+                </div>
               </div>
             {/if}
 
@@ -826,16 +1113,29 @@
 
   <ConfirmModal
     open={!!deleteConfirmDeployment}
-    title="Remove failed deployment?"
+    title={$_('dashboard.remove_failed_job_title')}
     message={deleteConfirmDeployment
-      ? `Remove "${deleteConfirmDeployment.realm_name || deleteConfirmDeployment.deployment_id}" from your dashboard? This cannot be undone.`
-      : ''}
-    confirmLabel="Remove"
+      ? `${$_('dashboard.remove_failed_job_confirm')} (${deleteConfirmDeployment.realm_name || deleteConfirmDeployment.deployment_id})`
+      : $_('dashboard.remove_failed_job_confirm')}
+    confirmLabel={$_('dashboard.remove_failed_job')}
     cancelLabel="Cancel"
     variant="danger"
     loading={!!deletingDeploymentId}
     on:cancel={cancelDeleteDeployment}
     on:confirm={confirmDeleteDeployment}
+  />
+
+  <ConfirmModal
+    open={!!destroyConfirmDeployment}
+    title={$_('dashboard.destroy_live_realm_title')}
+    message={destroyConfirmDeployment
+      ? `${$_('dashboard.destroy_live_realm_confirm')} (${destroyConfirmDeployment.realm_name || destroyConfirmDeployment.deployment_id})`
+      : $_('dashboard.destroy_live_realm_confirm')}
+    confirmLabel={$_('dashboard.destroy_live_realm')}
+    cancelLabel="Cancel"
+    variant="danger"
+    on:cancel={cancelDestroyDeployment}
+    on:confirm={confirmDestroyDeployment}
   />
 </div>
 
@@ -1338,6 +1638,13 @@
 
   /* History Section */
   .history-section h3,
+  .deployments-summary {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+  }
+
   .realms-group h3 {
     font-size: 1rem;
     font-weight: 600;
@@ -1580,15 +1887,73 @@
     margin-bottom: 0;
   }
 
+  .deployment-item.destroying {
+    border-color: #fdba74;
+    background: #fffaf5;
+  }
+
+  .deployment-item.destroyed {
+    border-color: #d4d4d4;
+    background: #fafafa;
+    opacity: 0.92;
+  }
+
+  .deployment-item.destroy-failed {
+    border-color: #fecaca;
+    background: #fef2f2;
+  }
+
   .deployment-info {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .deployment-title-row {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    gap: 0.5rem;
   }
 
   .deployment-name {
     font-weight: 600;
     color: #171717;
+    font-size: 1.0625rem;
+  }
+
+  .deployment-meta {
+    font-size: 0.75rem;
+    font-family: ui-monospace, monospace;
+    word-break: break-all;
+  }
+
+  .registry-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: #DBEAFE;
+    color: #1D4ED8;
+  }
+
+  .registry-badge.pending {
+    background: #F5F5F5;
+    color: #737373;
+  }
+
+  .registry-badge.destroying {
+    background: #ffedd5;
+    color: #c2410c;
+  }
+
+  .registry-badge.destroyed {
+    background: #e5e5e5;
+    color: #525252;
   }
 
   .deployment-date {
@@ -1654,6 +2019,17 @@
     cursor: not-allowed;
   }
 
+  .deployment-stage-badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #0e7490;
+    background: rgba(6, 182, 212, 0.14);
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+  }
+
   .deployment-delete-error {
     margin: 0 0 0.75rem;
     font-size: 0.8125rem;
@@ -1672,7 +2048,8 @@
   }
 
   .deployment-id,
-  .deployment-time {
+  .deployment-time,
+  .deployment-earlier {
     font-size: 0.75rem;
     color: #737373;
   }
@@ -1680,6 +2057,98 @@
   .deployment-id.subtle {
     margin-top: 0.35rem;
     font-family: ui-monospace, monospace;
+  }
+
+  .deployment-earlier.subtle {
+    margin-top: 0.35rem;
+  }
+
+  .deployment-history {
+    margin-top: 0.5rem;
+  }
+
+  .deployment-history-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: 0.75rem;
+    color: #525252;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .deployment-history-toggle:hover {
+    color: #171717;
+    text-decoration: underline;
+  }
+
+  .deployment-history-heading {
+    margin: 0.5rem 0 0.35rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #737373;
+  }
+
+  .deployment-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.375rem;
+    background: #FAFAFA;
+    overflow: hidden;
+  }
+
+  .deployment-history-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.75rem;
+    border-bottom: 1px solid #E5E5E5;
+  }
+
+  .deployment-history-item:last-child {
+    border-bottom: none;
+  }
+
+  .deployment-history-link {
+    font-family: ui-monospace, monospace;
+    color: #2563EB;
+    text-decoration: none;
+    word-break: break-all;
+  }
+
+  .deployment-history-link:hover {
+    text-decoration: underline;
+  }
+
+  .deployment-history-status {
+    font-weight: 500;
+    color: #525252;
+    white-space: nowrap;
+  }
+
+  .deployment-history-date {
+    color: #737373;
+    white-space: nowrap;
+    font-size: 0.6875rem;
+  }
+
+  .deployment-id-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .deployment-id-link:hover {
+    color: #2563EB;
   }
 
   .empty-hint {

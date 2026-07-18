@@ -10,9 +10,13 @@
   import RegistryFooter from '$lib/components/RegistryFooter.svelte';
   import RegistryMobileChrome from '$lib/components/RegistryMobileChrome.svelte';
   import RegistryTour from '$lib/components/RegistryTour.svelte';
+  import GlobeWireframeLoader from '$lib/components/GlobeWireframeLoader.svelte';
   import { fetchRealmDetails, fetchZoneData } from '$lib/globe/zone-fetcher.js';
   import { DUMMY_REALMS, DUMMY_ZONE_DATA } from '$lib/globe/dummy-realms.js';
   import { filterAndSortRealms } from '$lib/realm-utils.js';
+  import { realmPanelChrome } from '$lib/realm-panel-chrome.js';
+  import { assistantChrome } from '$lib/assistant-chrome.js';
+  import { mapShellInsets } from '$lib/map-shell-insets.js';
   
   let backend;
   let realms = [];
@@ -40,6 +44,31 @@
   /** @type {import('$lib/components/MapView.svelte').default | null} */
   let mapView = null;
   let searchInput = null;
+  let desktopLayout = true;
+  let pageOverlayShown = true;
+  let pageOverlayFade = false;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let pageOverlayFadeTimer = null;
+
+  $: mapInsets = mapShellInsets($realmPanelChrome, $assistantChrome, desktopLayout);
+  $: mapShellTransition =
+    !$realmPanelChrome.resizing && !$assistantChrome.resizing;
+
+  $: if (loading) {
+    pageOverlayShown = true;
+    pageOverlayFade = false;
+    if (pageOverlayFadeTimer) {
+      clearTimeout(pageOverlayFadeTimer);
+      pageOverlayFadeTimer = null;
+    }
+  } else if (pageOverlayShown && !pageOverlayFade) {
+    pageOverlayFade = true;
+    pageOverlayFadeTimer = setTimeout(() => {
+      pageOverlayShown = false;
+      pageOverlayFade = false;
+      pageOverlayFadeTimer = null;
+    }, 420);
+  }
 
   const marketplaceCanisterId = import.meta.env.CANISTER_ID_MARKETPLACE_FRONTEND || '';
   const casalsCanisterId = import.meta.env.CANISTER_ID_CASALS_FRONTEND || '';
@@ -180,6 +209,13 @@
   onMount(async () => {
     if (!browser) return;
 
+    const layoutMq = window.matchMedia('(min-width: 768px)');
+    const syncLayout = () => {
+      desktopLayout = layoutMq.matches;
+    };
+    syncLayout();
+    layoutMq.addEventListener('change', syncLayout);
+
     window.addEventListener('keydown', handleKeydown);
 
     const { backend: b } = await import('$lib/canisters');
@@ -234,6 +270,8 @@
     authLoading = false;
 
     return () => {
+      if (pageOverlayFadeTimer) clearTimeout(pageOverlayFadeTimer);
+      layoutMq.removeEventListener('change', syncLayout);
       window.removeEventListener('keydown', handleKeydown);
       clearTimeout(searchDebounceTimer);
     };
@@ -267,21 +305,26 @@
     </div>
   {/if}
 
-  <main class="map-shell">
-    {#if !loading}
-      <MapView
-        bind:this={mapView}
-        realms={filteredRealms}
-        {realmZoneData}
-        searchQuery={debouncedSearchQuery}
-        loading={globeLoading}
-        on:select={handleMapSelect}
-      />
-      <RegistryKpiLine realms={filteredRealms} {realmZoneData} />
-    {:else}
-      <div class="page-loading">
-        <div class="spinner"></div>
+  <main
+    class="map-shell"
+    class:map-shell-transition={mapShellTransition}
+    style="--map-inset-left: {mapInsets.left}px; --map-inset-right: {mapInsets.right}px"
+  >
+    <MapView
+      bind:this={mapView}
+      realms={filteredRealms}
+      {realmZoneData}
+      searchQuery={debouncedSearchQuery}
+      loading={globeLoading}
+      on:select={handleMapSelect}
+    />
+    {#if pageOverlayShown}
+      <div class="page-loading" class:fade-out={pageOverlayFade} aria-busy={!pageOverlayFade}>
+        <GlobeWireframeLoader size={56} />
       </div>
+    {/if}
+    {#if !loading}
+      <RegistryKpiLine realms={filteredRealms} {realmZoneData} />
     {/if}
   </main>
 
@@ -357,29 +400,42 @@
 
   .map-shell {
     position: absolute;
-    inset: 0;
+    top: 0;
+    bottom: 0;
+    left: var(--map-inset-left, 0px);
+    right: var(--map-inset-right, 0px);
+  }
+
+  .map-shell.map-shell-transition {
+    transition: left 0.25s ease, right 0.25s ease;
   }
 
   .page-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    height: 100%;
+    background: rgba(250, 250, 250, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 1;
+    transition: opacity 0.42s ease-out;
+    pointer-events: none;
   }
 
-  .spinner {
-    width: 32px;
-    height: 32px;
-    border: 2px solid var(--border);
-    border-top-color: var(--text-secondary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+  .page-loading.fade-out {
+    opacity: 0;
   }
 
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
+  @media (prefers-reduced-motion: reduce) {
+    .page-loading {
+      transition: none;
+    }
+
+    .page-loading.fade-out {
+      display: none;
     }
   }
 

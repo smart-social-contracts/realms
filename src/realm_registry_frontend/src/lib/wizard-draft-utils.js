@@ -9,6 +9,15 @@ export function isFailedDeployment(deployment) {
   return FAILED_DEPLOYMENT_STATUSES.has(st);
 }
 
+/** Completed deployment whose realm is still in alpha and may be destroyed. */
+export function canDestroyRealm(deployment, realmStage) {
+  const st = (deployment?.raw_status || deployment?.status || '').toLowerCase();
+  if (st !== 'completed') return false;
+  if (!(deployment?.backend_canister_id || '').trim()) return false;
+  if (!realmStage) return false;
+  return realmStage === 'alpha';
+}
+
 export function isActiveDeployment(deployment) {
   if (!deployment) return false;
   if (deployment.progress?.isActive != null) return deployment.progress.isActive;

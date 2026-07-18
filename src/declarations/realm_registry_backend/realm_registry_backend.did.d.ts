@@ -846,6 +846,7 @@ export interface RealmRegistryService {
     [string, string, string, string, string],
     string
   >,
+  'remove_realm' : ActorMethod<[string], string>,
 }
 export interface RealmRegistryUpgradeService {
   'get_credits' : ActorMethod<[string], GetCreditsResult>,

@@ -1,4 +1,4 @@
-from core.models import RealmRecord
+from core.models import RealmRecord, SlugRecord
 from _cdk import ic
 from ic_python_logging import get_logger
 
@@ -64,6 +64,9 @@ def remove_registered_realm(realm_id: str) -> dict:
         realm = RealmRecord[realm_id]
         if realm is None:
             return {"success": False, "error": f"Realm '{realm_id}' not found"}
+        for slug_rec in list(SlugRecord.instances()):
+            if (slug_rec.realm_id or "") == realm_id:
+                slug_rec.delete()
         realm.delete()
         return {"success": True, "message": f"Realm '{realm_id}' removed"}
     except Exception as e:

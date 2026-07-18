@@ -71,7 +71,7 @@ def test_candid_surface_has_core_methods():
     )
     assert code == 0, f"candid query failed: {err}"
     body = _unwrap(out)
-    for needed in ("enqueue_deployment", "report_canister_ready", "health"):
+    for needed in ("enqueue_deployment", "report_canister_ready", "destroy_realm_job", "health"):
         assert needed in body, f"missing endpoint in candid: {needed}"
     assert "deploy_realm" not in body, "deploy_realm should be removed from candid"
     print("✓")

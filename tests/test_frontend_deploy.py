@@ -227,6 +227,7 @@ class TestInstallerManifestParsing:
         assert "enqueue_deployment" in did_text
         assert "get_deployment_job_status" in did_text
         assert "get_deployment_manifest" in did_text
+        assert "destroy_realm_job" in did_text
         assert "report_frontend_verified" in did_text
         assert "deploy_frontend" not in did_text
         assert "install_realm_backend" not in did_text

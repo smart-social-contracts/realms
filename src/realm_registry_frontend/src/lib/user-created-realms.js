@@ -76,3 +76,28 @@ export async function fetchCreatedRealmsForUser(principalText, deployments = nul
     (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }),
   );
 }
+
+/** @returns {Map<string, object>} backend canister id → registry row */
+export function indexCreatedRealmsByBackend(realms) {
+  const map = new Map();
+  for (const realm of realms || []) {
+    const id = (realm.id || '').trim();
+    if (id) map.set(id, realm);
+  }
+  return map;
+}
+
+/** Registry row for a deployment job, if the realm is listed on-chain. */
+export function registryEntryForDeployment(deployment, registryByBackend) {
+  const backend = (deployment?.backend_canister_id || '').trim();
+  if (!backend || !registryByBackend) return null;
+  return registryByBackend.get(backend) || null;
+}
+
+/** Prefer federation portal URL from registry; fall back to deployment icp0 link. */
+export function preferredVisitUrl(deployment, registryEntry) {
+  const fromRegistry = (registryEntry?.url || '').trim();
+  if (fromRegistry) return fromRegistry.replace(/\/+$/, '') + '/';
+  const fromJob = (deployment?.realm_url || '').trim();
+  return fromJob || null;
+}

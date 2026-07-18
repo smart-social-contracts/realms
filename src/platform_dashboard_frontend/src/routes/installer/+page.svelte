@@ -37,7 +37,7 @@
       const results = await Promise.allSettled([
         installerActor.health(),
         installerActor.info(),
-        installerActor.list_deployment_jobs(),
+        installerActor.list_deployment_jobs([], []),
       ]);
 
       if (results[0].status === 'fulfilled' && (results[0].value as any)?.ok) {

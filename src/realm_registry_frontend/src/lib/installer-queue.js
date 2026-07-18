@@ -5,6 +5,9 @@ import { getObservedStageStarts, toTimestampMs } from '$lib/deployment-stage-tim
 
 const buildingOrTesting = building || process.env.NODE_ENV === 'test';
 
+/** Matches realm_installer ``_LIST_JOBS_MAX`` (one query page). */
+export const LIST_JOBS_PAGE_SIZE = 50;
+
 const DELETABLE_DEPLOYMENT_STATUSES = new Set(['failed', 'failed_verification', 'cancelled']);
 
 function isLocalDevelopment() {
@@ -67,15 +70,113 @@ export function isDeletableDeployment(deployment) {
   return DELETABLE_DEPLOYMENT_STATUSES.has(st);
 }
 
-/** @returns {Promise<object[]>} */
+function deploymentRowPriority(row) {
+  const st = (row?.raw_status || row?.status || '').toLowerCase();
+  if (isActiveQueueStatus(st) || st === 'in_progress') return 100;
+  if (st === 'completed') return 50;
+  if (st === 'failed' || st === 'failed_verification') return 20;
+  if (st === 'cancelled') return 10;
+  return 15;
+}
+
+function deploymentGroupKey(row) {
+  const backend = (row?.backend_canister_id || '').trim();
+  if (backend) return `backend:${backend}`;
+  const name = (row?.realm_name || row?.deployment_id || '').trim().toLowerCase();
+  if (name) return `name:${name}`;
+  return `job:${row?.deployment_id || ''}`;
+}
+
+/** @typedef {{ deployment_id: string, realm_name: string, raw_status: string, status: string, created_at: number, error: string | null }} DeploymentJobHistoryEntry */
+
+/** @param {object} row */
+function toJobHistoryEntry(row) {
+  return {
+    deployment_id: row.deployment_id || '',
+    realm_name: row.realm_name || row.deployment_id || '',
+    raw_status: row.raw_status || row.status || '',
+    status: row.status || '',
+    created_at: Number(row.created_at || 0),
+    error: row.error || null,
+  };
+}
+
+/**
+ * Collapse repeated redeploys to the same backend canister. Keeps the most
+ * relevant job (active > completed > failed) and records older jobs for expansion.
+ *
+ * @param {object[]} rows - output of ``installerJobToDeploymentRow``
+ * @returns {object[]}
+ */
+export function dedupeDeploymentRows(rows) {
+  const groups = new Map();
+
+  for (const row of rows || []) {
+    const key = deploymentGroupKey(row);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+
+  const deduped = [];
+  for (const group of groups.values()) {
+    const sorted = [...group].sort((a, b) => {
+      const priorityDiff = deploymentRowPriority(b) - deploymentRowPriority(a);
+      if (priorityDiff !== 0) return priorityDiff;
+      return Number(b.created_at || 0) - Number(a.created_at || 0);
+    });
+    const canonical = sorted[0];
+    const earlier = sorted.slice(1).map(toJobHistoryEntry);
+    deduped.push({
+      ...canonical,
+      earlier_deploy_count: earlier.length,
+      earlier_jobs: earlier,
+    });
+  }
+
+  deduped.sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
+  return deduped;
+}
+
+/** Fetch every deployment job page for the authenticated caller. */
 export async function fetchDeploymentJobsFromInstaller() {
   if (buildingOrTesting || !browser) return [];
-  const actor = await createInstallerActor();
-  const raw = await actor.list_deployment_jobs();
-  if (raw == null) return [];
-  if (typeof raw === 'object' && 'Err' in raw) return [];
-  const ok = resultOk(raw);
-  return (ok && ok.jobs) || [];
+  const actor = await createAuthenticatedInstallerActor();
+  const pageSize = LIST_JOBS_PAGE_SIZE;
+  const all = [];
+  let offset = 0;
+
+  for (;;) {
+    const offsetArg = offset > 0 ? [offset] : [];
+    const raw = await actor.list_deployment_jobs(offsetArg, [pageSize]);
+    if (raw == null) break;
+    if (typeof raw === 'object' && 'Err' in raw) break;
+    const ok = resultOk(raw);
+    if (!ok) break;
+
+    const jobs = ok.jobs || [];
+    all.push(...jobs);
+    if (jobs.length < pageSize) break;
+    offset += jobs.length;
+    if (offset > 5000) break;
+  }
+
+  return all;
+}
+
+/**
+ * Filter, map, and dedupe installer jobs for the dashboard Realms tab.
+ *
+ * @returns {{ rawJobs: object[], deployments: object[], totalJobCount: number }}
+ */
+export function prepareDashboardDeploymentRows(jobs, principalText) {
+  const mine = (jobs || []).filter((j) => (j.caller_principal || '') === principalText);
+  const rows = mine.map(installerJobToDeploymentRow);
+  const deployments = dedupeDeploymentRows(rows);
+  return {
+    rawJobs: mine,
+    deployments,
+    totalJobCount: mine.length,
+  };
 }
 
 /** @returns {Promise<object|null>} */
@@ -116,6 +217,116 @@ export async function deleteDeploymentJob(jobId) {
   return resultOk(raw);
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Destroy can take minutes (Casals drains every stand canister). Agent-js may report undefined. */
+function isAmbiguousDestroyError(err) {
+  const msg = String(err?.message || err || '');
+  return (
+    msg.includes('Call was returned undefined') ||
+    msg.includes('Cannot determine if the call was successful') ||
+    msg.includes('No response from installer') ||
+    msg.includes('ERR_NETWORK')
+  );
+}
+
+/** Retry-safe: realm/job already gone after a successful earlier attempt. */
+function isBenignDestroyError(message) {
+  const msg = String(message || '');
+  return (
+    msg.includes('unknown job_id') ||
+    /Realm '[^']+' not found/i.test(msg) ||
+    msg.includes('Canister has no update method') ||
+    msg.includes('Canister not found')
+  );
+}
+
+/**
+ * Poll until the installer drops the job record (destroy finished) or timeout.
+ * @returns {Promise<object>}
+ */
+export async function waitForRealmDestroy(jobId, { timeoutMs = 180000, intervalMs = 3000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const status = await fetchDeploymentJobStatus(jobId);
+    if (!status) {
+      return { job_id: jobId, status: 'destroyed', noop: false };
+    }
+    await sleep(intervalMs);
+  }
+  throw new Error(
+    'Destroy is still running on-chain. Wait a minute, refresh the dashboard, and check Casals treasury.',
+  );
+}
+
+/**
+ * Destroy an alpha-stage completed realm (owner only).
+ * @param {string} jobId
+ * @param {{ backendCanisterId?: string, onProgress?: (update: object) => void, pollIntervalMs?: number }} [options]
+ */
+export async function destroyRealmJob(jobId, options = {}) {
+  if (buildingOrTesting || !browser || !jobId) {
+    throw new Error('Cannot destroy realm');
+  }
+  const onProgress = options.onProgress;
+  const pollIntervalMs = options.pollIntervalMs ?? 3000;
+  const actor = await createAuthenticatedInstallerActor();
+
+  onProgress?.({ stageIndex: 0 });
+
+  let pollTimer = null;
+  let pollStage = 0;
+  const startPollProgress = () => {
+    pollTimer = setInterval(() => {
+      if (pollStage < 3) {
+        pollStage += 1;
+        onProgress?.({ stageIndex: pollStage });
+      }
+    }, pollIntervalMs);
+  };
+
+  const stopPollProgress = () => {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  };
+
+  try {
+    const raw = await actor.destroy_realm_job(jobId);
+    if (raw == null) {
+      startPollProgress();
+      const result = await waitForRealmDestroy(jobId, { intervalMs: pollIntervalMs });
+      onProgress?.({ stageIndex: 4, complete: true });
+      return result;
+    }
+    if (typeof raw === 'object' && 'Err' in raw) {
+      const msg = raw.Err?.message || raw.Err || 'Destroy failed';
+      if (isBenignDestroyError(msg)) {
+        startPollProgress();
+        const result = await waitForRealmDestroy(jobId, { intervalMs: pollIntervalMs });
+        onProgress?.({ stageIndex: 4, complete: true });
+        return result;
+      }
+      throw new Error(msg);
+    }
+    onProgress?.({ stageIndex: 4, complete: true });
+    return resultOk(raw);
+  } catch (err) {
+    if (isAmbiguousDestroyError(err) || isBenignDestroyError(err?.message)) {
+      startPollProgress();
+      const result = await waitForRealmDestroy(jobId, { intervalMs: pollIntervalMs });
+      onProgress?.({ stageIndex: 4, complete: true });
+      return result;
+    }
+    throw err;
+  } finally {
+    stopPollProgress();
+  }
+}
+
 /**
  * Map installer job to the shape previously returned by the management HTTP API
  * so dashboard templates stay stable.
@@ -147,6 +358,8 @@ export function installerJobToDeploymentRow(job) {
     frontend_canister_id: job.frontend_canister_id || '',
     caller_principal: job.caller_principal || '',
     credits_charged: 0,
+    earlier_deploy_count: 0,
+    earlier_jobs: [],
   };
   row.progress = getDeploymentProgress(
     { ...job, raw_status: st },

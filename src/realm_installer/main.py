@@ -44,6 +44,8 @@ class RealmRegistryService(Service):
     @service_update
     def register_realm(self, name: text, url: text, logo: text, backend_url: text, canister_ids_json: text) -> text: ...
     @service_update
+    def remove_realm(self, realm_id: text) -> text: ...
+    @service_update
     def deployment_failed(self, job_id: text, reason: text, caller_principal: text) -> text: ...
     @service_update
     def deployment_succeeded(self, job_id: text, caller_principal: text) -> text: ...
@@ -67,6 +69,8 @@ class CasalsService(Service):
     def orchestration_hand_to_baton(self, args: text) -> text: ...
     @service_update
     def orchestration_configure_baton(self, args: text) -> text: ...
+    @service_update
+    def destroy_realm_stand(self, args: text) -> text: ...
 
 # ── Entities ───────────────────────────────────────────────────────────
 
@@ -104,6 +108,7 @@ class DeploymentJob(Entity, TimestampedMixin):
     __alias__ = "name"
     name = String(max_length=64)
     status = String(max_length=32, default="pending")
+    realm_name = String(max_length=128, default="")
     caller_principal = String(max_length=64)
     manifest_json = String(max_length=8192)
     network = String(max_length=32)
@@ -128,6 +133,14 @@ class DeploymentJob(Entity, TimestampedMixin):
     error = String(max_length=2000)
     created_at = Integer(default=0)
     completed_at = Integer(default=0)
+
+
+class DeploymentJobRef(Entity):
+    """Lightweight index for listing jobs without scanning full manifests."""
+    __alias__ = "name"
+    name = String(max_length=64)
+    caller_principal = String(max_length=64)
+    created_at = Integer(default=0)
 
 class InstallerConfig(Entity):
     """Singleton config (alias 'singleton'). Holds the opt-in switch + pointers for
@@ -1014,15 +1027,31 @@ def _start_extensions_for_job(job, manifest: dict):
         schedule_registration(job.name)
 
 
-# ── Serialization ─────────────────────────────────────────────────────
+def _realm_name_from_manifest(job: DeploymentJob) -> str:
+    """Read realm.name from a job's manifest JSON (legacy jobs)."""
+    try:
+        manifest = json.loads(job.manifest_json or "{}")
+        return ((manifest.get("realm") or {}).get("name") or "").strip()
+    except Exception:
+        return ""
+
+
+def _resolve_job_realm_name(job: DeploymentJob) -> str:
+    """Return the human-readable realm name, backfilling legacy jobs from manifest."""
+    stored = (job.realm_name or "").strip()
+    job_id = (job.name or "").strip()
+    if stored and stored != job_id:
+        return stored
+    from_manifest = _realm_name_from_manifest(job)
+    if from_manifest:
+        if stored != from_manifest:
+            job.realm_name = from_manifest[:128]
+        return from_manifest
+    return job_id
+
 
 def _serialize_job(job: DeploymentJob) -> dict:
-    realm_name = ""
-    try:
-        m = json.loads(job.manifest_json or "{}")
-        realm_name = (m.get("realm") or {}).get("name", "")
-    except Exception:
-        pass
+    realm_name = _resolve_job_realm_name(job)
     return {
         "job_id": job.name, "status": job.status or "",
         "realm_name": realm_name, "caller_principal": job.caller_principal or "",
@@ -1050,6 +1079,70 @@ def _job_to_view(job: DeploymentJob) -> DeploymentJobView:
                                     int8(v) if k.endswith("_verified") else
                                     str(v)) for k, v in s.items()})
 
+
+def _upsert_job_ref(job: DeploymentJob) -> None:
+    if job is None or not (job.name or "").strip():
+        return
+    ref = DeploymentJobRef[job.name]
+    if ref is None:
+        ref = DeploymentJobRef(name=job.name)
+    ref.caller_principal = job.caller_principal or ""
+    ref.created_at = int(job.created_at or 0)
+
+
+def _delete_job_ref(job_id: text) -> None:
+    ref = DeploymentJobRef[(job_id or "").strip()]
+    if ref is not None:
+        ref.delete()
+
+
+_backfill_job_ref_resume = ""
+
+
+def _backfill_job_refs_batch(schedule_next: bool = True) -> None:
+    """Populate DeploymentJobRef rows in small batches (post-upgrade / timer)."""
+    global _backfill_job_ref_resume
+    resume = (_backfill_job_ref_resume or "").strip()
+    passed = not resume
+    processed = 0
+    last_id = ""
+    for job in DeploymentJob.instances():
+        jid = job.name or ""
+        if not jid:
+            continue
+        if not passed:
+            if jid == resume:
+                passed = True
+            continue
+        if DeploymentJobRef[jid] is None:
+            _upsert_job_ref(job)
+        _resolve_job_realm_name(job)
+        last_id = jid
+        processed += 1
+        if processed >= 25:
+            break
+    if processed >= 25:
+        _backfill_job_ref_resume = last_id
+        if schedule_next:
+            ic.set_timer(Duration(1), _backfill_job_refs_batch)
+    else:
+        _backfill_job_ref_resume = ""
+        _log.info("job ref backfill complete")
+
+
+def _schedule_job_ref_backfill() -> None:
+    ic.set_timer(Duration(0), _backfill_job_refs_batch)
+
+
+@update
+def backfill_job_refs_batch() -> text:
+    """Controller-only: advance one job-ref backfill batch (for migration)."""
+    if not ic.is_controller(ic.caller()):
+        return '{"ok":false,"error":"controller only"}'
+    _backfill_job_refs_batch(schedule_next=False)
+    done = not (_backfill_job_ref_resume or "")
+    return json.dumps({"ok": True, "done": done, "resume": _backfill_job_ref_resume or ""})
+
 # ── Endpoints ──────────────────────────────────────────────────────────
 
 @init
@@ -1060,6 +1153,7 @@ def _on_init() -> None:
 def _on_post_upgrade() -> None:
     _log.info("post_upgrade — resuming in-flight deploys")
     _resume_in_flight()
+    _schedule_job_ref_backfill()
 
 @query
 def status() -> GetStatusResult:
@@ -1117,7 +1211,8 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         casals_manifest = bool(manifest.get("casals"))
         initial_status = "provisioning" if casals_manifest else "pending"
         DeploymentJob(
-            name=job_id, status=initial_status, caller_principal=requester,
+            name=job_id, status=initial_status, realm_name=realm_name[:128],
+            caller_principal=requester,
             manifest_json=manifest_json[:8190], network=network,
             backend_canister_id=canister_ids.get("backend", ""),
             frontend_canister_id=canister_ids.get("frontend", ""),
@@ -1126,6 +1221,7 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
             expected_frontend_wasm_hash=expected_hashes.get("frontend_wasm", ""),
             created_at=now_s(),
         )
+        _upsert_job_ref(DeploymentJob[job_id])
         has_hashes = bool(expected_hashes.get("backend_wasm") or expected_hashes.get("frontend_wasm"))
         jlog(job_id).info(f"enqueued for '{realm_name}' on {network} (extensions={ext_count}, codex={bool(codex_info)}, cli_hashes={has_hashes})")
         return ResultEnqueue(Ok=EnqueueOk(
@@ -1232,13 +1328,42 @@ def get_deployment_manifest(job_id: text) -> ResultJobManifest:
     except Exception as e:
         return ResultJobManifest(Err=ie(str(e)))
 
+_LIST_JOBS_MAX = 50
+
+
 @query
-def list_deployment_jobs() -> ResultJobsList:
+def list_deployment_jobs(offset: Opt[nat32] = None, limit: Opt[nat32] = None) -> ResultJobsList:
+    """Return deployment jobs for the caller.
+
+    Non-controllers receive only their own jobs. Results are capped at 50 per
+    call; controllers may page via optional offset/limit.
+    """
     try:
-        list(DeploymentJob.instances())
-        jobs = [_job_to_view(j) for j in DeploymentJob.instances()]
-        jobs.sort(key=lambda v: int(v.created_at), reverse=True)
-        return ResultJobsList(Ok=JobsListOk(jobs=jobs, count=nat32(len(jobs))))
+        caller = str(ic.caller())
+        is_admin = ic.is_controller(ic.caller())
+        off = int(offset or 0) if offset is not None else 0
+        page_size = int(limit or _LIST_JOBS_MAX) if limit is not None else _LIST_JOBS_MAX
+        if page_size > _LIST_JOBS_MAX:
+            page_size = _LIST_JOBS_MAX
+        if off < 0:
+            off = 0
+
+        matched = []
+        for ref in DeploymentJobRef.instances():
+            if not is_admin and (ref.caller_principal or "") != caller:
+                continue
+            matched.append(ref)
+
+        matched.sort(key=lambda r: int(r.created_at or 0), reverse=True)
+        total = len(matched)
+        matched = matched[off:off + page_size]
+
+        jobs = []
+        for ref in matched:
+            job = DeploymentJob[ref.name]
+            if job is not None:
+                jobs.append(_job_to_view(job))
+        return ResultJobsList(Ok=JobsListOk(jobs=jobs, count=nat32(total)))
     except Exception as e:
         return ResultJobsList(Err=ie(str(e)))
 
@@ -1277,10 +1402,184 @@ def delete_deployment_job(job_id: text) -> ResultJobCancel:
         if prev not in _JOB_DELETABLE_STATUSES:
             return ResultJobCancel(Err=ie(f"cannot delete job with status '{prev}'"))
         job.delete()
+        _delete_job_ref(job_id)
         jlog(job_id).info(f"deleted by owner ({caller})")
         return ResultJobCancel(Ok=JobStatusAck(job_id=job_id, prev_status=prev, status="deleted", noop=False))
     except Exception as e:
         return ResultJobCancel(Err=ie(str(e)))
+
+
+def _parse_registry_remove_result(raw) -> None:
+    """Raise on registry remove_realm failure (Ok/Err variant or JSON text)."""
+    if raw is None:
+        raise RuntimeError("empty registry response")
+    if isinstance(raw, dict):
+        if raw.get("Err"):
+            raise RuntimeError(str(raw["Err"]))
+        if raw.get("Ok") is not None:
+            return
+        if raw.get("success") is False:
+            raise RuntimeError(str(raw.get("error") or "registry remove failed"))
+        return
+    if isinstance(raw, (bytes, bytearray)):
+        raw = raw.decode("utf-8", errors="replace")
+    if isinstance(raw, str):
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict) and data.get("success") is False:
+                raise RuntimeError(str(data.get("error") or "registry remove failed"))
+        except json.JSONDecodeError:
+            pass
+        return
+    if hasattr(raw, "Err") and getattr(raw, "Err", None):
+        raise RuntimeError(str(raw.Err))
+    return
+
+
+def _parse_ic_text_json(raw) -> dict:
+    """Parse JSON returned from another canister's ``text`` endpoint via ``call_raw``."""
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, (bytes, bytearray)):
+        raw = ic.candid_decode(raw)
+    if isinstance(raw, (list, tuple)) and raw:
+        raw = raw[0]
+    s = str(raw or "").strip()
+    if s.startswith("(") and ")" in s:
+        inner = s[1:s.rfind(")")].strip().rstrip(",").strip()
+        if inner.startswith('"') and inner.endswith('"'):
+            try:
+                inner_text = json.loads(inner)
+                if isinstance(inner_text, str):
+                    s = inner_text
+            except json.JSONDecodeError:
+                pass
+    return json.loads(s or "{}")
+
+
+def _fetch_realm_stage_gen(backend_id: text):
+    """Query realm backend get_runtime_flags for lifecycle stage."""
+    flags_res: CallResult = yield ic.call_raw(
+        Principal.from_str(backend_id), "get_runtime_flags",
+        ic.candid_encode("()"), 1,
+    )
+    try:
+        raw = unwrap_call_result(flags_res)
+    except Exception as e:
+        # Backends without get_runtime_flags are legacy builds (pre-stage) or
+        # half-destroyed sweep shells from an aborted destroy — both alpha.
+        if "no update method" in str(e) or "method not found" in str(e).lower():
+            return "alpha"
+        raise
+    data = _parse_ic_text_json(raw)
+    if not data.get("success", True):
+        raise RuntimeError(data.get("error") or "failed to read realm stage")
+    return (data.get("realm_stage") or "alpha").strip().lower()
+
+
+def _try_delete_canister_gen(canister_id: text, job_id: text):
+    """Best-effort IC canister teardown when the installer is a controller."""
+    if not (canister_id or "").strip():
+        return
+    cid = canister_id.strip()
+    try:
+        stop_res: CallResult = yield management_canister.stop_canister(
+            {"canister_id": Principal.from_str(cid)})
+        unwrap_call_result(stop_res)
+        del_res: CallResult = yield management_canister.delete_canister(
+            {"canister_id": Principal.from_str(cid)})
+        unwrap_call_result(del_res)
+        jlog(job_id).info(f"deleted canister {cid}")
+    except Exception as e:
+        jlog(job_id).warning(f"could not delete canister {cid} (non-fatal): {e}")
+
+
+def _destroy_realm_canisters_gen(job, job_id: text, backend_id: text, frontend_id: text):
+    """Tear down realm canisters via Casals so cycles are drained back into its
+    treasury before deletion. When Casals is configured, a Casals failure aborts
+    the destroy (no direct-delete fallback — the IC burns a deleted canister's
+    remaining cycles, so falling back would silently lose them)."""
+    manifest = json.loads(job.manifest_json or "{}")
+    cfg = _config()
+    casals_id = (cfg.casals_canister_id or "").strip()
+    if not casals_id:
+        jlog(job_id).info("casals_canister_id not configured; using direct delete")
+        yield from _try_delete_canister_gen(frontend_id, job_id)
+        yield from _try_delete_canister_gen(backend_id, job_id)
+        return
+
+    cas = manifest.get("casals", {}) or {}
+    realm_info = manifest.get("realm", {}) or {}
+    realm_name = realm_info.get("name") or job.name or ""
+    stand = (cas.get("stand") or _slugify(realm_name)).strip()
+
+    casals = CasalsService(Principal.from_str(casals_id))
+    payload = {
+        "stand": stand,
+        "backend_canister_id": backend_id,
+        "frontend_canister_id": frontend_id,
+    }
+    destroy_res: CallResult = yield casals.destroy_realm_stand(json.dumps(payload))
+    parsed = _casals_ok(destroy_res)
+    errors = parsed.get("errors") or []
+    reclaimed = int(parsed.get("total_cycles_reclaimed") or 0)
+    jlog(job_id).info(
+        f"casals destroy_realm_stand stand={stand} "
+        f"total_cycles_reclaimed={reclaimed} "
+        f"canisters={len(parsed.get('destroyed') or [])} failed={len(errors)}"
+    )
+    if errors:
+        raise RuntimeError(f"casals could not destroy all canisters: {errors}")
+
+
+@update
+def destroy_realm_job(job_id: text) -> Async[ResultJobCancel]:
+    """Destroy an alpha-stage realm owned by the caller.
+
+    Deregisters the realm from the registry (including federation slugs) and
+    destroys backend/frontend canisters via Casals when configured so cycles
+    return to the Casals treasury. Only completed deployments still in the alpha
+    lifecycle stage qualify.
+    """
+    try:
+        caller = str(ic.caller())
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return ResultJobCancel(Err=ie(f"unknown job_id: {job_id}"))
+        if (job.caller_principal or "") != caller:
+            return ResultJobCancel(Err=ie("only the job owner may destroy this realm"))
+        prev = job.status or "pending"
+        if prev != "completed":
+            return ResultJobCancel(Err=ie(f"cannot destroy job with status '{prev}'"))
+
+        backend_id = (job.backend_canister_id or "").strip()
+        if not backend_id:
+            return ResultJobCancel(Err=ie("deployment has no backend canister id"))
+
+        stage = yield from _fetch_realm_stage_gen(backend_id)
+        if stage != "alpha":
+            return ResultJobCancel(Err=ie(
+                f"cannot destroy realm in '{stage}' stage; only alpha realms can be destroyed"
+            ))
+
+        frontend_id = (job.frontend_canister_id or "").strip()
+        yield from _destroy_realm_canisters_gen(job, job_id, backend_id, frontend_id)
+
+        reg_id = (job.registry_canister_id or "").strip()
+        if reg_id:
+            registry = RealmRegistryService(Principal.from_str(reg_id))
+            remove_res: CallResult = yield registry.remove_realm(backend_id)
+            _parse_registry_remove_result(unwrap_call_result(remove_res))
+
+        job.delete()
+        _delete_job_ref(job_id)
+        jlog(job_id).info(f"destroyed alpha realm by owner ({caller})")
+        return ResultJobCancel(Ok=JobStatusAck(
+            job_id=job_id, prev_status=prev, status="destroyed", noop=False,
+        ))
+    except Exception as e:
+        return ResultJobCancel(Err=ie(str(e), traceback.format_exc()[-1500:]))
 
 @update
 def report_deployment_failure(args: text) -> ResultReportFailure:

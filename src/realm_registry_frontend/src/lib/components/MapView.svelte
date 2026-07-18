@@ -27,6 +27,7 @@
     softenGlobeBasemap,
     stripPoliticalLayers,
   } from '$lib/globe/globe-config.js';
+  import GlobeWireframeLoader from '$lib/components/GlobeWireframeLoader.svelte';
 
   export let realms = [];
   export let realmZoneData = {};
@@ -60,9 +61,15 @@
   let currentH3Res = -1;
   let mapError = '';
   let reducedMotion = false;
+  let overlayShown = true;
+  let overlayFade = false;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let overlayFadeTimer = null;
   let autoRotate = true;
   let resumeTimer = null;
   let rotateRaf = null;
+  /** @type {ResizeObserver | null} */
+  let resizeObserver = null;
   const AUTO_ROTATE_DEG_PER_FRAME = 0.012;
   const AUTO_ROTATE_RESUME_MS = 5000;
   /** Below this zoom the view is globe-like; above it MapLibre flattens toward mercator. */
@@ -414,6 +421,24 @@
     updateLayers();
   }
 
+  $: needsLoaderOverlay = !ready || loading;
+
+  $: if (needsLoaderOverlay) {
+    overlayShown = true;
+    overlayFade = false;
+    if (overlayFadeTimer) {
+      clearTimeout(overlayFadeTimer);
+      overlayFadeTimer = null;
+    }
+  } else if (overlayShown && !overlayFade) {
+    overlayFade = true;
+    overlayFadeTimer = setTimeout(() => {
+      overlayShown = false;
+      overlayFade = false;
+      overlayFadeTimer = null;
+    }, 420);
+  }
+
   onMount(async () => {
     if (!browser || !container) return;
 
@@ -543,12 +568,22 @@
         if (map) map.getCanvas().style.cursor = 'grab';
         clearHoverPopup();
       });
+
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+          map?.resize();
+        });
+        resizeObserver.observe(container);
+      }
     } catch (err) {
       console.error('Map init failed', err);
       mapError = err?.message || 'Failed to load map';
     }
 
     return () => {
+      if (overlayFadeTimer) clearTimeout(overlayFadeTimer);
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       if (resumeTimer) clearTimeout(resumeTimer);
       if (rotateRaf) cancelAnimationFrame(rotateRaf);
       clearHoverPopup();
@@ -560,6 +595,9 @@
   });
 
   onDestroy(() => {
+    if (overlayFadeTimer) clearTimeout(overlayFadeTimer);
+    resizeObserver?.disconnect();
+    resizeObserver = null;
     if (resumeTimer) clearTimeout(resumeTimer);
     if (rotateRaf) cancelAnimationFrame(rotateRaf);
     clearHoverPopup();
@@ -577,10 +615,9 @@
   aria-label={$_('globe.aria_label')}
   bind:this={container}
 >
-  {#if loading}
-    <div class="map-loading">
-      <div class="spinner"></div>
-      <span>{$_('globe.loading')}</span>
+  {#if overlayShown}
+    <div class="map-loading" class:fade-out={overlayFade} aria-busy={!overlayFade}>
+      <GlobeWireframeLoader size={64} />
     </div>
   {/if}
   {#if mapError}
@@ -825,7 +862,26 @@
   }
 
   .map-loading {
-    background: rgba(250, 250, 250, 0.55);
+    background: rgba(250, 250, 250, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 1;
+    transition: opacity 0.42s ease-out;
+  }
+
+  .map-loading.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .map-loading {
+      transition: none;
+    }
+
+    .map-loading.fade-out {
+      display: none;
+    }
   }
 
   .map-error {
@@ -834,20 +890,5 @@
     pointer-events: auto;
     padding: 1rem;
     text-align: center;
-  }
-
-  .spinner {
-    width: 28px;
-    height: 28px;
-    border: 2px solid var(--border, #e5e5e5);
-    border-top-color: var(--text-secondary, #525252);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 </style>

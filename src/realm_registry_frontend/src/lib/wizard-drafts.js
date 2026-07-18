@@ -12,6 +12,7 @@ export {
   findDraftForDeployment,
   draftResumeUrl,
   isFailedDeployment,
+  canDestroyRealm,
   getDraftMeta,
 } from './wizard-draft-utils.js';
 
@@ -62,6 +63,9 @@ export async function saveWizardDraft({
 export async function listWizardDrafts() {
   const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
   const registry = await getAuthenticatedRegistryActor();
+  if (typeof registry.list_wizard_drafts !== 'function') {
+    return [];
+  }
   const raw = await registry.list_wizard_drafts();
   const data = parseJson(raw);
   if (!data?.success) return [];

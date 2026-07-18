@@ -69,6 +69,7 @@ def get_runtime_flags_payload() -> dict:
         "realm_name": str(getattr(realm, "name", "") or ""),
         "realm_manifesto": str(getattr(realm, "manifesto", "") or ""),
         "realm_welcome_message": str(getattr(realm, "welcome_message", "") or ""),
+        "realm_stage": str(getattr(realm, "status", None) or "alpha"),
         "open_registration": bool(getattr(realm, "open_registration", False)),
         "ai_assistant_enabled": bool(getattr(realm, "ai_assistant_enabled", True)),
         "logo_url": str(getattr(realm, "logo_url", "") or ""),

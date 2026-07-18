@@ -12,10 +12,15 @@
     findDraftForDeployment,
     draftResumeUrl,
     isFailedDeployment,
+    canDestroyRealm,
     listWizardDrafts,
   } from '$lib/wizard-drafts.js';
-  import { deleteDeploymentJob } from '$lib/installer-queue.js';
+  import { deleteDeploymentJob, destroyRealmJob } from '$lib/installer-queue.js';
+  import { fetchRealmStage } from '$lib/realm-stage-client.js';
+  import { stageLabel } from '$lib/realm-stages.js';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import { getDestroyProgress, deploymentToDestroyRecord } from '$lib/realm-destroy-progress.js';
+  import { saveDestroyRecord } from '$lib/realm-destroy-records.js';
 
   let userPrincipal = null;
   let loading = true;
@@ -25,6 +30,12 @@
   let deleting = false;
   let deleteError = null;
   let showDeleteConfirm = false;
+  let destroying = false;
+  let destroyError = null;
+  let showDestroyConfirm = false;
+  /** @type {{ stageIndex: number, startedAt: number, error?: string } | null} */
+  let destroyState = null;
+  let realmStage = null;
   let stopPolling = () => {};
   let manifestRaw = null;
   let manifestLoading = false;
@@ -50,6 +61,18 @@
     ? `${draftResumeUrl(linkedDraft, 6)}&edit=1`
     : '/create-realm';
   $: retryDeployHref = linkedDraft ? draftResumeUrl(linkedDraft, 6) : '/create-realm';
+  $: destroyAllowed = canDestroyRealm(deployment, realmStage) && !destroyState;
+  $: destroyProgress = destroyState
+    ? getDestroyProgress({
+        stageIndex: destroyState.stageIndex,
+        isFailed: !!destroyState.error,
+        error: destroyState.error,
+        startedAt: destroyState.startedAt,
+        isComplete: false,
+        backendCanisterId: deployment?.backend_canister_id,
+        frontendCanisterId: deployment?.frontend_canister_id,
+      })
+    : null;
 
   function formatDate(dateValue) {
     const n = Number(dateValue || 0);
@@ -79,6 +102,11 @@
       loadError = null;
       deployment = row;
       recordDeploymentStageObservation(jobId, row);
+      if ((row.raw_status || '').toLowerCase() === 'completed' && row.backend_canister_id) {
+        realmStage = await fetchRealmStage(row.backend_canister_id);
+      } else {
+        realmStage = null;
+      }
     } catch (err) {
       console.error('Failed to load deployment:', err);
       loadError = err?.message || 'Failed to load deployment.';
@@ -154,6 +182,47 @@
       deleting = false;
     }
   }
+
+  function requestDestroyRealm() {
+    if (!jobId || !deployment || destroying) return;
+    showDestroyConfirm = true;
+  }
+
+  async function confirmDestroyRealm() {
+    if (!jobId || !deployment || destroying) return;
+    showDestroyConfirm = false;
+    destroying = true;
+    destroyError = null;
+    destroyState = { stageIndex: 0, startedAt: Date.now() };
+    try {
+      await destroyRealmJob(jobId, {
+        backendCanisterId: deployment.backend_canister_id || '',
+        onProgress: (update) => {
+          if (!destroyState) return;
+          destroyState = {
+            ...destroyState,
+            stageIndex: update.stageIndex ?? destroyState.stageIndex,
+          };
+        },
+      });
+      if (userPrincipal) {
+        saveDestroyRecord(
+          userPrincipal.toText(),
+          deploymentToDestroyRecord(deployment, Date.now()),
+        );
+      }
+      await goto('/my-dashboard?tab=realms');
+    } catch (err) {
+      console.error('Failed to destroy realm:', err);
+      destroyError = err?.message || 'Failed to destroy realm.';
+      destroyState = {
+        ...destroyState,
+        error: destroyError,
+      };
+    } finally {
+      destroying = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -210,8 +279,18 @@
           </span>
         </div>
       {/if}
+      {#if realmStage}
+        <div class="meta-row">
+          <span class="meta-label">Lifecycle stage</span>
+          <span>{stageLabel(realmStage)}</span>
+        </div>
+      {/if}
 
-      <DeploymentProgress progress={deployment.progress} variant="full" showSteps={true} />
+      <DeploymentProgress
+        progress={destroyProgress || deployment.progress}
+        variant="full"
+        showSteps={true}
+      />
 
       <DeploymentManifestPanel
         manifestRaw={manifestRaw}
@@ -242,11 +321,19 @@
           <a href={editDraftHref} class="btn btn-primary">Edit configuration</a>
           <a href={retryDeployHref} class="btn btn-outline">Retry deployment</a>
           <button type="button" class="btn btn-danger" disabled={deleting} on:click={removeFailedDeployment}>
-            {deleting ? 'Deleting…' : 'Delete'}
+            {deleting ? 'Removing…' : 'Remove failed job'}
+          </button>
+        {/if}
+        {#if destroyAllowed}
+          <button type="button" class="btn btn-danger" on:click={requestDestroyRealm}>
+            Destroy live realm
           </button>
         {/if}
         {#if deleteError}
           <p class="delete-error">{deleteError}</p>
+        {/if}
+        {#if destroyError}
+          <p class="delete-error">{destroyError}</p>
         {/if}
         <a href="/my-dashboard?tab=realms" class="btn btn-outline">All deployments</a>
       </div>
@@ -259,16 +346,29 @@
 
   <ConfirmModal
     open={showDeleteConfirm}
-    title="Remove failed deployment?"
+    title="Remove failed job?"
     message={deployment
-      ? `Remove "${deployment.realm_name || deployment.deployment_id}" from your dashboard? This cannot be undone.`
-      : 'Remove this failed deployment from your dashboard?'}
-    confirmLabel="Remove"
+      ? `Remove this failed deployment from your dashboard? The job record will be deleted; no live realm is affected. (${deployment.realm_name || deployment.deployment_id})`
+      : 'Remove this failed deployment from your dashboard? The job record will be deleted; no live realm is affected.'}
+    confirmLabel="Remove failed job"
     cancelLabel="Cancel"
     variant="danger"
     loading={deleting}
     on:cancel={() => { showDeleteConfirm = false; }}
     on:confirm={confirmRemoveFailedDeployment}
+  />
+
+  <ConfirmModal
+    open={showDestroyConfirm}
+    title="Destroy live realm?"
+    message={deployment
+      ? `Permanently destroy this alpha realm? It will be removed from the registry and its canisters deleted (cycles returned when possible). This cannot be undone. (${deployment.realm_name || deployment.deployment_id})`
+      : 'Permanently destroy this alpha realm? It will be removed from the registry and its canisters deleted. This cannot be undone.'}
+    confirmLabel="Destroy live realm"
+    cancelLabel="Cancel"
+    variant="danger"
+    on:cancel={() => { showDestroyConfirm = false; }}
+    on:confirm={confirmDestroyRealm}
   />
 </div>
 
