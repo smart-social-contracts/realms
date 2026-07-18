@@ -73,7 +73,7 @@ FAMILIES = {
 _BASILISK_REQUIREMENTS = [
     "ic-basilisk==0.14.2",
     "ic-basilisk-toolkit==0.4.0",
-    "ic-python-db==0.10.0",
+    "ic-python-db==0.11.0",
     "ic-python-logging==0.3.4",
 ]
 

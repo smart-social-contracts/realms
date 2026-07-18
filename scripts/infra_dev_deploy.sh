@@ -140,7 +140,7 @@ if [[ ! -x "$VENV/bin/python" ]]; then
     "$VENV/bin/pip" install -q --upgrade pip
     "$VENV/bin/pip" install -q \
         ic-basilisk==0.14.2 ic-basilisk-toolkit==0.4.0 \
-        ic-python-db==0.10.0 ic-python-logging==0.3.4
+        ic-python-db==0.11.0 ic-python-logging==0.3.4
 fi
 export PATH="$VENV/bin:$PATH"
 

@@ -1,3 +1,5 @@
+import json
+
 from ic_python_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
 from ic_python_logging import get_logger
 
@@ -5,8 +7,16 @@ logger = get_logger("entity.proposal")
 
 
 class Proposal(Entity, TimestampedMixin):
-    """Governance proposal entity for voting system"""
+    """Governance proposal entity for voting system.
 
+    v2: ``org_scope`` promoted from the metadata JSON blob to an indexed
+    field, and ``status`` indexed, so extensions can filter proposals by
+    organization/status via ``Proposal.find_by`` instead of scanning the
+    full ID range (ic-python-db#11). Entities written before the indexes
+    existed are backfilled by a timer chain kicked off in initialize().
+    """
+
+    __version__ = 2
     __alias__ = "proposal_id"
     proposal_id = String(max_length=64)
     title = String(max_length=256)
@@ -14,7 +24,8 @@ class Proposal(Entity, TimestampedMixin):
     code_url = String(max_length=512)
     code_checksum = String(max_length=128)
     proposer = ManyToOne("User", "proposals")
-    status = String(max_length=32)  # voting, pending_vote, approved, rejected, etc.
+    # voting, pending_vote, approved, rejected, etc.
+    status = String(max_length=32, indexed=True)
     voting_deadline = String(max_length=64)  # ISO format timestamp or None
     votes_yes = Float()
     votes_no = Float()
@@ -22,8 +33,25 @@ class Proposal(Entity, TimestampedMixin):
     total_voters = Float()
     required_threshold = Float()
     metadata = String(max_length=4096)
+    # Governing organization for org-scoped ballots. None/"" = realm-wide
+    # (kept unset so realm-wide proposals stay out of the index; filter
+    # them by omitting the org filter instead).
+    org_scope = String(max_length=128, indexed=True)
     votes = OneToMany("Vote", "proposal")
     budgets = OneToMany("Budget", "proposal")
+
+    @classmethod
+    def migrate(cls, obj: dict, from_version: int, to_version: int) -> dict:
+        if from_version == 1 and to_version >= 2:
+            try:
+                meta = json.loads(obj.get("metadata") or "{}")
+            except Exception:
+                meta = {}
+            scope = ""
+            if isinstance(meta, dict):
+                scope = (meta.get("org_scope") or "").strip()
+            obj["org_scope"] = scope or None
+        return obj
 
     def tally(self) -> dict:
         """Count votes from linked Vote entities and update tally fields.

@@ -4285,6 +4285,62 @@ def initialize() -> void:
     except Exception as e:
         logger.error(f"❌ Error ensuring population-sync task: {str(e)}")
 
+    # Backfill Proposal field indexes (status, org_scope — ic-python-db#11).
+    # Runs as a self-re-arming timer chain so each batch stays far below the
+    # per-message instruction limit; a persisted flag makes it once-only.
+    try:
+        _kick_off_proposal_index_backfill()
+    except Exception as e:
+        logger.error(f"❌ Error starting proposal index backfill: {str(e)}")
+
+
+_PROPOSAL_INDEX_BACKFILL_FLAG = "fi_backfill:Proposal:v2"
+_PROPOSAL_INDEX_FIELDS = ["status", "org_scope"]
+
+
+def _kick_off_proposal_index_backfill() -> void:
+    """Index pre-existing Proposals for the v2 indexed fields, once.
+
+    New/updated proposals are indexed automatically by the property
+    descriptors; this covers rows written before the indexes existed.
+    Loading each row also eagerly applies the v1→v2 migration (org_scope
+    promoted out of the metadata JSON). Timer callbacks must be created in
+    init/post_upgrade/update context, which is why this is called from
+    initialize().
+    """
+    from ggg import Proposal
+
+    db = Database.get_instance()
+    if db.load("_system", _PROPOSAL_INDEX_BACKFILL_FLAG):
+        return
+    if Proposal.max_id() == 0:
+        db.save("_system", _PROPOSAL_INDEX_BACKFILL_FLAG, "done")
+        return
+
+    state = {"field_idx": 0, "cursor": 1}
+
+    def _step():
+        try:
+            field = _PROPOSAL_INDEX_FIELDS[state["field_idx"]]
+            next_cursor = Proposal.rebuild_field_index(
+                field, from_id=state["cursor"], batch=50
+            )
+            if next_cursor is None:
+                state["field_idx"] += 1
+                state["cursor"] = 1
+                if state["field_idx"] >= len(_PROPOSAL_INDEX_FIELDS):
+                    db.save("_system", _PROPOSAL_INDEX_BACKFILL_FLAG, "done")
+                    logger.info("✅ Proposal field-index backfill complete")
+                    return
+            else:
+                state["cursor"] = next_cursor
+            ic.set_timer(1, _step)
+        except Exception as e:
+            logger.error(f"❌ Proposal index backfill step failed: {str(e)}")
+
+    ic.set_timer(5, _step)
+    logger.info("Proposal field-index backfill scheduled")
+
 
 @init
 def init_() -> void:
