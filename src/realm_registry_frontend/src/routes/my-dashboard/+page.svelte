@@ -114,12 +114,12 @@
   onMount(async () => {
     if (browser) {
       // Check if user is authenticated
-      const { isAuthenticated, getPrincipal, login: authLogin } = await import('$lib/auth.js');
+      const { isAuthenticated, getPrincipal, ensureTestAuth } = await import('$lib/auth.js');
       const { getTestModeIIBypass } = await import('$lib/config.js');
 
       let authenticated = false;
       if (getTestModeIIBypass()) {
-        const result = await authLogin();
+        const result = await ensureTestAuth();
         authenticated = !!result.principal;
       } else {
         authenticated = await isAuthenticated();

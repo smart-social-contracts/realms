@@ -7,6 +7,7 @@
   import { CONFIG } from '$lib/config.js';
   import codicesConfig from '$lib/codices-config.json';
   import AuthControls from '$lib/components/AuthControls.svelte';
+  import DeployProgressModal from '$lib/components/DeployProgressModal.svelte';
   import { deploymentJobUrl } from '$lib/deployment-tracker.js';
 
   // Auth state
@@ -30,6 +31,13 @@
   // Automatic deployment state
   let isDeploying = false;
   let deployError = null;
+  let deployModalOpen = false;
+  /** @type {'running' | 'error'} */
+  let deployModalPhase = 'running';
+  /** @type {'prepare' | 'upload' | 'submit' | 'redirect'} */
+  let deployActiveStep = 'prepare';
+  let deployUploadDetail = '';
+  let deployModalError = '';
 
   // Wizard draft persistence
   let draftId = null;
@@ -141,10 +149,10 @@
   onMount(async () => {
     if (browser) {
       try {
-        const { isAuthenticated, getPrincipal, login: authLogin } = await import("$lib/auth");
+        const { isAuthenticated, getPrincipal, ensureTestAuth } = await import("$lib/auth.js");
         const { getTestModeIIBypass } = await import("$lib/config.js");
         if (getTestModeIIBypass()) {
-          const result = await authLogin();
+          const result = await ensureTestAuth();
           if (result.principal) {
             isLoggedIn = true;
             userPrincipal = result.principal;
@@ -333,11 +341,58 @@
     }
   }
 
+  function closeDeployModal() {
+    deployModalOpen = false;
+    deployModalPhase = 'running';
+    deployActiveStep = 'prepare';
+    deployUploadDetail = '';
+    isDeploying = false;
+  }
+
+  function failAutomaticDeploy(message) {
+    const text = message || 'Deployment failed. Please check your connection and try again.';
+    deployError = text;
+    deployModalError = text;
+    deployModalPhase = 'error';
+  }
+
+  /** @param {'prepare' | 'upload' | 'submit' | 'redirect'} step */
+  function setDeployStep(step) {
+    deployActiveStep = step;
+    if (step !== 'upload') deployUploadDetail = '';
+  }
+
+  /** @param {{ path?: string, uploaded?: number, total?: number, status?: string }} progress */
+  function handleBrandingUploadProgress(progress) {
+    if (!progress?.path) return;
+    const base = progress.path.split('/').pop() || progress.path;
+    const friendly = base.includes('logo')
+      ? 'Logo'
+      : base.includes('background')
+        ? 'Background'
+        : base;
+    if (progress.status === 'done') {
+      deployUploadDetail = `${friendly} uploaded`;
+      return;
+    }
+    const pct =
+      progress.total && progress.total > 0
+        ? Math.min(100, Math.round((progress.uploaded / progress.total) * 100))
+        : null;
+    const statusLabel = progress.status ? progress.status.replace(/_/g, ' ') : 'uploading';
+    deployUploadDetail = pct != null ? `${friendly} — ${statusLabel} (${pct}%)` : `${friendly} — ${statusLabel}`;
+  }
+
   async function handleAutomaticDeploy() {
     if (!userPrincipal || userCredits < REQUIRED_CREDITS) return;
 
     isDeploying = true;
     deployError = null;
+    deployModalError = '';
+    deployModalPhase = 'running';
+    deployActiveStep = 'prepare';
+    deployUploadDetail = '';
+    deployModalOpen = true;
 
     try {
       const { buildRealmDeploymentManifest } = await import('$lib/deployment-manifest.js');
@@ -345,8 +400,10 @@
       const { uploadBrandingFiles, brandingNamespaceFor } = await import('$lib/branding-upload.js');
       const { ensureDefaultBranding } = await import('$lib/realm-branding-generator.js');
 
+      setDeployStep('prepare');
       await ensureDefaultBranding(formData);
 
+      setDeployStep('upload');
       let branding = null;
       if (formData.logo || formData.background) {
         // Upload branding straight from the browser into the file_registry
@@ -356,9 +413,11 @@
           background: formData.background,
           namespace: brandingNamespaceFor(formData.name),
           fileRegistryCanisterId: CONFIG.file_registry_canister_id,
+          onProgress: handleBrandingUploadProgress,
         });
       }
 
+      setDeployStep('submit');
       const manifest = await buildRealmDeploymentManifest(
         formData, CONFIG.default_deploy_queue_network, branding,
         { deployVersion: formData.deploy_version, useCasals: true },
@@ -370,11 +429,11 @@
       const result = typeof raw === 'string' ? JSON.parse(raw) : raw;
 
       if (!result?.success) {
-        deployError = result?.error || 'Deployment request failed';
-        isDeploying = false;
+        failAutomaticDeploy(result?.error || 'Deployment request failed');
         return;
       }
 
+      setDeployStep('redirect');
       await loadUserCredits();
       draftLockedForDeploy = true;
       if (draftId) {
@@ -392,9 +451,9 @@
       await goto(deploymentJobUrl(result.job_id));
     } catch (err) {
       console.error('Automatic deployment failed:', err);
-      deployError =
-        err?.message || 'Deployment failed. Please check your connection and try again.';
-      isDeploying = false;
+      failAutomaticDeploy(
+        err?.message || 'Deployment failed. Please check your connection and try again.',
+      );
     }
   }
 
@@ -1568,6 +1627,15 @@
 </div>
 {/if}
 </div>
+
+<DeployProgressModal
+  open={deployModalOpen}
+  phase={deployModalPhase}
+  activeStep={deployActiveStep}
+  uploadDetail={deployUploadDetail}
+  errorMessage={deployModalError}
+  on:dismiss={closeDeployModal}
+/>
 
 <style>
   .page-shell {

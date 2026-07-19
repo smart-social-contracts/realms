@@ -39,6 +39,7 @@ function createRegistryRuntimeFlagsStore() {
 				});
 				if (typeof sessionStorage !== 'undefined' && !payload.test_mode_ii_bypass) {
 					sessionStorage.removeItem('ii_bypass');
+					sessionStorage.removeItem('test_identity_index');
 				}
 			} catch (error) {
 				console.warn('[registry] runtime flags fetch failed:', error);

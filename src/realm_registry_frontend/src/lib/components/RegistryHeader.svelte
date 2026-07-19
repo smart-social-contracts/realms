@@ -3,6 +3,7 @@
   import { _, locale } from 'svelte-i18n';
   import { supportedLocales, setLocale } from '$lib/i18n';
   import { requestRegistryTour } from '$lib/registry-tour.js';
+  import { authSession } from '$lib/stores/authSession.js';
 
   export let isLoggedIn = false;
   export let userPrincipal = null;
@@ -21,7 +22,10 @@
   let showAuthMenu = false;
   let avatarFailed = false;
 
-  $: principalText = userPrincipal?.toText?.() || '';
+  $: effectiveLoggedIn = $authSession.isLoggedIn || isLoggedIn;
+  $: effectivePrincipal = $authSession.principal ?? userPrincipal;
+  $: effectiveAuthLoading = $authSession.loading || authLoading;
+  $: principalText = effectivePrincipal?.toText?.() || '';
   $: principalShort = principalText
     ? `${principalText.slice(0, 5)}…${principalText.slice(-3)}`
     : '';
@@ -214,13 +218,13 @@
 
   <div class="header-zone header-right">
     <div class="auth-item">
-      {#if authLoading}
+      {#if effectiveAuthLoading}
         <div class="corner-btn corner-loading" aria-hidden="true"></div>
       {:else}
         <button
           type="button"
           class="corner-btn auth-btn"
-          class:auth-btn-avatar={isLoggedIn}
+          class:auth-btn-avatar={effectiveLoggedIn}
           class:active={showAuthMenu}
           on:click|stopPropagation={() => {
             showAuthMenu = !showAuthMenu;
@@ -229,11 +233,11 @@
               showLanguagePicker = false;
             }
           }}
-          title={isLoggedIn ? principalText || $_('auth.account') : $_('auth.login')}
-          aria-label={isLoggedIn ? $_('auth.account') : $_('auth.login')}
+          title={effectiveLoggedIn ? principalText || $_('auth.account') : $_('auth.login')}
+          aria-label={effectiveLoggedIn ? $_('auth.account') : $_('auth.login')}
           aria-expanded={showAuthMenu}
         >
-          {#if isLoggedIn}
+          {#if effectiveLoggedIn}
             {#if avatarUrl && !avatarFailed}
               <img
                 src={avatarUrl}
@@ -259,7 +263,7 @@
 
         {#if showAuthMenu}
           <div class="auth-menu" role="menu" on:mousedown|stopPropagation>
-            {#if isLoggedIn}
+            {#if effectiveLoggedIn}
               {#if principalShort}
                 <div class="menu-meta" title={principalText}>{$_('auth.signed_in')}: {principalShort}</div>
               {/if}

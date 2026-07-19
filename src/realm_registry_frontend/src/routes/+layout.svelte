@@ -5,6 +5,7 @@
   import { browser } from '$app/environment';
   import { initI18n } from '$lib/i18n';
   import { ensureRegistryRuntimeFlags } from '$lib/stores/registryRuntimeFlags.js';
+  import { syncAuthSession } from '$lib/stores/authSession.js';
   import RegistryAssistant from '$lib/components/RegistryAssistant.svelte';
   import { assistantChrome } from '$lib/assistant-chrome.js';
   import '../index.scss';
@@ -32,6 +33,7 @@
 
   onMount(async () => {
     await ensureRegistryRuntimeFlags();
+    await syncAuthSession();
     // Initialize i18n and wait for translations to load
     await initI18n();
     i18nReady = true;

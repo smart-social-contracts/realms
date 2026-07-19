@@ -1,5 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte';
+  import { get } from 'svelte/store';
   import { browser } from '$app/environment';
   import { _ } from 'svelte-i18n';
   import MapView from '$lib/components/MapView.svelte';
@@ -17,6 +18,7 @@
   import { realmPanelChrome } from '$lib/realm-panel-chrome.js';
   import { assistantChrome } from '$lib/assistant-chrome.js';
   import { mapShellInsets } from '$lib/map-shell-insets.js';
+  import { syncAuthSession, authSession } from '$lib/stores/authSession.js';
   
   let backend;
   let realms = [];
@@ -193,19 +195,26 @@
   }
 
   async function handleLogin() {
-    const { login } = await import('$lib/auth');
-    const result = await login();
-    if (result.principal) {
+    const result = await syncAuthSession();
+    if (result?.principal) {
       isLoggedIn = true;
       userPrincipal = result.principal;
     }
   }
 
   async function handleLogout() {
-    const { logout } = await import('$lib/auth');
+    const { logout } = await import('$lib/auth.js');
     await logout();
     isLoggedIn = false;
     userPrincipal = null;
+  }
+
+  async function syncAuthState() {
+    await syncAuthSession();
+    const session = get(authSession);
+    isLoggedIn = session.isLoggedIn;
+    userPrincipal = session.principal;
+    authLoading = session.loading;
   }
 
   onMount(async () => {
@@ -255,21 +264,7 @@
           : new Date().toISOString().replace('T', ' ').substring(0, 19);
     }
 
-    const { isAuthenticated, getPrincipal, login: authLogin } = await import('$lib/auth');
-    const { getTestModeIIBypass } = await import('$lib/config.js');
-    if (getTestModeIIBypass()) {
-      const result = await authLogin();
-      if (result.principal) {
-        isLoggedIn = true;
-        userPrincipal = result.principal;
-              }
-            } else {
-      isLoggedIn = await isAuthenticated();
-      if (isLoggedIn) {
-        userPrincipal = await getPrincipal();
-      }
-    }
-    authLoading = false;
+    await syncAuthState();
 
     return () => {
       if (pageOverlayFadeTimer) clearTimeout(pageOverlayFadeTimer);
