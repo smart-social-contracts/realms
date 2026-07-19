@@ -100,7 +100,8 @@
 
 	$: isFullBleedExtension =
 		$page.url.pathname.includes('/extensions/codex_viewer') ||
-		$page.url.pathname.includes('/extensions/zone_selector');
+		$page.url.pathname.includes('/extensions/zone_selector') ||
+		$page.url.pathname.includes('/extensions/land_registry');
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden">
