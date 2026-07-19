@@ -44,25 +44,17 @@ export function realmTruthCells(zones, h3) {
   if (!zones?.length || !h3) return cells;
 
   for (const zone of zones) {
+    if (!zone.h3_index) continue;
     let idx = null;
     try {
-      if (zone.h3_index) {
-        const res = h3.getResolution?.(zone.h3_index);
-        if (res === ZONE_DATA_RESOLUTION) {
-          idx = zone.h3_index;
-        } else if (typeof res === 'number' && res > ZONE_DATA_RESOLUTION && h3.cellToParent) {
-          idx = h3.cellToParent(zone.h3_index, ZONE_DATA_RESOLUTION);
-        }
-      }
-      if (!idx) {
-        idx = h3.latLngToCell(zone.center_lat, zone.center_lng, ZONE_DATA_RESOLUTION);
+      const res = h3.getResolution?.(zone.h3_index);
+      if (res === ZONE_DATA_RESOLUTION) {
+        idx = zone.h3_index;
+      } else if (typeof res === 'number' && res > ZONE_DATA_RESOLUTION && h3.cellToParent) {
+        idx = h3.cellToParent(zone.h3_index, ZONE_DATA_RESOLUTION);
       }
     } catch {
-      try {
-        idx = h3.latLngToCell(zone.center_lat, zone.center_lng, ZONE_DATA_RESOLUTION);
-      } catch {
-        /* skip zone */
-      }
+      /* skip invalid cell */
     }
     if (idx) cells.add(idx);
   }
@@ -177,14 +169,22 @@ function zoneStatsByTruthCell(zones, h3) {
   const locations = new Map();
 
   for (const zone of zones) {
+    if (!zone.h3_index) continue;
+    let truthCell = null;
     try {
-      const truthCell = h3.latLngToCell(zone.center_lat, zone.center_lng, ZONE_DATA_RESOLUTION);
-      users.set(truthCell, (users.get(truthCell) || 0) + (zone.user_count || 0));
-      if (!locations.has(truthCell)) locations.set(truthCell, []);
-      locations.get(truthCell).push(zone.location_name || 'Zone');
+      const res = h3.getResolution?.(zone.h3_index);
+      if (res === ZONE_DATA_RESOLUTION) {
+        truthCell = zone.h3_index;
+      } else if (typeof res === 'number' && res > ZONE_DATA_RESOLUTION && h3.cellToParent) {
+        truthCell = h3.cellToParent(zone.h3_index, ZONE_DATA_RESOLUTION);
+      }
     } catch {
-      /* skip */
+      /* skip invalid cell */
     }
+    if (!truthCell) continue;
+    users.set(truthCell, (users.get(truthCell) || 0) + (zone.user_count || 0));
+    if (!locations.has(truthCell)) locations.set(truthCell, []);
+    locations.get(truthCell).push(zone.name || zone.location_name || 'Zone');
   }
 
   return { users, locations };
@@ -457,27 +457,26 @@ export function resolveCapitalZone(zones) {
  */
 export function capitalHexCenter(zone, h3, h3Resolution) {
   const fallback = {
-    lat: Number(zone.center_lat),
-    lng: Number(zone.center_lng),
+    lat: null,
+    lng: null,
     hexIndex: zone.h3_index || null,
   };
-  if (!h3 || !Number.isFinite(fallback.lat) || !Number.isFinite(fallback.lng)) {
+  if (!h3 || !zone.h3_index) {
     return fallback;
   }
 
   let hexIndex = null;
   try {
-    hexIndex = h3.latLngToCell(fallback.lat, fallback.lng, h3Resolution);
-  } catch {
-    try {
-      if (zone.h3_index && h3.cellToParent) {
-        hexIndex = h3.cellToParent(zone.h3_index, h3Resolution);
-      } else {
-        hexIndex = zone.h3_index || null;
-      }
-    } catch {
-      hexIndex = zone.h3_index || null;
+    const res = h3.getResolution?.(zone.h3_index);
+    if (res === h3Resolution) {
+      hexIndex = zone.h3_index;
+    } else if (typeof res === 'number' && res > h3Resolution && h3.cellToParent) {
+      hexIndex = h3.cellToParent(zone.h3_index, h3Resolution);
+    } else {
+      hexIndex = zone.h3_index;
     }
+  } catch {
+    hexIndex = zone.h3_index || null;
   }
 
   if (!hexIndex) return fallback;
@@ -637,9 +636,9 @@ export function computeKpis(realms, realmZoneData) {
   const locationClusters = new Set();
   Object.values(realmZoneData).forEach((data) => {
     data.zones?.forEach((zone) => {
-      const latBucket = Math.round(zone.center_lat);
-      const lngBucket = Math.round(zone.center_lng);
-      locationClusters.add(`${latBucket},${lngBucket}`);
+      if (zone.h3_index) {
+        locationClusters.add(zone.h3_index);
+      }
     });
   });
 

@@ -334,9 +334,7 @@ class RealmGenerator:
                 h3_index=h3_index,
                 name=f"{city_name} Zone",
                 description=f"Zone of influence near {city_name}",
-                latitude=lat,
-                longitude=lng,
-                resolution=6.0,
+                zone_type="unassigned",
                 user_id=user.id,
                 metadata="{}"
             )
@@ -391,20 +389,12 @@ class RealmGenerator:
                 )
                 lands.append(land)
                 
-                # Create child zone associated with land
-                try:
-                    lat, lng = h3.cell_to_latlng(child_h3)
-                except:
-                    lat = parent_zone.latitude + (i % 3 - 1) * 0.001
-                    lng = parent_zone.longitude + (i // 3 - 1) * 0.001
-                
+                # Create child zone associated with land (geometry is frontend-only).
                 child_zone = Zone(
                     h3_index=child_h3,
                     name=f"{parent_zone.name} - Parcel {i+1}",
                     description=f"Land parcel within {parent_zone.name}",
-                    latitude=lat,
-                    longitude=lng,
-                    resolution=9.0,
+                    zone_type="unassigned",
                     land=land,  # Associate with land
                     metadata=json.dumps({"parent_zone": parent_zone.h3_index})
                 )

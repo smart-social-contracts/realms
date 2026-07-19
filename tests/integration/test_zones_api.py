@@ -43,8 +43,8 @@ def test_get_zones_returns_locations():
     if zones:
         zone = zones[0]
         assert "h3_index" in zone, "Zone must have h3_index"
-        assert "center_lat" in zone, "Zone must have center_lat"
-        assert "center_lng" in zone, "Zone must have center_lng"
+        assert "name" in zone, "Zone must have name"
+        assert "zone_type" in zone, "Zone must have zone_type"
         assert "user_count" in zone, "Zone must have user_count"
     
     print("✓")
