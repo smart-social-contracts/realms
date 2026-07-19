@@ -254,7 +254,7 @@
 	});
 </script>
 
-<div class="{id === 'codex_viewer' ? 'extension-host-codex' : 'p-4'}">
+<div class="{id === 'codex_viewer' || id === 'zone_selector' ? 'extension-host-fullbleed' : 'p-4'}">
 	{#if status === 'loading'}
 		<div class="flex items-center gap-2 text-gray-500">
 			<svg class="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -276,6 +276,23 @@
 </div>
 
 <style>
+	.extension-host-fullbleed {
+		flex: 1;
+		height: 100%;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.extension-host-fullbleed :global(.extension-mount-point) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
 	.extension-host-codex {
 		height: calc(100vh - 4rem);
 		min-height: 0;

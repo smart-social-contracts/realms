@@ -98,7 +98,9 @@
 		}
 	});
 
-	$: isFullBleedExtension = $page.url.pathname.includes('/extensions/codex_viewer');
+	$: isFullBleedExtension =
+		$page.url.pathname.includes('/extensions/codex_viewer') ||
+		$page.url.pathname.includes('/extensions/zone_selector');
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden">
@@ -113,16 +115,20 @@
 
 		<!-- Main Content -->
 		<div
-			class="main-content-area relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {!drawerHidden ? 'lg:ml-64' : ''}"
+			class="main-content-area relative flex-1 overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {isFullBleedExtension ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-y-auto'} {!drawerHidden ? 'lg:ml-64' : ''}"
 		>
 			<DemoBanner />
 			<DelegationBanner />
 
-			<div class="{isFullBleedExtension ? 'px-0 lg:pl-0 lg:pr-0' : 'px-4 lg:pl-6 lg:pr-0'}">
+			<div
+				class="{isFullBleedExtension
+					? 'flex min-h-0 flex-1 flex-col overflow-hidden px-0 lg:pl-0 lg:pr-0'
+					: 'px-4 lg:pl-6 lg:pr-0'}"
+			>
 				{#if !isFullBleedExtension}
 					<PageBreadcrumb />
 				{/if}
-				
+
 				<slot />
 				{#if !isFullBleedExtension}
 					<Footer />
