@@ -173,15 +173,7 @@ def mint_land_nft(
 
 
 def get_nft_canister_id() -> Optional[str]:
-    """
-    Get the NFT canister ID for this realm from config.
+    """Get the NFT canister ID for this realm (Realm entity, then static config)."""
+    from api.tokens import get_nft_canister_id as _get_nft_canister_id
 
-    Returns:
-        NFT canister ID string or None if not configured
-    """
-    try:
-        from config import CANISTER_IDS
-        return CANISTER_IDS.get("nft_backend")
-    except Exception as e:
-        logger.warning(f"Could not get NFT canister ID from config: {e}")
-        return None
+    return _get_nft_canister_id()

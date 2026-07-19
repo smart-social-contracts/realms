@@ -1117,6 +1117,11 @@ def _set_canister_config_impl(
     installed_version=None,
     network=None,
     test_flags_json=None,
+    accounting_currency=None,
+    accounting_currency_decimals=None,
+    treasury_token_symbol=None,
+    treasury_token_indexer_id=None,
+    treasury_token_type=None,
 ) -> RealmResponse:
     """
     Set canister IDs and metadata for this realm (admin only).
@@ -1183,6 +1188,39 @@ def _set_canister_config_impl(
                 if key in flags:
                     setattr(realm, attr, bool(flags[key]))
 
+        if accounting_currency:
+            symbol = str(accounting_currency).strip()
+            if symbol:
+                realm.accounting_currency = symbol[:16]
+        if accounting_currency_decimals is not None:
+            try:
+                decimals = int(accounting_currency_decimals)
+                if 0 <= decimals <= 18:
+                    realm.accounting_currency_decimals = decimals
+            except (TypeError, ValueError):
+                pass
+
+        if token_canister_id:
+            from api.tokens import register_treasury_token
+
+            sym = (
+                str(treasury_token_symbol or "").strip()
+                or getattr(realm, "accounting_currency", "")
+                or "REALMS"
+            )
+            indexer = (
+                str(treasury_token_indexer_id or "").strip() or str(token_canister_id)
+            )
+            decimals = int(getattr(realm, "accounting_currency_decimals", 8) or 8)
+            token_type = str(treasury_token_type or "realm").strip() or "realm"
+            register_treasury_token(
+                symbol=sym,
+                ledger_canister_id=str(token_canister_id),
+                indexer_canister_id=indexer,
+                decimals=decimals,
+                token_type=token_type,
+            )
+
         logger.info(
             f"Updated canister config: frontend={frontend_canister_id}, "
             f"token={token_canister_id}, nft={nft_canister_id}, "
@@ -1239,7 +1277,9 @@ def set_canister_config_json(args: text) -> text:
 
     Args (JSON, all optional): {frontend_canister_id, token_canister_id,
     nft_canister_id, file_registry_canister_id, marketplace_canister_id,
-    installed_version, network, and either test_flags_json (a JSON string) or
+    installed_version, network, accounting_currency, accounting_currency_decimals,
+    treasury_token_symbol, treasury_token_indexer_id, treasury_token_type,
+    and either test_flags_json (a JSON string) or
     test_flags (a JSON object, e.g. {"test_mode":true,"demo_data":true})}.
 
     Returns: {"success": bool, "message"?: str, "error"?: str}.
@@ -1258,6 +1298,11 @@ def set_canister_config_json(args: text) -> text:
             installed_version=params.get("installed_version"),
             network=params.get("network"),
             test_flags_json=flags,
+            accounting_currency=params.get("accounting_currency"),
+            accounting_currency_decimals=params.get("accounting_currency_decimals"),
+            treasury_token_symbol=params.get("treasury_token_symbol"),
+            treasury_token_indexer_id=params.get("treasury_token_indexer_id"),
+            treasury_token_type=params.get("treasury_token_type"),
         )
         return json.dumps(_realm_response_to_json_dict(resp))
     except Exception as e:

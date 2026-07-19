@@ -28,9 +28,10 @@ CANISTER_IDS = {
     "internet_identity": "rdmx6-jaaaa-aaaaa-aaadq-cai",
     
     # REALM token canister (ledger + indexer in one canister)
-    # Staging: xbkkh-syaaa-aaaah-qq3ya-cai
-    "realm_token_ledger": "xbkkh-syaaa-aaaah-qq3ya-cai",
-    "realm_token_indexer": "xbkkh-syaaa-aaaah-qq3ya-cai",  # Same canister provides both
+    # Staging: 2rqin-xaaaa-aaaah-qunsq-cai (shared platform token-backend)
+    "realm_token_ledger": "2rqin-xaaaa-aaaah-qunsq-cai",
+    "realm_token_indexer": "2rqin-xaaaa-aaaah-qunsq-cai",  # Same canister provides both
+    "token_backend": "2rqin-xaaaa-aaaah-qunsq-cai",
     
     # NFT backend canister for LAND NFTs
     # Updated during deployment with realm-specific NFT canister

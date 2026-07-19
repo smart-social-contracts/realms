@@ -403,7 +403,7 @@ try:
     MAINNET_CKBTC_INDEXER = "n5wcd-faaaa-aaaar-qaaea-cai"
     
     # Staging shared REALMS token (ic-tokens deployment)
-    STAGING_REALMS_TOKEN = "xbkkh-syaaa-aaaah-qq3ya-cai"
+    STAGING_REALMS_TOKEN = "2rqin-xaaaa-aaaah-qunsq-cai"
     
     # 1. ckBTC (shared)
     ckbtc_ledger_id = None
