@@ -9,6 +9,31 @@ import {
 } from './globe-config.js';
 import { stageMarkerColor } from '../realm-stages.js';
 
+/** @param {number | null | undefined} lat @param {number | null | undefined} lng */
+export function isFiniteLatLng(lat, lng) {
+  return Number.isFinite(lat) && Number.isFinite(lng);
+}
+
+/** Legacy zone payloads (pre-#254) still expose stored map coordinates. */
+function storedZoneLatLng(zone) {
+  const lat = Number(zone.center_lat ?? zone.latitude ?? zone.lat);
+  const lng = Number(zone.center_lng ?? zone.longitude ?? zone.lng);
+  return isFiniteLatLng(lat, lng) ? { lat, lng } : null;
+}
+
+/** @param {object | null | undefined} h3 @param {string | null | undefined} h3Index */
+function isUsableH3Index(h3, h3Index) {
+  if (!h3Index || typeof h3Index !== 'string') return false;
+  if (h3Index.startsWith('manual')) return false;
+  try {
+    if (h3?.isValidCell?.(h3Index) === false) return false;
+    if (h3?.isValidIndex?.(h3Index) === false) return false;
+  } catch {
+    /* optional validators */
+  }
+  return true;
+}
+
 /**
  * @typedef {object} HexRealmEntry
  * @property {object} realm
@@ -44,7 +69,7 @@ export function realmTruthCells(zones, h3) {
   if (!zones?.length || !h3) return cells;
 
   for (const zone of zones) {
-    if (!zone.h3_index) continue;
+    if (!isUsableH3Index(h3, zone.h3_index)) continue;
     let idx = null;
     try {
       const res = h3.getResolution?.(zone.h3_index);
@@ -169,7 +194,7 @@ function zoneStatsByTruthCell(zones, h3) {
   const locations = new Map();
 
   for (const zone of zones) {
-    if (!zone.h3_index) continue;
+    if (!isUsableH3Index(h3, zone.h3_index)) continue;
     let truthCell = null;
     try {
       const res = h3.getResolution?.(zone.h3_index);
@@ -443,7 +468,9 @@ export function resolveCapitalZone(zones) {
   return [...zones].sort((a, b) => {
     const byUsers = (b.user_count || 0) - (a.user_count || 0);
     if (byUsers !== 0) return byUsers;
-    return String(a.location_name || '').localeCompare(String(b.location_name || ''));
+    return String(a.name || a.location_name || '').localeCompare(
+      String(b.name || b.location_name || '')
+    );
   })[0];
 }
 
@@ -456,12 +483,14 @@ export function resolveCapitalZone(zones) {
  * @returns {{ lat: number, lng: number, hexIndex: string | null }}
  */
 export function capitalHexCenter(zone, h3, h3Resolution) {
+  const stored = storedZoneLatLng(zone);
   const fallback = {
-    lat: null,
-    lng: null,
+    lat: stored?.lat ?? null,
+    lng: stored?.lng ?? null,
     hexIndex: zone.h3_index || null,
   };
-  if (!h3 || !zone.h3_index) {
+
+  if (!h3 || !isUsableH3Index(h3, zone.h3_index)) {
     return fallback;
   }
 
@@ -483,10 +512,14 @@ export function capitalHexCenter(zone, h3, h3Resolution) {
 
   try {
     const [lat, lng] = h3.cellToLatLng(hexIndex);
-    return { lat, lng, hexIndex };
+    if (isFiniteLatLng(lat, lng)) {
+      return { lat, lng, hexIndex };
+    }
   } catch {
-    return { ...fallback, hexIndex };
+    /* fall through to stored coordinates */
   }
+
+  return { ...fallback, hexIndex };
 }
 
 /**
@@ -506,8 +539,13 @@ export function separateCoincidentMarkers(
   h3Resolution,
   radiusPx = 12
 ) {
-  const keyOf = (m) =>
-    m.hexIndex || `${Number(m.lat).toFixed(5)},${Number(m.lng).toFixed(5)}`;
+  const keyOf = (m) => {
+    if (m.hexIndex) return m.hexIndex;
+    if (isFiniteLatLng(m.lat, m.lng)) {
+      return `${Number(m.lat).toFixed(5)},${Number(m.lng).toFixed(5)}`;
+    }
+    return '';
+  };
 
   /** @type {Map<string, object[]>} */
   let groups = new Map();
@@ -534,22 +572,25 @@ export function separateCoincidentMarkers(
       const ranked = [...zones].sort((a, b) => {
         const byUsers = (b.user_count || 0) - (a.user_count || 0);
         if (byUsers !== 0) return byUsers;
-        return String(a.location_name || '').localeCompare(
-          String(b.location_name || '')
+        return String(a.name || a.location_name || '').localeCompare(
+          String(b.name || b.location_name || '')
         );
       });
       const alternate = ranked.find((zone) => {
         const center = capitalHexCenter(zone, h3, h3Resolution);
-        const key = center.hexIndex ||
+        if (!isFiniteLatLng(center.lat, center.lng)) return false;
+        const key =
+          center.hexIndex ||
           `${center.lat.toFixed(5)},${center.lng.toFixed(5)}`;
-        return !occupied.has(key);
+        return key && !occupied.has(key);
       });
       if (!alternate) continue;
       const center = capitalHexCenter(alternate, h3, h3Resolution);
+      if (!isFiniteLatLng(center.lat, center.lng)) continue;
       marker.lat = center.lat;
       marker.lng = center.lng;
       marker.hexIndex = center.hexIndex;
-      marker.location = alternate.location_name;
+      marker.location = alternate.name || alternate.location_name;
       marker.users = alternate.user_count;
     }
   }
@@ -593,10 +634,25 @@ export function buildPointMarkers(
     const zones = realmZoneData[realm.id]?.zones;
     if (!zones?.length) return;
 
-    const capital = resolveCapitalZone(zones);
-    if (!capital) return;
+    const ranked = [...zones].sort((a, b) => {
+      const byUsers = (b.user_count || 0) - (a.user_count || 0);
+      if (byUsers !== 0) return byUsers;
+      return String(a.name || a.location_name || '').localeCompare(
+        String(b.name || b.location_name || '')
+      );
+    });
+    let capital = null;
+    let center = null;
+    for (const zone of ranked) {
+      const candidate = capitalHexCenter(zone, h3, h3Resolution);
+      if (isFiniteLatLng(candidate.lat, candidate.lng)) {
+        capital = zone;
+        center = candidate;
+        break;
+      }
+    }
+    if (!capital || !center) return;
 
-    const center = capitalHexCenter(capital, h3, h3Resolution);
     const isDimmed =
       dimNonMatching && matchingRealmIds && !matchingRealmIds.has(realm.id);
 
@@ -608,7 +664,7 @@ export function buildPointMarkers(
       hexIndex: center.hexIndex,
       users: capital.user_count,
       totalUsers: realm.users_count || capital.user_count,
-      location: capital.location_name,
+      location: capital.name || capital.location_name,
       stage: realm.realm_stage,
       manifesto: realm.manifesto,
       color: stageMarkerColor(realm.realm_stage, { dimmed: isDimmed }),

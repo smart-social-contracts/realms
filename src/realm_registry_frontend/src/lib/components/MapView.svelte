@@ -122,7 +122,10 @@
 
   function showHoverPopup(lngLat, html) {
     if (!map || !hoverPopup || !html) return;
-    hoverPopup.setLngLat(lngLat).setHTML(html).addTo(map);
+    const lng = Array.isArray(lngLat) ? lngLat[0] : lngLat?.lng;
+    const lat = Array.isArray(lngLat) ? lngLat[1] : lngLat?.lat;
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+    hoverPopup.setLngLat([lng, lat]).setHTML(html).addTo(map);
   }
 
   function attachMarkerHover(el, point) {
@@ -181,6 +184,7 @@
     const seen = new Set();
 
     for (const p of points) {
+      if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
       seen.add(p.realmId);
       let marker = markerById.get(p.realmId);
       const offset = Array.isArray(p.pixelOffset) ? p.pixelOffset : [0, 0];
