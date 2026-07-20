@@ -94,6 +94,12 @@ export interface AssistantListing {
 }
 export type AssistantResult = { 'Ok' : AssistantListing } |
   { 'Err' : string };
+export type AuthorityError = { 'GenericError' : GenericError } |
+  { 'NonExistingTokenId' : null } |
+  { 'Unauthorized' : null } |
+  { 'InvalidRecipient' : null };
+export type AuthorityResult = { 'Ok' : bigint } |
+  { 'Err' : AuthorityError };
 export interface BadBurn { 'min_burn_amount' : bigint }
 export interface BadFee { 'expected_fee' : bigint }
 export interface BillingStatusRecord {
@@ -172,6 +178,7 @@ export interface CasalsProvisionService {
 export interface CasalsService {
   'create_canister' : ActorMethod<[string], string>,
   'create_stand' : ActorMethod<[string], string>,
+  'destroy_realm_stand' : ActorMethod<[string], string>,
   'get_tree' : ActorMethod<[], string>,
   'orchestration_configure_baton' : ActorMethod<[string], string>,
   'orchestration_hand_to_baton' : ActorMethod<[string], string>,
@@ -408,6 +415,22 @@ export interface FileRegistryService {
   'get_file_size_icc' : ActorMethod<[string, string], string>,
   'get_frontend_files_icc' : ActorMethod<[string, string], string>,
 }
+export interface ForceTransferArg {
+  'to' : NftAccount,
+  'token_id' : bigint,
+  'memo' : [] | [string],
+}
+export interface ForcedTransferArgs {
+  'to' : TokenAccount,
+  'from' : TokenAccount,
+  'memo' : [] | [string],
+  'amount' : bigint,
+}
+export interface FreezeAccountArgs {
+  'account' : TokenAccount,
+  'reason' : [] | [string],
+}
+export interface FreezeArg { 'token_id' : bigint, 'reason' : [] | [string] }
 export interface GenericError { 'message' : string, 'error_code' : bigint }
 export type GenericResult = { 'Ok' : string } |
   { 'Err' : string };
@@ -647,7 +670,7 @@ export type MetadataValue = { 'Int' : bigint } |
   { 'Text' : string };
 export type MillisatoshiPerByte = bigint;
 export interface MintArg {
-  'token_id' : bigint,
+  'token_id' : [] | [bigint],
   'owner' : NftAccount,
   'metadata' : [] | [Array<[string, MetadataValue]>],
 }
@@ -663,7 +686,12 @@ export interface MintTx {
   'created_at_time' : [] | [bigint],
   'amount' : bigint,
 }
-export interface NFTService { 'mint' : ActorMethod<[MintArg], MintResult> }
+export interface NFTService {
+  'force_transfer' : ActorMethod<[ForceTransferArg], AuthorityResult>,
+  'freeze_token' : ActorMethod<[FreezeArg], AuthorityResult>,
+  'mint' : ActorMethod<[MintArg], MintResult>,
+  'unfreeze_token' : ActorMethod<[bigint], AuthorityResult>,
+}
 export interface NameResult { 'name' : string }
 export interface NftAccount {
   'owner' : Principal,
@@ -1002,6 +1030,21 @@ export interface TakeSnapshotOk {
 }
 export interface TimeStamp { 'timestamp_nanos' : bigint }
 export type TimerId = bigint;
+export interface TokenAccount {
+  'owner' : Principal,
+  'subaccount' : [] | [Uint8Array | number[]],
+}
+export type TokenAuthorityError = { 'GenericError' : string } |
+  { 'InsufficientBalance' : null } |
+  { 'Unauthorized' : null } |
+  { 'InvalidRecipient' : null };
+export type TokenAuthorityResult = { 'Ok' : bigint } |
+  { 'Err' : TokenAuthorityError };
+export interface TokenAuthorityService {
+  'forced_transfer' : ActorMethod<[ForcedTransferArgs], TokenAuthorityResult>,
+  'freeze_account' : ActorMethod<[FreezeAccountArgs], TokenAuthorityResult>,
+  'unfreeze_account' : ActorMethod<[TokenAccount], TokenAuthorityResult>,
+}
 export interface Tokens { 'e8s' : bigint }
 export interface Transaction {
   'burn' : [] | [BurnTx],
@@ -1222,6 +1265,13 @@ export interface _SERVICE {
     [string, Array<[string, string]>],
     RealmResponse
   >,
+  'force_transfer_land_nft' : ActorMethod<[string, string, string], string>,
+  'force_transfer_tokens' : ActorMethod<
+    [string, string, bigint, string],
+    string
+  >,
+  'freeze_land_nft' : ActorMethod<[string, string], string>,
+  'freeze_token_account' : ActorMethod<[string, string], string>,
   'get_available_upgrade' : ActorMethod<[string], string>,
   'get_bootstrap_status' : ActorMethod<[], string>,
   'get_canister_id' : ActorMethod<[], string>,
@@ -1273,10 +1323,7 @@ export interface _SERVICE {
   'list_extensions' : ActorMethod<[string], RealmResponse>,
   'list_runtime_extensions' : ActorMethod<[], string>,
   'list_share_audiences' : ActorMethod<[], RealmResponse>,
-  'mint_land_nft_for_parcel' : ActorMethod<
-    [string, string, bigint, string],
-    string
-  >,
+  'mint_land_nft_for_parcel' : ActorMethod<[string, string, string], string>,
   'process_quarter_scaling' : ActorMethod<[], string>,
   'receive_realm_message' : ActorMethod<
     [string, string, string, string],
@@ -1296,6 +1343,7 @@ export interface _SERVICE {
   'report_quarter_population' : ActorMethod<[bigint], string>,
   'request_upgrade' : ActorMethod<[string], string>,
   'resolve_ref' : ActorMethod<[string], string>,
+  'resolve_token_ledger' : ActorMethod<[string], string>,
   'revoke_delegation_json' : ActorMethod<[string], string>,
   'send_realm_message' : ActorMethod<[string, string, string, string], string>,
   'set_canister_config' : ActorMethod<
@@ -1324,6 +1372,8 @@ export interface _SERVICE {
   'store_admin_invite_hash' : ActorMethod<[string], RealmResponse>,
   'sync_quarters' : ActorMethod<[string], string>,
   'test_timer' : ActorMethod<[], string>,
+  'unfreeze_land_nft' : ActorMethod<[string], string>,
+  'unfreeze_token_account' : ActorMethod<[string], string>,
   'uninstall_codex' : ActorMethod<[string], string>,
   'uninstall_extension' : ActorMethod<[string], string>,
   'update_my_private_data' : ActorMethod<[string], RealmResponse>,

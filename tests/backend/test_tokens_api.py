@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "realm_backend"))
 
-from api.tokens import resolve_shared_token  # noqa: E402
+from api.tokens import resolve_shared_token, resolve_shared_token_by_ledger  # noqa: E402
 
 
 def test_resolve_realms_staging():
@@ -19,3 +19,10 @@ def test_resolve_ckbtc_case_insensitive():
     cfg = resolve_shared_token("ckbtc", "staging")
     assert cfg is not None
     assert cfg["ledger"] == "mxzaz-hqaaa-aaaar-qaada-cai"
+
+
+def test_resolve_realms_by_ledger_staging():
+    cfg = resolve_shared_token_by_ledger("2rqin-xaaaa-aaaah-qunsq-cai", "staging")
+    assert cfg is not None
+    assert cfg["symbol"] == "REALMS"
+    assert cfg["indexer"] == "2rqin-xaaaa-aaaah-qunsq-cai"

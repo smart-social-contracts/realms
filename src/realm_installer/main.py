@@ -610,24 +610,16 @@ def schedule_registration(job_id_val: str):
                 )).strip()
                 token_cfg = _resolve_token_from_manifest(manifest)
                 token_id = ""
-                nft_id = ""
+                nft_id = _shared_nft_canister_id(network)
                 if token_cfg:
                     if token_cfg.get("deploy_new"):
                         casals_id = (_config().casals_canister_id or "").strip()
-                        stand_token, stand_nft = yield from _lookup_stand_token_ids(
+                        stand_token, _ = yield from _lookup_stand_token_ids(
                             casals_id, stand, job_id_val
                         )
                         token_id = stand_token or ""
-                        nft_id = stand_nft or ""
                     else:
                         token_id = token_cfg.get("ledger", "")
-                        nft_id = ""
-                        casals_id = (_config().casals_canister_id or "").strip()
-                        if casals_id and stand:
-                            _, stand_nft = yield from _lookup_stand_token_ids(
-                                casals_id, stand, job_id_val
-                            )
-                            nft_id = stand_nft or ""
 
                 link_payload = {
                     "frontend_canister_id": frontend_id or None,
@@ -1015,6 +1007,17 @@ _FILE_REGISTRY_IDS = {
     "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
 }
 
+# Shared land-NFT backend per network (Casals infra stand "nft", not per-realm).
+_SHARED_NFT_CANISTERS = {
+    "staging": "27sff-mqaaa-aaaah-quntq-cai",
+    "demo": "6hrip-iiaaa-aaaaf-qdoha-cai",
+    "test": "eelas-yyaaa-aaaao-qps7a-cai",
+}
+
+
+def _shared_nft_canister_id(network: str) -> str:
+    return (_SHARED_NFT_CANISTERS.get((network or "").strip().lower()) or "").strip()
+
 # Shared treasury ledgers keyed by network + symbol (mirrors realm_backend.api.tokens).
 _SHARED_TOKEN_LEDGERS = {
     "staging": {
@@ -1124,85 +1127,73 @@ def _resolve_token_from_manifest(manifest: dict):
     return None
 
 
-def _token_install_arg_candid(name: str, symbol: str) -> str:
+def _token_install_arg_candid(name: str, symbol: str, initial_owner: str = "",
+                              network: str = "") -> str:
     safe_name = _esc_candid_text(name)
     safe_symbol = _esc_candid_text(symbol)
+    # test mode allows public minting; never enable it on mainnet.
+    test_flag = "false" if network in ("ic", "mainnet", "prod") else "true"
+    owner_part = (
+        f'initial_owner = opt principal "{initial_owner}"' if initial_owner
+        else 'initial_owner = null'
+    )
     return (
         f'(record {{ name = "{safe_name}"; symbol = "{safe_symbol}"; '
         f'decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; '
-        f'fee = 10_000 : nat; test = opt true }})'
-    )
-
-
-def _nft_install_arg_candid(realm_name: str) -> str:
-    safe_name = _esc_candid_text(realm_name)[:40] or "Realm"
-    prefix = "".join(ch for ch in safe_name.upper() if ch.isalnum())[:4] or "RLM"
-    symbol = (prefix + "LAND")[:10]
-    return (
-        f'(record {{ name = "{safe_name} Land"; symbol = "{symbol}"; '
-        f'description = opt "Land ownership NFT for {safe_name}"; '
-        f'supply_cap = opt 10000 : opt nat; test = opt true }})'
+        f'fee = 10_000 : nat; test = opt {test_flag}; {owner_part} }})'
     )
 
 
 def _lookup_stand_token_ids(casals_id: str, stand: str, job_id: str):
-    """Generator: resolve per-stand token + nft canister IDs from Casals tree."""
+    """Generator: resolve a per-stand realm token canister (wizard ``token.new`` path)."""
     token_id = ""
-    nft_id = ""
     if not casals_id or not stand:
-        return token_id, nft_id
+        return token_id, ""
     try:
         casals = CasalsService(Principal.from_str(casals_id))
         tree_res: CallResult = yield casals.get_tree()
         tree = _casals_ok(tree_res)
         token_id = _casals_find_canister(tree, stand, f"{stand}-token")
-        nft_id = _casals_find_canister(tree, stand, f"{stand}-nft")
         if token_id:
             jlog(job_id).info(f"resolved stand token {token_id} ({stand}-token)")
-        if nft_id:
-            jlog(job_id).info(f"resolved stand nft {nft_id} ({stand}-nft)")
     except Exception as e:
         jlog(job_id).warning(f"Casals token lookup failed (non-fatal): {e}")
-    return token_id, nft_id
+    return token_id, ""
 
 
-def _provision_realm_token_canisters(casals, job_id: str, stand: str, manifest: dict,
-                                     backend_id: str):
-    """Generator: ensure per-stand treasury + land NFT canisters exist."""
+def _provision_realm_token_canister(casals, job_id: str, stand: str, manifest: dict,
+                                    backend_id: str = ""):
+    """Generator: deploy a per-stand ICRC-1 token when the wizard chose ``token.new``.
+
+    ``backend_id`` (the realm backend) becomes the ledger's initial owner and
+    authority, so the realm — not Casals — holds the supply and the
+    ERC-3643-style powers (forced_transfer / freeze / transfer_authority).
+    """
     token_cfg = _resolve_token_from_manifest(manifest)
+    if not token_cfg or not token_cfg.get("deploy_new"):
+        return "", token_cfg
+
     realm_info = manifest.get("realm") or {}
     realm_name = (realm_info.get("display_name") or realm_info.get("name") or stand).strip()
     cas = manifest.get("casals") or {}
     token_wasm_key = (cas.get("token_wasm_key") or "token-backend").strip()
-    nft_wasm_key = (cas.get("nft_wasm_key") or "nft-backend").strip()
+    network = (manifest.get("network") or "").strip().lower()
 
-    token_id = ""
-    if token_cfg and token_cfg.get("deploy_new"):
-        token_id = yield from _casals_create_or_reuse_canister(
-            casals,
-            job_id,
-            stand,
-            f"{stand}-token",
-            "backend",
-            token_wasm_key,
-            install_arg=_token_install_arg_candid(
-                token_cfg.get("name") or f"{realm_name} Token",
-                token_cfg.get("symbol") or "RLM",
-            ),
-        )
-    elif token_cfg:
-        token_id = token_cfg.get("ledger", "")
-
-    nft_id = yield from _casals_create_or_reuse_canister(
+    token_id = yield from _casals_create_or_reuse_canister(
         casals,
         job_id,
         stand,
-        f"{stand}-nft",
+        f"{stand}-token",
         "backend",
-        nft_wasm_key,
-        install_arg=_nft_install_arg_candid(realm_name),
+        token_wasm_key,
+        install_arg=_token_install_arg_candid(
+            token_cfg.get("name") or f"{realm_name} Token",
+            token_cfg.get("symbol") or "RLM",
+            initial_owner=backend_id,
+            network=network,
+        ),
     )
-    return token_id, nft_id, token_cfg
+    return token_id, token_cfg
 
 def _start_extensions_for_job(job, manifest: dict):
     realm_info = manifest.get("realm", {})
@@ -2099,21 +2090,20 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
             job.frontend_canister_id = frontend_id
             job.frontend_wasm_verified = 1
 
-        # 3a. Per-realm treasury token (optional) + land NFT collection.
+        # 3a. Optional per-stand treasury token when the wizard chose token.new.
         token_id = ""
-        nft_id = ""
         if backend_id and _resolve_token_from_manifest(manifest) is not None:
-            try:
-                token_id, nft_id, _token_cfg = yield from _provision_realm_token_canisters(
-                    casals, job_id, stand, manifest, backend_id,
-                )
-                jlog(job_id).info(
-                    f"token/nft canisters ready: token={token_id or '–'}, nft={nft_id or '–'}"
-                )
-            except Exception as tok_err:
-                jlog(job_id).warning(
-                    f"token/nft provisioning failed (non-fatal): {tok_err}"
-                )
+            token_cfg = _resolve_token_from_manifest(manifest)
+            if token_cfg and token_cfg.get("deploy_new"):
+                try:
+                    token_id, _ = yield from _provision_realm_token_canister(
+                        casals, job_id, stand, manifest, backend_id=backend_id,
+                    )
+                    jlog(job_id).info(f"stand token ready: {token_id or '–'}")
+                except Exception as tok_err:
+                    jlog(job_id).warning(
+                        f"stand token provisioning failed (non-fatal): {tok_err}"
+                    )
 
         # 3b. Per-realm Baton governance (opt-in): stand baton + hand-offs +
         # 2-of-2 (casals-backend + realm-backend) approval policy.
@@ -2128,8 +2118,6 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
                 hand_targets.append((f"{stand}-frontend", frontend_id))
             if token_id:
                 hand_targets.append((f"{stand}-token", token_id))
-            if nft_id:
-                hand_targets.append((f"{stand}-nft", nft_id))
             baton_id = yield from _setup_stand_baton(
                 casals, job_id, stand, casals_id, baton_key,
                 hand_targets, backend_id if want_backend else "",

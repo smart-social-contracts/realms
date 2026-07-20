@@ -23,6 +23,14 @@ class Operations:
     TRANSFER_REVERT = "transfer.delete"
     INVOICE_REFRESH = "invoice.refresh"
     NFT_MINT = "nft.mint"
+    # Registry-authority override of NFT ownership (judicial/governance):
+    # force-transfer to a new owner, or freeze/unfreeze during a dispute.
+    NFT_FORCE_TRANSFER = "nft.force_transfer"
+    NFT_FREEZE = "nft.freeze"
+    # Monetary-authority override of fungible token balances (ERC-3643-style):
+    # forced transfer between accounts, or freeze/unfreeze of an account.
+    TOKEN_FORCE_TRANSFER = "token.force_transfer"
+    TOKEN_FREEZE = "token.freeze"
     LICENSE_ISSUE = "license.issue"
     LICENSE_REVOKE = "license.revoke"
 
@@ -40,6 +48,7 @@ class Operations:
     REALM_CONFIGURE = "realm.configure"
     REALM_CONFIGURE_CODEX = "realm.configure.codex"
     REALM_CONFIGURE_INFRASTRUCTURE = "realm.configure.infrastructure"
+    REALM_CONFIGURE_TOKENS = "realm.configure.tokens"
     REALM_REGISTER = "realm.register"
     QUARTER_REGISTER = "quarter.register"
     QUARTER_DEREGISTER = "quarter.deregister"
@@ -210,6 +219,7 @@ class Profiles:
             Operations.REALM_CONFIGURE,
             Operations.REALM_CONFIGURE_CODEX,
             Operations.REALM_CONFIGURE_INFRASTRUCTURE,
+            Operations.REALM_CONFIGURE_TOKENS,
             Operations.QUARTER_REGISTER,
             Operations.QUARTER_DEREGISTER,
             Operations.QUARTER_CONFIGURE,

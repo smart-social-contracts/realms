@@ -60,7 +60,13 @@ from api.quarter_provisioning import (
     parse_casals_spec as _parse_casals_spec,
 )
 from api.messaging import send_realm_message as _send_realm_message
-from api.nft import get_nft_canister_id, mint_land_nft
+from api.nft import (
+    force_transfer_nft,
+    freeze_nft,
+    get_nft_canister_id,
+    mint_land_nft,
+    unfreeze_nft,
+)
 from api.registry import get_registry_info, register_realm
 from api.status import get_status
 from api.user import (
@@ -5091,19 +5097,18 @@ def get_available_upgrade(registry_canister_id: text = "") -> Async[text]:
 def mint_land_nft_for_parcel(
     land_id: text,
     owner_principal: text,
-    token_id: nat,
     nft_canister_id: text = "",
 ) -> Async[text]:
     """
     Mint a LAND NFT for a registered land parcel.
 
     Makes an inter-canister call to the realm's NFT canister to mint
-    an NFT representing ownership of the land parcel.
+    an NFT representing ownership of the land parcel. The NFT canister
+    assigns the next sequential token ID automatically.
 
     Args:
         land_id: ID of the land parcel
         owner_principal: Principal ID of the land owner
-        token_id: Unique token ID for the NFT
         nft_canister_id: Optional NFT canister ID (uses config if not provided)
 
     Returns:
@@ -5124,15 +5129,31 @@ def mint_land_nft_for_parcel(
                 {"success": False, "error": "NFT canister ID not configured"}
             )
 
-        # Mint the NFT
+        # Mint the NFT (token ID auto-assigned by the NFT canister)
+        land_zones = list(land.zones) if hasattr(land, "zones") and land.zones else []
+        h3_indexes = [
+            zone.h3_index for zone in land_zones if getattr(zone, "h3_index", None)
+        ]
+        metadata_obj = {}
+        if land.metadata:
+            try:
+                metadata_obj = json.loads(land.metadata)
+            except json.JSONDecodeError:
+                metadata_obj = {}
+        if not h3_indexes and metadata_obj.get("parent_zone"):
+            h3_indexes = [str(metadata_obj["parent_zone"])]
+        elif metadata_obj.get("h3_indexes"):
+            h3_indexes = [str(i) for i in metadata_obj["h3_indexes"] if i]
+
         result = yield mint_land_nft(
             nft_canister_id=canister_id,
-            token_id=int(token_id),
             owner_principal=owner_principal,
             land_id=land_id,
             x_coordinate=land.x_coordinate,
             y_coordinate=land.y_coordinate,
             land_type=land.land_type,
+            h3_index=h3_indexes[0] if h3_indexes else None,
+            h3_indexes=h3_indexes or None,
         )
 
         # Update land with NFT token ID if successful
@@ -5143,6 +5164,310 @@ def mint_land_nft_for_parcel(
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error in mint_land_nft_for_parcel: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+def _land_nft_context(land_id: str, nft_canister_id: str = ""):
+    """Resolve (land, canister_id, token_id) or return an error dict."""
+    from ggg import Land
+
+    land = Land[land_id]
+    if not land:
+        return None, None, None, {"success": False, "error": f"Land {land_id} not found"}
+
+    canister_id = nft_canister_id or get_nft_canister_id()
+    if not canister_id:
+        return None, None, None, {"success": False, "error": "NFT canister ID not configured"}
+
+    token_id_str = (land.nft_token_id or "").strip()
+    if not token_id_str:
+        return None, None, None, {
+            "success": False,
+            "error": f"Land {land_id} has no minted NFT (nft_token_id is empty)",
+        }
+    try:
+        token_id = int(token_id_str)
+    except ValueError:
+        return None, None, None, {
+            "success": False,
+            "error": f"Land {land_id} has an invalid nft_token_id: {token_id_str!r}",
+        }
+    return land, canister_id, token_id, None
+
+
+def _append_land_audit(land, entry: dict) -> None:
+    """Best-effort append of an authority-action audit entry to land metadata."""
+    try:
+        meta = json.loads(land.metadata or "{}")
+    except Exception:
+        meta = {}
+    history = meta.get("authority_actions") or []
+    history.append(entry)
+    # Land.metadata is capped at 512 chars; keep only the most recent entries
+    # that fit. The NFT canister's transaction log keeps the full history.
+    while history:
+        meta["authority_actions"] = history
+        serialized = json.dumps(meta, separators=(",", ":"))
+        if len(serialized) <= 512:
+            land.metadata = serialized
+            return
+        history = history[1:]
+    logger.warning(
+        f"Could not persist audit entry for land {land.id} in metadata; "
+        f"see the NFT canister transaction log for the authoritative record"
+    )
+
+
+@update
+@require(Operations.NFT_FORCE_TRANSFER)
+def force_transfer_land_nft(
+    land_id: text,
+    new_owner_principal: text,
+    reason: text = "",
+) -> Async[text]:
+    """
+    Forcefully reassign a land parcel's NFT to a new owner.
+
+    Registry-authority override (ERC-3643-style forced transfer): intended to
+    be executed as the outcome of a judicial procedure, a passed governance
+    proposal, or key recovery. Requires the nft.force_transfer permission
+    (admins have it; others should go through a proposal).
+    """
+    try:
+        from ggg import Land, User
+
+        land, canister_id, token_id, err = _land_nft_context(land_id)
+        if err:
+            return json.dumps(err, indent=2)
+
+        old_owner_user = land.owner_user.id if land.owner_user else ""
+
+        result = yield force_transfer_nft(
+            nft_canister_id=canister_id,
+            token_id=token_id,
+            new_owner_principal=new_owner_principal,
+            memo=reason or "realm force transfer",
+        )
+
+        if result.get("success"):
+            # Update the realm's canonical ownership record.
+            new_owner_user = User[new_owner_principal]
+            land.owner_user = new_owner_user  # None if not a registered user
+            land.owner_organization = None
+            _append_land_audit(land, {
+                "action": "force_transfer",
+                "token_id": str(token_id),
+                "from": old_owner_user,
+                "to": new_owner_principal,
+                "reason": reason or "",
+                "by": str(ic.caller().to_str()),
+                "at": int(ic.time()),
+            })
+            try:
+                Land.land_transfer_posthook(land, old_owner_user, new_owner_principal)
+            except Exception as hook_err:
+                logger.warning(f"land_transfer_posthook failed: {hook_err}")
+            result["land_id"] = land_id
+            result["token_id"] = str(token_id)
+            result["new_owner"] = new_owner_principal
+            logger.info(
+                f"Force-transferred land {land_id} NFT {token_id} to {new_owner_principal} "
+                f"(reason: {reason!r})"
+            )
+
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in force_transfer_land_nft: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@update
+@require(Operations.NFT_FREEZE)
+def freeze_land_nft(land_id: text, reason: text = "") -> Async[text]:
+    """
+    Freeze a land parcel's NFT: the holder cannot transfer it until unfrozen.
+
+    Used while a dispute or investigation is ongoing. Also marks the land
+    record as disputed.
+    """
+    try:
+        from ggg import LandStatus
+
+        land, canister_id, token_id, err = _land_nft_context(land_id)
+        if err:
+            return json.dumps(err, indent=2)
+
+        result = yield freeze_nft(canister_id, token_id, reason or "realm freeze")
+
+        if result.get("success"):
+            land.status = LandStatus.DISPUTED
+            _append_land_audit(land, {
+                "action": "freeze",
+                "token_id": str(token_id),
+                "reason": reason or "",
+                "by": str(ic.caller().to_str()),
+                "at": int(ic.time()),
+            })
+            result["land_id"] = land_id
+            result["token_id"] = str(token_id)
+
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in freeze_land_nft: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@update
+@require(Operations.NFT_FREEZE)
+def unfreeze_land_nft(land_id: text) -> Async[text]:
+    """Unfreeze a land parcel's NFT, restoring normal transfers."""
+    try:
+        from ggg import LandStatus
+
+        land, canister_id, token_id, err = _land_nft_context(land_id)
+        if err:
+            return json.dumps(err, indent=2)
+
+        result = yield unfreeze_nft(canister_id, token_id)
+
+        if result.get("success"):
+            land.status = LandStatus.ACTIVE
+            _append_land_audit(land, {
+                "action": "unfreeze",
+                "token_id": str(token_id),
+                "by": str(ic.caller().to_str()),
+                "at": int(ic.time()),
+            })
+            result["land_id"] = land_id
+            result["token_id"] = str(token_id)
+
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in unfreeze_land_nft: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+def _token_authority_context(from_principal: str = "", to_principal: str = ""):
+    """Resolve the treasury token ledger and validate principals; returns (ledger, err)."""
+    from api.nft import _validate_principal_text
+    from api.tokens import get_token_canister_id
+
+    ledger = get_token_canister_id()
+    if not ledger:
+        return None, {"success": False, "error": "Realm token canister ID not configured"}
+    for label, value in (("from", from_principal), ("to", to_principal)):
+        if value:
+            try:
+                _validate_principal_text(value)
+            except Exception as e:
+                return None, {"success": False, "error": f"Invalid {label} principal: {e}"}
+    return ledger, None
+
+
+@update
+@require(Operations.TOKEN_FORCE_TRANSFER)
+def force_transfer_tokens(
+    from_principal: text,
+    to_principal: text,
+    amount: nat,
+    reason: text = "",
+) -> Async[text]:
+    """
+    Forcefully move realm treasury tokens between two accounts.
+
+    Monetary-authority override (ERC-3643-style forcedTransfer): intended to
+    be executed as the outcome of a judicial procedure, a passed governance
+    proposal, or key recovery. Requires the token.force_transfer permission.
+    The realm backend must be the token canister's ledger authority (or a
+    controller).
+    """
+    try:
+        from api.tokens import forced_transfer_tokens
+
+        ledger, err = _token_authority_context(from_principal, to_principal)
+        if err:
+            return json.dumps(err, indent=2)
+
+        result = yield forced_transfer_tokens(
+            ledger_canister_id=ledger,
+            from_principal=from_principal,
+            to_principal=to_principal,
+            amount=int(amount),
+            memo=reason or "realm forced transfer",
+        )
+
+        if result.get("success"):
+            result["from"] = from_principal
+            result["to"] = to_principal
+            result["amount"] = str(amount)
+            logger.info(
+                f"Force-transferred {amount} tokens from {from_principal} to "
+                f"{to_principal} (reason: {reason!r}) by {ic.caller().to_str()}"
+            )
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in force_transfer_tokens: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@update
+@require(Operations.TOKEN_FREEZE)
+def freeze_token_account(user_principal: text, reason: text = "") -> Async[text]:
+    """
+    Freeze a realm treasury token account: it cannot send tokens until
+    unfrozen (receiving remains possible). Used during disputes,
+    investigations, or sanctions. Requires the token.freeze permission.
+    """
+    try:
+        from api.tokens import freeze_token_account_call
+
+        ledger, err = _token_authority_context(user_principal)
+        if err:
+            return json.dumps(err, indent=2)
+
+        result = yield freeze_token_account_call(
+            ledger, user_principal, reason or "realm freeze"
+        )
+
+        if result.get("success"):
+            result["account"] = user_principal
+            logger.info(
+                f"Froze token account {user_principal} (reason: {reason!r}) "
+                f"by {ic.caller().to_str()}"
+            )
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in freeze_token_account: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@update
+@require(Operations.TOKEN_FREEZE)
+def unfreeze_token_account(user_principal: text) -> Async[text]:
+    """Unfreeze a realm treasury token account, restoring normal transfers."""
+    try:
+        from api.tokens import unfreeze_token_account_call
+
+        ledger, err = _token_authority_context(user_principal)
+        if err:
+            return json.dumps(err, indent=2)
+
+        result = yield unfreeze_token_account_call(ledger, user_principal)
+
+        if result.get("success"):
+            result["account"] = user_principal
+            logger.info(
+                f"Unfroze token account {user_principal} by {ic.caller().to_str()}"
+            )
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in unfreeze_token_account: {e}")
         logger.error(traceback.format_exc())
         return json.dumps({"success": False, "error": str(e)}, indent=2)
 
@@ -5171,6 +5496,24 @@ def get_nft_config() -> text:
 
 
 @update
+def resolve_token_ledger(ledger_canister_id: text) -> text:
+    """Resolve symbol, decimals, and suggested indexer from a ledger canister."""
+    try:
+        from ggg import Realm
+        from api.tokens import resolve_ledger_token_info_sync
+
+        network = ""
+        realm = Realm.load("1")
+        if realm:
+            network = getattr(realm, "network", "") or ""
+        result = resolve_ledger_token_info_sync(ledger_canister_id, network)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"resolve_token_ledger failed: {e}")
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@update
 def update_realm_config(config_json: str) -> str:
     """
     Update the realm configuration (name, manifesto, welcome_message,
@@ -5178,6 +5521,9 @@ def update_realm_config(config_json: str) -> str:
 
     Infrastructure fields (file_registry_canister_id, marketplace_canister_id)
     require the stronger ``realm.configure.infrastructure`` permission.
+
+    Token/NFT canister fields (token_canister_id, token_indexer_canister_id,
+    nft_canister_id) require ``realm.configure.tokens`` permission.
 
     Args:
         config_json: JSON string containing realm configuration fields
@@ -5206,6 +5552,19 @@ def update_realm_config(config_json: str) -> str:
                 "success": False,
                 "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE_INFRASTRUCTURE}'",
                 "denied_operation": Operations.REALM_CONFIGURE_INFRASTRUCTURE,
+            })
+
+        token_keys = {
+            "token_canister_id",
+            "token_indexer_canister_id",
+            "nft_canister_id",
+        }
+        has_token_change = bool(token_keys & set(config.keys()))
+        if has_token_change and not _check_access(caller, Operations.REALM_CONFIGURE_TOKENS):
+            return json.dumps({
+                "success": False,
+                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE_TOKENS}'",
+                "denied_operation": Operations.REALM_CONFIGURE_TOKENS,
             })
 
         realms = list(Realm.instances())
@@ -5313,6 +5672,42 @@ def update_realm_config(config_json: str) -> str:
             updated_fields.append(
                 f"accounting_currency_decimals={realm.accounting_currency_decimals}"
             )
+
+        if "token_canister_id" in config:
+            token_id = str(config.get("token_canister_id") or "").strip()
+            realm.token_canister_id = token_id
+            updated_fields.append(f"token_canister_id={token_id}")
+
+        if "nft_canister_id" in config:
+            nft_id = str(config.get("nft_canister_id") or "").strip()
+            realm.nft_canister_id = nft_id
+            updated_fields.append(f"nft_canister_id={nft_id}")
+
+        token_ledger = getattr(realm, "token_canister_id", "") or ""
+        if token_ledger and (
+            "token_canister_id" in config
+            or "token_indexer_canister_id" in config
+            or "accounting_currency" in config
+        ):
+            from api.tokens import register_treasury_token
+
+            sym = (
+                str(getattr(realm, "accounting_currency", "") or "").strip()
+                or "REALMS"
+            )
+            indexer = str(config.get("token_indexer_canister_id") or "").strip()
+            if not indexer:
+                from api.tokens import get_treasury_token_indexer
+
+                indexer = get_treasury_token_indexer(sym, token_ledger)
+            decimals = int(getattr(realm, "accounting_currency_decimals", 8) or 8)
+            register_treasury_token(
+                symbol=sym,
+                ledger_canister_id=token_ledger,
+                indexer_canister_id=indexer,
+                decimals=decimals,
+            )
+            updated_fields.append(f"treasury_token={sym}@{token_ledger}")
 
         logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
         return json.dumps({"success": True, "updated_fields": updated_fields})

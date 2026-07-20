@@ -212,6 +212,7 @@ def get_status() -> "dict[str, Any]":
     # Accounting currency
     accounting_currency = "ckBTC"
     accounting_currency_decimals = 8
+    token_indexer_canister_id = ""
     try:
         first_realm = Realm.load("1")
         if first_realm:
@@ -220,6 +221,12 @@ def get_status() -> "dict[str, Any]":
             )
             accounting_currency_decimals = (
                 getattr(first_realm, "accounting_currency_decimals", None) or 8
+            )
+            from api.tokens import get_treasury_token_indexer
+
+            token_indexer_canister_id = get_treasury_token_indexer(
+                accounting_currency,
+                getattr(first_realm, "token_canister_id", "") or "",
             )
     except Exception as e:
         logger.warning(f"Could not load accounting currency: {e}")
@@ -347,6 +354,7 @@ def get_status() -> "dict[str, Any]":
         "parent_realm_canister_id": parent_realm_canister_id,
         "accounting_currency": accounting_currency,
         "accounting_currency_decimals": accounting_currency_decimals,
+        "token_indexer_canister_id": token_indexer_canister_id,
         "logo_url": logo_url,
         "background_image_url": background_image_url,
         "file_registry_canister_id": file_registry_canister_id,
