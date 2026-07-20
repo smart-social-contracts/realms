@@ -5610,6 +5610,56 @@ def update_realm_config(config_json: str) -> str:
                     f"policy is authoritative ({realm.open_registration})"
                 )
 
+        if "config_overrides" in config:
+            # Per-deployment codex parameter overrides chosen in the creation
+            # wizard (issue #253). Stored under manifest_data.config_overrides;
+            # codex_hooks.get_config() applies them over codex-declared values.
+            overrides = config["config_overrides"]
+            if not isinstance(overrides, dict):
+                return json.dumps({
+                    "success": False,
+                    "error": "config_overrides must be an object",
+                })
+            try:
+                md = json.loads(getattr(realm, "manifest_data", "") or "{}")
+                if not isinstance(md, dict):
+                    md = {}
+            except (json.JSONDecodeError, TypeError):
+                md = {}
+            existing = md.get("config_overrides")
+            if isinstance(existing, dict):
+                merged_overrides = dict(existing)
+                merged_overrides.update(overrides)
+            else:
+                merged_overrides = dict(overrides)
+            md["config_overrides"] = merged_overrides
+            serialized_md = json.dumps(md)
+            if len(serialized_md) > 4096:
+                return json.dumps({
+                    "success": False,
+                    "error": f"manifest_data would exceed 4096 chars ({len(serialized_md)})",
+                })
+            realm.manifest_data = serialized_md
+            updated_fields.append(
+                f"config_overrides={list(merged_overrides.keys())}"
+            )
+
+            # The voting window lives on the Calendar entity (seconds), not in
+            # manifest_data — sync it from the effective merged config so a
+            # wizard override of governance.voting_window_days actually changes
+            # how long ballots stay open.
+            try:
+                from core.codex_hooks import get_config as _get_codex_config
+
+                effective = _get_codex_config()
+                days = (effective.get("governance") or {}).get("voting_window_days")
+                if days is not None and realm.calendar:
+                    seconds = max(1, int(round(float(days) * 86400)))
+                    realm.calendar.voting_window = seconds
+                    updated_fields.append(f"calendar.voting_window={seconds}s")
+            except Exception as cal_err:
+                logger.warning(f"Could not sync calendar voting_window: {cal_err}")
+
         if "quarter_join_mode" in config:
             mode = str(config["quarter_join_mode"] or "auto").strip().lower()
             if mode not in ("auto", "choice"):

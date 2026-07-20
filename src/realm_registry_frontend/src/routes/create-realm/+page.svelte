@@ -265,7 +265,50 @@
       openRegistration: reg?.open_registration === true,
       defaultProfile: reg?.default_profile || 'member',
       identityRequirements: manifest.onboarding?.identity_requirements || [],
+      // Wizard-editable codex parameters (issue #253): declared with a
+      // config path, default, and optional min/max; values the user changes
+      // are deployed as manifest_data.config_overrides.
+      parameters: Array.isArray(manifest.parameters) ? manifest.parameters : [],
     };
+  }
+
+  let showAdvancedParams = false;
+  $: basicParams = (selectedCodexDetails?.parameters || []).filter((p) => !p.advanced);
+  $: advancedParams = (selectedCodexDetails?.parameters || []).filter((p) => p.advanced);
+
+  function selectCodex(codexId) {
+    if (formData.codex_package_name !== codexId) {
+      formData.codex_package_name = codexId;
+      // Parameter choices belong to a codex; changing codex resets them.
+      formData.codex_params = {};
+      showAdvancedParams = false;
+    }
+  }
+
+  /** Parse a parameter input; returns null when unset/at default (no override). */
+  function paramOverrideValue(param, raw) {
+    if (raw === '' || raw === null || raw === undefined) return null;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return null;
+    const value = param.type === 'integer' ? Math.round(num) : num;
+    if (value === param.default) return null;
+    return value;
+  }
+
+  /** Flat {"lifecycle.critical_mass": 25} → nested {lifecycle: {critical_mass: 25}}. */
+  function buildConfigOverrides(params, values) {
+    const nested = {};
+    for (const param of params || []) {
+      const value = paramOverrideValue(param, values?.[param.path]);
+      if (value === null) continue;
+      const keys = param.path.split('.');
+      let node = nested;
+      for (let i = 0; i < keys.length - 1; i++) {
+        node = node[keys[i]] = node[keys[i]] || {};
+      }
+      node[keys[keys.length - 1]] = value;
+    }
+    return nested;
   }
 
   $: selectedCodexDetails = codexDetails(codexManifests[formData.codex_package_name] || null);
@@ -420,7 +463,13 @@
       setDeployStep('submit');
       const manifest = await buildRealmDeploymentManifest(
         formData, CONFIG.default_deploy_queue_network, branding,
-        { deployVersion: formData.deploy_version, useCasals: true },
+        {
+          deployVersion: formData.deploy_version,
+          useCasals: true,
+          configOverrides: buildConfigOverrides(
+            selectedCodexDetails?.parameters, formData.codex_params,
+          ),
+        },
       );
       const manifestJson = JSON.stringify(manifest);
 
@@ -538,6 +587,9 @@
     codex_source: 'package',
     codex_package_name: '',
     codex_package_version: 'latest',
+    // Codex parameter values keyed by config path (issue #253); only values
+    // differing from the codex default are deployed as config_overrides.
+    codex_params: {},
     // Governance Assistant
     assistant: null, // null means no assistant, or assistant id
     // Member registration type (default follows the selected codex)
@@ -562,6 +614,18 @@
     if (step === 0) {
       if (!formData.codex_package_name.trim()) {
         errors.codex_package_name = 'Please select a codex';
+      }
+      for (const param of selectedCodexDetails?.parameters || []) {
+        const raw = formData.codex_params?.[param.path];
+        if (raw === '' || raw === null || raw === undefined) continue;
+        const num = Number(raw);
+        if (!Number.isFinite(num)) {
+          errors[`param_${param.path}`] = 'Must be a number';
+        } else if (param.min !== undefined && num < param.min) {
+          errors[`param_${param.path}`] = `Must be at least ${param.min}`;
+        } else if (param.max !== undefined && num > param.max) {
+          errors[`param_${param.path}`] = `Must be at most ${param.max}`;
+        }
       }
     }
     
@@ -727,6 +791,14 @@
     // Governance Assistant
     if (formData.assistant) {
       manifest.assistant = formData.assistant;
+    }
+
+    // Codex parameter choices (issue #253)
+    const configOverrides = buildConfigOverrides(
+      selectedCodexDetails?.parameters, formData.codex_params,
+    );
+    if (Object.keys(configOverrides).length > 0) {
+      manifest.config_overrides = configOverrides;
     }
 
     return manifest;
@@ -1321,7 +1393,7 @@
                   type="button"
                   class="codex-card"
                   class:selected={formData.codex_package_name === codex.id}
-                  on:click={() => formData.codex_package_name = codex.id}
+                  on:click={() => selectCodex(codex.id)}
                 >
                   <div class="codex-radio">
                     {#if formData.codex_package_name === codex.id}
@@ -1415,6 +1487,77 @@
                 later from inside your realm.
               </p>
             </div>
+
+            {#if selectedCodexDetails.parameters.length > 0}
+              <div class="codex-manifest-details codex-params-panel">
+                <h3>Parameters</h3>
+                <p class="codex-details-note" style="margin-top: 0;">
+                  This codex lets you tune the values below per realm. Leave a
+                  field empty to keep the codex default.
+                </p>
+
+                {#each basicParams as param (param.path)}
+                  <div class="form-group codex-param-group">
+                    <label for={`param-${param.path}`}>
+                      {param.label}
+                      <span class="codex-param-default">default: {param.default}</span>
+                    </label>
+                    {#if param.description}
+                      <p class="hint codex-param-hint">{param.description}</p>
+                    {/if}
+                    <input
+                      type="number"
+                      id={`param-${param.path}`}
+                      step="any"
+                      min={param.min}
+                      max={param.max}
+                      placeholder={String(param.default)}
+                      bind:value={formData.codex_params[param.path]}
+                      class:error={errors[`param_${param.path}`]}
+                    />
+                    {#if errors[`param_${param.path}`]}
+                      <span class="error-message">{errors[`param_${param.path}`]}</span>
+                    {/if}
+                  </div>
+                {/each}
+
+                {#if advancedParams.length > 0}
+                  <button
+                    type="button"
+                    class="codex-expand-btn"
+                    on:click={() => showAdvancedParams = !showAdvancedParams}
+                  >
+                    {showAdvancedParams ? 'Hide advanced parameters' : `Show advanced parameters (${advancedParams.length})`}
+                  </button>
+                  {#if showAdvancedParams}
+                    {#each advancedParams as param (param.path)}
+                      <div class="form-group codex-param-group">
+                        <label for={`param-${param.path}`}>
+                          {param.label}
+                          <span class="codex-param-default">default: {param.default}</span>
+                        </label>
+                        {#if param.description}
+                          <p class="hint codex-param-hint">{param.description}</p>
+                        {/if}
+                        <input
+                          type="number"
+                          id={`param-${param.path}`}
+                          step="any"
+                          min={param.min}
+                          max={param.max}
+                          placeholder={String(param.default)}
+                          bind:value={formData.codex_params[param.path]}
+                          class:error={errors[`param_${param.path}`]}
+                        />
+                        {#if errors[`param_${param.path}`]}
+                          <span class="error-message">{errors[`param_${param.path}`]}</span>
+                        {/if}
+                      </div>
+                    {/each}
+                  {/if}
+                {/if}
+              </div>
+            {/if}
           {/if}
       </div>
 
@@ -2845,6 +2988,31 @@
     margin: 0.5rem 0 0;
     font-size: 0.8rem;
     color: #64748b;
+  }
+
+  /* Codex parameters (issue #253) */
+  .codex-params-panel {
+    margin-top: 1rem;
+  }
+
+  .codex-param-group {
+    margin-bottom: 1rem;
+  }
+
+  .codex-param-group input[type='number'] {
+    max-width: 16rem;
+  }
+
+  .codex-param-default {
+    margin-left: 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: #94a3b8;
+  }
+
+  .codex-param-hint {
+    margin: 0.15rem 0 0.4rem;
+    font-size: 0.75rem;
   }
 
   /* Select all row */

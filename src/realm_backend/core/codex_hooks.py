@@ -47,6 +47,9 @@ _NON_CONFIG_MANIFEST_KEYS = frozenset({
     "author", "dependencies", "extension_overrides", "data_files",
     "entity_method_overrides", "profiles", "categories", "icon",
     "show_in_sidebar", "sidebar_label", "doc_url", "permissions", "system",
+    # Wizard-editable parameter declarations (issue #253) — metadata about
+    # the config, not config itself.
+    "parameters",
 })
 
 
@@ -207,6 +210,18 @@ def _manifest_config_blocks(manifest: dict) -> dict:
     }
 
 
+def _deep_merge(base: dict, overrides: dict) -> dict:
+    """Recursively merge ``overrides`` over ``base`` (dicts only; any other
+    value in ``overrides`` replaces the base value)."""
+    merged = dict(base)
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def get_config() -> dict:
     """Realm configuration as declared by the installed codex.
 
@@ -220,6 +235,12 @@ def get_config() -> dict:
     in ``manifest_data`` so runtime-seeded keys (e.g. lifecycle counters
     written by extensions) survive while codex-declared values stay
     authoritative.
+
+    Exception: ``manifest_data.config_overrides`` — per-deployment parameter
+    values chosen in the creation wizard (or patched later by an admin, issue
+    #253) — is applied **last** and therefore beats the codex. That is the
+    contract that makes codex ``parameters`` (critical mass, voting window,
+    fees…) tunable per realm without republishing the codex.
     """
     base: Dict[str, Any] = {}
     try:
@@ -267,6 +288,12 @@ def get_config() -> dict:
             merged[key] = {**merged[key], **value}
         else:
             merged[key] = value
+
+    # Per-deployment overrides always win (wizard parameters, issue #253).
+    overrides = base.get("config_overrides")
+    if isinstance(overrides, dict) and overrides:
+        merged = _deep_merge(merged, overrides)
+    merged.pop("config_overrides", None)
     return merged
 
 

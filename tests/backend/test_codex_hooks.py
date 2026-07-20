@@ -199,6 +199,85 @@ class TestGetConfig:
         })
         assert codex_hooks.get_config()["fees"]["registration"] == 1.0
 
+    def test_config_overrides_beat_codex_config(self):
+        """Wizard parameter choices (manifest_data.config_overrides, issue
+        #253) are applied last — they beat the codex-declared values, which
+        otherwise win over manifest_data."""
+        _mock_ggg(manifest_data=json.dumps({
+            "lifecycle": {"critical_mass": 9999, "total_deposits": 42},
+            "config_overrides": {"lifecycle": {"critical_mass": 25}},
+        }))
+        module = MagicMock(spec=[])  # no get_config hook
+        _mock_runtime_extensions(
+            manifests={
+                "syntropia": {
+                    "kind": "codex",
+                    "id": "syntropia",
+                    "lifecycle": {"critical_mass": 10000, "beta_proving_days": 30},
+                },
+            },
+            modules={"syntropia": module},
+        )
+        config = codex_hooks.get_config()
+        assert config["lifecycle"]["critical_mass"] == 25  # override wins
+        assert config["lifecycle"]["beta_proving_days"] == 30  # codex kept
+        assert config["lifecycle"]["total_deposits"] == 42  # runtime kept
+        assert "config_overrides" not in config  # internal key stripped
+
+    def test_config_overrides_deep_merge_preserves_siblings(self):
+        _mock_ggg(manifest_data=json.dumps({
+            "config_overrides": {"governance": {"voting_window_days": 0.0007}},
+        }))
+        module = MagicMock(spec=[])
+        _mock_runtime_extensions(
+            manifests={
+                "syntropia": {
+                    "kind": "codex",
+                    "id": "syntropia",
+                    "governance": {
+                        "voting_window_days": 7,
+                        "quorum_percent": 20,
+                        "approval_threshold": 0.5,
+                    },
+                },
+            },
+            modules={"syntropia": module},
+        )
+        governance = codex_hooks.get_config()["governance"]
+        assert governance["voting_window_days"] == 0.0007
+        assert governance["quorum_percent"] == 20
+        assert governance["approval_threshold"] == 0.5
+
+    def test_config_overrides_beat_get_config_hook(self):
+        """Overrides are applied by the core even when the codex serves its
+        config through the get_config hook."""
+        _mock_ggg(manifest_data=json.dumps({
+            "config_overrides": {"fees": {"registration": 0.0}},
+        }))
+        module = MagicMock()
+        module.get_config = lambda args: json.dumps({
+            "fees": {"registration": 9.0, "deposit": 0.01},
+        })
+        _mock_runtime_extensions(
+            manifests={"syntropia": {"kind": "codex", "id": "syntropia"}},
+            modules={"syntropia": module},
+        )
+        fees = codex_hooks.get_config()["fees"]
+        assert fees["registration"] == 0.0
+        assert fees["deposit"] == 0.01
+
+    def test_parameters_block_is_not_config(self):
+        """The wizard-facing ``parameters`` declaration is packaging
+        metadata, not realm configuration."""
+        blocks = codex_hooks._manifest_config_blocks({
+            "id": "syntropia",
+            "kind": "codex",
+            "parameters": [{"path": "lifecycle.critical_mass", "default": 10000}],
+            "lifecycle": {"critical_mass": 10000},
+        })
+        assert "parameters" not in blocks
+        assert "lifecycle" in blocks
+
 
 # ---------------------------------------------------------------------------
 # extension overrides

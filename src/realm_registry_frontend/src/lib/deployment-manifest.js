@@ -144,7 +144,8 @@ function buildCasalsBlock(realmName, deployVersion) {
  * @param {string} network - e.g. staging, demo
  * @param {{ file_registry_canister_id: string, namespace: string,
  *           files: Record<string,string> }} [branding]
- * @param {{ deployVersion?: string, useCasals?: boolean }} [options]
+ * @param {{ deployVersion?: string, useCasals?: boolean,
+ *           configOverrides?: Record<string, any> }} [options]
  */
 export async function buildRealmDeploymentManifest(
   formData,
@@ -206,6 +207,14 @@ export async function buildRealmDeploymentManifest(
 
   if (formData.assistant) {
     realm.assistant = formData.assistant;
+  }
+
+  // Codex parameter choices (issue #253): nested config values the user
+  // changed from the codex defaults. The installer stores them under
+  // manifest_data.config_overrides on the new realm; the codex's get_config
+  // applies them over its declared blocks.
+  if (options.configOverrides && Object.keys(options.configOverrides).length > 0) {
+    realm.config_overrides = options.configOverrides;
   }
 
   const manifest = {

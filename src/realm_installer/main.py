@@ -568,6 +568,13 @@ def schedule_registration(job_id_val: str):
                     config["open_registration"] = realm_info.get(
                         "open_registration", False
                     )
+                # Wizard codex-parameter choices (issue #253): stored in
+                # manifest_data.config_overrides on the realm; the codex's
+                # get_config applies them over its declared defaults. Runs
+                # after codex init, so the lean manifest_data is preserved.
+                overrides = realm_info.get("config_overrides")
+                if isinstance(overrides, dict) and overrides:
+                    config["config_overrides"] = overrides
                 config_json = json.dumps(config).replace('\\', '\\\\').replace('"', '\\"')
                 config_arg = '("' + config_json + '")'
                 config_result: CallResult = yield ic.call_raw(
