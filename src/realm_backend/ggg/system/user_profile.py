@@ -13,7 +13,8 @@ class Operations:
     USER_DELETE = "user.delete"
     USER_UPDATE_STATUS = "user.update_status"
 
-    # Organization management
+    # Department management (wire IDs keep the legacy "organization." prefix
+    # because they are stored in existing Permission grants)
     ORGANIZATION_ADD = "organization.add"
     ORGANIZATION_EDIT = "organization.edit"
     ORGANIZATION_DELETE = "organization.delete"

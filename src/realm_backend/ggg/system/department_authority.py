@@ -5,7 +5,7 @@ logger = get_logger("entity.department_authority")
 
 
 class DepartmentAuthority(Entity, TimestampedMixin):
-    """Permission grant from one organization over another (issue #240).
+    """Permission grant from one department over another (issue #240).
 
     Local target: set ``target`` to a Department on this quarter.
     Remote target (capital → other quarter): leave ``target`` empty and set

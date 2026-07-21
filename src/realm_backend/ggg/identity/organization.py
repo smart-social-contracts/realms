@@ -5,6 +5,12 @@ logger = get_logger("entity.organization")
 
 
 class Organization(Entity, TimestampedMixin):
+    """External party the realm trades with (company, NGO, vendor, ...).
+
+    Owns land, appears in the ledger, and can hold a license. Internal
+    governance teams are ``Department``, not ``Organization``.
+    """
+
     __alias__ = "name"
     name = String(min_length=2, max_length=256)
     owned_lands = OneToMany("Land", "owner_organization")

@@ -107,7 +107,7 @@ def apply_position_action(action: dict) -> dict:
 
             dept = Department[dept_name]
             if not dept:
-                return {"success": False, "error": f"Organization '{dept_name}' not found"}
+                return {"success": False, "error": f"Department '{dept_name}' not found"}
 
             key = f"{dept_name}/{title}"
             if Position[key]:

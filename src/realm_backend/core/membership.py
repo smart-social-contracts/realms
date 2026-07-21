@@ -50,7 +50,7 @@ def _scan_users(predicate: Callable, limit: Optional[int] = None) -> List:
 
 
 # ---------------------------------------------------------------------------
-# Departments (organizations)
+# Departments
 # ---------------------------------------------------------------------------
 
 

@@ -13,20 +13,21 @@ from ic_python_logging import get_logger
 
 logger = get_logger("entity.department")
 
-# Reserved name for the quarter's top governing organization (issue #240).
+# Reserved name for the quarter's top governing department (issue #240).
 ROOT_ORG_NAME = "root"
 
 
 class Department(Entity, TimestampedMixin):
-    """Governance organization within a quarter (product name: Organization).
+    """Internal governance department within a quarter.
 
-    See https://github.com/smart-social-contracts/realms/issues/240
+    Not to be confused with ``Organization`` (an external party the realm
+    trades with). See https://github.com/smart-social-contracts/realms/issues/240
 
-    - Members are users only (no org nesting).
+    - Members are users only (no department nesting).
     - Policy (M/N, quorum, veto) governs how members exercise powers.
-    - Optional fund link is the org's budget envelope.
-    - Exactly one org named ``root`` with ``is_root=True`` per quarter.
-    - Authority *over* other orgs is modeled by ``DepartmentAuthority``,
+    - Optional fund link is the department's budget envelope.
+    - Exactly one department named ``root`` with ``is_root=True`` per quarter.
+    - Authority *over* other departments is modeled by ``DepartmentAuthority``,
       not by parent/child membership.
     """
 
@@ -41,20 +42,20 @@ class Department(Entity, TimestampedMixin):
     # traverse forward (user.departments); list members via core.membership.
     permissions = ManyToMany(["Permission"], "departments")
     extensions = ManyToMany(["Extension"], "departments")
-    # Deprecated: org nesting is forbidden (issue #240). Kept for schema
+    # Deprecated: department nesting is forbidden (issue #240). Kept for schema
     # compatibility with existing data; create/update APIs must reject writes.
     parent = ManyToOne("Department", "sub_departments")
     sub_departments = OneToMany("Department", "parent")
     notifications = OneToMany("Notification", "department")
 
-    # --- Organization model (issue #240) ---
+    # --- Department governance model (issue #240) ---
     is_root = Boolean(default=False)
     # Policy: require M approvals out of N eligible members (N=0 → use member count).
     policy_threshold_m = Integer(default=1)
     policy_threshold_n = Integer(default=1)
     # Minimum participation percent (0–100) among eligible members; 0 = no extra quorum.
     policy_quorum_percent = Integer(default=0)
-    # Comma-separated principals that may veto an action under this org's policy.
+    # Comma-separated principals that may veto an action under this department's policy.
     policy_veto_principals = String(max_length=2048, default="")
     # Budget envelope (governmental Fund).
     fund = OneToOne("Fund", "department")

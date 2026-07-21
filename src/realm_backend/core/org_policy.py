@@ -1,4 +1,4 @@
-"""Organization policy helpers (issue #240).
+"""Department policy helpers (issue #240).
 
 Realm-internal GGG rules for governance orgs (Department entity).
 Not related to Casals/Baton orchestration policies.
@@ -102,14 +102,14 @@ def ensure_root_org(head_user=None):
     if not fund:
         fund = Fund(
             code="ROOT",
-            name="Root Organization Fund",
+            name="Root Department Fund",
             fund_type=FundType.GENERAL,
-            description="Budget envelope for the quarter root organization",
+            description="Budget envelope for the quarter root department",
         )
 
     root = Department(
         name=ROOT_ORG_NAME,
-        description="Quarter top governing organization",
+        description="Quarter top governing department",
         is_root=True,
         policy_threshold_m=1,
         policy_threshold_n=1,
@@ -125,7 +125,7 @@ def ensure_root_org(head_user=None):
         except Exception:
             pass
 
-    logger.info("ensure_root_org: created root organization")
+    logger.info("ensure_root_org: created root department")
     return root
 
 

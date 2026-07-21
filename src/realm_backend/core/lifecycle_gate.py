@@ -79,7 +79,7 @@ def readiness_checklist(realm) -> list:
         "id": "departments_seeded",
         "label": "Departments seeded",
         "done": len(non_root) > 0 and len(non_root) >= len(expected),
-        "detail": f"{len(non_root)} organizations (template lists {len(expected)})",
+        "detail": f"{len(non_root)} departments (template lists {len(expected)})",
     })
 
     def _member_count(dept) -> int:
@@ -184,7 +184,7 @@ def readiness_checklist(realm) -> list:
         "id": "root_handover",
         "label": "Root handed to governance authority",
         "done": root_members > 1,
-        "detail": f"root organization has {root_members} member(s)",
+        "detail": f"root department has {root_members} member(s)",
     })
 
     return items
@@ -288,7 +288,7 @@ def beta_to_production_ready(realm, approvals: Optional[list] = None):
        since the realm entered beta (0/absent disables the requirement).
     2. **Governance vote** — root must have been handed over (root org has
        members beyond the creator) and the recorded approvals must satisfy
-       the root organization's policy among its member principals.
+       the root department's policy among its member principals.
 
     ``approvals`` defaults to ``lifecycle.stage_approvals.production`` in
     ``manifest_data`` (written by realm_settings ``approve_stage_transition``).
