@@ -463,6 +463,10 @@ def install_extension_from_registry(
     files = {}
     for path, content in raw_files.items():
         clean = path.removeprefix("backend/") if path.startswith("backend/") else path
+        # Legacy packages ship a minimal backend/manifest.json stub; never let
+        # it clobber the authoritative root manifest.json (categories, labels).
+        if clean == "manifest.json" and path != "manifest.json" and "manifest.json" in raw_files:
+            continue
         files[clean] = content
 
     logger.info(f"Got {len(files)} files from registry (version {resolved_version})")
