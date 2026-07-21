@@ -52,11 +52,14 @@
     "dismiss_label": "Dismiss test mode notice"
   },
   "categories": {
+    "home": "Home",
     "public_services": "Public Services",
-    "governance": "Governance",
-    "administration": "Administration",
     "land_territory": "Territory",
+    "governance": "Governance",
+    "people_access": "People & Access",
     "finances": "Finances",
+    "realm_management": "Realm Management",
+    "administration": "Administration",
     "settings": "Settings",
     "other": "Other"
   },

@@ -6175,19 +6175,32 @@ def _active_extension_overrides(manifests: dict) -> dict:
 
 
 DEFAULT_CATEGORY_ORDER = [
+    ("home", "Home", 0),
     ("public_services", "Public Services", 1),
-    ("governance", "Governance", 2),
-    ("administration", "Administration", 3),
-    ("land_territory", "Territory", 4),
+    ("land_territory", "Territory", 2),
+    ("governance", "Governance", 3),
+    ("people_access", "People & Access", 4),
     ("finances", "Finances", 5),
-    ("settings", "Settings", 6),
+    ("realm_management", "Realm Management", 6),
+    # Legacy ids kept so third-party extensions using them still render.
+    ("administration", "Administration", 7),
+    ("settings", "Settings", 8),
     ("other", "Other", 99),
 ]
 
 DEFAULT_ITEM_ORDER = {
+    "land_territory": ["land_registry", "zone_selector"],
     "governance": ["voting", "codex_viewer"],
+    "people_access": ["role_manager", "access_manager", "member_manager", "department_docs"],
     "finances": ["vault", "metrics"],
-    "settings": ["package_manager", "managed_services"],
+    "realm_management": [
+        "realm_settings",
+        "package_manager",
+        "managed_services",
+        "admin_dashboard",
+        "task_monitor",
+        "system_info",
+    ],
 }
 
 

@@ -101,12 +101,12 @@
 		return `https://api.dicebear.com/9.x/glass/svg?seed=${seed}`;
 	}
 	
-	// Determine user type label based on profiles
+	// Show the user's actual profiles (users can hold several, e.g. member + judge).
 	$: userTypeLabel = (() => {
 		if (!$userProfiles || $userProfiles.length === 0) return 'Guest';
-		if ($userProfiles.includes('admin')) return 'Admin';
-		if ($userProfiles.includes('member')) return 'Member';
-		return 'Guest';
+		return $userProfiles
+			.map((p) => p.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()))
+			.join(', ');
 	})();
 	
 	function goToSettings() {
