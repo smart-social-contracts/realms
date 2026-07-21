@@ -180,6 +180,37 @@ def benchmark_all() -> list[dict]:
         results.append(measure(c, f"get_file_chunk (query, {read_kb} KB)", read_sz,
                                lambda a=arg: dfx_call(c, "get_file_chunk", a, query=True)))
 
+    # --- get_backend_files_icc (bulk read baseline for install path) ---
+    read_ns = "ext/bench_read/1.0.0"
+    read_files = [
+        ("manifest.json", 2 * 1024),
+        ("backend/a.py", 8 * 1024),
+        ("backend/b.py", 12 * 1024),
+    ]
+    total_read_bytes = sum(sz for _, sz in read_files)
+    for path, sz in read_files:
+        blob = make_payload(sz)
+        b64 = base64.b64encode(blob).decode()
+        dfx_call(c, "store_file_chunk", candid_text({
+            "namespace": read_ns, "path": path,
+            "chunk_index": 0, "total_chunks": 1,
+            "data_b64": b64, "content_type": "application/octet-stream",
+        }))
+        dfx_call(c, "finalize_chunked_file_step", candid_text({
+            "namespace": read_ns, "path": path,
+            "expected_sha256": hashlib.sha256(blob).hexdigest(),
+            "batch_size": 1,
+        }))
+    dfx_call(c, "publish_namespace", candid_text({"namespace": read_ns}))
+    results.append(measure(
+        c, f"get_backend_files_icc (query, {total_read_bytes // 1024} KB bundle)",
+        total_read_bytes,
+        lambda: dfx_call(
+            c, "get_backend_files_icc",
+            '("ext", "bench_read", "1.0.0")', query=True,
+        ),
+    ))
+
     # --- Re-upload identical content (no dedup) ---
     blob = make_payload(50 * 1024)
     b64 = base64.b64encode(blob).decode()

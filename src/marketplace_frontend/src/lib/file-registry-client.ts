@@ -13,8 +13,8 @@
 //     call also fixes the file's expected SHA-256 from the browser's
 //     pre-computed hash.
 //
-// Small files (<128 KB) take a fast path that skips the chunk staging
-// area: a single store_file({namespace, path, content_b64, content_type}).
+// All uploads use the chunked path (~7x cheaper per KB than store_file on the
+// WASI Python registry; see scripts/BENCHMARK_RESULTS.md).
 
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
@@ -63,7 +63,6 @@ export async function listFiles(canisterId: string, namespace: string): Promise<
 
 const fileRegistryIdlFactory = ({ IDL: idl }: { IDL: typeof IDL }) =>
   idl.Service({
-    store_file: idl.Func([idl.Text], [idl.Text], []),
     store_file_chunk: idl.Func([idl.Text], [idl.Text], []),
     finalize_chunked_file_step: idl.Func([idl.Text], [idl.Text], []),
     publish_namespace: idl.Func([idl.Text], [idl.Text], []),
@@ -91,8 +90,7 @@ async function getRegistryActor(canisterId: string) {
 // Upload
 // ---------------------------------------------------------------------------
 
-const SMALL_FILE_THRESHOLD = 96 * 1024;     // <96 KB → single store_file
-const CHUNK_BYTES = 128 * 1024;             // 128 KB per store_file_chunk
+const CHUNK_BYTES = 64 * 1024;
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -155,27 +153,9 @@ export async function uploadFile(
   const actor = await getRegistryActor(canisterId);
 
   onProgress?.({ path, uploaded: 0, total, status: 'queued' });
-
-  if (total <= SMALL_FILE_THRESHOLD) {
-    onProgress?.({ path, uploaded: 0, total, status: 'uploading' });
-    const buf = await file.arrayBuffer();
-    const args = JSON.stringify({
-      namespace,
-      path,
-      content_b64: arrayBufferToBase64(buf),
-      content_type: ct,
-    });
-    const resp = await (actor as any).store_file(args);
-    const parsed = JSON.parse(String(resp));
-    if (parsed?.error) throw new Error(`store_file: ${parsed.error}`);
-    onProgress?.({ path, uploaded: total, total, status: 'done' });
-    return;
-  }
-
-  // Chunked path. Hash first so the registry can store the SHA on commit.
   onProgress?.({ path, uploaded: 0, total, status: 'hashing' });
   const sha256 = await sha256HexFromBlob(file);
-  const totalChunks = Math.ceil(total / CHUNK_BYTES);
+  const totalChunks = Math.max(1, Math.ceil(total / CHUNK_BYTES));
 
   for (let i = 0; i < totalChunks; i++) {
     const start = i * CHUNK_BYTES;

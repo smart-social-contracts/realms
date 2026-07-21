@@ -9,14 +9,12 @@ import { IDL } from '@dfinity/candid';
 import { Principal } from '@dfinity/principal';
 import { initializeAuthClient } from './auth';
 
-// Match CLI publish limits (extension.py): 128 KiB raw chunks blow the IC
-// per-message instruction budget once JSON + base64 decode land in WASI Python.
-const SMALL_FILE_THRESHOLD = 64 * 1024;
+// Match CLI publish limits (extension.py): keep raw chunks at 64 KiB so JSON +
+// base64 decode stays under the WASI Python per-message instruction budget.
 const CHUNK_BYTES = 64 * 1024;
 
 const fileRegistryIdlFactory = ({ IDL: idl }) =>
   idl.Service({
-    store_file: idl.Func([idl.Text], [idl.Text], []),
     store_file_chunk: idl.Func([idl.Text], [idl.Text], []),
     finalize_chunked_file_step: idl.Func([idl.Text], [idl.Text], []),
     publish_namespace: idl.Func([idl.Text], [idl.Text], []),
@@ -134,26 +132,9 @@ export async function uploadFile(canisterId, payload, onProgress) {
   const actor = await getRegistryActor(canisterId);
 
   onProgress?.({ path, uploaded: 0, total, status: 'queued' });
-
-  if (total <= SMALL_FILE_THRESHOLD) {
-    onProgress?.({ path, uploaded: 0, total, status: 'uploading' });
-    const buf = await file.arrayBuffer();
-    const args = JSON.stringify({
-      namespace,
-      path,
-      content_b64: arrayBufferToBase64(buf),
-      content_type: ct,
-    });
-    const resp = await actor.store_file(args);
-    const parsed = JSON.parse(String(resp));
-    if (parsed?.error) throw new Error(`store_file: ${parsed.error}`);
-    onProgress?.({ path, uploaded: total, total, status: 'done' });
-    return;
-  }
-
   onProgress?.({ path, uploaded: 0, total, status: 'hashing' });
   const sha256 = await sha256HexFromBlob(file);
-  const totalChunks = Math.ceil(total / CHUNK_BYTES);
+  const totalChunks = Math.max(1, Math.ceil(total / CHUNK_BYTES));
 
   for (let i = 0; i < totalChunks; i++) {
     const start = i * CHUNK_BYTES;

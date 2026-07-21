@@ -1052,11 +1052,9 @@ def codex_runtime_list_command(canister: str, network: str = "local", identity: 
 # Publish commands — upload extensions / codices to file_registry
 # ---------------------------------------------------------------------------
 
-# Files larger than this are uploaded via store_file_chunk + finalize_chunked_file_step.
 # Each store_file_chunk JSON-parses + base64-decodes its payload inside the WASI
 # Python runtime; ~200 KiB/chunk blows the 40B per-message instruction budget, so
 # keep raw chunks small (64 KiB raw -> ~88 KiB base64 payload).
-_PUBLISH_CHUNK_THRESHOLD_BYTES = 64 * 1024  # 64 KiB raw — single-shot store_file below this
 _PUBLISH_CHUNK_SIZE_BYTES = 64 * 1024
 # Chunks concatenated per finalize_chunked_file_step call. Concatenation is cheap
 # (the expensive on-chain SHA-256 is skipped — we pass the local hash), so several
@@ -1148,37 +1146,12 @@ def _upload_one_file(
 
     content_type = _content_type_for(local_path)
 
-    if size <= _PUBLISH_CHUNK_THRESHOLD_BYTES:
-        with open(local_path, "rb") as fh:
-            blob = fh.read()
-        payload = json.dumps({
-            "namespace": namespace,
-            "path": registry_path,
-            "content_b64": _b64.b64encode(blob).decode("ascii"),
-            "content_type": content_type,
-        })
-        candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
-        raw = _dfx_call(
-            registry, "store_file", candid_arg, network, identity, timeout=300
-        )
-        try:
-            res = json.loads(raw)
-        except json.JSONDecodeError:
-            res = {"raw": raw}
-        if isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True):
-            console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes)")
-            return "uploaded"
+    total_chunks = max(1, (size + _PUBLISH_CHUNK_SIZE_BYTES - 1) // _PUBLISH_CHUNK_SIZE_BYTES)
+    if total_chunks > 1:
         console.print(
-            f"  [red]✗[/red] failed to store {registry_path}: {res}"
+            f"  [blue]…[/blue] chunked upload of {namespace}/{registry_path} "
+            f"({size:,} bytes, {total_chunks} chunks)"
         )
-        return "failed"
-
-    # Chunked upload
-    total_chunks = (size + _PUBLISH_CHUNK_SIZE_BYTES - 1) // _PUBLISH_CHUNK_SIZE_BYTES
-    console.print(
-        f"  [blue]…[/blue] chunked upload of {namespace}/{registry_path} "
-        f"({size:,} bytes, {total_chunks} chunks)"
-    )
     with open(local_path, "rb") as fh:
         for chunk_index in range(total_chunks):
             blob = fh.read(_PUBLISH_CHUNK_SIZE_BYTES)
@@ -1210,10 +1183,6 @@ def _upload_one_file(
                 )
                 return "failed"
 
-    # Incremental finalize: concatenate chunks a batch at a time. The single-shot
-    # finalize_chunked_file hashes the whole file in one message, which exceeds the
-    # 40B-instruction budget for multi-MB files on the WASI Python runtime. The step
-    # variant skips on-chain hashing and trusts the locally-computed SHA-256.
     local_sha = _local_file_sha256(local_path)
     while True:
         finalize_payload = json.dumps({
@@ -1239,7 +1208,8 @@ def _upload_one_file(
             console.print(f"  [red]✗[/red] finalize failed for {registry_path}: {res}")
             return "failed"
         if res.get("done") is True:
-            console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes, chunked)")
+            label = "chunked" if total_chunks > 1 else "stored"
+            console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes, {label})")
             return "uploaded"
 
 

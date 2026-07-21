@@ -35,13 +35,19 @@ logger = get_logger("api.file_registry")
 
 class FileRegistryService(Service):
     @service_query
-    def get_backend_files_icc(self, category: text, item_id: text, version: text) -> text: ...
-
-    @service_query
-    def get_frontend_files_icc(self, item_id: text, version: text) -> text: ...
-
-    @service_query
     def get_extension_manifest(self, args: text) -> text: ...
+
+    @service_query
+    def latest_version(self, args: text) -> text: ...
+
+    @service_query
+    def list_extensions(self) -> text: ...
+
+    @service_query
+    def list_codices(self) -> text: ...
+
+    @service_query
+    def list_files_icc(self, namespace: text) -> text: ...
 
     @service_query
     def get_file_size_icc(self, namespace: text, path: text) -> text: ...
@@ -101,6 +107,225 @@ def _resolve_codex_dependencies(manifest: dict, codex_id: str) -> Dict[str, str]
         logger.error(f"Codex '{codex_id}': could not add core extensions: {e}")
 
     return dependencies
+
+
+def _parse_semver(version: str) -> tuple:
+    parts = []
+    for p in (version or "0").split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            parts.append(0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def _is_range_spec(spec: str) -> bool:
+    s = (spec or "").strip().lower()
+    return s.startswith(("^", "~")) or "x" in s.split(".") or "*" in s
+
+
+def _spec_matches(spec: str, version: str) -> bool:
+    spec = (spec or "").strip()
+    vt = _parse_semver(version)
+    if spec.startswith("^") or spec.startswith("~"):
+        base = _parse_semver(spec[1:])
+        if vt < base or vt[0] != base[0]:
+            return False
+        if spec.startswith("~") and (len(vt) < 2 or len(base) < 2 or vt[1] != base[1]):
+            return False
+        return True
+    if "x" in spec.lower() or "*" in spec:
+        spec_parts = spec.replace("*", "x").lower().split(".")
+        version_parts = version.split(".")
+        for i, sp in enumerate(spec_parts):
+            if sp == "x":
+                return True
+            if i >= len(version_parts) or sp != version_parts[i]:
+                return False
+        return len(spec_parts) == len(version_parts)
+    return spec == version
+
+
+def _resolve_version_from_published(published: list, spec: str) -> str:
+    spec = (spec or "").strip()
+    if not spec or spec.lower() == "latest":
+        if not published:
+            return ""
+        return max(published, key=_parse_semver)
+    if not _is_range_spec(spec):
+        return spec
+    best = ""
+    best_tuple = (-1,)
+    for version in published:
+        if _spec_matches(spec, version):
+            vt = _parse_semver(version)
+            if vt > best_tuple:
+                best_tuple = vt
+                best = version
+    return best
+
+
+def _unwrap_call_result(result) -> str:
+    """Normalize a basilisk inter-canister query result to its text payload."""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        return result.get("Ok", result.get("ok", str(result)))
+    if hasattr(result, "Ok"):
+        return result.Ok
+    return str(result)
+
+
+def _pull_file_bytes(registry: "FileRegistryService", namespace: str, path: str) -> Async[bytes]:
+    """Pull a stored file from the registry via chunked base64 reads."""
+    data = bytearray()
+    offset = 0
+    for _ in range(4096):
+        res: CallResult = yield registry.get_file_chunk_icc(namespace, path, str(offset), "")
+        raw = _unwrap_call_result(res)
+        obj = json.loads(raw)
+        if "error" in obj:
+            raise Exception(obj["error"])
+        chunk_b64 = obj.get("content_b64", "")
+        chunk = base64.b64decode(chunk_b64) if chunk_b64 else b""
+        data.extend(chunk)
+        offset += len(chunk)
+        if obj.get("eof") or len(chunk) == 0:
+            break
+    return bytes(data)
+
+
+def _pull_namespace_file_text(registry: "FileRegistryService", namespace: str, path: str) -> Async[str]:
+    data = yield from _pull_file_bytes(registry, namespace, path)
+    return data.decode("utf-8", errors="replace")
+
+
+def _resolve_registry_namespace(
+    registry: "FileRegistryService", category: str, item_id: str, version: str,
+) -> Async[tuple]:
+    """Resolve (namespace, resolved_version). Returns (ns, ver, error_json)."""
+    version = (version or "").strip()
+    if category == "ext":
+        published = []
+        if _is_range_spec(version):
+            ext_res: CallResult = yield registry.list_extensions()
+            for entry in json.loads(_unwrap_call_result(ext_res)):
+                if entry.get("ext_id") == item_id:
+                    published = entry.get("versions") or []
+                    break
+            resolved = _resolve_version_from_published(published, version)
+            if not resolved:
+                return "", "", json.dumps({
+                    "error": f"No published version of ext/{item_id} matches '{version}'",
+                })
+            ns = f"ext/{item_id}/{resolved}".rstrip("/")
+            return ns, resolved, None
+
+        manifest_res: CallResult = yield registry.get_extension_manifest(
+            json.dumps({"ext_id": item_id, "version": version or None})
+        )
+        manifest = json.loads(_unwrap_call_result(manifest_res))
+        if manifest.get("error"):
+            return "", "", json.dumps({"error": manifest["error"]})
+        ns = (manifest.get("_namespace") or f"ext/{item_id}/{manifest.get('_version', '')}").rstrip("/")
+        resolved = manifest.get("_version") or version or "unknown"
+        return ns, resolved, None
+
+    if category == "codex":
+        codex_res: CallResult = yield registry.list_codices()
+        codices = json.loads(_unwrap_call_result(codex_res))
+        published = []
+        for entry in codices:
+            if entry.get("codex_id") == item_id:
+                published = entry.get("versions") or []
+                break
+        if not version or version.lower() == "latest":
+            resolved = _resolve_version_from_published(published, "")
+            if not resolved:
+                return "", "", json.dumps({"error": f"No versions found for codex/{item_id}"})
+        elif _is_range_spec(version):
+            resolved = _resolve_version_from_published(published, version)
+            if not resolved:
+                return "", "", json.dumps({
+                    "error": f"No published version of codex/{item_id} matches '{version}'",
+                })
+        else:
+            resolved = version
+        ns = f"codex/{item_id}/{resolved}".rstrip("/")
+        return ns, resolved, None
+
+    return "", "", json.dumps({"error": f"Unknown category: {category}"})
+
+
+def _list_namespace_paths(registry: "FileRegistryService", namespace: str) -> Async[list]:
+    raw: CallResult = yield registry.list_files_icc(namespace)
+    listing = json.loads(_unwrap_call_result(raw))
+    if isinstance(listing, dict) and listing.get("error"):
+        raise Exception(listing["error"])
+    if not isinstance(listing, list):
+        return []
+    return [entry["path"] for entry in listing if entry.get("path")]
+
+
+def _pull_namespace_files(
+    registry: "FileRegistryService", namespace: str, path_filter,
+) -> Async[Dict[str, str]]:
+    files = {}
+    paths = yield from _list_namespace_paths(registry, namespace)
+    for path in paths:
+        if not path_filter(path):
+            continue
+        try:
+            size_res: CallResult = yield registry.get_file_size_icc(namespace, path)
+            size_obj = json.loads(_unwrap_call_result(size_res))
+            if size_obj.get("error"):
+                continue
+            files[path] = yield from _pull_namespace_file_text(registry, namespace, path)
+        except Exception as e:
+            logger.warning(f"Skip {namespace}/{path}: {e}")
+    return files
+
+
+def _pull_extension_backend_files(
+    registry: "FileRegistryService", category: str, item_id: str, version: str,
+) -> Async[tuple]:
+    """Returns (files dict, resolved_version, error_json)."""
+    namespace, resolved_version, err = yield from _resolve_registry_namespace(
+        registry, category, item_id, version
+    )
+    if err:
+        return {}, "", err
+
+    if category == "ext":
+        def _filter(path: str) -> bool:
+            return path.startswith("backend/") or path == "manifest.json"
+    else:
+        def _filter(path: str) -> bool:
+            return True
+
+    files = yield from _pull_namespace_files(registry, namespace, _filter)
+    if not files:
+        label = f"{category}/{item_id}"
+        return {}, resolved_version, json.dumps({"error": f"No backend files found for {label}"})
+    return files, resolved_version, None
+
+
+def _pull_extension_frontend_files(
+    registry: "FileRegistryService", ext_id: str, version: str,
+) -> Async[tuple]:
+    """Returns (files dict, resolved_version, error_json)."""
+    namespace, resolved_version, err = yield from _resolve_registry_namespace(
+        registry, "ext", ext_id, version
+    )
+    if err:
+        return {}, "", err
+
+    files = yield from _pull_namespace_files(
+        registry, namespace, lambda path: path.startswith("frontend/"),
+    )
+    return files, resolved_version, None
 
 
 def _get_realm_frontend_canister_id() -> str:
@@ -223,28 +448,12 @@ def install_extension_from_registry(
 
     registry = FileRegistryService(Principal.from_str(registry_canister_id))
 
-    result: CallResult = yield registry.get_backend_files_icc(
-        "ext", ext_id, version or ""
+    raw_files, resolved_version, err = yield from _pull_extension_backend_files(
+        registry, "ext", ext_id, version or ""
     )
-
-    # Extract response (basilisk returns dict or object)
-    raw = result if isinstance(result, str) else str(result)
-    # Handle CallResult wrapping
-    if isinstance(result, dict):
-        raw = result.get("Ok", result.get("ok", raw))
-    elif hasattr(result, "Ok"):
-        raw = result.Ok
-
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, TypeError) as e:
-        return json.dumps({"success": False, "error": f"Failed to parse registry response: {e}"})
-
-    if "error" in data:
-        return json.dumps({"success": False, "error": data["error"]})
-
-    raw_files = data.get("files", {})
-    resolved_version = data.get("version", version or "unknown")
+    if err:
+        err_obj = json.loads(err)
+        return json.dumps({"success": False, "error": err_obj.get("error", err)})
 
     if not raw_files:
         return json.dumps({"success": False, "error": f"No backend files found for extension '{ext_id}'"})
@@ -415,27 +624,12 @@ def install_codex_from_registry(
 
     registry = FileRegistryService(Principal.from_str(registry_canister_id))
 
-    result: CallResult = yield registry.get_backend_files_icc(
-        "codex", codex_id, version or ""
+    files, resolved_version, err = yield from _pull_extension_backend_files(
+        registry, "codex", codex_id, version or ""
     )
-
-    # Extract response
-    raw = result if isinstance(result, str) else str(result)
-    if isinstance(result, dict):
-        raw = result.get("Ok", result.get("ok", raw))
-    elif hasattr(result, "Ok"):
-        raw = result.Ok
-
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, TypeError) as e:
-        return json.dumps({"success": False, "error": f"Failed to parse registry response: {e}"})
-
-    if "error" in data:
-        return json.dumps({"success": False, "error": data["error"]})
-
-    files = data.get("files", {})
-    resolved_version = data.get("version", version or "unknown")
+    if err:
+        err_obj = json.loads(err)
+        return json.dumps({"success": False, "error": err_obj.get("error", err)})
 
     if not files:
         return json.dumps({"success": False, "error": f"No files found for codex '{codex_id}'"})
@@ -541,30 +735,18 @@ def _copy_frontend_to_asset_canister(
     )
 
     registry = FileRegistryService(Principal.from_str(registry_canister_id))
-    result: CallResult = yield registry.get_frontend_files_icc(ext_id, version or "")
-
-    raw = result if isinstance(result, str) else str(result)
-    if isinstance(result, dict):
-        raw = result.get("Ok", result.get("ok", raw))
-    elif hasattr(result, "Ok"):
-        raw = result.Ok
-
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.warning(f"Failed to parse frontend files response: {e}")
+    files, resolved_version, err = yield from _pull_extension_frontend_files(
+        registry, ext_id, version or ""
+    )
+    if err:
+        logger.warning(f"Frontend files fetch error: {json.loads(err).get('error', err)}")
         return 0
 
-    if "error" in data:
-        logger.warning(f"Frontend files fetch error: {data['error']}")
-        return 0
-
-    files = data.get("files", {})
     if not files:
         logger.info(f"No frontend files found for {ext_id}@{version}")
         return 0
 
-    resolved_version = data.get("version", version)
+    resolved_version = resolved_version or version
     copied = 0
     frontend_principal = Principal.from_str(frontend_canister_id)
 
@@ -595,41 +777,6 @@ def _copy_frontend_to_asset_canister(
 
     logger.info(f"Copied {copied}/{len(files)} frontend files for {ext_id}@{resolved_version}")
     return copied
-
-
-def _unwrap_call_result(result) -> str:
-    """Normalize a basilisk inter-canister query result to its text payload."""
-    if isinstance(result, str):
-        return result
-    if isinstance(result, dict):
-        return result.get("Ok", result.get("ok", str(result)))
-    if hasattr(result, "Ok"):
-        return result.Ok
-    return str(result)
-
-
-def _pull_file_bytes(registry: "FileRegistryService", namespace: str, path: str) -> Async[bytes]:
-    """Pull a stored file from the registry via chunked base64 reads.
-
-    Uses get_file_chunk_icc (positional args + base64 payload) so binary files
-    (images) survive the JSON/Candid transport. Returns the assembled bytes.
-    """
-    data = bytearray()
-    offset = 0
-    # Hard cap on iterations so a misbehaving registry can't loop forever.
-    for _ in range(4096):
-        res: CallResult = yield registry.get_file_chunk_icc(namespace, path, str(offset), "")
-        raw = _unwrap_call_result(res)
-        obj = json.loads(raw)
-        if "error" in obj:
-            raise Exception(obj["error"])
-        chunk_b64 = obj.get("content_b64", "")
-        chunk = base64.b64decode(chunk_b64) if chunk_b64 else b""
-        data.extend(chunk)
-        offset += len(chunk)
-        if obj.get("eof") or len(chunk) == 0:
-            break
-    return bytes(data)
 
 
 def install_branding_from_registry(
