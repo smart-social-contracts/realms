@@ -452,14 +452,26 @@
       }
 
       // Validate against the TARGET quarter — invite codes live on the quarter
-      // they were created for, not the capital.
+      // they were created for, not the capital. role_manager owns invitations;
+      // fall back to the deprecated census extension on older realms.
       const actor = targetActor || backend;
-      const result = await actor.extension_call(
-        'census',
-        'validate_registration_code',
-        JSON.stringify({ code: inviteCode })
-      );
-      const parsed = typeof result.response === 'string' ? JSON.parse(result.response) : result.response;
+      const callValidate = async (ext) => {
+        const result = await actor.extension_call(
+          ext,
+          'validate_registration_code',
+          JSON.stringify({ code: inviteCode })
+        );
+        return typeof result.response === 'string' ? JSON.parse(result.response) : result.response;
+      };
+      let parsed;
+      try {
+        parsed = await callValidate('role_manager');
+      } catch (e) {
+        parsed = null;
+      }
+      if (!parsed || (parsed.success === false && /unknown|not (found|installed)/i.test(parsed.error || ''))) {
+        parsed = await callValidate('census');
+      }
       if (parsed.success && parsed.data) {
         inviteValid = true;
         inviteProfile = parsed.data.profile || 'member';

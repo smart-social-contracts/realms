@@ -119,7 +119,6 @@ const FALLBACK_EXTENSIONS: ExtensionUnderTest[] = [
 	{ id: 'hello_world',           name: 'hello_world',           show_in_sidebar: true,  sidebar_label: { en: 'Hello World' } },
 	{ id: 'justice_litigation',    name: 'justice_litigation',    show_in_sidebar: true,  sidebar_label: { en: 'Justice & Litigation' } },
 	{ id: 'land_registry',         name: 'land_registry',         show_in_sidebar: true,  sidebar_label: { en: 'Land Registry' } },
-	{ id: 'market_place',          name: 'market_place',          show_in_sidebar: true,  sidebar_label: { en: 'Extensions Marketplace' } },
 	{ id: 'member_dashboard',      name: 'member_dashboard',      show_in_sidebar: true,  sidebar_label: { en: 'My Dashboard' } },
 	{ id: 'metrics',               name: 'metrics',               show_in_sidebar: true,  sidebar_label: { en: 'Metrics' } },
 	{ id: 'notifications',         name: 'notifications',         show_in_sidebar: true,  sidebar_label: { en: 'Notifications' } },

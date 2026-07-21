@@ -148,7 +148,7 @@ def apply_position_action(action: dict) -> dict:
                     position=key,
                 )
                 invite_url = (
-                    f"{frontend_url}/extensions/census/user_registration?code={code.code}"
+                    f"{frontend_url}/join?invite={code.code}"
                     if code.code and frontend_url
                     else ""
                 )

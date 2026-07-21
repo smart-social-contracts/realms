@@ -79,6 +79,13 @@ export interface RealmExtensionContext {
 	backend: any;
 
 	/**
+	 * Adapter for the shared marketplace canister (browse listings, purchases).
+	 * Currently only provided to package_manager (and the deprecated
+	 * market_place bundle). Null when the realm has no marketplace configured.
+	 */
+	marketplace?: any;
+
+	/**
 	 * Call a sync extension function on the backend.
 	 * Automatically handles positional Candid args and JSON serialization.
 	 *

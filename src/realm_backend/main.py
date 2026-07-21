@@ -6187,7 +6187,7 @@ DEFAULT_CATEGORY_ORDER = [
 DEFAULT_ITEM_ORDER = {
     "governance": ["voting", "codex_viewer"],
     "finances": ["vault", "metrics"],
-    "settings": ["extensions_manager", "package_manager", "managed_services"],
+    "settings": ["package_manager", "managed_services"],
 }
 
 

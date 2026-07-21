@@ -66,11 +66,20 @@
 		// quarter is resolved + activated (see setActiveQuarter). The marketplace
 		// is a realm-wide infra canister and keeps its dedicated actor.
 		let extensionBackend: typeof backend = quarterBackend;
-		if (id === 'market_place' && infraConfig.marketplaceCanisterId) {
-			extensionBackend = (await createMarketplaceExtensionBackend(
+		let marketplaceAdapter: Awaited<ReturnType<typeof createMarketplaceExtensionBackend>> | null =
+			null;
+		if (
+			(id === 'market_place' || id === 'package_manager') &&
+			infraConfig.marketplaceCanisterId
+		) {
+			marketplaceAdapter = await createMarketplaceExtensionBackend(
 				infraConfig.marketplaceCanisterId,
 				infraConfig.fileRegistryCanisterId ?? '',
-			)) as typeof backend;
+			).catch(() => null);
+		}
+		// Legacy: the deprecated market_place bundle expects the adapter as ctx.backend.
+		if (id === 'market_place' && marketplaceAdapter) {
+			extensionBackend = marketplaceAdapter as unknown as typeof backend;
 		}
 
 		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
@@ -101,6 +110,8 @@
 			extensionId: id,
 			version,
 			backend: extensionBackend,
+			/** Marketplace canister adapter (browse/purchase); null when unavailable. */
+			marketplace: marketplaceAdapter,
 			callSync,
 			callAsync,
 			principal,

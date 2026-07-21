@@ -117,12 +117,6 @@ export const builtinExtensions: ExtensionListing[] = [
     '1.1.0', '⚙️', 'administration',
   ),
   ext(
-    'census',
-    'Census',
-    'User population statistics and invitation management for onboarding new members',
-    '1.0.0', '👥', 'administration',
-  ),
-  ext(
     'realm_settings',
     'Realm Settings',
     'Configure realm name, manifesto, branding, registration, and infrastructure settings',
@@ -150,28 +144,16 @@ export const builtinExtensions: ExtensionListing[] = [
   ),
   // Settings
   ext(
-    'extensions_manager',
-    'Menus',
-    'Manage menu layout, extensions, and access control',
-    '1.0.0', '🧩', 'settings',
-  ),
-  ext(
     'package_manager',
     'Package Manager',
-    'Install, update and uninstall extensions and codex packages from connected file registries',
-    '0.1.0', '📦', 'settings',
+    'Install, update and uninstall extensions and codex packages from connected file registries, and browse the marketplace',
+    '0.3.0', '📦', 'settings',
   ),
   ext(
     'managed_services',
     'Managed Services',
     'Version management, self-upgrade, and credit purchasing',
     '0.1.1', '☁️', 'settings',
-  ),
-  ext(
-    'market_place',
-    'Marketplace',
-    'Extensions marketplace for browsing, purchasing, and publishing extensions',
-    '2.0.0', '🏪', 'settings',
   ),
   // Other
   ext(
