@@ -497,6 +497,9 @@
           });
         } catch (_) { /* non-fatal */ }
       }
+      // Close the modal before navigating so the tracker page renders cleanly
+      // and any early failure there is visible instead of hidden behind the modal.
+      deployModalOpen = false;
       await goto(deploymentJobUrl(result.job_id));
     } catch (err) {
       console.error('Automatic deployment failed:', err);
