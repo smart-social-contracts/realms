@@ -94,6 +94,12 @@ export interface AssistantListing {
 }
 export type AssistantResult = { 'Ok' : AssistantListing } |
   { 'Err' : string };
+export type AuthorityError = { 'GenericError' : GenericError } |
+  { 'NonExistingTokenId' : null } |
+  { 'Unauthorized' : null } |
+  { 'InvalidRecipient' : null };
+export type AuthorityResult = { 'Ok' : bigint } |
+  { 'Err' : AuthorityError };
 export interface BadBurn { 'min_burn_amount' : bigint }
 export interface BadFee { 'expected_fee' : bigint }
 export interface BillingStatusRecord {
@@ -409,6 +415,22 @@ export interface FileRegistryService {
   'get_file_size_icc' : ActorMethod<[string, string], string>,
   'get_frontend_files_icc' : ActorMethod<[string, string], string>,
 }
+export interface ForceTransferArg {
+  'to' : NftAccount,
+  'token_id' : bigint,
+  'memo' : [] | [string],
+}
+export interface ForcedTransferArgs {
+  'to' : TokenAccount,
+  'from' : TokenAccount,
+  'memo' : [] | [string],
+  'amount' : bigint,
+}
+export interface FreezeAccountArgs {
+  'account' : TokenAccount,
+  'reason' : [] | [string],
+}
+export interface FreezeArg { 'token_id' : bigint, 'reason' : [] | [string] }
 export interface GenericError { 'message' : string, 'error_code' : bigint }
 export type GenericResult = { 'Ok' : string } |
   { 'Err' : string };
@@ -648,7 +670,7 @@ export type MetadataValue = { 'Int' : bigint } |
   { 'Text' : string };
 export type MillisatoshiPerByte = bigint;
 export interface MintArg {
-  'token_id' : bigint,
+  'token_id' : [] | [bigint],
   'owner' : NftAccount,
   'metadata' : [] | [Array<[string, MetadataValue]>],
 }
@@ -664,7 +686,12 @@ export interface MintTx {
   'created_at_time' : [] | [bigint],
   'amount' : bigint,
 }
-export interface NFTService { 'mint' : ActorMethod<[MintArg], MintResult> }
+export interface NFTService {
+  'force_transfer' : ActorMethod<[ForceTransferArg], AuthorityResult>,
+  'freeze_token' : ActorMethod<[FreezeArg], AuthorityResult>,
+  'mint' : ActorMethod<[MintArg], MintResult>,
+  'unfreeze_token' : ActorMethod<[bigint], AuthorityResult>,
+}
 export interface NameResult { 'name' : string }
 export interface NftAccount {
   'owner' : Principal,
@@ -972,6 +999,21 @@ export interface TakeSnapshotOk {
 }
 export interface TimeStamp { 'timestamp_nanos' : bigint }
 export type TimerId = bigint;
+export interface TokenAccount {
+  'owner' : Principal,
+  'subaccount' : [] | [Uint8Array | number[]],
+}
+export type TokenAuthorityError = { 'GenericError' : string } |
+  { 'InsufficientBalance' : null } |
+  { 'Unauthorized' : null } |
+  { 'InvalidRecipient' : null };
+export type TokenAuthorityResult = { 'Ok' : bigint } |
+  { 'Err' : TokenAuthorityError };
+export interface TokenAuthorityService {
+  'forced_transfer' : ActorMethod<[ForcedTransferArgs], TokenAuthorityResult>,
+  'freeze_account' : ActorMethod<[FreezeAccountArgs], TokenAuthorityResult>,
+  'unfreeze_account' : ActorMethod<[TokenAccount], TokenAuthorityResult>,
+}
 export interface Tokens { 'e8s' : bigint }
 export interface Transaction {
   'memo' : bigint,
