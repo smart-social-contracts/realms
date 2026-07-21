@@ -163,11 +163,19 @@ async function tryRemoteAiImage(prompt, { width, height, seed }) {
   url.searchParams.set('height', String(height));
   if (seed != null) url.searchParams.set('seed', String(seed));
 
-  const res = await fetch(url.toString());
-  if (!res.ok) return null;
-  const blob = await res.blob();
-  if (!blob.type.startsWith('image/')) return null;
-  return blob;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url.toString(), { signal: controller.signal });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    if (!blob.type.startsWith('image/')) return null;
+    return blob;
+  } catch (e) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /**

@@ -60,13 +60,17 @@
       aria-modal="true"
       aria-labelledby="deploy-progress-title"
     >
-      {#if phase === 'error'}
-        <h2 id="deploy-progress-title" class="title">Deployment could not start</h2>
-        <p class="lead error-text">{errorMessage || 'Something went wrong. Please try again.'}</p>
-        <div class="actions">
-          <button type="button" class="btn btn-primary" on:click={dismiss}>Close</button>
-        </div>
-      {:else}
+  {#if phase === 'error'}
+    <h2 id="deploy-progress-title" class="title error-title">Deployment could not start</h2>
+    <div class="error-box" role="alert">
+      <p class="error-label">Error:</p>
+      <p class="error-text">{errorMessage || 'Something went wrong. Please try again.'}</p>
+    </div>
+    <p class="lead">You can close this dialog and retry the deployment from the wizard.</p>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" on:click={dismiss}>Close</button>
+    </div>
+  {:else}
         <h2 id="deploy-progress-title" class="title">Starting your deployment</h2>
         <p class="lead">
           This usually takes one to two minutes. Please keep this tab open — you will be
@@ -164,6 +168,37 @@
 
   .lead.error-text {
     color: #991b1b;
+  }
+
+  .title.error-title {
+    color: #991b1b;
+  }
+
+  .error-box {
+    margin: 0 0 1.25rem;
+    padding: 0.875rem 1rem;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+  }
+
+  .error-label {
+    margin: 0 0 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: #b91c1c;
+  }
+
+  .error-box .error-text {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #7f1d1d;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
   }
 
   .steps {

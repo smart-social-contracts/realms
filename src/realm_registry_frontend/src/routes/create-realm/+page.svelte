@@ -397,6 +397,9 @@
     deployError = text;
     deployModalError = text;
     deployModalPhase = 'error';
+    isDeploying = false;
+    // Force the modal to stay open so the user sees the error; it can be dismissed explicitly.
+    deployModalOpen = true;
   }
 
   /** @param {'prepare' | 'upload' | 'submit' | 'redirect'} step */
