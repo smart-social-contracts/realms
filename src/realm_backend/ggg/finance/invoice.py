@@ -59,6 +59,20 @@ logger = get_logger("entity.invoice")
 
 DEFAULT_DECIMALS = 8
 
+
+def _now_iso() -> str:
+    """Return the current time as an ISO string, working in the ICP canister."""
+    try:
+        from ic_basilisk_toolkit.date_utils import epoch_to_datetime_str, ic_time_to_epoch
+        if ic is not None:
+            return epoch_to_datetime_str(ic_time_to_epoch(int(ic.time()))).replace(" ", "T")
+    except Exception:
+        pass
+    try:
+        return datetime.utcnow().isoformat()
+    except Exception:
+        return ""
+
 # ---------------------------------------------------------------------------
 # Payment mode
 # ---------------------------------------------------------------------------
@@ -413,6 +427,16 @@ class Invoice(Entity, TimestampedMixin):
                 return token
         return None
 
+    def _get_token_decimals(self) -> int:
+        """Return the decimal places for this invoice's currency token."""
+        token = self._find_token()
+        if token and token.decimals:
+            try:
+                return int(token.decimals)
+            except Exception:
+                pass
+        return DEFAULT_DECIMALS
+
     # ------------------------------------------------------------------
     # Accounting
     # ------------------------------------------------------------------
@@ -446,10 +470,10 @@ class Invoice(Entity, TimestampedMixin):
             return custom_entries
 
         transaction_id = f"TXN-INV-{self.id}"
-        entry_date = datetime.utcnow().isoformat()
+        entry_date = self.paid_at if self.paid_at and not self.paid_at.startswith("1970-01-01T00:00:00") else _now_iso()
         desc = description or f"Invoice {self.id}"
         currency = self.currency or "ckBTC"
-        amount_raw = self.get_amount_raw()
+        amount_raw = self.get_amount_raw(self._get_token_decimals())
 
         entries = [
             {
@@ -518,11 +542,11 @@ class Invoice(Entity, TimestampedMixin):
             return custom_entries
 
         transaction_id = f"TXN-INV-PAY-{self.id}"
-        entry_date = self.paid_at or datetime.utcnow().isoformat()
+        entry_date = self.paid_at if self.paid_at and not self.paid_at.startswith("1970-01-01T00:00:00") else _now_iso()
         desc = description or f"Invoice {self.id} payment"
         rev_cat = revenue_category or Category.FEE
         currency = self.currency or "ckBTC"
-        amount_raw = self.get_amount_raw()
+        amount_raw = self.get_amount_raw(self._get_token_decimals())
 
         entries = [
             {
@@ -578,6 +602,37 @@ class Invoice(Entity, TimestampedMixin):
         logger.info(f"Created {len(created)} payment entries for Invoice {self.id}")
         return created
 
+    def _ensure_payment_booked(self) -> list:
+        """
+        Ensure this paid invoice has ledger entries.
+
+        If the invoice has no creation entries yet, record them first so the
+        payment books cleanly. Then record the payment entries. Idempotent:
+        skips if payment entries already exist.
+        """
+        from .fund import Fund, FundType
+        from .ledger_entry import LedgerEntry
+
+        # Find or create the root treasury fund.
+        fund = Fund["ROOT"]
+        if not fund:
+            fund = Fund(
+                code="ROOT",
+                name="Root Department Fund",
+                fund_type=FundType.GENERAL,
+                description="Budget envelope for the quarter root department",
+            )
+
+        payment_txn_id = f"TXN-INV-PAY-{self.id}"
+        if LedgerEntry.find({"transaction_id": payment_txn_id}):
+            return []
+
+        creation_txn_id = f"TXN-INV-{self.id}"
+        if not LedgerEntry.find({"transaction_id": creation_txn_id}):
+            self.record_accounting(fund=fund)
+
+        return self.record_payment(fund=fund)
+
     # ------------------------------------------------------------------
     # mark_paid
     # ------------------------------------------------------------------
@@ -598,9 +653,9 @@ class Invoice(Entity, TimestampedMixin):
                 if epoch_s > 0:
                     self.paid_at = epoch_to_datetime_str(epoch_s).replace(" ", "T")
                 else:
-                    self.paid_at = datetime.utcnow().isoformat()
+                    self.paid_at = _now_iso()
             else:
-                self.paid_at = datetime.utcnow().isoformat()
+                self.paid_at = _now_iso()
         except Exception:
             self.paid_at = ""
         if payment_currency:
@@ -613,6 +668,10 @@ class Invoice(Entity, TimestampedMixin):
             f"Invoice {self.id} marked as paid at {self.paid_at} "
             f"({payment_amount} {payment_currency})"
         )
+        try:
+            self._ensure_payment_booked()
+        except Exception as e:
+            logger.warning(f"Invoice {self.id}: failed to book ledger entries: {e}")
 
     def _sync_treasury_transactions(self, token) -> "Async[dict]":
         """Sync WalletTransfer cache from the token indexer after payment."""
