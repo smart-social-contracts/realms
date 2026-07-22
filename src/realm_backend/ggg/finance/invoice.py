@@ -589,15 +589,16 @@ class Invoice(Entity, TimestampedMixin):
         payment_amount_raw: int = None,
     ) -> None:
         """Mark this invoice as paid and record the timestamp."""
-        from datetime import timedelta
+        from ic_basilisk_toolkit.date_utils import epoch_to_datetime_str, ic_time_to_epoch
 
         self.status = "Paid"
         try:
             if ic is not None:
-                epoch_ns = ic.time()
-                self.paid_at = (
-                    datetime(1970, 1, 1) + timedelta(seconds=epoch_ns // 1_000_000_000)
-                ).isoformat()
+                epoch_s = ic_time_to_epoch(int(ic.time()))
+                if epoch_s > 0:
+                    self.paid_at = epoch_to_datetime_str(epoch_s).replace(" ", "T")
+                else:
+                    self.paid_at = datetime.utcnow().isoformat()
             else:
                 self.paid_at = datetime.utcnow().isoformat()
         except Exception:
@@ -612,6 +613,22 @@ class Invoice(Entity, TimestampedMixin):
             f"Invoice {self.id} marked as paid at {self.paid_at} "
             f"({payment_amount} {payment_currency})"
         )
+
+    def _sync_treasury_transactions(self, token) -> "Async[dict]":
+        """Sync WalletTransfer cache from the token indexer after payment."""
+        from ic_basilisk_toolkit.wallet import Wallet
+
+        wallet = Wallet()
+        try:
+            result = yield wallet.refresh(token.name)
+            logger.info(
+                f"Invoice {self.id}: treasury sync — "
+                f"{result.get('new_txs', 0)} new txs for {token.name}"
+            )
+            return result
+        except Exception as e:
+            logger.warning(f"Invoice {self.id}: treasury sync failed: {e}")
+            return {"new_txs": 0, "error": str(e)}
 
     # ------------------------------------------------------------------
     # refresh — public entry point
@@ -875,12 +892,14 @@ class Invoice(Entity, TimestampedMixin):
                         payment_amount=amount / (10 ** token_decimals),
                         payment_amount_raw=amount,
                     )
+                    treasury_sync = yield self._sync_treasury_transactions(token)
                     return {
                         "invoice_id": self.id,
                         "status": "Paid",
                         "payment_method": "nonce",
                         "matched_amount_raw": amount,
                         "nonce": self.payment_nonce,
+                        "treasury_sync": treasury_sync,
                     }
 
             return {
