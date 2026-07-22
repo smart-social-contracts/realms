@@ -602,37 +602,6 @@ class Invoice(Entity, TimestampedMixin):
         logger.info(f"Created {len(created)} payment entries for Invoice {self.id}")
         return created
 
-    def _ensure_payment_booked(self) -> list:
-        """
-        Ensure this paid invoice has ledger entries.
-
-        If the invoice has no creation entries yet, record them first so the
-        payment books cleanly. Then record the payment entries. Idempotent:
-        skips if payment entries already exist.
-        """
-        from .fund import Fund, FundType
-        from .ledger_entry import LedgerEntry
-
-        # Find or create the root treasury fund.
-        fund = Fund["ROOT"]
-        if not fund:
-            fund = Fund(
-                code="ROOT",
-                name="Root Department Fund",
-                fund_type=FundType.GENERAL,
-                description="Budget envelope for the quarter root department",
-            )
-
-        payment_txn_id = f"TXN-INV-PAY-{self.id}"
-        if LedgerEntry.find({"transaction_id": payment_txn_id}):
-            return []
-
-        creation_txn_id = f"TXN-INV-{self.id}"
-        if not LedgerEntry.find({"transaction_id": creation_txn_id}):
-            self.record_accounting(fund=fund)
-
-        return self.record_payment(fund=fund)
-
     # ------------------------------------------------------------------
     # mark_paid
     # ------------------------------------------------------------------
@@ -669,9 +638,13 @@ class Invoice(Entity, TimestampedMixin):
             f"({payment_amount} {payment_currency})"
         )
         try:
-            self._ensure_payment_booked()
+            from core.codex_hooks import dispatch_invoice_accounting
+
+            dispatch_invoice_accounting(self.id, "paid")
         except Exception as e:
-            logger.warning(f"Invoice {self.id}: failed to book ledger entries: {e}")
+            logger.warning(
+                f"Invoice {self.id}: accounting event dispatch failed: {e}"
+            )
 
     def _sync_treasury_transactions(self, token) -> "Async[dict]":
         """Sync WalletTransfer cache from the token indexer after payment."""

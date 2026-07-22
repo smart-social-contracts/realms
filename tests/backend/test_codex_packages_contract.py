@@ -29,6 +29,8 @@ OPTIONAL_HOOKS = {
     "seed",
     "on_user_register",
     "on_treasury_send",
+    "on_invoice_accounting",
+    "on_stage_change",
     "check_lifecycle_transition",
     "get_dashboard_config",
     "get_extension_overrides",

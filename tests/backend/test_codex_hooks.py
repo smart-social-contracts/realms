@@ -7,6 +7,7 @@ Covers core/codex_hooks.py:
   - get_config merge semantics (codex config over Realm.manifest_data)
   - extension override resolution (hook + manifest + legacy shim)
   - on_user_register dispatch behavior
+  - invoice-accounting event dispatch
 """
 
 import json
@@ -375,6 +376,40 @@ class TestOnUserRegister:
         )
         # Handled (no legacy double-fire), even though the hook failed.
         assert codex_hooks.dispatch_on_user_register("u1") is True
+
+
+# ---------------------------------------------------------------------------
+# invoice accounting hook
+# ---------------------------------------------------------------------------
+
+
+class TestInvoiceAccounting:
+    def test_no_codex_hook_returns_false(self):
+        _mock_runtime_extensions(manifests={})
+        assert codex_hooks.dispatch_invoice_accounting("inv-1", "paid") is False
+
+    def test_hook_receives_invoice_event(self):
+        calls = []
+        module = MagicMock()
+        module.on_invoice_accounting = lambda args: calls.append(json.loads(args))
+        _mock_runtime_extensions(
+            manifests={"syntropia": {"kind": "codex"}},
+            modules={"syntropia": module},
+        )
+
+        assert codex_hooks.dispatch_invoice_accounting("inv-1", "paid") is True
+        assert calls == [{"invoice_id": "inv-1", "event": "paid"}]
+
+    def test_hook_error_still_counts_as_handled(self):
+        module = MagicMock()
+        module.on_invoice_accounting = lambda args: (_ for _ in ()).throw(
+            RuntimeError("hook exploded")
+        )
+        _mock_runtime_extensions(
+            manifests={"syntropia": {"kind": "codex"}},
+            modules={"syntropia": module},
+        )
+        assert codex_hooks.dispatch_invoice_accounting("inv-1", "paid") is True
 
 
 # ---------------------------------------------------------------------------

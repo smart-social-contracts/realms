@@ -16,6 +16,8 @@ implementation serving the manifest's config blocks):
     on_user_register(user_id)         replaces entity_method_overrides on
                                       User.user_register_posthook
     on_treasury_send(treasury, to, amount)   async treasury transfer hook
+    on_invoice_accounting(invoice_id, event) realm-specific journal policy
+    on_stage_change(from, to)         post-transition realm policy
     check_lifecycle_transition(from, to) -> {allowed, missing[]}
     get_dashboard_config() -> {...}
     get_extension_overrides() -> {base: override}
@@ -361,6 +363,26 @@ def dispatch_on_user_register(user_id: str) -> bool:
         logger.error(f"Codex on_user_register failed for {user_id}: {e}")
         # The hook existed and was dispatched; don't double-fire legacy paths.
         return True
+
+
+def dispatch_invoice_accounting(invoice_id: str, event: str) -> bool:
+    """Dispatch realm-specific invoice accounting policy.
+
+    Returns True when the active codex implements the hook. The codex owns
+    journal creation and idempotency; core only emits the domain event.
+    """
+    hook = get_hook("on_invoice_accounting")
+    if hook is None:
+        return False
+    try:
+        hook(json.dumps({"invoice_id": invoice_id, "event": event}))
+    except Exception as e:
+        logger.error(
+            f"Codex on_invoice_accounting failed for {invoice_id}/{event}: {e}"
+        )
+    # A present hook counts as handled even if it failed, avoiding accidental
+    # fallback to a different realm's accounting assumptions.
+    return True
 
 
 def check_lifecycle_transition(from_stage: str, to_stage: str) -> Optional[dict]:
