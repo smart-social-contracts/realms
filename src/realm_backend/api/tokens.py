@@ -551,5 +551,15 @@ def register_treasury_token(
         token.token_type = token_type
         token.enabled = "true"
         logger.info(f"Registered treasury token {sym} -> {ledger}")
+
+        # The vault focuses on the realm's treasury currency; disable other
+        # registered tokens so they are not refreshed by default.
+        try:
+            for other in Token.instances():
+                if other.name != sym and getattr(other, "is_enabled", lambda: True)():
+                    other.enabled = "false"
+                    logger.info(f"Disabled non-treasury token {other.name}")
+        except Exception as disable_err:
+            logger.warning(f"Could not disable old tokens: {disable_err}")
     except Exception as e:
         logger.warning(f"Could not register treasury token {sym}: {e}")

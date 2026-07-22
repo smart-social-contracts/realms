@@ -3933,15 +3933,17 @@ def create_foundational_objects() -> void:
 
         logger.info("Created treasury")
 
-        # 7. Register well-known IC mainnet tokens so the invoice system can
-        #    look up ledger/indexer canister IDs for payment detection.
+        # 7. Register the realm's accounting currency token so the invoice
+        #    system can look up ledger/indexer canister IDs for payment
+        #    detection.  We no longer seed every well-known token by default.
         try:
             from ic_basilisk_toolkit.wallet import Wallet
             wallet = Wallet()
-            wallet.register_well_known_tokens()
-            logger.info("Registered well-known ICRC-1 tokens (ckBTC, ckUSDC, …)")
+            acct_currency = getattr(realm, "accounting_currency", "ckBTC") or "ckBTC"
+            wallet.register_well_known_tokens(acct_currency)
+            logger.info(f"Registered accounting currency token: {acct_currency}")
         except Exception as tok_err:
-            logger.warning(f"Could not register well-known tokens: {tok_err}")
+            logger.warning(f"Could not register accounting currency token: {tok_err}")
 
         logger.info("✅ All foundational objects created successfully")
         _ensure_root_organization()
@@ -4021,14 +4023,22 @@ def initialize() -> void:
     # Create foundational objects after entity registration
     create_foundational_objects()
 
-    # Ensure well-known IC mainnet tokens are in the registry.
+    # Ensure the realm's accounting currency token is in the registry.
     # register_token() is an upsert, so this is safe on every startup.
     try:
         from ic_basilisk_toolkit.wallet import Wallet
-        Wallet().register_well_known_tokens()
-        logger.info("Ensured well-known ICRC-1 tokens are registered")
+        from ggg import Realm
+        wallet = Wallet()
+        realm = Realm.load("1")
+        acct_currency = (
+            getattr(realm, "accounting_currency", "ckBTC") or "ckBTC"
+            if realm
+            else "ckBTC"
+        )
+        wallet.register_well_known_tokens(acct_currency)
+        logger.info(f"Ensured accounting currency token is registered: {acct_currency}")
     except Exception as e:
-        logger.warning(f"Could not register well-known tokens: {e}")
+        logger.warning(f"Could not register accounting currency token: {e}")
 
     # Register OS-level wallet transfer hook for permission enforcement
     _register_wallet_transfer_hook()
