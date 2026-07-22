@@ -763,7 +763,7 @@ Verify: `realms --help` and `dfx --version`.
 
 ## dfx in this environment
 
-dfx 0.30.2 crashes with `ColorOutOfRange` unless the terminal is set up correctly. Always export these before running any `dfx` command:
+dfx 0.30.2 crashes with `ColorOutOfRange` (`panicked at src/dfx/src/main.rs: Failed to set stderr output color`) unless the terminal is set up correctly. Always export these before running any `dfx` command:
 
 ```bash
 export TERM=xterm
@@ -771,6 +771,15 @@ export DFX_WARNING=-mainnet_plaintext_identity
 ```
 
 The first fixes the color panic, the second suppresses the plaintext identity warning that blocks execution on `test`/`staging` networks.
+
+**If the panic still occurs** (including inside wrappers like `realms files publish`, which shells out to dfx): the shell has `NO_COLOR` and/or `FORCE_COLOR` set, and dfx panics on the conflict. **Unset both** and use a color-capable TERM:
+
+```bash
+env -u NO_COLOR -u FORCE_COLOR TERM=xterm-256color DFX_WARNING=-mainnet_plaintext_identity \
+  realms files publish --network staging --extensions-only --extensions <ext_id>
+```
+
+Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the panic — dfx needs a real color terminal, not a colorless one.
 
 ---
 

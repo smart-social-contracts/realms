@@ -10,11 +10,12 @@
 	import { quintOut } from 'svelte/easing';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
-	import { IconLogin } from '@tabler/icons-svelte';
+	import { IconCopy, IconLogin } from '@tabler/icons-svelte';
 	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
 
 	let principalText = '';
 	let showDropdown = false;
+	let copiedPrincipal = false;
 
 	// Using the centralized profile loading function from the store
 
@@ -152,6 +153,20 @@
 		event.stopPropagation();
 		showDropdown = !showDropdown;
 	}
+
+	async function copyPrincipal(event) {
+		event.stopPropagation();
+		if (!$principal) return;
+		try {
+			await navigator.clipboard.writeText($principal);
+			copiedPrincipal = true;
+			setTimeout(() => {
+				copiedPrincipal = false;
+			}, 2000);
+		} catch (error) {
+			console.error('Failed to copy principal:', error);
+		}
+	}
 </script>
 
 
@@ -183,14 +198,25 @@
 		<!-- Dropdown Menu -->
 		{#if showDropdown}
 			<div 
-				class="absolute right-0 mt-2 w-48 z-50 bg-white rounded-lg shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700 origin-top-right" 
+				class="absolute right-0 mt-2 w-56 z-50 bg-white rounded-lg shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700 origin-top-right" 
 				role="menu"
 				transition:slide={{ duration: 200, easing: quintOut }}
 			>
 				<div class="px-4 py-3">
-					<p class="text-sm text-gray-900 dark:text-white truncate font-medium">
-						{shortPrincipal}
-					</p>
+					<div class="flex items-center gap-1.5 min-w-0">
+						<p class="text-sm text-gray-900 dark:text-white truncate font-medium flex-1 min-w-0">
+							{shortPrincipal}
+						</p>
+						<button
+							type="button"
+							class="shrink-0 p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+							title={copiedPrincipal ? 'Copied!' : 'Copy principal'}
+							aria-label={copiedPrincipal ? 'Copied' : 'Copy principal'}
+							on:click={copyPrincipal}
+						>
+							<IconCopy size={14} />
+						</button>
+					</div>
 					<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
 						{userTypeLabel}
 					</p>

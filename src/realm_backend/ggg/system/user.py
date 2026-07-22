@@ -116,6 +116,11 @@ class User(Entity, TimestampedMixin):
 
         Default: allow. Codex overrides implement governance policy
         (e.g., require approved proposal for sensitive roles).
+
+        Desired execution mode is configured via ``core.runtime_sandbox``
+        (Realm Settings → Extension Sandboxing). Until this hook is marked
+        sandbox-compatible (plain-data contract), the legacy in-process
+        ``exec()`` path below remains the effective implementation.
         """
         try:
             from ggg.governance.codex import Codex
