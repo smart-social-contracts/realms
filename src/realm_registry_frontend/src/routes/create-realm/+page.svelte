@@ -5,6 +5,13 @@
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { CONFIG } from '$lib/config.js';
+  import {
+    SHARED_TOKEN_CATALOG,
+    displaySharedToken,
+    loadSharedTokenMetadata,
+    matchesSharedRegistryKey,
+    normalizeSharedRegistryKey,
+  } from '$lib/shared-tokens.js';
   import codicesConfig from '$lib/codices-config.json';
   import AuthControls from '$lib/components/AuthControls.svelte';
   import DeployProgressModal from '$lib/components/DeployProgressModal.svelte';
@@ -195,6 +202,14 @@
         loadingDeployVersions = false;
       }
 
+      try {
+        existingTokens = await loadSharedTokenMetadata(CONFIG.deploy_queue_network);
+      } catch (e) {
+        console.error('Failed to load shared token metadata:', e);
+      } finally {
+        existingTokensLoading = false;
+      }
+
       // Fetch codex descriptions from remote SHORT_DESCRIPTION.md files
       for (const codex of AVAILABLE_CODICES) {
         if (codex.description_url) {
@@ -322,9 +337,9 @@
       formData.open_registration = details.openRegistration;
     }
     if (details.currency) {
-      if (EXISTING_TOKENS.some((t) => t.symbol === details.currency)) {
+      if (matchesSharedRegistryKey(details.currency)) {
         formData.token_mode = 'existing';
-        formData.token_existing = details.currency;
+        formData.token_existing = normalizeSharedRegistryKey(details.currency);
       } else {
         // A codex-native currency (e.g. Dominion's DOM) means: mint it.
         formData.token_mode = 'new';
@@ -550,12 +565,25 @@
     }
   ];
 
-  // Existing shared token ledgers a realm can adopt instead of minting its own.
-  const EXISTING_TOKENS = [
-    { symbol: 'REALMS', name: 'REALMS Token', description: 'The shared mundus-wide token, common to all realms' },
-    { symbol: 'ckBTC', name: 'ckBTC', description: 'Chain-Key Bitcoin — IC-native Bitcoin twin' },
-    { symbol: 'ckUSDC', name: 'ckUSDC', description: 'Chain-Key USDC — IC-native USD stablecoin' },
-  ];
+  // Shared token ledgers — registryKey is the manifest identifier; name/symbol
+  // are loaded from live ICRC-1 metadata on mount.
+  let existingTokens = SHARED_TOKEN_CATALOG.map((t) => ({
+    registryKey: t.registryKey,
+    name: t.name,
+    symbol: t.symbol,
+    description: t.description,
+    ledger: t.ledgers?.[CONFIG.deploy_queue_network] || t.ledgers?.staging || '',
+    decimals: t.decimals,
+  }));
+  let existingTokensLoading = true;
+
+  $: existingTokenSymbolsLabel = existingTokens.length
+    ? existingTokens.map((t) => t.symbol).join(', ')
+    : 'REALMS, ckBTC or ckUSDC';
+
+  $: pinnedCodexCurrencyDisplay = selectedCodexDetails?.currency
+    ? displaySharedToken(selectedCodexDetails.currency, existingTokens)
+    : null;
 
   // Available codices (loaded from $lib/codices-config.json)
   let AVAILABLE_CODICES = codicesConfig.codices;
@@ -1255,7 +1283,7 @@
             <div class="codex-detail-row">
               <span class="codex-detail-label">Token (set by the {AVAILABLE_CODICES.find(c => c.id === formData.codex_package_name)?.name || formData.codex_package_name} codex)</span>
               <span class="codex-detail-value">
-                <strong>{selectedCodexDetails.currencyName || selectedCodexDetails.currency} ({selectedCodexDetails.currency})</strong>
+                <strong>{pinnedCodexCurrencyDisplay?.name || selectedCodexDetails.currencyName || selectedCodexDetails.currency} ({pinnedCodexCurrencyDisplay?.symbol || selectedCodexDetails.currency})</strong>
                 {#if formData.token_mode === 'existing'}
                   — an existing shared ledger this realm will adopt
                 {:else}
@@ -1265,7 +1293,7 @@
             </div>
             <p class="codex-details-note">
               This codex's fees, deposits and treasury operations are denominated in
-              {selectedCodexDetails.currency}, so the wizard doesn't offer a choice here.
+              {pinnedCodexCurrencyDisplay?.symbol || selectedCodexDetails.currency}, so the wizard doesn't offer a choice here.
             </p>
           </div>
         {:else}
@@ -1303,7 +1331,7 @@
             </div>
             <div class="registration-option-text">
               <strong>Use an existing token</strong>
-              <span>Adopt a shared ledger like REALMS, ckBTC or ckUSDC</span>
+              <span>Adopt a shared ledger like {existingTokenSymbolsLabel}</span>
             </div>
           </button>
         </div>
@@ -1344,16 +1372,19 @@
         {:else}
           <div class="form-group" style="margin-top: 1.5rem;">
             <label>Select Token</label>
+            {#if existingTokensLoading}
+              <p class="codex-details-note">Loading token metadata from ledgers…</p>
+            {/if}
             <div class="codex-options">
-              {#each EXISTING_TOKENS as token}
+              {#each existingTokens as token}
                 <button
                   type="button"
                   class="codex-card"
-                  class:selected={formData.token_existing === token.symbol}
-                  on:click={() => formData.token_existing = token.symbol}
+                  class:selected={formData.token_existing === token.registryKey}
+                  on:click={() => formData.token_existing = token.registryKey}
                 >
                   <div class="codex-radio">
-                    {#if formData.token_existing === token.symbol}
+                    {#if formData.token_existing === token.registryKey}
                       <div class="codex-radio-dot"></div>
                     {/if}
                   </div>
@@ -1482,7 +1513,7 @@
               {#if selectedCodexDetails.currency}
                 <div class="codex-detail-row">
                   <span class="codex-detail-label">Realm token</span>
-                  <span class="codex-detail-value">{selectedCodexDetails.currencyName || selectedCodexDetails.currency} ({selectedCodexDetails.currency})</span>
+                  <span class="codex-detail-value">{pinnedCodexCurrencyDisplay?.name || selectedCodexDetails.currencyName || selectedCodexDetails.currency} ({pinnedCodexCurrencyDisplay?.symbol || selectedCodexDetails.currency})</span>
                 </div>
               {/if}
 

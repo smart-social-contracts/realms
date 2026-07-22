@@ -96,11 +96,12 @@ async function _createTestIdentity({ random = false, identityIndex = null } = {}
   const { createTestIdentityFromIndex } = await import('$lib/test-identities.js');
   // createTestIdentityFromIndex is sync; dynamic import keeps the initial bundle small.
   if (identityIndex != null && Number.isFinite(identityIndex)) {
-    const idx = Math.max(0, Math.min(255, Math.floor(identityIndex)));
+    const { normalizeTestIdentityIndex, testIdentityLabel } = await import('$lib/test-identities.js');
+    const idx = normalizeTestIdentityIndex(identityIndex);
     _testIdentity = createTestIdentityFromIndex(idx);
     _testIdentityIndex = idx;
     console.log(
-      `[TEST MODE] ${(await import('$lib/test-identities.js')).testIdentityLabel(idx)}: ${_testIdentity.getPrincipal().toText()}`,
+      `[TEST MODE] ${testIdentityLabel(idx)}: ${_testIdentity.getPrincipal().toText()}`,
     );
     return _testIdentity;
   }

@@ -199,6 +199,19 @@ class Invoice(Entity, TimestampedMixin):
     def __init__(self, **kwargs):
         if "id" not in kwargs and "_id" not in kwargs:
             kwargs["id"] = generate_unique_id("inv_")
+        if not kwargs.get("currency"):
+            try:
+                from ggg import Realm
+
+                realms = Realm.instances()
+                if realms:
+                    acct = str(
+                        getattr(realms[0], "accounting_currency", "") or ""
+                    ).strip()
+                    if acct:
+                        kwargs["currency"] = acct[:16]
+            except Exception:
+                pass
         super().__init__(**kwargs)
         # Auto-assign a nonce in nonce-suffix mode so callers don't have to
         # remember to call assign_nonce() separately.

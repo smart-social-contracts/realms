@@ -18,10 +18,14 @@
 import { Ed25519KeyIdentity, Secp256k1KeyIdentity } from '@dfinity/identity';
 
 export const TEST_IDENTITY_MAGIC = [0xed, 0x57];
-/** Highest index shown in the join-page picker (inclusive). Four personas: 0…3. */
-export const TEST_IDENTITY_PICKER_MAX_INDEX = 3;
+/** Indices 0–1 shown as fixed cards in the join-page picker (Identity 1–2). */
+export const TEST_IDENTITY_FIXED_PICKER_MAX_INDEX = 1;
+/** @deprecated alias for fixed picker cards */
+export const TEST_IDENTITY_PICKER_MAX_INDEX = TEST_IDENTITY_FIXED_PICKER_MAX_INDEX;
 /** Highest index for programmatic use (E2E may use more). */
 export const DEFAULT_TEST_IDENTITY_MAX_INDEX = 8;
+/** Highest supported identity index (human Identity number = index + 1). */
+export const TEST_IDENTITY_MAX_INDEX = 0xffffffff;
 
 /** Human-facing identity number (1-based). Index 0 → Identity 1. */
 export function testIdentityNumber(index) {
@@ -98,36 +102,63 @@ export function shortPrincipal(principal) {
   return `${principal.slice(0, 8)}…${principal.slice(-8)}`;
 }
 
+/** @param {number} index */
+export function normalizeTestIdentityIndex(index) {
+  const parsed = Math.floor(Number(index));
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(TEST_IDENTITY_MAX_INDEX, parsed));
+}
+
+/** @param {number} identityNumber 1-based human identity number */
+export function identityNumberToIndex(identityNumber) {
+  return normalizeTestIdentityIndex(Number(identityNumber) - 1);
+}
+
+/** @param {number} identityNumber 1-based human identity number */
+export function isValidCustomIdentityNumber(identityNumber) {
+  const parsed = Math.floor(Number(identityNumber));
+  if (!Number.isFinite(parsed)) return false;
+  const minCustom = testIdentityNumber(TEST_IDENTITY_FIXED_PICKER_MAX_INDEX + 1);
+  const maxCustom = testIdentityNumber(TEST_IDENTITY_MAX_INDEX);
+  return parsed >= minCustom && parsed <= maxCustom;
+}
+
 /**
- * Labels and principals for the join-page picker.
- * When a roster principal is configured for a slot (via
- * __TEST_IDENTITY_PRINCIPALS), it is displayed as that slot's principal;
- * otherwise the deterministic login principal is shown.
+ * @param {number} index
+ * @returns {{ index: number, label: string, principal: string, loginPrincipal: string, description: string, hasPem: boolean }}
+ */
+export function getTestIdentityPersona(index) {
+  const normalized = normalizeTestIdentityIndex(index);
+  const pems = globalThis.__TEST_IDENTITY_PEms;
+  const hasPem = Array.isArray(pems) && !!pems[normalized];
+  const configured = expectedPrincipal(normalized);
+  let loginPrincipal = '';
+  try {
+    loginPrincipal = testIdentityPrincipal(normalized);
+  } catch {
+    loginPrincipal = '';
+  }
+  return {
+    index: normalized,
+    label: testIdentityLabel(normalized),
+    principal: configured || loginPrincipal,
+    loginPrincipal,
+    hasPem,
+    description:
+      normalized === 0
+        ? 'Realm founder persona — use admin invite code "admin" if not yet registered'
+        : `Deterministic test member ${testIdentityNumber(normalized)}`,
+  };
+}
+
+/**
+ * Fixed picker cards (Identity 1–2 by default).
  * @returns {{ index: number, label: string, principal: string, loginPrincipal: string, description: string, hasPem: boolean }[]}
  */
-export function listTestIdentities(maxIndex = TEST_IDENTITY_PICKER_MAX_INDEX) {
-  const pems = globalThis.__TEST_IDENTITY_PEms;
+export function listTestIdentities(maxIndex = TEST_IDENTITY_FIXED_PICKER_MAX_INDEX) {
   const items = [];
   for (let index = 0; index <= maxIndex; index++) {
-    const hasPem = Array.isArray(pems) && !!pems[index];
-    const configured = expectedPrincipal(index);
-    let loginPrincipal = '';
-    try {
-      loginPrincipal = testIdentityPrincipal(index);
-    } catch {
-      loginPrincipal = '';
-    }
-    items.push({
-      index,
-      label: testIdentityLabel(index),
-      principal: configured || loginPrincipal,
-      loginPrincipal,
-      hasPem,
-      description:
-        index === 0
-          ? 'Realm founder persona — use admin invite code "admin" if not yet registered'
-          : `Deterministic test member ${testIdentityNumber(index)}`,
-    });
+    items.push(getTestIdentityPersona(index));
   }
   return items;
 }

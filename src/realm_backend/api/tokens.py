@@ -3,6 +3,7 @@
 from typing import Optional
 
 from _cdk import (
+    Async,
     CallResult,
     Opt,
     Principal,
@@ -11,7 +12,9 @@ from _cdk import (
     Variant,
     blob,
     nat,
+    nat8,
     null,
+    service_query,
     service_update,
     text,
 )
@@ -388,8 +391,104 @@ def get_treasury_token_indexer(symbol: str = "", ledger_canister_id: str = "") -
     return ledger
 
 
+class Icrc1MetadataService(Service):
+    """Minimal ICRC-1 metadata queries against a ledger canister."""
+
+    @service_query
+    def icrc1_symbol(self) -> text:
+        ...
+
+    @service_query
+    def icrc1_name(self) -> text:
+        ...
+
+    @service_query
+    def icrc1_decimals(self) -> nat8:
+        ...
+
+
+def _unwrap_query_result(result):
+    """Normalize a basilisk inter-canister query result."""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        return result.get("Ok", result.get("ok", result))
+    if hasattr(result, "Ok"):
+        return result.Ok
+    return result
+
+
+def _indexer_for_ledger(ledger: str, network: str = "") -> str:
+    shared = resolve_shared_token_by_ledger(ledger, network)
+    if shared and shared.get("indexer"):
+        return str(shared["indexer"]).strip()
+    return ledger
+
+
+def resolve_ledger_token_info(ledger_canister_id: str, network: str = "") -> "Async[dict]":
+    """Resolve symbol/decimals/indexer from live ICRC-1 ledger metadata.
+
+    Queries ``icrc1_symbol``, ``icrc1_name``, and ``icrc1_decimals`` on the
+    canister. Falls back to the static shared-token registry only when the
+    ledger does not expose ICRC-1 metadata (e.g. legacy ledgers).
+    """
+    ledger = (ledger_canister_id or "").strip()
+    if not ledger:
+        return {"success": False, "error": "ledger_canister_id is required"}
+    if not _valid_canister_id(ledger):
+        return {"success": False, "error": "Invalid ledger canister ID format"}
+
+    ledger_error = None
+    try:
+        service = Icrc1MetadataService(Principal.from_str(ledger))
+        symbol_res: CallResult = yield service.icrc1_symbol()
+        name_res: CallResult = yield service.icrc1_name()
+        decimals_res: CallResult = yield service.icrc1_decimals()
+
+        symbol = str(_unwrap_query_result(symbol_res) or "").strip()
+        name = str(_unwrap_query_result(name_res) or "").strip()
+        decimals_raw = _unwrap_query_result(decimals_res)
+        decimals = int(decimals_raw) if decimals_raw is not None else 8
+
+        if symbol:
+            shared = resolve_shared_token_by_ledger(ledger, network)
+            display_name = name or (shared or {}).get("name") or symbol
+            return {
+                "success": True,
+                "ledger_canister_id": ledger,
+                "symbol": symbol[:16],
+                "name": str(display_name)[:64],
+                "decimals": decimals,
+                "indexer_canister_id": _indexer_for_ledger(ledger, network),
+                "source": "ledger",
+            }
+        ledger_error = "empty icrc1_symbol response"
+    except Exception as e:
+        ledger_error = str(e)
+        logger.warning(f"ICRC-1 metadata query failed for {ledger}: {e}")
+
+    shared = resolve_shared_token_by_ledger(ledger, network)
+    if shared:
+        symbol = (shared.get("symbol") or shared.get("name") or "TOKEN")[:16]
+        decimals = int(shared.get("decimals", 8))
+        return {
+            "success": True,
+            "ledger_canister_id": ledger,
+            "symbol": symbol,
+            "decimals": decimals,
+            "indexer_canister_id": (shared.get("indexer") or ledger).strip(),
+            "source": "shared_registry_fallback",
+            "warning": ledger_error,
+        }
+
+    return {
+        "success": False,
+        "error": ledger_error or "Could not resolve ledger metadata",
+    }
+
+
 def resolve_ledger_token_info_sync(ledger_canister_id: str, network: str = "") -> dict:
-    """Resolve symbol/decimals/indexer from the shared registry (sync)."""
+    """Legacy sync resolver — shared registry only (no inter-canister query)."""
     ledger = (ledger_canister_id or "").strip()
     if not ledger:
         return {"success": False, "error": "ledger_canister_id is required"}

@@ -14,7 +14,17 @@
   import { cn } from '$lib/theme/utilities';
   import { formatQuarterLabel } from '$lib/utils/quarterLabels';
   import { probeFederatedMembership, activateMembership } from '$lib/utils/federatedMembership';
-  import { listTestIdentities, shortPrincipal } from '$lib/test-identities.js';
+  import {
+    listTestIdentities,
+    shortPrincipal,
+    getTestIdentityPersona,
+    identityNumberToIndex,
+    isValidCustomIdentityNumber,
+    testIdentityLabel,
+    testIdentityNumber,
+    TEST_IDENTITY_FIXED_PICKER_MAX_INDEX,
+    TEST_IDENTITY_MAX_INDEX,
+  } from '$lib/test-identities.js';
   import { _ } from 'svelte-i18n';
   
   // Step management: 'auth' | 'already_joined' | 'terms' | 'profile' | 'success'
@@ -53,6 +63,14 @@
   /** @type {ReturnType<typeof listTestIdentities>} */
   let testIdentities = listTestIdentities();
   let selectedTestIdentityIndex = 0;
+  let customIdentityNumber = 3;
+
+  $: customIdentityIndex = isValidCustomIdentityNumber(customIdentityNumber)
+    ? identityNumberToIndex(customIdentityNumber)
+    : null;
+  $: customPersona = customIdentityIndex != null ? getTestIdentityPersona(customIdentityIndex) : null;
+  $: maxCustomIdentityNumber = testIdentityNumber(TEST_IDENTITY_MAX_INDEX);
+  $: selectedIdentityLabel = testIdentityLabel(selectedTestIdentityIndex);
   // The granted profile is resolved by the backend (issue #242): the invite
   // code's profile when a code is used, otherwise the codex-defined default.
   // There is no profile picker — user types are gone; only profiles exist.
@@ -713,6 +731,53 @@
                   <p class="text-xs text-gray-400 mt-1">{persona.description}</p>
                 </button>
               {/each}
+
+              <div
+                class={cn(
+                  'w-full p-4 rounded-xl border-2 transition-all',
+                  customIdentityIndex != null && selectedTestIdentityIndex === customIdentityIndex
+                    ? 'border-gray-900 bg-gray-50'
+                    : 'border-gray-200 bg-white'
+                )}
+              >
+                <label class="block text-sm font-semibold text-gray-900 mb-2" for="join-custom-identity-number">
+                  Other identity (enter number)
+                </label>
+                <div class="flex gap-2">
+                  <input
+                    id="join-custom-identity-number"
+                    class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    type="number"
+                    min="3"
+                    max={maxCustomIdentityNumber}
+                    step="1"
+                    inputmode="numeric"
+                    bind:value={customIdentityNumber}
+                    disabled={loading}
+                    on:change={() => {
+                      if (customIdentityIndex != null) selectedTestIdentityIndex = customIdentityIndex;
+                    }}
+                  />
+                  <button
+                    type="button"
+                    class="px-3 py-2 text-sm font-medium border border-gray-900 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    disabled={loading || customIdentityIndex == null}
+                    on:click={() => {
+                      if (customIdentityIndex != null) selectedTestIdentityIndex = customIdentityIndex;
+                    }}
+                  >
+                    Select
+                  </button>
+                </div>
+                {#if customPersona}
+                  <p class="text-xs font-mono text-gray-500 mt-2 break-all">{customPersona.principal}</p>
+                  <p class="text-xs text-gray-400 mt-1">{customPersona.description}</p>
+                {:else}
+                  <p class="text-xs text-gray-400 mt-2">
+                    Identity numbers 3–{maxCustomIdentityNumber.toLocaleString()}.
+                  </p>
+                {/if}
+              </div>
               <button
                 on:click={() => handleLogin({ identityIndex: selectedTestIdentityIndex })}
                 disabled={loading}
@@ -725,7 +790,7 @@
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  <span>Continue as {testIdentities[selectedTestIdentityIndex]?.label || 'Identity 1 (Creator)'}</span>
+                  <span>Continue as {selectedIdentityLabel}</span>
                 {/if}
               </button>
             </div>

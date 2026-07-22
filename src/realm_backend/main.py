@@ -5496,17 +5496,17 @@ def get_nft_config() -> text:
 
 
 @update
-def resolve_token_ledger(ledger_canister_id: text) -> text:
+def resolve_token_ledger(ledger_canister_id: text) -> Async[text]:
     """Resolve symbol, decimals, and suggested indexer from a ledger canister."""
     try:
         from ggg import Realm
-        from api.tokens import resolve_ledger_token_info_sync
+        from api.tokens import resolve_ledger_token_info
 
         network = ""
         realm = Realm.load("1")
         if realm:
             network = getattr(realm, "network", "") or ""
-        result = resolve_ledger_token_info_sync(ledger_canister_id, network)
+        result = yield from resolve_ledger_token_info(ledger_canister_id, network)
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"resolve_token_ledger failed: {e}")

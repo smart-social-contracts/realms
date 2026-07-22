@@ -5,6 +5,7 @@ import { clearAuthSession, setAuthSession } from '$lib/stores/authSession.js';
 import {
   createTestIdentityFromIndex,
   getStoredTestIdentityIndex,
+  normalizeTestIdentityIndex,
   setStoredTestIdentityIndex,
   testIdentityLabel,
   testIdentityPrincipal,
@@ -28,9 +29,7 @@ let _ensureTestAuthPromise = null;
 
 function _normalizeIdentityIndex(index) {
   if (index == null || index === '') return getStoredTestIdentityIndex();
-  const parsed = Number(index);
-  if (!Number.isFinite(parsed)) return getStoredTestIdentityIndex();
-  return Math.max(0, Math.min(255, Math.floor(parsed)));
+  return normalizeTestIdentityIndex(index);
 }
 
 function _readIdentityIndexFromUrl() {

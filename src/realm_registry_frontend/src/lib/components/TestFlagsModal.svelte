@@ -12,7 +12,13 @@
   } from '$lib/auth.js';
   import {
     listTestIdentities,
-    shortPrincipal
+    shortPrincipal,
+    getTestIdentityPersona,
+    identityNumberToIndex,
+    isValidCustomIdentityNumber,
+    testIdentityNumber,
+    TEST_IDENTITY_FIXED_PICKER_MAX_INDEX,
+    TEST_IDENTITY_MAX_INDEX,
   } from '$lib/test-identities.js';
 
   export let open = false;
@@ -34,9 +40,15 @@
   let message = '';
   let testIdentities = listTestIdentities();
   let selectedTestIdentityIndex = 0;
+  let customIdentityNumber = 3;
   let switchingIdentity = false;
-  let identityMessage = '';
   let identityError = '';
+
+  $: customIdentityIndex = isValidCustomIdentityNumber(customIdentityNumber)
+    ? identityNumberToIndex(customIdentityNumber)
+    : null;
+  $: customPersona = customIdentityIndex != null ? getTestIdentityPersona(customIdentityIndex) : null;
+  $: maxCustomIdentityNumber = testIdentityNumber(TEST_IDENTITY_MAX_INDEX);
 
   $: showIdentityPicker = !!values.ii_bypass;
   $: currentPrincipalText = $authSession.principal?.toText?.() || '';
@@ -50,32 +62,54 @@
     values = next;
     error = '';
     message = '';
-    identityMessage = '';
     identityError = '';
     testIdentities = listTestIdentities();
     selectedTestIdentityIndex = getTestIdentityIndex();
+    if (selectedTestIdentityIndex > TEST_IDENTITY_FIXED_PICKER_MAX_INDEX) {
+      customIdentityNumber = testIdentityNumber(selectedTestIdentityIndex);
+    } else {
+      customIdentityNumber = 3;
+    }
   }
 
   async function selectIdentity(index) {
     selectedTestIdentityIndex = index;
-    const persona = testIdentities.find((item) => item.index === index);
+    const persona = getTestIdentityPersona(index);
     if (
       persona &&
       currentPrincipalText &&
       persona.loginPrincipal === currentPrincipalText
     ) {
-      identityMessage = `Already signed in as ${persona.label}.`;
       identityError = '';
       return;
     }
     await applyIdentitySwitch(index);
   }
 
+  async function selectCustomIdentity() {
+    if (!isValidCustomIdentityNumber(customIdentityNumber)) {
+      identityError = `Enter an identity number from 3 to ${maxCustomIdentityNumber.toLocaleString()}.`;
+      return;
+    }
+    await selectIdentity(identityNumberToIndex(customIdentityNumber));
+  }
+
+  function handleCustomInputKeydown(event) {
+    event.stopPropagation();
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      selectCustomIdentity();
+    }
+  }
+
+  function handleCustomInputClick(event) {
+    event.stopPropagation();
+  }
+
   async function applyIdentitySwitch(index = selectedTestIdentityIndex) {
     if (switchingIdentity) return;
     switchingIdentity = true;
     identityError = '';
-    identityMessage = '';
 
     try {
       const result = await switchTestIdentity(index);
@@ -87,7 +121,6 @@
         index,
         principal: result.principal
       });
-      identityMessage = `Signed in as ${testIdentities[index]?.label || 'selected identity'}.`;
     } catch (e) {
       identityError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -187,17 +220,58 @@
                     <span class="identity-badge">Switching…</span>
                   {/if}
                 </span>
-                <span class="identity-option-principal">{persona.principal}</span>
+                <span class="identity-option-principal">{shortPrincipal(persona.principal)}</span>
                 <span class="identity-option-hint">{persona.description}</span>
               </button>
             {/each}
+
+            <button
+              type="button"
+              class="identity-option identity-option-custom"
+              class:selected={customIdentityIndex != null && activeIdentityIndex === customIdentityIndex}
+              class:active={customPersona && currentPrincipalText && customPersona.loginPrincipal === currentPrincipalText}
+              class:invalid={customIdentityIndex == null}
+              disabled={saving || switchingIdentity}
+              on:click={selectCustomIdentity}
+            >
+              <span class="identity-option-head">
+                <span class="identity-custom-head">
+                  <span class="identity-option-label">Identity</span>
+                  <input
+                    id="custom-identity-number"
+                    class="identity-custom-input"
+                    type="number"
+                    min="3"
+                    max={maxCustomIdentityNumber}
+                    step="1"
+                    inputmode="numeric"
+                    placeholder="3"
+                    bind:value={customIdentityNumber}
+                    disabled={saving || switchingIdentity}
+                    on:click={handleCustomInputClick}
+                    on:keydown={handleCustomInputKeydown}
+                    aria-label="Identity number"
+                  />
+                </span>
+                {#if customIdentityIndex != null && activeIdentityIndex === customIdentityIndex}
+                  <span class="identity-badge active-badge">Active</span>
+                {:else if switchingIdentity && customIdentityIndex != null && selectedTestIdentityIndex === customIdentityIndex}
+                  <span class="identity-badge">Switching…</span>
+                {/if}
+              </span>
+              {#if customPersona}
+                <span class="identity-option-principal">{shortPrincipal(customPersona.principal)}</span>
+                <span class="identity-option-hint">{customPersona.description}</span>
+              {:else}
+                <span class="identity-option-hint">
+                  Click to sign in · numbers 3–{maxCustomIdentityNumber.toLocaleString()}
+                </span>
+              {/if}
+            </button>
           </div>
 
           {#if identityError}
             <p class="feedback error">{identityError}</p>
-          {/if}
-          {#if identityMessage}
-            <p class="feedback success">{identityMessage}</p>
           {/if}
         </section>
       {/if}
@@ -426,6 +500,46 @@
     color: #a3a3a3;
   }
 
+  .identity-option-custom.invalid {
+    cursor: default;
+  }
+
+  .identity-option-custom.invalid:hover:not(:disabled) {
+    border-color: #e5e5e5;
+    background: #fff;
+  }
+
+  .identity-custom-head {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .identity-custom-input {
+    width: 4.75rem;
+    min-width: 4.75rem;
+    padding: 0.2rem 0.375rem;
+    border: 1px solid #d4d4d4;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #171717;
+    text-align: center;
+    background: #fff;
+    cursor: text;
+  }
+
+  .identity-custom-input:focus {
+    outline: none;
+    border-color: #171717;
+  }
+
+  .identity-custom-input:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
   .feedback {
     margin: 0 0 0.75rem;
     font-size: 0.8125rem;
@@ -437,18 +551,6 @@
 
   .feedback.success {
     color: #15803d;
-  }
-
-  .btn-switch {
-    width: 100%;
-    margin-bottom: 0.25rem;
-    background: #fff;
-    color: #171717;
-    border: 1px solid #171717;
-  }
-
-  .btn-switch:hover:not(:disabled) {
-    background: #fafafa;
   }
 
   .actions {
