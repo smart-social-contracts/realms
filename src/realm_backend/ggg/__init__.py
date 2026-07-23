@@ -66,6 +66,8 @@ from .justice import (
 
 # Finance module - instruments, balances, budgets, tokens, and treasury
 from .finance import (
+    AllocationRule,
+    AllocationRuleStatus,
     Balance,
     Budget,
     BudgetStatus,
@@ -85,6 +87,7 @@ from .finance import (
     Trade,
     Transfer,
     Treasury,
+    TreasuryConfig,
 )
 
 # Identity module - humans, identities, members, and organizations
@@ -125,6 +128,8 @@ from .land import (
 )
 
 __all__ = [
+    "AllocationRule",
+    "AllocationRuleStatus",
     "Appointment",
     "AppointmentStatus",
     "Balance",
@@ -215,6 +220,7 @@ __all__ = [
     "Trade",
     "Transfer",
     "Treasury",
+    "TreasuryConfig",
     "User",
     "UserProfile",
     "Vote",
@@ -229,7 +235,7 @@ def classes() -> list[str]:
     """Return list of GGG entity class names (excludes helper types)."""
     return [name for name in __all__ if name not in (
         'LandType', 'LandStatus', 'RealmStatus', 'Operations', 'Profiles', 'BudgetStatus',
-        'FiscalPeriodStatus', 'FundType', 'EntryType', 'Category',
+        'FiscalPeriodStatus', 'FundType', 'EntryType', 'Category', 'AllocationRuleStatus',
         'LicenseType', 'JusticeSystemType', 'CourtLevel', 'CaseStatus', 'QuarterStatus',
         'PenaltyType', 'AppealStatus', 'PositionStatus', 'AppointmentStatus',
         'case_file', 'case_assign_judges',

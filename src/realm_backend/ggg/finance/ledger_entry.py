@@ -33,7 +33,12 @@ class Category:
     SERVICE = "service"
     INVESTMENT_INCOME = "investment_income"
     INTERGOVERNMENTAL = "intergovernmental"
-    
+    UNALLOCATED = "unallocated"  # swept deposits pending classification
+
+    # Interfund movements (booked as equity so they never distort the
+    # income statement; see core.treasury_allocation, issue #261)
+    TRANSFER_IN = "transfer_in"
+
     # Expenses
     PERSONNEL = "personnel"
     SUPPLIES = "supplies"

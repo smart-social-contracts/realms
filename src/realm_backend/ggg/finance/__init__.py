@@ -1,5 +1,6 @@
 """Finance module - instruments, balances, budgets, tokens, and treasury."""
 
+from .allocation_rule import AllocationRule, AllocationRuleStatus, TreasuryConfig
 from .balance import Balance
 from .budget import Budget, BudgetStatus
 from .fiscal_period import FiscalPeriod, FiscalPeriodStatus
@@ -16,6 +17,8 @@ from .transfer import Transfer
 from .treasury import Treasury
 
 __all__ = [
+    "AllocationRule",
+    "AllocationRuleStatus",
     "Balance",
     "Budget",
     "BudgetStatus",
@@ -35,4 +38,5 @@ __all__ = [
     "Trade",
     "Transfer",
     "Treasury",
+    "TreasuryConfig",
 ]
