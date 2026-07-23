@@ -30,7 +30,6 @@ else goes through an org-scoped proposal built by
 """
 
 import json
-from datetime import date, datetime, timedelta
 
 from ic_python_logging import get_logger
 
@@ -71,8 +70,58 @@ def _now_ts() -> int:
     return ts
 
 
-def _today() -> date:
-    return datetime.fromtimestamp(_now_ts()).date()
+# NOTE: the canister's frozen datetime module is unreliable (fromtimestamp
+# returns 1970 regardless of input, no date/timedelta), so all date math
+# below is pure integer arithmetic on (year, month, day) tuples and ISO
+# "YYYY-MM-DD" strings.
+
+def civil_from_ts(ts: int) -> tuple:
+    """Unix timestamp → (year, month, day) in UTC — no datetime involved.
+
+    Howard Hinnant's civil_from_days algorithm; exact for all Gregorian dates.
+    """
+    z = ts // 86_400 + 719_468
+    era = (z if z >= 0 else z - 146_096) // 146_097
+    doe = z - era * 146_097
+    yoe = (doe - doe // 1_460 + doe // 36_524 - doe // 146_096) // 365
+    year = yoe + era * 400
+    doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
+    mp = (5 * doy + 2) // 153
+    day = doy - (153 * mp + 2) // 5 + 1
+    month = mp + 3 if mp < 10 else mp - 9
+    if month <= 2:
+        year += 1
+    return (year, month, day)
+
+
+def _today() -> tuple:
+    """Today as a (year, month, day) tuple (canister-safe)."""
+    return civil_from_ts(_now_ts())
+
+
+def _iso(ymd: tuple) -> str:
+    return f"{ymd[0]:04d}-{ymd[1]:02d}-{ymd[2]:02d}"
+
+
+def _parse_iso(iso: str) -> tuple:
+    parts = str(iso)[:10].split("-")
+    return (int(parts[0]), int(parts[1]), int(parts[2]))
+
+
+def _days_in_month(year: int, month: int) -> int:
+    if month == 2:
+        leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+        return 29 if leap else 28
+    return 30 if month in (4, 6, 9, 11) else 31
+
+
+def _next_day_iso(iso: str) -> str:
+    y, m, d = _parse_iso(iso)
+    if d < _days_in_month(y, m):
+        return _iso((y, m, d + 1))
+    if m < 12:
+        return _iso((y, m + 1, 1))
+    return _iso((y + 1, 1, 1))
 
 
 def treasury_currency() -> str:
@@ -131,46 +180,45 @@ def set_epoch_config(
 # Calendar-aligned epochs
 # ---------------------------------------------------------------------------
 
-def _epoch_start_for(d: date, months: int, anchor: int) -> date:
-    """First day of the epoch (of *months* length) containing *d*."""
-    total = d.year * 12 + (d.month - 1)
+def _epoch_start_for(ymd: tuple, months: int, anchor: int) -> tuple:
+    """(year, month) of the first day of the epoch containing *ymd*."""
+    total = ymd[0] * 12 + (ymd[1] - 1)
     a = anchor - 1
     idx = (total - a) // months
     start_total = a + idx * months
-    return date(start_total // 12, start_total % 12 + 1, 1)
+    return (start_total // 12, start_total % 12 + 1)
 
 
-def _add_months(d: date, months: int) -> date:
-    total = d.year * 12 + (d.month - 1) + months
-    return date(total // 12, total % 12 + 1, 1)
-
-
-def epoch_id_for(d: date, cfg=None) -> str:
-    """Calendar-aligned epoch id containing *d* under the current config."""
+def epoch_id_for(ymd: tuple, cfg=None) -> str:
+    """Calendar-aligned epoch id containing *ymd* under the current config."""
     cfg = cfg or get_treasury_config()
     length = cfg.epoch_length or "monthly"
     months = EPOCH_MONTHS.get(length, 1)
     anchor = min(max(int(cfg.anchor_month or 1), 1), 12)
-    start = _epoch_start_for(d, months, anchor)
+    start_y, start_m = _epoch_start_for(ymd, months, anchor)
     if length == "monthly":
-        return f"{start.year:04d}-{start.month:02d}"
+        return f"{start_y:04d}-{start_m:02d}"
     if length == "quarterly":
-        q = ((start.month - anchor) % 12) // 3 + 1
-        return f"{start.year:04d}-Q{q}"
+        q = ((start_m - anchor) % 12) // 3 + 1
+        return f"{start_y:04d}-Q{q}"
     if length == "semiannual":
-        h = ((start.month - anchor) % 12) // 6 + 1
-        return f"{start.year:04d}-H{h}"
-    return f"FY{start.year:04d}"
+        h = ((start_m - anchor) % 12) // 6 + 1
+        return f"{start_y:04d}-H{h}"
+    return f"FY{start_y:04d}"
 
 
-def epoch_bounds_for(d: date, cfg=None) -> tuple:
-    """(start, inclusive end) of the epoch containing *d*."""
+def epoch_bounds_for(ymd: tuple, cfg=None) -> tuple:
+    """(start_iso, inclusive end_iso) of the epoch containing *ymd*."""
     cfg = cfg or get_treasury_config()
     months = EPOCH_MONTHS.get(cfg.epoch_length or "monthly", 1)
     anchor = min(max(int(cfg.anchor_month or 1), 1), 12)
-    start = _epoch_start_for(d, months, anchor)
-    end = _add_months(start, months) - timedelta(days=1)
-    return start, end
+    start_y, start_m = _epoch_start_for(ymd, months, anchor)
+    end_total = start_y * 12 + (start_m - 1) + months - 1
+    end_y, end_m = end_total // 12, end_total % 12 + 1
+    return (
+        _iso((start_y, start_m, 1)),
+        _iso((end_y, end_m, _days_in_month(end_y, end_m))),
+    )
 
 
 def _period_range(period) -> tuple:
@@ -182,7 +230,7 @@ def _period_range(period) -> tuple:
     start_iso = str(period.start_date or "")[:10]
     end_incl = str(period.end_date or "")[:10]
     try:
-        end_excl = (date.fromisoformat(end_incl) + timedelta(days=1)).isoformat()
+        end_excl = _next_day_iso(end_incl)
     except Exception:
         end_excl = "9999-12-31"
     return start_iso, end_excl
@@ -197,7 +245,7 @@ def ensure_epoch_periods() -> dict:
     from ggg import FiscalPeriod, FiscalPeriodStatus
 
     today = _today()
-    today_iso = today.isoformat()
+    today_iso = _iso(today)
     closed_now = []
     latest_end = None
     for period in FiscalPeriod.instances():
@@ -213,25 +261,22 @@ def ensure_epoch_periods() -> dict:
     eid = epoch_id_for(today, cfg)
     current = FiscalPeriod[eid]
     if current is None:
-        start, end = epoch_bounds_for(today, cfg)
-        start_iso = start.isoformat()
+        start_iso, end_iso = epoch_bounds_for(today, cfg)
         # Partial first period after an epoch-length change: never overlap
         # an already-recorded period.
         if latest_end and latest_end >= start_iso:
             try:
-                start_iso = (
-                    date.fromisoformat(latest_end) + timedelta(days=1)
-                ).isoformat()
+                start_iso = _next_day_iso(latest_end)
             except Exception:
                 pass
         current = FiscalPeriod(
             id=eid,
             name=f"Fiscal period {eid}",
             start_date=start_iso,
-            end_date=end.isoformat(),
+            end_date=end_iso,
             status=FiscalPeriodStatus.OPEN,
         )
-        logger.info(f"Opened fiscal period {eid} ({start_iso} → {end.isoformat()})")
+        logger.info(f"Opened fiscal period {eid} ({start_iso} → {end_iso})")
     return {"current": eid, "closed": closed_now}
 
 
@@ -350,7 +395,7 @@ def sweep_deposits():
                     "debit": amount,
                     "fund": fund,
                     "fiscal_period": period,
-                    "entry_date": _today().isoformat(),
+                    "entry_date": _iso(_today()),
                     "currency": currency,
                     "description": f"Swept deposit from {wt.principal_from}",
                     "reference": str(wt.tx_id or ""),
@@ -361,7 +406,7 @@ def sweep_deposits():
                     "credit": amount,
                     "fund": fund,
                     "fiscal_period": period,
-                    "entry_date": _today().isoformat(),
+                    "entry_date": _iso(_today()),
                     "currency": currency,
                     "description": f"Unclassified deposit from {wt.principal_from}",
                     "reference": str(wt.tx_id or ""),
@@ -566,7 +611,7 @@ def run_allocation(period_id: str = None, triggered_by: str = "") -> dict:
         seq += 1
 
     currency = treasury_currency()
-    today_iso = _today().isoformat()
+    today_iso = _iso(_today())
     allocations = []
     allocated_now = 0
     for line in lines:

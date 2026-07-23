@@ -69,17 +69,21 @@ def _now_ts() -> int:
 
 
 def current_period() -> str:
-    """Current payroll period as ``YYYY-MM``."""
-    from datetime import datetime
+    """Current payroll period as ``YYYY-MM``.
 
-    dt = datetime.fromtimestamp(_now_ts())
-    return f"{dt.year:04d}-{dt.month:02d}"
+    Uses integer date math (core.treasury_allocation.civil_from_ts) because
+    the canister's frozen ``datetime.fromtimestamp`` always returns 1970.
+    """
+    from core.treasury_allocation import civil_from_ts
+
+    year, month, _ = civil_from_ts(_now_ts())
+    return f"{year:04d}-{month:02d}"
 
 
 def current_day_of_month() -> int:
-    from datetime import datetime
+    from core.treasury_allocation import civil_from_ts
 
-    return datetime.fromtimestamp(_now_ts()).day
+    return civil_from_ts(_now_ts())[2]
 
 
 def payroll_currency() -> str:
