@@ -6759,8 +6759,8 @@ def list_codex_packages() -> text:
 @require(Operations.EXTENSION_INSTALL)
 def install_extension_from_registry(args: text) -> Async[text]:
     """Install an extension by pulling backend files from the file registry.
-    Also copies frontend bundles to the realm's frontend asset canister
-    for same-origin loading.
+    Copies frontend bundles to the realm's frontend asset canister before
+    installing the backend. Install fails if frontend copy fails.
 
     Args (JSON): {
         "registry_canister_id": str,

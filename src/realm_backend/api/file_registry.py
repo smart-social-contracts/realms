@@ -424,8 +424,9 @@ def install_extension_from_registry(
     frontend_canister_id: str = None,
 ) -> Async[str]:
     """Pull extension backend files from the file registry and install them.
-    If frontend_canister_id is provided, also copies frontend bundles to
-    the realm's frontend asset canister for same-origin loading.
+    Frontend bundles are copied to the realm's frontend asset canister before
+    the backend is installed. Install fails if any frontend file cannot be
+    copied (same-origin loading has no file_registry fallback).
 
     Codex packages (manifest ``"kind": "codex"``, issue #244) install through
     this same path with three extra steps: privileged-caller check, singleton
@@ -436,7 +437,9 @@ def install_extension_from_registry(
         registry_canister_id: Canister ID of the file registry
         ext_id: Extension identifier (e.g. "voting")
         version: Specific version or None for latest
-        frontend_canister_id: Optional - frontend asset canister to copy bundles to
+        frontend_canister_id: Frontend asset canister for same-origin UI bundles
+            (required when the package includes frontend/ files; defaults to the
+            realm's configured frontend_canister_id)
 
     Returns (via yield):
         JSON string with result
@@ -526,6 +529,37 @@ def install_extension_from_registry(
             registry_canister_id, ext_id, dependencies
         )
 
+    # Copy frontend bundles before installing backend so we never mark an
+    # extension installed without its same-origin UI assets.
+    fe_canister = (frontend_canister_id or _get_realm_frontend_canister_id() or "").strip()
+    frontend_files, _fe_version, fe_pull_err = yield from _pull_extension_frontend_files(
+        registry, ext_id, resolved_version
+    )
+    if fe_pull_err:
+        err_obj = json.loads(fe_pull_err)
+        return json.dumps({"success": False, "error": err_obj.get("error", fe_pull_err)})
+
+    frontend_copied = 0
+    if frontend_files:
+        if not fe_canister:
+            return json.dumps({
+                "success": False,
+                "error": (
+                    f"Extension '{ext_id}' has frontend files but no frontend_canister_id "
+                    f"is configured on this realm"
+                ),
+            })
+        copy_err = yield from _copy_frontend_to_asset_canister(
+            registry_canister_id,
+            ext_id,
+            resolved_version,
+            fe_canister,
+            files=frontend_files,
+        )
+        if copy_err:
+            return json.dumps({"success": False, "error": copy_err})
+        frontend_copied = len(frontend_files)
+
     from core.runtime_extensions import install_extension as _install
 
     ok = _install(
@@ -550,12 +584,6 @@ def install_extension_from_registry(
         # Post-install realm setup — the codex enforces its realm settings
         # server-side here, so no wizard bug can contradict the codex.
         init_error = codex_hooks.run_init(ext_id)
-
-    frontend_copied = 0
-    if frontend_canister_id:
-        frontend_copied = yield from _copy_frontend_to_asset_canister(
-            registry_canister_id, ext_id, resolved_version, frontend_canister_id,
-        )
 
     result = {
         "success": True,
@@ -726,32 +754,38 @@ def _guess_content_type(path: str) -> str:
 
 
 def _copy_frontend_to_asset_canister(
-    registry_canister_id: str, ext_id: str, version: str, frontend_canister_id: str,
-) -> Async[int]:
+    registry_canister_id: str,
+    ext_id: str,
+    version: str,
+    frontend_canister_id: str,
+    files: dict = None,
+) -> Async[Opt[str]]:
     """Fetch frontend files from the file registry and upload them to the
     realm's frontend asset canister under /ext/{ext_id}/{version}/...
 
-    Returns the number of files successfully copied.
+    Returns None on success, or an error message string on failure.
     """
     logger.info(
         f"Copying frontend files for {ext_id}@{version} "
         f"from registry {registry_canister_id} to frontend {frontend_canister_id}"
     )
 
-    registry = FileRegistryService(Principal.from_str(registry_canister_id))
-    files, resolved_version, err = yield from _pull_extension_frontend_files(
-        registry, ext_id, version or ""
-    )
-    if err:
-        logger.warning(f"Frontend files fetch error: {json.loads(err).get('error', err)}")
-        return 0
+    if files is None:
+        registry = FileRegistryService(Principal.from_str(registry_canister_id))
+        files, resolved_version, err = yield from _pull_extension_frontend_files(
+            registry, ext_id, version or ""
+        )
+        if err:
+            err_obj = json.loads(err)
+            return err_obj.get("error", err)
+        version = resolved_version or version
 
     if not files:
-        logger.info(f"No frontend files found for {ext_id}@{version}")
-        return 0
+        return None
 
-    resolved_version = resolved_version or version
+    resolved_version = version
     copied = 0
+    errors = []
     frontend_principal = Principal.from_str(frontend_canister_id)
 
     for path, content in files.items():
@@ -773,14 +807,26 @@ def _copy_frontend_to_asset_canister(
                 ic.candid_encode(candid_arg), 0,
             )
             if isinstance(store_result, dict) and "Err" in store_result:
-                logger.warning(f"store failed for {asset_key}: {store_result['Err']}")
+                msg = f"{asset_key}: {store_result['Err']}"
+                errors.append(msg)
+                logger.error(f"Frontend store failed for {msg}")
             else:
                 copied += 1
         except Exception as e:
-            logger.warning(f"store exception for {asset_key}: {e}")
+            msg = f"{asset_key}: {e}"
+            errors.append(msg)
+            logger.error(f"Frontend store exception for {msg}")
 
     logger.info(f"Copied {copied}/{len(files)} frontend files for {ext_id}@{resolved_version}")
-    return copied
+    if errors:
+        preview = "; ".join(errors[:3])
+        if len(errors) > 3:
+            preview += f"; ... and {len(errors) - 3} more"
+        return (
+            f"Failed to copy frontend files for '{ext_id}@{resolved_version}' "
+            f"({copied}/{len(files)} succeeded): {preview}"
+        )
+    return None
 
 
 def install_branding_from_registry(
