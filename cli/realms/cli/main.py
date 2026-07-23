@@ -129,6 +129,10 @@ def extension(
         False, "--skip-publish",
         help="Upload files but do not call publish_namespace (publish action only)",
     ),
+    frontend_canister: Optional[str] = typer.Option(
+        None, "--frontend-canister",
+        help="Realm frontend asset canister (runtime-install: upload frontend-rt bundle same-origin)",
+    ),
 ) -> None:
     """Manage Realm extensions."""
     extension_command(
@@ -146,6 +150,7 @@ def extension(
         bundle_path,
         namespace_prefix,
         skip_publish_marker,
+        frontend_canister,
     )
 
 

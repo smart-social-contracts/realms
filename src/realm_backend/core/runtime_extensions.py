@@ -297,8 +297,8 @@ def install_extension(
         dirpath = os.path.dirname(filepath)
         if dirpath and dirpath != ext_path:
             os.makedirs(dirpath, exist_ok=True)
-        with open(filepath, "w") as f:
-            f.write(content)
+        with open(filepath, "wb") as f:
+            f.write(content.encode("utf-8"))
         logger.info(f"Extension {ext_id}: wrote {filename} ({len(content)} bytes)")
 
     if source_registry_id:

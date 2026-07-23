@@ -46,7 +46,7 @@ per realm.
 | Goal | Path | Typical time |
 |---|---|---|
 | **Realm UI or backend change** (Agora, Dominion, Syntropia) | `realms mundus deploy` with `--version build` | ~90s |
-| **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install (see below) | ~26s |
+| **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install, **or** [direct runtime install](#direct-runtime-install-no-file-registry) | ~26s via registry; direct path skips registry |
 | **Registry / installer / other infra** during dev | `scripts/infra_dev_deploy.sh` or direct `dfx deploy` | ~2–5 min |
 | **Pre-merge / make Casals authoritative** | `publish-build` → `rollout` | several min |
 
@@ -746,6 +746,89 @@ artifact, not local edits.
 - The extension bundle must stay under ~200KB for `files publish` to succeed (file_registry instruction limit). Keep heavy libraries (leaflet, h3-js) loaded at runtime via `fetch()` + `eval()` instead of bundling them.
 - The extension `version` in `manifest.json` must match the version in the `dfx canister call`. Bump the version when you need to force cache invalidation.
 - After finishing iteration, commit the changes to the submodule and update the ref in `realms` (see "Deploying Extension Changes" above).
+
+### Direct runtime install (no file registry, no Casals installer)
+
+When iterating on **one specific realm** and the file registry is unavailable,
+out of cycles, or the Casals installer is slow/stuck, push packages straight to
+the realm canister with `dfx`. No publish step, no ICP for the registry, no
+installer polling.
+
+| What changed | Direct command | Notes |
+|---|---|---|
+| **Realm backend** (`src/realm_backend/`) | Build WASM locally → `dfx canister install --mode upgrade` | ~25s; preserves canister state |
+| **Extension** (backend + frontend bundle) | `realms extension runtime-install` | Backend via `install_extension`; frontend via asset-canister `store` |
+| **Codex** (`kind: codex` packages) | `realms codex runtime-install --run-init` | Backend via `install_extension`; runs codex `init` hook |
+
+> **Not the same as `mundus deploy`.** `realms mundus deploy --version build`
+> builds locally but still submits to the Casals installer canister (artifact
+> upload + verify polling). Use that when the installer is healthy (~90s). Use
+> the pure `dfx` path below when you need to skip the installer entirely.
+
+**Setup (once per session):**
+
+```bash
+export TERM=xterm-256color DFX_WARNING=-mainnet_plaintext_identity
+export PATH="$PWD/.venv-basilisk/bin:$PATH"   # basilisk refuses to build outside this venv
+export CANISTER_CANDID_PATH=src/realm_backend/realm_backend.did
+dfx identity use deployer   # or my_dev_identity_1 on test
+```
+
+**Staging canister IDs:**
+
+| Realm | Backend | Frontend |
+|---|---|---|
+| Syntropia | `jnope-2yaaa-aaaac-beh4a-cai` | `jkpjq-xaaaa-aaaac-beh4q-cai` |
+| Agora | `ihbn6-yiaaa-aaaac-beh3a-cai` | `iaalk-vqaaa-aaaac-beh3q-cai` |
+
+**Full example — justice courts on staging Syntropia (verified Jul 2026):**
+
+```bash
+cd /path/to/realms
+
+# 1. Backend WASM — build locally, upgrade directly (~25s)
+python -m basilisk realm_backend src/realm_backend/main.py
+gzip -c .basilisk/realm_backend/realm_backend.wasm > /tmp/realm_backend.wasm.gz
+dfx canister install jnope-2yaaa-aaaac-beh4a-cai \
+  --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network staging
+
+# 2. Codex (seeds court hierarchy via init → seed_justice)
+realms codex runtime-install \
+  --canister jnope-2yaaa-aaaac-beh4a-cai \
+  --source-dir codices/codices/syntropia \
+  --network staging --run-init
+
+# 3. Extension (backend + frontend bundle + initialize hook)
+realms files build --extensions justice_litigation   # build frontend-rt/dist first
+realms extension runtime-install \
+  --canister jnope-2yaaa-aaaac-beh4a-cai \
+  --source-dir extensions/extensions/justice_litigation \
+  --frontend-canister jkpjq-xaaaa-aaaac-beh4q-cai \
+  --network staging
+```
+
+Repeat steps 2–3 for Agora (`ihbn6-yiaaa-aaaac-beh3a-cai` / `iaalk-vqaaa-aaaac-beh3q-cai`)
+with `--source-dir codices/codices/agora`.
+
+**What the pure `dfx` backend upgrade skips (usually fine on staging):**
+
+- Casals protective snapshot / automatic rollback
+- `set_canister_config` post-deploy (frontend ID, version string, test flags — these
+  persist from prior deploys; `--mode upgrade` keeps state)
+- Branding upload + `/custom/` pinning on the frontend canister
+
+**When to use which path:**
+
+| Situation | Use |
+|---|---|
+| Single-realm dev iteration, registry or installer down | **Direct runtime install** (this section) |
+| Normal fast iteration when installer is healthy | [`mundus deploy`](#fast-realm-deploy-mundus--default) (~90s) |
+| Extension-only change, registry healthy | [Fast Remote Extension Deploy](#fast-remote-extension-deploy-26s) above |
+| Quarters / multi-realm / pre-merge authoritative deploy | `deploy-files` → registry install → Casals rollout |
+
+Direct install only affects the canister you target. It does **not** update
+the file registry catalog — run `deploy-files` before merge so other realms and
+quarter bootstrap can pull the new packages.
 
 ---
 

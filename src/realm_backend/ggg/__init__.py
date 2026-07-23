@@ -58,6 +58,7 @@ from .justice import (
     PenaltyType,
     penalty_execute,
     penalty_waive,
+    seed_justice_template,
     Verdict,
     verdict_prehook,
     verdict_posthook,
@@ -182,6 +183,7 @@ __all__ = [
     "PenaltyType",
     "penalty_execute",
     "penalty_waive",
+    "seed_justice_template",
     "Appeal",
     "AppealStatus",
     "appeal_file",
@@ -233,6 +235,7 @@ def classes() -> list[str]:
         'case_file', 'case_assign_judges',
         'case_issue_verdict', 'case_close', 'verdict_prehook', 'verdict_posthook',
         'penalty_execute', 'penalty_waive', 'appeal_file', 'appeal_decide',
+        'seed_justice_template',
         'license_issue', 'license_revoke', 'appoint', 'department_personnel_cost',
         'position_key'
     )]

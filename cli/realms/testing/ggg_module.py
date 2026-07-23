@@ -387,3 +387,121 @@ Service = _entity("Service", alias="service_id")
 
 # --- Disputes (legacy, kept for backward compat) ---
 Dispute = _entity("Dispute", alias="dispute_id")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Justice seeding (mirrors ggg.justice.seeding.seed_justice_template)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def seed_justice_template(template, license_data=None, realm=None):
+    """Mock of the real template-driven justice seeding (idempotent).
+
+    Same semantics as ``ggg.justice.seeding.seed_justice_template``: courts
+    with ``scope: "capital"`` are skipped on plain quarters, existing
+    entities (looked up by name) are never touched, and a quarter court
+    whose parent was skipped records the capital's canister id in metadata.
+    """
+    import json as _json
+    import time as _time
+
+    if realm is None:
+        realms = Realm.instances()
+        realm = realms[0] if realms else None
+
+    plain_quarter = bool(
+        realm is not None
+        and getattr(realm, "is_quarter", False)
+        and not getattr(realm, "is_capital", False)
+    )
+    capital_id = str(getattr(realm, "federation_realm_id", "") or "") if realm else ""
+
+    js_spec = template.get("justice_system") or {}
+    js_name = (js_spec.get("name") or "").strip()
+    if not js_name:
+        raise ValueError("justice_system template requires a name")
+    js = JusticeSystem[js_name]
+    if js is None:
+        js = JusticeSystem(
+            name=js_name,
+            description=js_spec.get("description", "") or "",
+            system_type=js_spec.get("system_type", JusticeSystemType.PUBLIC),
+            status=js_spec.get("status", "active"),
+        )
+        if realm is not None:
+            js.realm = realm
+
+    lic = None
+    if license_data:
+        spec = license_data.get("license", license_data)
+        lic_name = (spec.get("name") or "").strip()
+        if lic_name:
+            lic = License[lic_name]
+            if lic is None:
+                now = int(_time.time())
+                extra = {k: spec[k] for k in ("scope", "terms") if spec.get(k) is not None}
+                lic = License(
+                    name=lic_name,
+                    license_type=spec.get("license_type", LicenseType.JUSTICE_PROVIDER),
+                    description=license_data.get("description", spec.get("description", "")) or "",
+                    status=spec.get("status", "active"),
+                    issued_at=now,
+                    expires_at=now + int(spec.get("validity_seconds", 365 * 86400)),
+                    issuing_authority=spec.get("issuing_authority", "") or "",
+                    metadata=_json.dumps(extra) if extra else "",
+                )
+            if getattr(js, "license", None) is None:
+                lic.justice_system = js
+                js.license = lic
+
+    court_specs = list(template.get("courts") or [])
+    created, existing, skipped = [], [], []
+    skipped_names = set()
+
+    for spec in court_specs:
+        name = (spec.get("name") or "").strip()
+        if not name:
+            continue
+        scope = (spec.get("scope") or "quarter").strip().lower()
+        if scope == "capital" and plain_quarter:
+            skipped.append(name)
+            skipped_names.add(name)
+            continue
+        if Court[name] is not None:
+            existing.append(name)
+            continue
+        Court(
+            name=name,
+            description=spec.get("description", "") or "",
+            jurisdiction=spec.get("jurisdiction", "") or "",
+            level=spec.get("level", "first_instance"),
+            status=spec.get("status", "active"),
+            justice_system=js,
+            metadata="",
+        )
+        created.append(name)
+
+    for spec in court_specs:
+        name = (spec.get("name") or "").strip()
+        if name not in created:
+            continue
+        court = Court[name]
+        if court is None:
+            continue
+        meta = {"scope": (spec.get("scope") or "quarter").strip().lower()}
+        parent_name = (spec.get("parent") or "").strip()
+        if parent_name:
+            parent = Court[parent_name]
+            if parent is not None:
+                court.parent_court = parent
+            elif parent_name in skipped_names and capital_id:
+                meta["appellate_court"] = parent_name
+                meta["appellate_quarter_id"] = capital_id
+        court.metadata = _json.dumps(meta)
+
+    return {
+        "justice_system": js.name,
+        "license": lic.name if lic is not None else None,
+        "created": created,
+        "existing": existing,
+        "skipped": skipped,
+    }

@@ -7,6 +7,7 @@ from .dispute import Dispute
 from .judge import Judge
 from .justice_system import JusticeSystem, JusticeSystemType
 from .penalty import Penalty, PenaltyType, penalty_execute, penalty_waive
+from .seeding import seed_justice_template
 from .verdict import Verdict, verdict_prehook, verdict_posthook
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
     "PenaltyType",
     "penalty_execute",
     "penalty_waive",
+    "seed_justice_template",
     "Verdict",
     "verdict_prehook",
     "verdict_posthook",

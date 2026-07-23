@@ -743,11 +743,22 @@ def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=
                 pass
 
 
-def _collect_runtime_extension_files(source_dir: str) -> dict:
-    """Collect extension files from a source directory into a {filename: content} dict.
+def _ic_safe_text(content: str) -> str:
+    """Strip astral Unicode (emoji) for IC narrow-unicode filesystem writes.
 
-    Reads manifest.json from the root, and all .py files from backend/.
-    Backend files are flattened: backend/entry.py -> entry.py
+    ``open(path, 'w')`` on the canister raises ``UnicodeEncodeError: surrogates
+    not allowed`` when extension sources contain emoji. Registry installs hit
+    the same path; direct runtime-install sanitizes at upload time.
+    """
+    return "".join(c if ord(c) < 0x10000 else "?" for c in content)
+
+
+def _collect_backend_package_files(source_dir: str) -> dict:
+    """Collect manifest.json plus backend/*.py and backend/**/*.json (flattened).
+
+    Matches what ``install_extension`` expects on the canister: ``entry.py`` at
+    the extension root and ``data/*.json`` beside it (``backend/`` prefix
+    stripped), same as ``install_extension_from_registry``.
     """
     files = {}
 
@@ -756,31 +767,93 @@ def _collect_runtime_extension_files(source_dir: str) -> dict:
         console.print(f"[red]Error: manifest.json not found in {source_dir}[/red]")
         raise typer.Exit(1)
     with open(manifest_path, "r") as f:
-        files["manifest.json"] = f.read()
+        files["manifest.json"] = _ic_safe_text(f.read())
 
     backend_dir = os.path.join(source_dir, "backend")
     if os.path.isdir(backend_dir):
         for root, _dirs, filenames in os.walk(backend_dir):
             for fname in filenames:
-                if fname.endswith(".py"):
-                    full_path = os.path.join(root, fname)
-                    rel = os.path.relpath(full_path, backend_dir)
-                    with open(full_path, "r") as f:
-                        files[rel] = f.read()
+                if not fname.endswith((".py", ".json")):
+                    continue
+                full_path = os.path.join(root, fname)
+                rel = os.path.relpath(full_path, backend_dir).replace(os.sep, "/")
+                with open(full_path, "r") as f:
+                    files[rel] = _ic_safe_text(f.read())
     else:
         entry_path = os.path.join(source_dir, "entry.py")
         if os.path.exists(entry_path):
             with open(entry_path, "r") as f:
-                files["entry.py"] = f.read()
+                files["entry.py"] = _ic_safe_text(f.read())
 
     if "entry.py" not in files:
-        console.print(f"[red]Error: entry.py not found in {source_dir}/backend/ or {source_dir}/[/red]")
+        console.print(
+            f"[red]Error: entry.py not found in {source_dir}/backend/ or {source_dir}/[/red]"
+        )
         raise typer.Exit(1)
 
     return files
 
 
-def runtime_install_command(canister: str, source_dir: str, network: str = "local", identity: Optional[str] = None):
+def _collect_runtime_extension_files(source_dir: str) -> dict:
+    """Collect extension backend files for ``install_extension``."""
+    return _collect_backend_package_files(source_dir)
+
+
+def _upload_extension_frontend_bundle(
+    frontend_canister: str,
+    ext_id: str,
+    version: str,
+    bundle_path: str,
+    network: str,
+    identity: Optional[str] = None,
+) -> None:
+    """Push ``frontend-rt/dist/index.js`` to the realm asset canister (same-origin)."""
+    if not os.path.isfile(bundle_path):
+        console.print(f"  [yellow]![/yellow] frontend bundle not found, skipping: {bundle_path}")
+        return
+
+    with open(bundle_path, "rb") as f:
+        data = f.read()
+
+    asset_key = f"/ext/{ext_id}/{version}/frontend/dist/index.js"
+    console.print(f"  Uploading frontend bundle ({len(data):,} bytes) → {asset_key}")
+
+    blob_hex = "".join(f"\\{b:02x}" for b in data)
+    arg = (
+        f'(record {{ key="{asset_key}"; content_type="application/javascript"; '
+        f'content=blob "{blob_hex}"; content_encoding="identity"; sha256=null }})'
+    )
+    _dfx_call(frontend_canister, "store", arg, network, identity, timeout=120)
+    console.print(f"  [green]✓[/green] frontend bundle uploaded")
+
+
+def _extension_sync_call(
+    backend_canister: str,
+    ext_id: str,
+    method: str,
+    args: str,
+    network: str,
+    identity: Optional[str] = None,
+) -> None:
+    """Best-effort post-install hook (``initialize``, codex ``init``, …)."""
+    escaped_args = args.replace("\\", "\\\\").replace('"', '\\"')
+    candid = f'("{ext_id}", "{method}", "{escaped_args}")'
+    try:
+        raw = _dfx_call(
+            backend_canister, "extension_sync_call", candid, network, identity, timeout=120
+        )
+        console.print(f"  [dim]{method}(): {raw[:200]}[/dim]")
+    except Exception as e:
+        console.print(f"  [yellow]⚠ {method}() hook: {e}[/yellow]")
+
+
+def runtime_install_command(
+    canister: str,
+    source_dir: str,
+    network: str = "local",
+    identity: Optional[str] = None,
+    frontend_canister: Optional[str] = None,
+):
     """Install an extension on a deployed realm canister at runtime.
 
     Reads backend files from the source directory and uploads them to the
@@ -795,6 +868,7 @@ def runtime_install_command(canister: str, source_dir: str, network: str = "loca
     with open(manifest_path, "r") as f:
         manifest = json.loads(f.read())
     ext_id = manifest.get("name") or os.path.basename(source_dir)
+    version = str(manifest.get("version") or "0.0.0")
 
     console.print(f"[blue]Installing extension '{ext_id}' on {canister} ({network})...[/blue]")
 
@@ -807,7 +881,7 @@ def runtime_install_command(canister: str, source_dir: str, network: str = "loca
     payload = json.dumps({"extension_id": ext_id, "files": files})
     candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
 
-    console.print("  Uploading to canister...")
+    console.print("  Uploading backend to canister...")
     raw = _dfx_call(canister, "install_extension", candid_arg, network, identity, timeout=300)
 
     try:
@@ -816,11 +890,19 @@ def runtime_install_command(canister: str, source_dir: str, network: str = "loca
         console.print(f"  Response: {raw}")
         return
 
-    if result.get("success"):
-        console.print(f"[green]  ✓ Extension '{ext_id}' installed successfully[/green]")
-    else:
+    if not result.get("success"):
         console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
         raise typer.Exit(1)
+
+    console.print(f"[green]  ✓ Extension '{ext_id}' backend installed[/green]")
+
+    if frontend_canister:
+        bundle = os.path.join(source_dir, "frontend-rt", "dist", "index.js")
+        _upload_extension_frontend_bundle(
+            frontend_canister, ext_id, version, bundle, network, identity
+        )
+
+    _extension_sync_call(canister, ext_id, "initialize", "{}", network, identity)
 
 
 def runtime_uninstall_command(canister: str, extension_id: str, network: str = "local", identity: Optional[str] = None):
@@ -936,16 +1018,8 @@ def registry_install_command(canister: str, registry: str, ext_id: str, version:
 
 
 def _collect_codex_files(source_dir: str) -> dict:
-    """Collect codex files from a source directory into a {filename: content} dict."""
-    files = {}
-    for root, _dirs, filenames in os.walk(source_dir):
-        for fname in filenames:
-            if fname.endswith(".py") or fname == "manifest.json":
-                full_path = os.path.join(root, fname)
-                rel = os.path.relpath(full_path, source_dir)
-                with open(full_path, "r") as f:
-                    files[rel] = f.read()
-    return files
+    """Collect codex package files for direct install (includes JSON data files)."""
+    return _collect_backend_package_files(source_dir)
 
 
 def codex_runtime_install_command(canister: str, source_dir: str, codex_id: Optional[str] = None, run_init: bool = True, network: str = "local", identity: Optional[str] = None):
@@ -955,8 +1029,14 @@ def codex_runtime_install_command(canister: str, source_dir: str, codex_id: Opti
         console.print(f"[red]Error: {source_dir} is not a directory[/red]")
         raise typer.Exit(1)
 
+    manifest_path = os.path.join(source_dir, "manifest.json")
+    with open(manifest_path, "r") as f:
+        manifest = json.loads(f.read())
+
     if not codex_id:
-        codex_id = os.path.basename(source_dir)
+        codex_id = manifest.get("id") or os.path.basename(source_dir)
+
+    is_hook_codex = manifest.get("kind") == "codex"
 
     console.print(f"[blue]Installing codex '{codex_id}' on {canister} ({network})...[/blue]")
 
@@ -966,11 +1046,17 @@ def codex_runtime_install_command(canister: str, source_dir: str, codex_id: Opti
     for fname, content in sorted(files.items()):
         console.print(f"    {fname} ({len(content):,} bytes)")
 
-    payload = json.dumps({"codex_id": codex_id, "files": files, "run_init": run_init})
-    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+    if is_hook_codex:
+        payload = json.dumps({"extension_id": codex_id, "files": files})
+        candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        method = "install_extension"
+    else:
+        payload = json.dumps({"codex_id": codex_id, "files": files, "run_init": run_init})
+        candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        method = "install_codex"
 
-    console.print("  Uploading to canister...")
-    raw = _dfx_call(canister, "install_codex", candid_arg, network, identity, timeout=300)
+    console.print(f"  Uploading via {method}...")
+    raw = _dfx_call(canister, method, candid_arg, network, identity, timeout=300)
 
     try:
         result = json.loads(raw)
@@ -978,13 +1064,16 @@ def codex_runtime_install_command(canister: str, source_dir: str, codex_id: Opti
         console.print(f"  Response: {raw}")
         return
 
-    if result.get("success"):
-        console.print(f"[green]  ✓ Codex '{codex_id}' installed successfully[/green]")
-        if result.get("init_warning"):
-            console.print(f"[yellow]  ⚠ init.py warning: {result['init_warning']}[/yellow]")
-    else:
+    if not result.get("success"):
         console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
         raise typer.Exit(1)
+
+    console.print(f"[green]  ✓ Codex '{codex_id}' installed[/green]")
+
+    if is_hook_codex and run_init:
+        _extension_sync_call(canister, codex_id, "init", "{}", network, identity)
+    elif result.get("init_warning"):
+        console.print(f"[yellow]  ⚠ init warning: {result['init_warning']}[/yellow]")
 
 
 def codex_runtime_uninstall_command(canister: str, codex_id: str, network: str = "local", identity: Optional[str] = None):
@@ -1696,6 +1785,11 @@ def extension_command(
         "--skip-publish",
         help="Upload files but do not call publish_namespace (publish action only)",
     ),
+    frontend_canister: Optional[str] = typer.Option(
+        None,
+        "--frontend-canister",
+        help="Realm frontend asset canister (runtime-install: upload frontend-rt bundle same-origin)",
+    ),
 ) -> None:
     """Manage Realm extensions."""
 
@@ -1736,7 +1830,7 @@ def extension_command(
         if not canister:
             console.print("[red]Error: --canister is required for runtime-install[/red]")
             raise typer.Exit(1)
-        runtime_install_command(canister, source_dir, network, identity)
+        runtime_install_command(canister, source_dir, network, identity, frontend_canister)
     elif action == "runtime-uninstall":
         if not canister:
             console.print("[red]Error: --canister is required for runtime-uninstall[/red]")
