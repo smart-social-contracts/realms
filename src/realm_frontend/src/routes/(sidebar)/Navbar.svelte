@@ -4,6 +4,7 @@
 	import QuarterIndicator from '$lib/components/QuarterIndicator.svelte';
 	import DelegationSwitcher from '$lib/components/DelegationSwitcher.svelte';
 	import { realmInfo, realmName } from '$lib/stores/realmInfo';
+	import { unreadCount } from '$lib/stores/notifications';
 	import { onMount } from 'svelte';
 	import { Navbar } from 'flowbite-svelte';
 	import { IconMenu2 } from '@tabler/icons-svelte';
@@ -21,11 +22,17 @@
 	<button
 		type="button"
 		on:click={() => (drawerHidden = !drawerHidden)}
-		class="m-0 inline-flex p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-600 hover:text-gray-900"
-		aria-label="Toggle navigation menu"
+		class="relative m-0 inline-flex p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-600 hover:text-gray-900"
+		aria-label={$unreadCount > 0 ? 'Toggle navigation menu (unread messages)' : 'Toggle navigation menu'}
 		aria-expanded={!drawerHidden}
 	>
 		<IconMenu2 size={22} />
+		{#if $unreadCount > 0}
+			<span
+				class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
+				aria-hidden="true"
+			></span>
+		{/if}
 	</button>
 
 	<div class="absolute left-1/2 transform -translate-x-1/2">

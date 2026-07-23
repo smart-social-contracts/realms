@@ -10,6 +10,7 @@
 	import { sidebarConfig, sidebarLoading, loadSidebar } from '$lib/stores/sidebar';
 	import { profilesLoading } from '$lib/stores/profiles';
 	import { isAuthenticated } from '$lib/stores/auth';
+	import { unreadCount } from '$lib/stores/notifications';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
 	import { IconLogin, IconLayoutDashboard } from '@tabler/icons-svelte';
 	// @ts-ignore
@@ -210,7 +211,15 @@
 									isActive(item.href) ? 'bg-gray-100 font-medium' : ''
 								)}
 							>
-								<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+								<span class="relative flex-shrink-0">
+									<svelte:component this={IconComp} size={22} class="w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+									{#if item.href === '/messages' && $unreadCount > 0}
+										<span
+											class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
+											aria-hidden="true"
+										></span>
+									{/if}
+								</span>
 								<span class="ml-3">{item.label}</span>
 							</a>
 						</li>

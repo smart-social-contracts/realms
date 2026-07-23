@@ -6,9 +6,13 @@
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
 	import DelegationBanner from '$lib/components/DelegationBanner.svelte';
 	import PageBreadcrumb from '$lib/components/PageBreadcrumb.svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
+	import { isAuthenticated } from '$lib/stores/auth';
+	import { loadNotifications } from '$lib/stores/notifications';
 	import { hostActionEvents, documentFocus } from '$lib/host-bridge';
 	import { portalFocusPush, portalAssistantOpen, isEmbeddedInPortal } from '$lib/portal-bridge.ts';
 	import { realmInfo } from '$lib/stores/realmInfo';
@@ -90,12 +94,21 @@
 				portalFocusPush(focus);
 			});
 			
+			const unsubAuth = isAuthenticated.subscribe((auth) => {
+				if (auth) void loadNotifications();
+			});
+
 			return () => {
 				window.removeEventListener('resize', handleResize);
 				unsubHostActions();
 				unsubFocus();
+				unsubAuth();
 			};
 		}
+	});
+
+	afterNavigate(() => {
+		if (get(isAuthenticated)) void loadNotifications();
 	});
 
 	$: isFullBleedExtension =
