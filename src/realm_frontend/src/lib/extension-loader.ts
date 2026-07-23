@@ -36,6 +36,12 @@ async function resolveInstalledVersion(
   extId: string,
   fallbackVersion: string,
 ): Promise<string> {
+  // Manifest version (from list_runtime_extensions) matches the installed
+  // backend and the same-origin bundle uploaded at runtime-install time.
+  // _source.json can lag after direct runtime-install — prefer manifest.
+  if (fallbackVersion) {
+    return fallbackVersion;
+  }
   if (typeof backend?.get_extension_frontend_info === 'function') {
     try {
       const raw = await backend.get_extension_frontend_info(

@@ -6575,26 +6575,31 @@ def get_extension_frontend_info(args: text) -> text:
     (Issue #168 Layer 2).
     """
     try:
-        from core.runtime_extensions import get_extension_source
+        from core.runtime_extensions import get_extension_source, _load_manifest
 
         params = json.loads(args) if args else {}
         ext_id = params.get("extension_id")
         if not ext_id:
             return json.dumps({"success": False, "error": "extension_id is required"})
 
-        src = get_extension_source(ext_id)
-        if not src or not src.get("registry_canister_id"):
+        src = get_extension_source(ext_id) or {}
+        manifest = _load_manifest(ext_id)
+        manifest_version = str((manifest or {}).get("version") or "")
+        # Prefer manifest version — it tracks runtime-install; _source.json can lag.
+        version = manifest_version or src.get("version") or ""
+        registry_id = src.get("registry_canister_id") or ""
+
+        if not version and not registry_id:
             return json.dumps({
                 "success": False,
-                "error": f"No registry source recorded for extension '{ext_id}'",
+                "error": f"No frontend source recorded for extension '{ext_id}'",
             })
 
-        version = src.get("version") or ""
         return json.dumps({
             "success": True,
             "extension_id": ext_id,
             "version": version,
-            "registry_canister_id": src["registry_canister_id"],
+            "registry_canister_id": registry_id,
             "namespace": f"ext/{ext_id}/{version}" if version else f"ext/{ext_id}",
             "frontend_path": "frontend/dist/index.js",
         })

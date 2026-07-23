@@ -325,6 +325,27 @@ def install_extension(
         logger.error(f"Extension {ext_id}: installed but missing manifest.json")
         return False
 
+    # Keep _source.json version in sync with manifest after runtime-install
+    # (direct install skips source_registry_id but frontend loader needs
+    # the current version for same-origin bundle paths).
+    manifest_version = str(manifest.get("version") or "")
+    if manifest_version:
+        src_path = os.path.join(ext_path, "_source.json")
+        src_data = {}
+        if os.path.exists(src_path):
+            try:
+                with open(src_path, "r") as f:
+                    src_data = json.loads(f.read())
+            except Exception:
+                src_data = {}
+        if src_data.get("version") != manifest_version:
+            src_data["version"] = manifest_version
+            try:
+                with open(src_path, "wb") as f:
+                    f.write(json.dumps(src_data).encode("utf-8"))
+            except Exception as e:
+                logger.warning(f"Extension {ext_id}: could not sync _source.json — {e}")
+
     _seed_extension_entity(ext_id, manifest)
 
     has_entry = os.path.exists(os.path.join(ext_path, "entry.py"))

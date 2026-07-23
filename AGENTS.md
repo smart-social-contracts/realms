@@ -830,6 +830,56 @@ Direct install only affects the canister you target. It does **not** update
 the file registry catalog — run `deploy-files` before merge so other realms and
 quarter bootstrap can pull the new packages.
 
+**Gotchas (learned staging Jul 2026):**
+
+1. **Deploy to the realm you're actually viewing.** Capital Syntropia/Agora
+   canister IDs (table above) are *not* manual-test or quarter realms created
+   via the registry wizard. If the UI shows e.g. `ManualTest410Syntropia`, look
+   up its backend/frontend IDs first:
+
+   ```bash
+   dfx canister call 7wzxh-wyaaa-aaaau-aggyq-cai list_realms '()' \
+     --network staging --query | grep -i manualtest
+   ```
+
+   Then pass those IDs to `--canister` / `--frontend-canister`.
+
+2. **Manifest version ≠ UI version after direct extension install.** The info
+   tooltip reads `manifest.json` (e.g. `0.4.0`) but the tab bar comes from the
+   **frontend JS bundle**. The loader resolves the bundle path via
+   `get_extension_frontend_info`, which historically read stale `_source.json`
+   from an earlier registry install (e.g. still pointing at `0.3.8`). Symptom:
+   new backend works, tooltip shows new version, UI looks unchanged.
+
+   **Fix:** bump `version` in `manifest.json`, upload the bundle to
+   `/ext/{id}/{new-version}/frontend/dist/index.js` on the realm **frontend**
+   asset canister, then ensure `_source.json` matches (backend now syncs this
+   on `install_extension`; older backends may need a one-off patch):
+
+   ```bash
+   # Verify what the loader will use:
+   dfx canister call <backend-id> get_extension_frontend_info \
+     '("{\"extension_id\": \"justice_litigation\"}")' --network staging --query
+
+   # Should return the new version. If not, patch _source.json:
+   dfx canister call <backend-id> install_extension \
+     '("{\"extension_id\":\"justice_litigation\",\"files\":{\"_source.json\":\"{\\\"registry_canister_id\\\":\\\"iebdk-kqaaa-aaaau-agoxq-cai\\\",\\\"version\\\":\\\"0.4.0\\\"}\"}}")' \
+     --network staging
+   ```
+
+   Hard-refresh the browser (Ctrl+Shift+R). In DevTools → Network, confirm the
+   request is `/ext/justice_litigation/0.4.0/frontend/dist/index.js`, not an
+   older version.
+
+3. **Codex direct install and emoji.** IC Python's narrow unicode build rejects
+   emoji in extension/codex sources during `open(..., 'w')`. The CLI strips
+   astral characters on upload; registry installs are unaffected.
+
+4. **Manual-test realms need all three steps.** Backend WASM (if ggg/codex hooks
+   changed), codex `runtime-install --run-init`, and extension
+   `runtime-install --frontend-canister` — same as capital, just different
+   canister IDs.
+
 ---
 
 ## Environment Setup
