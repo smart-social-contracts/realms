@@ -239,5 +239,16 @@ def register_demo_citizens_routed(citizens: List[dict]):
     if isinstance(parsed, dict):
         parsed["routed_from"] = self_id
         parsed["target"] = target
+        # Home-quarter directory (issue #263): the capital routed these
+        # principals itself, so record their home quarter locally without an
+        # extra round-trip.
+        if parsed.get("success"):
+            try:
+                from core.federation import record_resident
+
+                for principal in parsed.get("created") or []:
+                    record_resident(principal, target)
+            except Exception as e:
+                logger.error(f"Demo directory record failed for {target}: {e}")
         return parsed
     return {"success": True, "target": target, "result": parsed}

@@ -5,6 +5,7 @@ from .codex import Codex
 from .contract import Contract
 from .delegation import Delegation
 from .entity_migration import EntityMigration
+from .federation import FederationMessage, QuarterResident
 from .license import License, LicenseType, license_issue, license_revoke
 from .mandate import Mandate
 from .proposal import Proposal
@@ -20,6 +21,7 @@ __all__ = [
     "Contract",
     "Delegation",
     "EntityMigration",
+    "FederationMessage",
     "License",
     "LicenseType",
     "license_issue",
@@ -28,6 +30,7 @@ __all__ = [
     "Proposal",
     "GuestUser",
     "Quarter",
+    "QuarterResident",
     "QuarterStatus",
     "Realm",
     "RealmStatus",

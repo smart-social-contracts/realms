@@ -805,6 +805,23 @@ def join_realm(
                     logger.error(
                         f"Population push to capital {capital_id} raised: {e}"
                     )
+                # Home-quarter directory upsert (issue #263): tell the capital
+                # this principal now lives here so per-user federation actions
+                # (verdict enforcement, messaging) can be routed. Best-effort.
+                try:
+                    from core.federation import send_federation_message
+
+                    upsert = yield from send_federation_message(
+                        capital_id, "gos.directory.upsert", {"principal": caller}
+                    )
+                    if not (isinstance(upsert, dict) and upsert.get("success")):
+                        logger.error(
+                            f"Directory upsert to capital {capital_id} failed: {upsert}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Directory upsert to capital {capital_id} raised: {e}"
+                    )
 
         return RealmResponse(
             success=True,
@@ -2158,6 +2175,27 @@ def register_demo_citizens(payload: text) -> Async[text]:
         return json.dumps(result)
     except Exception as e:
         logger.error(f"Error in register_demo_citizens: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def federation_message(payload: text) -> text:
+    """Generic federation transport endpoint (issue #263).
+
+    Payload: ``{msg_id, topic, body}``. Reserved ``gos.*`` topics are handled
+    by core (ping, home-quarter directory); everything else dispatches to the
+    active codex's ``on_federation_message`` hook.
+
+    Auth: ``ic.caller()`` must be a federation member (the capital accepts its
+    registered quarters; a quarter accepts its capital). Duplicate ``msg_id``
+    deliveries replay the stored response (idempotent retries).
+    """
+    try:
+        from core.federation import handle_incoming
+
+        return handle_incoming(payload, ic.caller().to_str())
+    except Exception as e:
+        logger.error(f"Error in federation_message: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

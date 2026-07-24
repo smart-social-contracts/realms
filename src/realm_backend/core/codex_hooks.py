@@ -365,6 +365,29 @@ def dispatch_on_user_register(user_id: str) -> bool:
         return True
 
 
+def dispatch_federation_message(topic: str, source: str, body: dict) -> Optional[dict]:
+    """Fire the ``on_federation_message`` hook for a non-reserved federation
+    topic (issue #263). Returns the handler's parsed result, or None when no
+    hook-API codex implements the hook (core then reports an unhandled topic).
+    """
+    hook = get_hook("on_federation_message")
+    if hook is None:
+        return None
+    try:
+        result = hook(json.dumps({"topic": topic, "source": source, "body": body or {}}))
+        if isinstance(result, str):
+            try:
+                return json.loads(result)
+            except (json.JSONDecodeError, TypeError):
+                return {"success": True, "result": result}
+        if isinstance(result, dict):
+            return result
+        return {"success": True, "result": result}
+    except Exception as e:
+        logger.error(f"Codex on_federation_message failed for {topic}: {e}")
+        return {"success": False, "error": str(e)}
+
+
 def dispatch_invoice_accounting(invoice_id: str, event: str) -> bool:
     """Dispatch realm-specific invoice accounting policy.
 

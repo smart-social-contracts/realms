@@ -52,6 +52,8 @@ FORCE_IN_PROCESS_HOOKS = frozenset({
     "init",
     "seed",
     "on_treasury_send",
+    # Federation handlers create/read ggg entities (issue #263).
+    "on_federation_message",
 })
 
 # Well-known hook names shown in Realm Settings (desired mode is configurable
@@ -67,6 +69,7 @@ KNOWN_CODEX_HOOKS = (
     "get_extension_overrides",
     "on_user_register",
     "on_invoice_accounting",
+    "on_federation_message",
     "on_stage_change",
     "check_lifecycle_transition",
     "init",

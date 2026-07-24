@@ -45,6 +45,15 @@ class DemoRegistrationService(Service):
         ...
 
 
+class FederationService(Service):
+    """Remote interface of a federation member's generic message endpoint
+    (issue #263). Semantics live in ``core.federation`` / the codex."""
+
+    @service_update
+    def federation_message(self, payload: text) -> text:
+        ...
+
+
 def fetch_peer_directory(peer_canister_id: str) -> Async[Dict]:
     """Query a peer quarter's ``get_quarter_directory`` and return parsed data.
 
