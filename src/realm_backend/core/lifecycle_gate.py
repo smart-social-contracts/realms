@@ -19,7 +19,6 @@ Milestones (computed live from GGG entities, no cached flags):
 """
 
 import json
-from typing import Optional
 
 from ic_python_logging import get_logger
 
@@ -279,19 +278,20 @@ def _stage_entered_at(realm, stage: str) -> int:
     return 0
 
 
-def beta_to_production_ready(realm, approvals: Optional[list] = None):
+def beta_to_production_ready(realm):
     """Return ``(ready, missing_labels)`` for the beta→production gate.
 
     Two conditions (issue #253):
 
     1. **Proving period** — ``lifecycle.beta_proving_days`` must have elapsed
        since the realm entered beta (0/absent disables the requirement).
-    2. **Governance vote** — root must have been handed over (root org has
-       members beyond the creator) and the recorded approvals must satisfy
-       the root department's policy among its member principals.
+    2. **Root handover** — the root org has members beyond the creator.
 
-    ``approvals`` defaults to ``lifecycle.stage_approvals.production`` in
-    ``manifest_data`` (written by realm_settings ``approve_stage_transition``).
+    The governance vote itself is no longer checked here: ``set_realm_stage``
+    is a governed action (issue #262), so when the root policy is not 1/1
+    the transition only executes as the replay of an accepted root-scoped
+    proposal. This gate runs again at replay time, so the proving period
+    cannot be bypassed by voting early.
     """
     from ggg import Department, ROOT_ORG_NAME
 
@@ -322,36 +322,9 @@ def beta_to_production_ready(realm, approvals: Optional[list] = None):
         ),
         None,
     )
-    from core.membership import department_member_count, department_member_principals
+    from core.membership import department_member_count
 
     if root is None or department_member_count(root) < 1:
         missing.append("Root not handed to governance authority")
-        return (False, missing)
-
-    if approvals is None:
-        try:
-            raw = json.loads(getattr(realm, "manifest_data", "{}") or "{}")
-            approvals = (
-                (raw.get("lifecycle", {}) or {})
-                .get("stage_approvals", {})
-                .get("production", [])
-            ) or []
-        except (json.JSONDecodeError, TypeError):
-            approvals = []
-
-    eligible = department_member_principals(root)
-    from core.org_policy import policy_satisfied
-
-    ok, reason = policy_satisfied(
-        approvals=approvals,
-        vetoes=[],
-        eligible=eligible,
-        threshold_m=int(getattr(root, "policy_threshold_m", 1) or 1),
-        threshold_n=int(getattr(root, "policy_threshold_n", 1) or 1),
-        quorum_percent=int(getattr(root, "policy_quorum_percent", 0) or 0),
-        veto_principals=[],
-    )
-    if not ok:
-        missing.append(f"Governance vote not passed: {reason}")
 
     return (not missing, missing)

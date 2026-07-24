@@ -71,6 +71,29 @@ _ggg.User = _FakeUser
 _ggg.Department = _FakeDept
 _ggg.ROOT_ORG_NAME = "root"
 
+# The canister CDK is unavailable off-chain; core/__init__ pulls it in via
+# core.extensions, so stub just enough for imports to resolve.
+if "_cdk" not in sys.modules:
+    import typing
+
+    _cdk = types.ModuleType("_cdk")
+    _cdk.Async = typing.Iterator  # subscriptable stand-in for annotations
+
+    class _FakeIc:
+        @staticmethod
+        def time():
+            return 0
+
+    _cdk.ic = _FakeIc()
+    sys.modules["_cdk"] = _cdk
+
+# lifecycle_gate does `from core.membership import ...` (canister-style
+# imports); alias the package so it resolves off-chain too.
+if "core" not in sys.modules:
+    import src.realm_backend.core as _core_pkg
+
+    sys.modules["core"] = _core_pkg
+
 # core.codex_hooks.get_config would return {} (no realm, no codex) and hide
 # the manifest under test — force the manifest_data fallback path.
 _hooks = types.ModuleType("core.codex_hooks")
@@ -155,31 +178,24 @@ def test_boolean_milestones():
 
 
 # ---------------------------------------------------------------------------
-# beta→production (proving period + governance vote)
+# beta→production (proving period + root handover; the governance vote is
+# provided by the generic governed-action gate, issue #262)
 # ---------------------------------------------------------------------------
 
 
 def test_production_blocked_without_root_handover():
     realm, _ = _realm_with({}, users=5, root_members=0)
-    ready, missing = beta_to_production_ready(realm, approvals=[])
+    ready, missing = beta_to_production_ready(realm)
     assert not ready
     assert any("Root not handed" in m for m in missing)
 
 
-def test_production_requires_governance_approvals():
+def test_production_ready_after_root_handover():
     realm, root = _realm_with({}, users=5, root_members=2)
-    # Congress members are root members.
     _FakeUser._users[0].departments = [root]
     _FakeUser._users[1].departments = [root]
-    root.policy_threshold_m = 2
 
-    ready, missing = beta_to_production_ready(realm, approvals=["principal-0"])
-    assert not ready
-    assert any("Governance vote" in m for m in missing)
-
-    ready, missing = beta_to_production_ready(
-        realm, approvals=["principal-0", "principal-1"]
-    )
+    ready, missing = beta_to_production_ready(realm)
     assert ready, missing
 
 
@@ -195,7 +211,7 @@ def test_production_proving_period(monkeypatch):
     )
 
     # No timestamped beta entry in history → blocked with explanation.
-    ready, missing = beta_to_production_ready(realm, approvals=["principal-0"])
+    ready, missing = beta_to_production_ready(realm)
     assert not ready
     assert any("Proving period" in m for m in missing)
 
@@ -205,5 +221,5 @@ def test_production_proving_period(monkeypatch):
         {"stage": "beta", "at": now - 40 * 86400}
     ]
     realm.manifest_data = json.dumps(manifest)
-    ready, missing = beta_to_production_ready(realm, approvals=["principal-0"])
+    ready, missing = beta_to_production_ready(realm)
     assert ready, missing
