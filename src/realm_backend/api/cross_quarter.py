@@ -37,6 +37,14 @@ class CapitalPopulationService(Service):
         ...
 
 
+class DemoRegistrationService(Service):
+    """Remote interface for capital-orchestrated demo citizen registration."""
+
+    @service_update
+    def register_demo_citizens(self, payload: text) -> text:
+        ...
+
+
 def fetch_peer_directory(peer_canister_id: str) -> Async[Dict]:
     """Query a peer quarter's ``get_quarter_directory`` and return parsed data.
 

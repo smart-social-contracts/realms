@@ -2144,6 +2144,23 @@ def report_quarter_population(population: nat) -> text:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@update
+def register_demo_citizens(payload: text) -> Async[text]:
+    """Register synthetic demo citizens on this canister (capital or quarter).
+
+    Gated on the capital by ``test_mode`` + ``test_mode_demo_data``. Quarters
+    accept calls only from their federation capital canister id.
+    """
+    try:
+        from core.demo_registration import register_demo_citizens_impl
+
+        result = yield from register_demo_citizens_impl(payload)
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"Error in register_demo_citizens: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 @query
 def get_scale_status() -> text:
     """Report the federation's auto-scaling state (issue #156).

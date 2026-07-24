@@ -268,6 +268,7 @@ type CasalsProvisionService = service { create_canister : (text) -> (text) };
 type QuarterBootstrapService = service { bootstrap_as_quarter : (text) -> (text) };
 type RealmRegistryService = service { register_realm : (text, text, text, text, text) -> (AddRealmResult) };
 type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (GetCreditsResult) query; get_latest_version : () -> (UpgradeResult) query };
+type DemoRegistrationService = service { register_demo_citizens : (text) -> (text) };
 type TokenAuthorityService = service { forced_transfer : (ForcedTransferArgs) -> (TokenAuthorityResult); freeze_account : (FreezeAccountArgs) -> (TokenAuthorityResult); unfreeze_account : (TokenAccount) -> (TokenAuthorityResult) };
 type Icrc1MetadataService = service { icrc1_symbol : () -> (text) query; icrc1_name : () -> (text) query; icrc1_decimals : () -> (nat8) query };
 type RealmInstallerService = service { enqueue_deployment : (text) -> (RResultEnqueue); cancel_deployment : (text) -> (text); provision_via_casals : (text) -> (RResultProvision) };
@@ -310,6 +311,7 @@ service : {
   "get_join_targets" : () -> (text) query;
   "sync_quarters" : (text) -> (text);
   "report_quarter_population" : (nat) -> (text);
+  "register_demo_citizens" : (text) -> (text);
   "get_scale_status" : () -> (text) query;
   "set_quarter_provisioning_config" : (text) -> (text);
   "approve_orchestration_action" : (text) -> (text);
