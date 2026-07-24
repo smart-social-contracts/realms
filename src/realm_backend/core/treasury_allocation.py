@@ -49,6 +49,13 @@ EPOCH_MONTHS = {
     "annual": 12,
 }
 
+EPOCH_LENGTHS = frozenset(
+    set(EPOCH_MONTHS) | {"weekly", "biweekly", "minutes"}
+)
+
+# Monday 1970-01-05 — anchor for 14-day biweekly periods.
+_BIWEEKLY_ANCHOR_ORD = 4
+
 
 # ---------------------------------------------------------------------------
 # Time & config
@@ -124,6 +131,71 @@ def _next_day_iso(iso: str) -> str:
     return _iso((y + 1, 1, 1))
 
 
+def _ymd_to_ord(y: int, m: int, d: int) -> int:
+    """Proleptic Gregorian days since 1970-01-01 (UTC)."""
+    y_adj = y - (1 if m <= 2 else 0)
+    era = y_adj // 400 if y_adj >= 0 else (y_adj - 399) // 400
+    yoe = y_adj - era * 400
+    doy = (153 * (m + (-3 if m > 2 else 9)) + 2) // 5 + d - 1
+    doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+    return era * 146097 + doe - 719468
+
+
+def _ord_to_ymd(ord_day: int) -> tuple:
+    """Inverse of :func:`_ymd_to_ord` — matches :func:`civil_from_ts`."""
+    return civil_from_ts(int(ord_day) * 86_400)
+
+
+def _monday_of_week(ymd: tuple) -> tuple:
+    """Monday (ISO) on or before *ymd*."""
+    ord_day = _ymd_to_ord(*ymd)
+    return _ord_to_ymd(ord_day - (ord_day + 3) % 7)
+
+
+def _biweekly_start(ymd: tuple) -> tuple:
+    """Start (Monday) of the 14-day epoch containing *ymd*."""
+    ord_day = _ymd_to_ord(*ymd)
+    start_ord = _BIWEEKLY_ANCHOR_ORD + ((ord_day - _BIWEEKLY_ANCHOR_ORD) // 14) * 14
+    return _ord_to_ymd(start_ord)
+
+
+def _ts_to_iso(ts: int) -> str:
+    ymd = civil_from_ts(int(ts))
+    rem = int(ts) % 86_400
+    hours = rem // 3600
+    minutes = (rem % 3600) // 60
+    seconds = rem % 60
+    return f"{_iso(ymd)}T{hours:02d}:{minutes:02d}:{seconds:02d}Z"
+
+
+def _parse_iso_ts(iso: str) -> int:
+    """Parse an ISO date or datetime string to a unix timestamp (UTC)."""
+    raw = str(iso or "").strip()
+    if not raw:
+        return 0
+    if "T" in raw:
+        date_part, time_part = raw[:10], raw[11:19]
+        y, m, d = _parse_iso(date_part)
+        parts = time_part.replace("Z", "").split(":")
+        hours = int(parts[0]) if len(parts) > 0 else 0
+        minutes = int(parts[1]) if len(parts) > 1 else 0
+        seconds = int(parts[2]) if len(parts) > 2 else 0
+        return _ymd_to_ord(y, m, d) * 86_400 + hours * 3600 + minutes * 60 + seconds
+    y, m, d = _parse_iso(raw[:10])
+    return _ymd_to_ord(y, m, d) * 86_400 + 86_399
+
+
+def _period_end_passed(end_incl: str, cfg) -> bool:
+    """True when an open period's inclusive end is strictly before now."""
+    end_incl = str(end_incl or "").strip()
+    if not end_incl:
+        return False
+    length = (cfg.epoch_length or "monthly").lower()
+    if length == "minutes" or "T" in end_incl:
+        return _parse_iso_ts(end_incl) < _now_ts()
+    return end_incl[:10] < _iso(_today())
+
+
 def treasury_currency() -> str:
     """The realm's accounting currency (fallback: ckBTC)."""
     try:
@@ -150,28 +222,49 @@ def get_treasury_config():
 
 
 def set_epoch_config(
-    epoch_length: str, anchor_month: int = None, triggered_by: str = ""
+    epoch_length: str,
+    anchor_month: int = None,
+    epoch_minutes: int = None,
+    triggered_by: str = "",
 ) -> dict:
     """Change the epoch length (policy-gated by the caller).
 
     Takes effect when the currently open period ends; see module docstring.
     """
     epoch_length = (epoch_length or "").strip().lower()
-    if epoch_length not in EPOCH_MONTHS:
+    if epoch_length == "bi-weekly":
+        epoch_length = "biweekly"
+    if epoch_length not in EPOCH_LENGTHS:
         return {
-            "error": f"epoch_length must be one of {sorted(EPOCH_MONTHS)}"
+            "error": f"epoch_length must be one of {sorted(EPOCH_LENGTHS)}"
         }
+    if epoch_length == "minutes":
+        from core.runtime_flags import is_test_mode
+
+        if not is_test_mode():
+            return {
+                "error": "Minute-based epochs are only available in test mode"
+            }
+        mins = int(epoch_minutes or 0)
+        if mins < 1 or mins > 10_080:
+            return {"error": "epoch_minutes must be between 1 and 10080"}
     cfg = get_treasury_config()
     cfg.epoch_length = epoch_length
+    if epoch_length == "minutes":
+        cfg.epoch_minutes = int(epoch_minutes or 0)
+    else:
+        cfg.epoch_minutes = 0
     if anchor_month is not None:
         cfg.anchor_month = min(max(int(anchor_month), 1), 12)
     logger.info(
         f"Treasury epoch config set to {epoch_length} "
-        f"(anchor month {cfg.anchor_month}, by {triggered_by or 'unknown'})"
+        f"(anchor month {cfg.anchor_month}, minutes {cfg.epoch_minutes or 0}, "
+        f"by {triggered_by or 'unknown'})"
     )
     return {
         "success": True,
         "epoch_length": cfg.epoch_length,
+        "epoch_minutes": int(cfg.epoch_minutes or 0),
         "anchor_month": int(cfg.anchor_month or 1),
     }
 
@@ -192,7 +285,15 @@ def _epoch_start_for(ymd: tuple, months: int, anchor: int) -> tuple:
 def epoch_id_for(ymd: tuple, cfg=None) -> str:
     """Calendar-aligned epoch id containing *ymd* under the current config."""
     cfg = cfg or get_treasury_config()
-    length = cfg.epoch_length or "monthly"
+    length = (cfg.epoch_length or "monthly").lower()
+    if length == "minutes":
+        period_sec = max(int(cfg.epoch_minutes or 0), 1) * 60
+        idx = _now_ts() // period_sec
+        return f"m{idx}"
+    if length == "weekly":
+        return f"W{_iso(_monday_of_week(ymd))}"
+    if length == "biweekly":
+        return f"B{_iso(_biweekly_start(ymd))}"
     months = EPOCH_MONTHS.get(length, 1)
     anchor = min(max(int(cfg.anchor_month or 1), 1), 12)
     start_y, start_m = _epoch_start_for(ymd, months, anchor)
@@ -210,7 +311,22 @@ def epoch_id_for(ymd: tuple, cfg=None) -> str:
 def epoch_bounds_for(ymd: tuple, cfg=None) -> tuple:
     """(start_iso, inclusive end_iso) of the epoch containing *ymd*."""
     cfg = cfg or get_treasury_config()
-    months = EPOCH_MONTHS.get(cfg.epoch_length or "monthly", 1)
+    length = (cfg.epoch_length or "monthly").lower()
+    if length == "minutes":
+        ts = _now_ts()
+        period_sec = max(int(cfg.epoch_minutes or 0), 1) * 60
+        start_ts = (ts // period_sec) * period_sec
+        end_ts = start_ts + period_sec - 1
+        return (_ts_to_iso(start_ts), _ts_to_iso(end_ts))
+    if length == "weekly":
+        start = _monday_of_week(ymd)
+        end_ord = _ymd_to_ord(*start) + 6
+        return (_iso(start), _iso(_ord_to_ymd(end_ord)))
+    if length == "biweekly":
+        start = _biweekly_start(ymd)
+        end_ord = _ymd_to_ord(*start) + 13
+        return (_iso(start), _iso(_ord_to_ymd(end_ord)))
+    months = EPOCH_MONTHS.get(length, 1)
     anchor = min(max(int(cfg.anchor_month or 1), 1), 12)
     start_y, start_m = _epoch_start_for(ymd, months, anchor)
     end_total = start_y * 12 + (start_m - 1) + months - 1
@@ -225,10 +341,15 @@ def _period_range(period) -> tuple:
     """(start_iso, exclusive end_iso) for date-string comparisons.
 
     LedgerEntry.entry_date may carry a time component, so the exclusive
-    bound is the day *after* the period's inclusive end date.
+    bound is the instant *after* the period's inclusive end.
     """
-    start_iso = str(period.start_date or "")[:10]
-    end_incl = str(period.end_date or "")[:10]
+    start_iso = str(period.start_date or "")
+    end_incl = str(period.end_date or "")
+    if "T" in end_incl:
+        end_excl = _ts_to_iso(_parse_iso_ts(end_incl) + 1)
+        return start_iso, end_excl
+    start_iso = start_iso[:10]
+    end_incl = end_incl[:10]
     try:
         end_excl = _next_day_iso(end_incl)
     except Exception:
@@ -244,20 +365,20 @@ def ensure_epoch_periods() -> dict:
     """
     from ggg import FiscalPeriod, FiscalPeriodStatus
 
+    cfg = get_treasury_config()
     today = _today()
-    today_iso = _iso(today)
     closed_now = []
     latest_end = None
     for period in FiscalPeriod.instances():
-        end_incl = str(period.end_date or "")[:10]
-        if end_incl:
-            if latest_end is None or end_incl > latest_end:
-                latest_end = end_incl
-        if period.status == FiscalPeriodStatus.OPEN and end_incl and end_incl < today_iso:
+        end_incl = str(period.end_date or "")
+        end_cmp = end_incl if "T" in end_incl else end_incl[:10]
+        if end_cmp:
+            if latest_end is None or end_cmp > latest_end:
+                latest_end = end_cmp
+        if period.status == FiscalPeriodStatus.OPEN and _period_end_passed(end_incl, cfg):
             period.close()
             closed_now.append(period.id)
 
-    cfg = get_treasury_config()
     eid = epoch_id_for(today, cfg)
     current = FiscalPeriod[eid]
     if current is None:
@@ -828,6 +949,8 @@ def treasury_overview() -> dict:
 
     ensure_epoch_periods()
     cfg = get_treasury_config()
+    from core.runtime_flags import is_test_mode
+
     source = _source_fund()
     currency = treasury_currency()
     token = Token[currency]
@@ -854,7 +977,9 @@ def treasury_overview() -> dict:
         "decimals": int(token.decimals or 8) if token else 8,
         "source_fund": source.code if source else None,
         "epoch_length": cfg.epoch_length or "monthly",
+        "epoch_minutes": int(cfg.epoch_minutes or 0),
         "anchor_month": int(cfg.anchor_month or 1),
+        "test_mode": is_test_mode(),
         "current_period": epoch_id_for(_today(), cfg),
         "periods": _list_periods(),
         "rule": {
@@ -1002,6 +1127,146 @@ def allocation_flows(period_id: str = None) -> dict:
     }
 
 
+def _add_months_ym(y: int, m: int, delta: int) -> tuple:
+    total = y * 12 + (m - 1) + delta
+    return total // 12, total % 12 + 1
+
+
+def _epoch_at_ts(ts: int, cfg=None) -> dict:
+    """Epoch containing unix timestamp *ts* under *cfg*."""
+    cfg = cfg or get_treasury_config()
+    length = (cfg.epoch_length or "monthly").lower()
+    ts = int(ts)
+
+    if length == "minutes":
+        period_sec = max(int(cfg.epoch_minutes or 0), 1) * 60
+        idx = ts // period_sec
+        start_ts = idx * period_sec
+        end_ts = start_ts + period_sec - 1
+        return {
+            "id": f"m{idx}",
+            "start_date": _ts_to_iso(start_ts),
+            "end_date": _ts_to_iso(end_ts),
+            "start_ts": start_ts,
+            "end_ts": end_ts,
+        }
+
+    ymd = civil_from_ts(ts)
+    if length == "weekly":
+        start = _monday_of_week(ymd)
+        start_ts = _ymd_to_ord(*start) * 86_400
+        end_ts = start_ts + 7 * 86_400 - 1
+        eid = f"W{_iso(start)}"
+        start_iso, end_iso = _iso(start), _iso(_ord_to_ymd(start_ts // 86_400 + 6))
+    elif length == "biweekly":
+        start = _biweekly_start(ymd)
+        start_ts = _ymd_to_ord(*start) * 86_400
+        end_ts = start_ts + 14 * 86_400 - 1
+        eid = f"B{_iso(start)}"
+        start_iso = _iso(start)
+        end_iso = _iso(_ord_to_ymd(start_ts // 86_400 + 13))
+    else:
+        eid = epoch_id_for(ymd, cfg)
+        start_iso, end_iso = epoch_bounds_for(ymd, cfg)
+        start_ts = _parse_iso_ts(start_iso)
+        end_ts = _parse_iso_ts(end_iso)
+
+    return {
+        "id": eid,
+        "start_date": start_iso,
+        "end_date": end_iso,
+        "start_ts": start_ts,
+        "end_ts": end_ts,
+    }
+
+
+def _step_epoch_start(start_ts: int, cfg, direction: int) -> int:
+    """Start timestamp of the epoch *direction* steps from *start_ts* (-1 prev, +1 next)."""
+    length = (cfg.epoch_length or "monthly").lower()
+    if length == "minutes":
+        period_sec = max(int(cfg.epoch_minutes or 0), 1) * 60
+        return int(start_ts) + direction * period_sec
+    if length == "weekly":
+        return int(start_ts) + direction * 7 * 86_400
+    if length == "biweekly":
+        return int(start_ts) + direction * 14 * 86_400
+    months = EPOCH_MONTHS.get(length, 1)
+    y, m, _ = civil_from_ts(int(start_ts))
+    ny, nm = _add_months_ym(y, m, direction * months)
+    return _ymd_to_ord(ny, nm, 1) * 86_400
+
+
+def epoch_timeline(
+    center_ts: int = None,
+    before: int = 20,
+    after: int = 20,
+) -> dict:
+    """Timeline read model: projected epochs with optional stored stats.
+
+    Returns a window of epochs centred on *center_ts* (default: now), each
+    with start/end timestamps, lifecycle status, and treasury totals when a
+    :class:`ggg.FiscalPeriod` record exists.
+    """
+    from ggg import FiscalPeriod
+
+    ensure_epoch_periods()
+    cfg = get_treasury_config()
+    now_ts = _now_ts()
+    center_ts = int(center_ts or now_ts)
+    before = max(0, min(int(before or 20), 60))
+    after = max(0, min(int(after or 20), 60))
+
+    current = _epoch_at_ts(center_ts, cfg)
+    start_ts = current["start_ts"]
+    for _ in range(before):
+        start_ts = _step_epoch_start(start_ts, cfg, -1)
+
+    stored = {p.id: p for p in FiscalPeriod.instances()}
+    source = _source_fund()
+    epochs = []
+    ts = start_ts
+    for _ in range(before + after + 1):
+        ep = _epoch_at_ts(ts, cfg)
+        period = stored.get(ep["id"])
+        if period is not None:
+            ep["status"] = period.status or "closed"
+            ep["stored"] = True
+            if source is not None:
+                pool = recognized_revenue(period, source)
+                allocated = allocated_out(period, source)
+                ep["pool"] = pool
+                ep["allocated"] = allocated
+                ep["unallocated"] = pool - allocated
+            else:
+                ep["pool"] = ep["allocated"] = ep["unallocated"] = 0
+        elif ep["start_ts"] <= now_ts <= ep["end_ts"]:
+            ep["status"] = "open"
+            ep["stored"] = False
+            ep["pool"] = ep["allocated"] = ep["unallocated"] = 0
+        elif ep["end_ts"] < now_ts:
+            ep["status"] = "closed"
+            ep["stored"] = False
+            ep["pool"] = ep["allocated"] = ep["unallocated"] = 0
+        else:
+            ep["status"] = "future"
+            ep["stored"] = False
+            ep["pool"] = ep["allocated"] = ep["unallocated"] = 0
+        ep["is_current"] = ep["start_ts"] <= now_ts <= ep["end_ts"]
+        epochs.append(ep)
+        ts = _step_epoch_start(ep["start_ts"], cfg, 1)
+
+    current_id = _epoch_at_ts(now_ts, cfg)["id"]
+    return {
+        "now_ts": now_ts,
+        "center_ts": center_ts,
+        "current_period": current_id,
+        "epoch_length": cfg.epoch_length or "monthly",
+        "epoch_minutes": int(cfg.epoch_minutes or 0),
+        "currency": treasury_currency(),
+        "epochs": epochs,
+    }
+
+
 def budgets_for_period(period_id: str = None) -> dict:
     """Planned vs actual allocation budgets for one epoch."""
     from ggg import Budget, FiscalPeriod
@@ -1047,7 +1312,11 @@ def describe_treasury_action(action: dict) -> str:
     if kind == "run_allocation":
         return f"Run treasury allocation for epoch {action.get('period', 'current')}"
     if kind == "set_epoch":
-        return f"Set treasury epoch length to {action.get('epoch_length', '?')}"
+        length = action.get("epoch_length", "?")
+        if length == "minutes":
+            mins = action.get("epoch_minutes", "?")
+            return f"Set treasury epoch length to {mins} minutes"
+        return f"Set treasury epoch length to {length}"
     if kind == "set_schedule":
         state = "Enable" if action.get("enabled") else "Disable"
         auto = " with automatic allocation" if action.get("auto_allocate") else ""
@@ -1071,6 +1340,7 @@ def apply_treasury_action(action: dict) -> dict:
         return set_epoch_config(
             action.get("epoch_length", ""),
             anchor_month=action.get("anchor_month"),
+            epoch_minutes=action.get("epoch_minutes"),
             triggered_by=by,
         )
     if kind == "set_schedule":
