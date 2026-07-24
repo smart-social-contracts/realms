@@ -56,8 +56,9 @@ class TreasuryConfig(Entity, TimestampedMixin):
     """
     __alias__ = "id"
     id = String(max_length=8)                 # always "1"
-    # monthly | quarterly | semiannual | annual
+    # monthly | quarterly | semiannual | annual | weekly | biweekly | minutes
     epoch_length = String(max_length=16, default="monthly")
+    epoch_minutes = Integer(default=0)         # test-mode only, when epoch_length=minutes
     anchor_month = Integer(default=1)          # fiscal-year start month (annual)
     source_fund_code = String(max_length=16, default="ROOT")
     auto_allocate = String(max_length=8, default="false")  # "true"/"false"
