@@ -68,6 +68,16 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     except Exception:
         pass
 
+    # 0-replay. An approved governance proposal replaying its action acts
+    # with the realm's own authority (issue #262). Proposal inline code can
+    # already mutate the DB freely, so this does not widen anything.
+    try:
+        from core.governed_action import in_replay
+        if in_replay():
+            return True
+    except Exception:
+        pass
+
     # 0a. IC-level controllers always allowed. This is critical for
     # layered deployments where realm_installer (a controller) drives
     # post-install bootstrapping (registry registration, codex install,

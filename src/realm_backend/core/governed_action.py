@@ -1,0 +1,302 @@
+"""Generic org-policy gating for governed actions (issue #262).
+
+One shared implementation of the two-layer governance state machine used by
+position_admin / payroll / treasury / sandbox_admin:
+
+- **Direct** — the governing org's policy is 1/1 (no quorum, no veto), or the
+  caller is an IC controller / trusted principal (bootstrap tooling): the
+  action applies immediately.
+- **Confirm** — any other policy: the first call returns
+  ``requires_confirmation`` so the UI can warn the user a vote is needed.
+- **Proposal** — the caller re-submits with ``confirm=True``: an org-scoped
+  Proposal is created whose inline code *replays the exact same call* with
+  realm authority once the vote passes.
+
+Because the direct path and the replay path converge on the same function,
+an approved vote can never do something a direct call could not, and vice
+versa.
+
+Replay authority: while :func:`execute_replay` / :func:`execute_backend_replay`
+run, ``in_replay()`` is True and ``core.access._check_access`` grants every
+operation — an accepted proposal acts with the realm's own authority, exactly
+like any other proposal inline code (which can already mutate the DB freely).
+"""
+
+import json
+from typing import Any, Dict, Optional
+
+from ic_python_logging import get_logger
+
+logger = get_logger("core.governed_action")
+
+# Depth counter: >0 while replaying an approved proposal's action.
+_replay_depth = 0
+
+
+def in_replay() -> bool:
+    """True while an approved governance proposal is replaying its action."""
+    return _replay_depth > 0
+
+
+def policy_is_direct(dept) -> bool:
+    """True when the org's policy lets a single initiator act without a vote."""
+    from core.position_admin import policy_is_direct as _impl
+
+    return _impl(dept)
+
+
+def governing_org(org_name: Optional[str] = None):
+    """Resolve the governing Department: *org_name* if given, else root."""
+    from ggg import Department, ROOT_ORG_NAME
+
+    if org_name:
+        dept = Department[org_name]
+        if dept:
+            return dept
+        logger.warning(f"governing_org: '{org_name}' not found, falling back to root")
+    root = Department[ROOT_ORG_NAME]
+    if root:
+        return root
+    for dept in Department.instances():
+        if getattr(dept, "is_root", False):
+            return dept
+    return None
+
+
+def format_org_policy(dept) -> str:
+    m = int(getattr(dept, "policy_threshold_m", 1) or 1)
+    n = int(getattr(dept, "policy_threshold_n", 1) or 1)
+    q = int(getattr(dept, "policy_quorum_percent", 0) or 0)
+    veto = (getattr(dept, "policy_veto_principals", "") or "").strip()
+    label = f"{m}/{n}"
+    extras = []
+    if q > 0:
+        extras.append(f"quorum {q}%")
+    if veto:
+        extras.append("veto")
+    if extras:
+        label = f"{label} ({', '.join(extras)})"
+    return label
+
+
+def confirmation_payload(governing, summary: str) -> Dict[str, Any]:
+    """Response for the first (unconfirmed) call to a governed action.
+
+    ``success`` is False so legacy frontends that don't understand
+    ``requires_confirmation`` show an error instead of a false success toast.
+    """
+    policy = format_org_policy(governing)
+    return {
+        "success": False,
+        "requires_confirmation": True,
+        "summary": summary,
+        "governed_by": governing.name,
+        "policy": policy.split(" (")[0],
+        "governed_policy": policy,
+        "error": (
+            f"This action is governed by {governing.name}'s policy ({policy}); "
+            f"a vote is required. Re-submit with confirm=true to open a proposal."
+        ),
+        "policy_reason": (
+            f"This action is governed by {governing.name}'s policy ({policy}); "
+            f"a vote is required before it can apply."
+        ),
+        "voters_org": governing.name,
+    }
+
+
+def _voting_window_seconds() -> int:
+    window = 604_800
+    try:
+        from ggg import Realm
+
+        realm = Realm[1]
+        if realm and realm.calendar and realm.calendar.voting_window:
+            window = int(realm.calendar.voting_window)
+    except Exception:
+        pass
+    return window
+
+
+def submit_replay_proposal(
+    governing,
+    summary: str,
+    code_inline: str,
+    proposer_principal: str,
+    metadata_extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Create an org-scoped Proposal that replays a governed action on approval."""
+    from _cdk import ic
+    from ggg import Proposal, User
+
+    proposer = User[proposer_principal]
+    if not proposer:
+        return {
+            "success": False,
+            "error": f"Caller {proposer_principal} is not a registered user; cannot propose",
+        }
+
+    proposal_num = len(Proposal.instances()) + 1
+    proposal_id = f"prop_{proposal_num:03d}"
+
+    metadata = {
+        "proposal_type": "governed_action",
+        "org_scope": governing.name,
+        "code_inline": code_inline,
+        "codex_name": f"governed_action_{proposal_id}",
+    }
+    if metadata_extra:
+        metadata.update(metadata_extra)
+
+    deadline_s = ic.time() // 1_000_000_000 + _voting_window_seconds()
+
+    Proposal(
+        proposal_id=proposal_id,
+        title=summary,
+        description=(
+            f"Governed action under '{governing.name}' "
+            f"(policy {format_org_policy(governing)}). "
+            f"Proposed by {proposer.id}."
+        ),
+        code_url="",
+        code_checksum="",
+        proposer=proposer,
+        status="voting",
+        voting_deadline=str(deadline_s),
+        votes_yes=0.0,
+        votes_no=0.0,
+        votes_abstain=0.0,
+        total_voters=0.0,
+        required_threshold=1.0,
+        org_scope=governing.name,
+        metadata=json.dumps(metadata),
+    )
+    logger.info(
+        f"governed proposal {proposal_id} submitted for '{governing.name}': {summary}"
+    )
+    return {
+        "success": True,
+        "applied": "proposal",
+        "proposal_id": proposal_id,
+        "summary": summary,
+        "governed_by": governing.name,
+        "governed_policy": format_org_policy(governing),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Replay code builders + executors
+# ---------------------------------------------------------------------------
+
+
+def build_extension_replay_code(ext_id: str, function_name: str, args_json: str) -> str:
+    """Inline proposal code that re-runs an extension call with realm authority."""
+    return (
+        "from core.governed_action import execute_replay\n"
+        "\n"
+        "def main():\n"
+        f"    return execute_replay({ext_id!r}, {function_name!r}, {args_json!r})\n"
+    )
+
+
+def build_backend_replay_code(module_path: str, function_name: str, payload_json: str) -> str:
+    """Inline proposal code that re-runs a backend core function with realm authority."""
+    return (
+        "from core.governed_action import execute_backend_replay\n"
+        "\n"
+        "def main():\n"
+        f"    return execute_backend_replay({module_path!r}, {function_name!r}, {payload_json!r})\n"
+    )
+
+
+def _check_replay_result(result: Any) -> Any:
+    """Raise if a replayed call reports failure, so the proposal is marked failed."""
+    parsed = result
+    if isinstance(result, str):
+        try:
+            parsed = json.loads(result)
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+    if isinstance(parsed, dict):
+        if parsed.get("success") is False or parsed.get("error"):
+            raise RuntimeError(
+                f"Governed action failed on replay: {parsed.get('error') or parsed}"
+            )
+    return result
+
+
+def execute_replay(ext_id: str, function_name: str, args_json: str) -> Any:
+    """Replay an extension call with realm authority (proposal execution only)."""
+    global _replay_depth
+    from core.extensions import call_extension_function
+
+    _replay_depth += 1
+    try:
+        result = call_extension_function(ext_id, function_name, args_json)
+        if hasattr(result, "__next__"):
+            # Async extension function: hand the generator to the proposal
+            # executor (it yields from main()'s return value). The final
+            # result cannot be checked here.
+            return result
+        return _check_replay_result(result)
+    finally:
+        _replay_depth -= 1
+
+
+def execute_backend_replay(module_path: str, function_name: str, payload_json: str) -> Any:
+    """Replay a backend core function with realm authority (proposal execution only)."""
+    global _replay_depth
+    import importlib
+
+    _replay_depth += 1
+    try:
+        module = importlib.import_module(module_path)
+        func = getattr(module, function_name)
+        payload = json.loads(payload_json)
+        result = func(payload)
+        if hasattr(result, "__next__"):
+            return result
+        return _check_replay_result(result)
+    finally:
+        _replay_depth -= 1
+
+
+# ---------------------------------------------------------------------------
+# The generic gate
+# ---------------------------------------------------------------------------
+
+
+def gate(
+    *,
+    caller: str,
+    summary: str,
+    replay_code: str,
+    org_name: Optional[str] = None,
+    confirm: bool = False,
+    metadata_extra: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Run the governed-action state machine.
+
+    Returns None when the caller may proceed directly (1/1 policy, controller,
+    trusted principal, or already inside an approved replay). Otherwise
+    returns the response dict the endpoint must hand back to the caller
+    (requires_confirmation payload or proposal-created payload).
+    """
+    if in_replay():
+        return None
+
+    from core.access import _is_controller_or_trusted
+
+    if _is_controller_or_trusted(caller):
+        return None
+
+    governing = governing_org(org_name)
+    if governing is None or policy_is_direct(governing):
+        return None
+
+    if not confirm:
+        return confirmation_payload(governing, summary)
+
+    return submit_replay_proposal(
+        governing, summary, replay_code, caller, metadata_extra
+    )
