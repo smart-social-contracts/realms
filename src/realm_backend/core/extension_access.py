@@ -190,6 +190,7 @@ def gate_extension_call(
         return None
 
     from core.governed_action import (
+        INITIATOR_KEY,
         build_extension_replay_code,
         gate as governed_gate,
     )
@@ -201,6 +202,11 @@ def gate_extension_call(
         args_obj = json.loads(args) if args else {}
         if isinstance(args_obj, dict):
             confirm = bool(args_obj.pop("confirm", False))
+            # Record who is asking, so caller-bound actions replay against
+            # the right person (issue #262). Client-supplied values are
+            # discarded first — only the gate may write this key.
+            args_obj.pop(INITIATOR_KEY, None)
+            args_obj[INITIATOR_KEY] = caller
             replay_args = json.dumps(args_obj)
             if spec["org_from_arg"]:
                 # Governing org named by the call itself (e.g. the affected

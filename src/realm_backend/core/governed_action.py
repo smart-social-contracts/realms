@@ -38,6 +38,38 @@ def in_replay() -> bool:
     return _replay_depth > 0
 
 
+# Reserved args key holding the principal that originally submitted a
+# governed call. Written exclusively by the dispatch gate (which strips any
+# client-supplied value first), so inside a replay it cannot be forged.
+INITIATOR_KEY = "_initiator"
+
+
+def effective_caller(args) -> str:
+    """The principal a caller-bound action is about.
+
+    Normally the live verified caller. During the replay of an approved
+    governed proposal the live caller is just whoever triggered execution,
+    so the initiator recorded by the dispatch gate at submission time is
+    used instead. Fail-closed: a replay without a recorded initiator gets
+    an empty string, so downstream user lookups fail rather than acting on
+    the executor.
+    """
+    if in_replay():
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except (json.JSONDecodeError, TypeError):
+                args = None
+        if isinstance(args, dict):
+            recorded = args.get(INITIATOR_KEY)
+            if isinstance(recorded, str) and recorded.strip():
+                return recorded.strip()
+        return ""
+    from _cdk import ic
+
+    return str(ic.caller())
+
+
 def policy_is_direct(dept) -> bool:
     """True when the org's policy lets a single initiator act without a vote."""
     from core.position_admin import policy_is_direct as _impl
