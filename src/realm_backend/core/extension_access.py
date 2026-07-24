@@ -13,7 +13,8 @@ Manifest declaration (``manifest.json``)::
       "functions": {
         "get_public_info": "public",
         "transfer":        {"level": "admin", "governed": true},
-        "assign_profile":  {"level": "role.assign", "governed": true, "org": "root"}
+        "assign_profile":  {"level": "role.assign", "governed": true, "org": "root"},
+        "join_committee":  {"level": "member", "governed": true, "org_from_arg": "department"}
       }
     }
 
@@ -27,10 +28,20 @@ Access levels:
   (e.g. ``"role.assign"``).
 
 ``"governed": true`` adds the org-policy layer on top: when the governing
-org's policy (``org`` key, default root) is not 1/1, the call must be
-confirmed (``confirm: true`` in args) and then becomes an org-scoped
-Proposal that replays the same call after the vote passes
-(see core.governed_action).
+org's policy is not 1/1, the call must be confirmed (``confirm: true`` in
+args) and then becomes an org-scoped Proposal that replays the same call
+after the vote passes (see core.governed_action).
+
+The governing org is configurable per function:
+
+- ``"org": "<name>"`` — a fixed org;
+- ``"org_from_arg": "<key>"`` — read the org name from that key in the
+  call args, so e.g. department-scoped actions are voted by the affected
+  department itself;
+- neither — the root org.
+
+If the named org does not exist, governance falls back to the root org
+(the stricter direction), never to direct execution.
 
 FAIL-CLOSED RULES — this is the whole point:
 
@@ -61,9 +72,15 @@ _BYPASS_PROBE_OP = "__extension_access_bypass_probe__"
 def resolve_spec(manifest: Optional[dict], function_name: str) -> Dict[str, Any]:
     """Resolve the access spec for a function. Pure logic — unit-testable.
 
-    Returns ``{"level": str, "governed": bool, "org": Optional[str]}``.
+    Returns ``{"level": str, "governed": bool, "org": Optional[str],
+    "org_from_arg": Optional[str]}``.
     """
-    fallback = {"level": FAIL_CLOSED_LEVEL, "governed": False, "org": None}
+    fallback = {
+        "level": FAIL_CLOSED_LEVEL,
+        "governed": False,
+        "org": None,
+        "org_from_arg": None,
+    }
     try:
         if not isinstance(manifest, dict):
             return fallback
@@ -79,7 +96,12 @@ def resolve_spec(manifest: Optional[dict], function_name: str) -> Dict[str, Any]
             raw = entry_access.get("default", FAIL_CLOSED_LEVEL)
 
         if isinstance(raw, str) and raw.strip():
-            return {"level": raw.strip(), "governed": False, "org": None}
+            return {
+                "level": raw.strip(),
+                "governed": False,
+                "org": None,
+                "org_from_arg": None,
+            }
         if isinstance(raw, dict):
             level = raw.get("level")
             if not isinstance(level, str) or not level.strip():
@@ -88,6 +110,7 @@ def resolve_spec(manifest: Optional[dict], function_name: str) -> Dict[str, Any]
                 "level": level.strip(),
                 "governed": bool(raw.get("governed", False)),
                 "org": raw.get("org") or None,
+                "org_from_arg": raw.get("org_from_arg") or None,
             }
         return fallback
     except Exception as e:
@@ -173,11 +196,19 @@ def gate_extension_call(
 
     confirm = False
     replay_args = args or "{}"
+    org_name = spec["org"]
     try:
         args_obj = json.loads(args) if args else {}
         if isinstance(args_obj, dict):
             confirm = bool(args_obj.pop("confirm", False))
             replay_args = json.dumps(args_obj)
+            if spec["org_from_arg"]:
+                # Governing org named by the call itself (e.g. the affected
+                # department). Missing/unknown orgs fall back to root inside
+                # governing_org() — stricter, never direct.
+                dynamic = args_obj.get(spec["org_from_arg"])
+                if isinstance(dynamic, str) and dynamic.strip():
+                    org_name = dynamic.strip()
     except (json.JSONDecodeError, TypeError):
         pass
 
@@ -188,7 +219,7 @@ def gate_extension_call(
             caller=caller,
             summary="",
             replay_code="",
-            org_name=spec["org"],
+            org_name=org_name,
             confirm=False,
         )
         if verdict is None:
@@ -216,7 +247,7 @@ def gate_extension_call(
         replay_code=build_extension_replay_code(
             extension_name, function_name, replay_args
         ),
-        org_name=spec["org"],
+        org_name=org_name,
         confirm=confirm,
         metadata_extra={
             "governed_extension": extension_name,
