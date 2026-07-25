@@ -42,6 +42,24 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : CasalsConfigView,
     'Err' : InstallerError,
   });
+  const DeployStepView = IDL.Record({
+    'idx' : IDL.Nat32,
+    'status' : IDL.Text,
+    'kind' : IDL.Text,
+    'label' : IDL.Text,
+    'error' : IDL.Text,
+  });
+  const DeployTaskView = IDL.Record({
+    'status' : IDL.Text,
+    'task_id' : IDL.Text,
+    'completed_count' : IDL.Nat32,
+    'steps' : IDL.Vec(DeployStepView),
+    'total_count' : IDL.Nat32,
+  });
+  const ResultDeployTaskStatus = IDL.Variant({
+    'Ok' : DeployTaskView,
+    'Err' : InstallerError,
+  });
   const DeploymentJobView = IDL.Record({
     'status' : IDL.Text,
     'expected_wasm_hash' : IDL.Text,
@@ -49,7 +67,9 @@ export const idlFactory = ({ IDL }) => {
     'backend_canister_id' : IDL.Text,
     'ext_deploy_task_id' : IDL.Text,
     'assets_verified' : IDL.Int8,
+    'expected_step_count' : IDL.Nat32,
     'network' : IDL.Text,
+    'frontend_wasm_verified' : IDL.Int8,
     'created_at' : IDL.Nat64,
     'error' : IDL.Text,
     'wasm_verified' : IDL.Int8,
@@ -167,6 +187,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_casals_config' : IDL.Func([], [ResultCasalsConfig], ['query']),
+    'get_deploy_task_status' : IDL.Func(
+        [IDL.Text],
+        [ResultDeployTaskStatus],
+        ['query'],
+      ),
     'get_deployment_job_status' : IDL.Func(
         [IDL.Text],
         [ResultJobIdStatus],

@@ -1,6 +1,8 @@
 type InsertError = variant { KeyTooLarge : record { given : nat32; max : nat32 }; ValueTooLarge : record { given : nat32; max : nat32 } };
 type InstallerError = record { message : text; traceback : text };
-type DeploymentJobView = record { job_id : text; status : text; realm_name : text; caller_principal : text; network : text; backend_canister_id : text; frontend_canister_id : text; expected_wasm_hash : text; actual_wasm_hash : text; wasm_verified : int8; assets_verified : int8; ext_deploy_task_id : text; registry_canister_id : text; error : text; created_at : nat64; completed_at : nat64 };
+type DeploymentJobView = record { job_id : text; status : text; realm_name : text; caller_principal : text; network : text; backend_canister_id : text; frontend_canister_id : text; expected_wasm_hash : text; actual_wasm_hash : text; wasm_verified : int8; assets_verified : int8; frontend_wasm_verified : int8; ext_deploy_task_id : text; expected_step_count : nat32; registry_canister_id : text; error : text; created_at : nat64; completed_at : nat64 };
+type DeployStepView = record { idx : nat32; kind : text; label : text; status : text; error : text };
+type DeployTaskView = record { task_id : text; status : text; steps : vec DeployStepView; completed_count : nat32; total_count : nat32 };
 type PendingJobEntry = record { job : DeploymentJobView; manifest : text };
 type PendingJobsOk = record { jobs : vec PendingJobEntry; count : nat32 };
 type JobsListOk = record { jobs : vec DeploymentJobView; count : nat32 };
@@ -204,6 +206,7 @@ type ResultPendingJobs = variant { Ok : PendingJobsOk; Err : InstallerError };
 type ResultJobsList = variant { Ok : JobsListOk; Err : InstallerError };
 type ResultEnqueue = variant { Ok : EnqueueOk; Err : InstallerError };
 type ResultJobIdStatus = variant { Ok : DeploymentJobView; Err : InstallerError };
+type ResultDeployTaskStatus = variant { Ok : DeployTaskView; Err : InstallerError };
 type ResultJobManifest = variant { Ok : text; Err : InstallerError };
 type ResultJobCancel = variant { Ok : JobStatusAck; Err : InstallerError };
 type ResultReportFailure = variant { Ok : JobStatusAck; Err : InstallerError };
@@ -284,6 +287,7 @@ service : {
   "take_pre_upgrade_snapshot" : (text) -> (ResultTakeSnapshot);
   "get_pending_deployments" : () -> (ResultPendingJobs) query;
   "get_deployment_job_status" : (text) -> (ResultJobIdStatus) query;
+  "get_deploy_task_status" : (text) -> (ResultDeployTaskStatus) query;
   "get_deployment_manifest" : (text) -> (ResultJobManifest) query;
   "list_deployment_jobs" : (opt nat32, opt nat32) -> (ResultJobsList) query;
   "cancel_deployment" : (text) -> (ResultJobCancel);

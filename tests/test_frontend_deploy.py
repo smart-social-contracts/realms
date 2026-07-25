@@ -251,6 +251,21 @@ class TestInstallerManifestParsing:
         assert "gzip_sha256" not in main_text
         assert "content_encoding" not in main_text
 
+    def test_installer_configures_frontend_before_extension_install(self):
+        main_path = REPO_ROOT / "src" / "realm_installer" / "main.py"
+        main_text = main_path.read_text()
+        assert 'kind="configure_canister_ids"' in main_text
+        assert '"frontend_canister_id": frontend_id' in main_text
+        assert "_install_step_failed" in main_text
+        assert main_text.index("configure_canister_ids") < main_text.index("grant_frontend_access")
+
+    def test_codex_install_fails_when_dependencies_fail(self):
+        fr_path = REPO_ROOT / "src" / "realm_backend" / "api" / "file_registry.py"
+        fr_text = fr_path.read_text()
+        assert "_format_failed_deps" in fr_text
+        assert "if failed_deps:" in fr_text
+        assert "frontend_canister_id: str = None" in fr_text
+
 
 class TestWasmSpecResolution:
     """Verify _wasm_spec_for_member handles all member types."""

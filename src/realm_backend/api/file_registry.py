@@ -340,8 +340,24 @@ def _get_realm_frontend_canister_id() -> str:
     return ""
 
 
+def _format_failed_deps(codex_id: str, failed_deps: list) -> str:
+    parts = []
+    for item in failed_deps[:5]:
+        if isinstance(item, dict):
+            parts.append(
+                f"{item.get('extension', '?')}: {item.get('error', 'unknown')}"
+            )
+        else:
+            parts.append(str(item))
+    summary = "; ".join(parts)
+    if len(failed_deps) > 5:
+        summary += f" (+{len(failed_deps) - 5} more)"
+    return f"Codex '{codex_id}': {len(failed_deps)} dependency install(s) failed: {summary}"
+
+
 def _install_codex_dependencies(
     registry_canister_id: str, codex_id: str, dependencies: Dict[str, str],
+    frontend_canister_id: str = None,
 ) -> Async[tuple]:
     """Install a codex's missing dependency extensions from the registry.
 
@@ -361,11 +377,15 @@ def _install_codex_dependencies(
         f"(missing: {list(missing) or 'none'})"
     )
 
-    frontend_canister_id = _get_realm_frontend_canister_id() or None
+    fe_canister = (
+        (frontend_canister_id or "").strip()
+        or _get_realm_frontend_canister_id()
+        or None
+    )
 
     for dep, pin in missing.items():
         dep_raw = yield from install_extension_from_registry(
-            registry_canister_id, dep, pin or None, frontend_canister_id
+            registry_canister_id, dep, pin or None, fe_canister
         )
         try:
             dep_result = json.loads(dep_raw)
@@ -483,6 +503,8 @@ def install_extension_from_registry(
         manifest = {}
     is_codex = manifest.get("kind") == "codex"
 
+    fe_canister = (frontend_canister_id or _get_realm_frontend_canister_id() or "").strip()
+
     installed_deps = []
     failed_deps = []
     if is_codex:
@@ -526,12 +548,17 @@ def install_extension_from_registry(
         #    half-working codex).
         dependencies = _resolve_codex_dependencies(manifest, ext_id)
         installed_deps, failed_deps = yield from _install_codex_dependencies(
-            registry_canister_id, ext_id, dependencies
+            registry_canister_id, ext_id, dependencies, fe_canister or None
         )
+        if failed_deps:
+            return json.dumps({
+                "success": False,
+                "error": _format_failed_deps(ext_id, failed_deps),
+                "dependency_warnings": failed_deps,
+            })
 
     # Copy frontend bundles before installing backend so we never mark an
     # extension installed without its same-origin UI assets.
-    fe_canister = (frontend_canister_id or _get_realm_frontend_canister_id() or "").strip()
     frontend_files, _fe_version, fe_pull_err = yield from _pull_extension_frontend_files(
         registry, ext_id, resolved_version
     )
@@ -606,7 +633,8 @@ def install_extension_from_registry(
 
 
 def install_codex_from_registry(
-    registry_canister_id: str, codex_id: str, version: str = None, run_init: bool = True
+    registry_canister_id: str, codex_id: str, version: str = None, run_init: bool = True,
+    frontend_canister_id: str = None,
 ) -> Async[str]:
     """Install a codex, preferring the unified extension pipeline (issue #244).
 
@@ -623,6 +651,8 @@ def install_codex_from_registry(
         version: Specific version or None for latest
         run_init: Whether to run init after install (legacy path only —
             the unified path always runs the init hook)
+        frontend_canister_id: Frontend asset canister for same-origin UI bundles
+            (overrides the realm's configured frontend_canister_id)
 
     Returns (via yield):
         JSON string with result
@@ -632,7 +662,11 @@ def install_codex_from_registry(
         f"from registry {registry_canister_id} — trying unified ext/ namespace first"
     )
 
-    frontend_id = _get_realm_frontend_canister_id() or None
+    frontend_id = (
+        (frontend_canister_id or "").strip()
+        or _get_realm_frontend_canister_id()
+        or None
+    )
     unified_raw = yield from install_extension_from_registry(
         registry_canister_id, codex_id, version, frontend_canister_id=frontend_id
     )
@@ -691,8 +725,14 @@ def install_codex_from_registry(
 
     dependencies = _resolve_codex_dependencies(codex_manifest, codex_id)
     installed_deps, failed_deps = yield from _install_codex_dependencies(
-        registry_canister_id, codex_id, dependencies
+        registry_canister_id, codex_id, dependencies, frontend_id
     )
+    if failed_deps:
+        return json.dumps({
+            "success": False,
+            "error": _format_failed_deps(codex_id, failed_deps),
+            "dependency_warnings": failed_deps,
+        })
 
     # Install via runtime_codex
     from core.runtime_codex import (

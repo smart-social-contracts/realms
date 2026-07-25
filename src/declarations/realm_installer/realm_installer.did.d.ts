@@ -273,6 +273,20 @@ export interface DeleteCanisterSnapshotArgs {
   'canister_id' : Principal,
   'snapshot_id' : Uint8Array | number[],
 }
+export interface DeployStepView {
+  'idx' : number,
+  'status' : string,
+  'kind' : string,
+  'label' : string,
+  'error' : string,
+}
+export interface DeployTaskView {
+  'status' : string,
+  'task_id' : string,
+  'completed_count' : number,
+  'steps' : Array<DeployStepView>,
+  'total_count' : number,
+}
 export interface DeploymentJobView {
   'status' : string,
   'expected_wasm_hash' : string,
@@ -280,7 +294,9 @@ export interface DeploymentJobView {
   'backend_canister_id' : string,
   'ext_deploy_task_id' : string,
   'assets_verified' : number,
+  'expected_step_count' : number,
   'network' : string,
+  'frontend_wasm_verified' : number,
   'created_at' : bigint,
   'error' : string,
   'wasm_verified' : number,
@@ -922,6 +938,8 @@ export interface ReportReadyOk {
 }
 export type ResultCasalsConfig = { 'Ok' : CasalsConfigView } |
   { 'Err' : InstallerError };
+export type ResultDeployTaskStatus = { 'Ok' : DeployTaskView } |
+  { 'Err' : InstallerError };
 export type ResultEnqueue = { 'Ok' : EnqueueOk } |
   { 'Err' : InstallerError };
 export type ResultJobCancel = { 'Ok' : JobStatusAck } |
@@ -1178,6 +1196,7 @@ export interface _SERVICE {
     Array<PublicLogEntry>
   >,
   'get_casals_config' : ActorMethod<[], ResultCasalsConfig>,
+  'get_deploy_task_status' : ActorMethod<[string], ResultDeployTaskStatus>,
   'get_deployment_job_status' : ActorMethod<[string], ResultJobIdStatus>,
   'get_deployment_manifest' : ActorMethod<[string], ResultJobManifest>,
   'get_pending_deployments' : ActorMethod<[], ResultPendingJobs>,

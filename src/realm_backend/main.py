@@ -6731,7 +6731,8 @@ def install_codex_from_registry(args: text) -> Async[text]:
         "registry_canister_id": str,
         "codex_id": str,           (e.g. "syntropia")
         "version": str|null,       (null = latest)
-        "run_init": bool           (optional, default true; legacy path only)
+        "run_init": bool,          (optional, default true; legacy path only)
+        "frontend_canister_id": str|null  (overrides Realm entity value)
     }
     """
     try:
@@ -6740,6 +6741,7 @@ def install_codex_from_registry(args: text) -> Async[text]:
         codex_id = params.get("codex_id")
         version = params.get("version")
         run_init = params.get("run_init", True)
+        frontend_id = params.get("frontend_canister_id") or _get_frontend_canister_id()
 
         if not registry_id:
             return json.dumps({"success": False, "error": "registry_canister_id is required"})
@@ -6748,7 +6750,9 @@ def install_codex_from_registry(args: text) -> Async[text]:
 
         from api.file_registry import install_codex_from_registry as _install
 
-        result = yield from _install(registry_id, codex_id, version, run_init)
+        result = yield from _install(
+            registry_id, codex_id, version, run_init, frontend_canister_id=frontend_id or None
+        )
         return result
     except Exception as e:
         logger.error(f"install_codex_from_registry error: {e}\n{traceback.format_exc()}")

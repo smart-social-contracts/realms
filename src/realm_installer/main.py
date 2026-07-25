@@ -124,6 +124,7 @@ class DeploymentJob(Entity, TimestampedMixin):
     assets_verified = Integer(default=0)
     frontend_wasm_verified = Integer(default=0)
     ext_deploy_task_id = String(max_length=64)
+    expected_step_count = Integer(default=0)
     registry_canister_id = String(max_length=64)
     offchain_deployer_principal = String(max_length=64)
     settlement_notified = Integer(default=0)
@@ -195,11 +196,31 @@ class DeploymentJobView(Record, _CA):
     actual_wasm_hash: text
     wasm_verified: int8
     assets_verified: int8
+    frontend_wasm_verified: int8
     ext_deploy_task_id: text
+    expected_step_count: nat32
     registry_canister_id: text
     error: text
     created_at: nat64
     completed_at: nat64
+
+class DeployStepView(Record, _CA):
+    idx: nat32
+    kind: text
+    label: text
+    status: text
+    error: text
+
+class DeployTaskView(Record, _CA):
+    task_id: text
+    status: text
+    steps: Vec[DeployStepView]
+    completed_count: nat32
+    total_count: nat32
+
+class ResultDeployTaskStatus(Variant, total=False):
+    Ok: DeployTaskView
+    Err: InstallerError
 
 class PendingJobEntry(Record, _CA):
     job: DeploymentJobView
@@ -800,6 +821,50 @@ _RETRY_BASE_S = 10
 _retry_counts: dict = {}
 
 
+def _format_dependency_warnings(warnings: list) -> str:
+    parts = []
+    for item in (warnings or [])[:5]:
+        if isinstance(item, dict):
+            parts.append(f"{item.get('extension', '?')}: {item.get('error', 'unknown')}")
+        else:
+            parts.append(str(item))
+    summary = "; ".join(parts)
+    if len(warnings or []) > 5:
+        summary += f" (+{len(warnings) - 5} more)"
+    return summary
+
+
+def _install_step_failed(parsed) -> tuple:
+    """Return (failed: bool, error: str) for an extension/codex install result."""
+    if not isinstance(parsed, dict):
+        return False, ""
+    if parsed.get("success") is False:
+        return True, (parsed.get("error") or "install failed")
+    warnings = parsed.get("dependency_warnings") or []
+    if warnings:
+        return True, f"dependency install failed: {_format_dependency_warnings(warnings)}"
+    return False, ""
+
+
+def _count_expected_steps(manifest: dict, backend_id: str = "", frontend_id: str = "") -> int:
+    """Mirror ``_build_steps`` counts for progress UI before the task exists."""
+    count = 0
+    deploy_scope = (manifest.get("deploy_scope") or "both").strip()
+    has_pair = bool((backend_id or "").strip() and (frontend_id or "").strip())
+    if has_pair or deploy_scope == "both":
+        count += 1
+    realm_info = manifest.get("realm") or {}
+    for ext in (realm_info.get("extensions") or []):
+        if isinstance(ext, str) and ext.strip():
+            count += 1
+        elif isinstance(ext, dict) and (ext.get("id") or "").strip():
+            count += 1
+    codex = realm_info.get("codex")
+    if codex and isinstance(codex, dict) and codex.get("package"):
+        count += 1
+    return count
+
+
 def _build_steps(task, manifest: dict) -> list:
     steps = []
     idx = 0
@@ -807,6 +872,18 @@ def _build_steps(task, manifest: dict) -> list:
     frontend_id = manifest.get("frontend_canister_id", "")
     backend_id = manifest.get("target_canister_id", "")
     if frontend_id and backend_id:
+        _log.info(f"[{task.name}] step {idx}: configure_canister_ids frontend={frontend_id}")
+        steps.append(DeployStep(
+            task=task, idx=idx, kind="configure_canister_ids", label="configure_canister_ids",
+            args_json=json.dumps({
+                "backend_canister_id": backend_id,
+                "frontend_canister_id": frontend_id,
+                "file_registry_canister_id": manifest.get("registry_canister_id", ""),
+                "network": manifest.get("network", ""),
+            }),
+            status="pending",
+        ))
+        idx += 1
         _log.info(f"[{task.name}] step {idx}: grant_frontend_access backend={backend_id} frontend={frontend_id}")
         steps.append(DeployStep(
             task=task, idx=idx, kind="grant_frontend_access", label="grant_frontend_access",
@@ -841,7 +918,8 @@ def _build_steps(task, manifest: dict) -> list:
             task=task, idx=idx, kind="codex", label=cdx_id,
             args_json=json.dumps({"registry_canister_id": task.registry_canister_id,
                                    "codex_id": cdx_id, "version": cdx.get("version"),
-                                   "run_init": bool(cdx.get("run_init", True))}),
+                                   "run_init": bool(cdx.get("run_init", True)),
+                                   "frontend_canister_id": frontend_id}),
             status="pending",
         ))
         idx += 1
@@ -861,6 +939,10 @@ def _execute_step(task, step):
     try:
         args = json.loads(step.args_json or "{}")
         jlog(task.name).info(f"step {step.idx} args: {step.args_json[:200]}")
+
+        if step.kind == "configure_canister_ids":
+            yield from _execute_configure_canister_ids(task, step, args)
+            return
 
         if step.kind == "grant_frontend_access":
             yield from _execute_grant_frontend_access(task, step, args)
@@ -885,8 +967,9 @@ def _execute_step(task, step):
             parsed = json.loads(raw) if isinstance(raw, str) else raw
         except Exception:
             parsed = None
-        if isinstance(parsed, dict) and parsed.get("success") is False:
-            step.error = (parsed.get("error") or "install failed")[:1990]
+        failed, err = _install_step_failed(parsed)
+        if failed:
+            step.error = err[:1990]
             step.status = "failed"
             jlog(task.name).error(f"step {step.idx} ({step.label}) failed: {step.error[:200]}")
         else:
@@ -896,6 +979,58 @@ def _execute_step(task, step):
         step.error = f"{type(e).__name__}: {e}"[:1990]
         step.status = "failed"
         jlog(task.name).error(f"step {step.idx} ({step.label}) exception: {step.error[:300]}")
+    step.completed_at = now_s()
+
+
+def _execute_configure_canister_ids(task, step, args):
+    """Persist frontend (and infra) canister IDs on the realm backend before installs."""
+    backend_id = args.get("backend_canister_id", "")
+    frontend_id = args.get("frontend_canister_id", "")
+    if not backend_id or not frontend_id:
+        step.error = "missing backend_canister_id or frontend_canister_id"
+        step.status = "failed"
+        step.completed_at = now_s()
+        return
+
+    payload = {"frontend_canister_id": frontend_id}
+    registry_id = (args.get("file_registry_canister_id") or "").strip()
+    if registry_id:
+        payload["file_registry_canister_id"] = registry_id
+    network = (args.get("network") or "").strip()
+    if network:
+        payload["network"] = network
+
+    jlog(task.name).info(
+        f"setting canister config on backend {backend_id}: frontend={frontend_id}"
+    )
+    config_json = json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"')
+    config_arg = '("' + config_json + '")'
+    config_result: CallResult = yield ic.call_raw(
+        Principal.from_str(backend_id), "set_canister_config_json",
+        ic.candid_encode(config_arg), 0,
+    )
+    if isinstance(config_result, dict) and "Err" in config_result:
+        step.error = f"set_canister_config_json failed: {config_result['Err']}"[:1990]
+        step.status = "failed"
+        jlog(task.name).error(f"step {step.idx} configure_canister_ids failed: {step.error}")
+        step.completed_at = now_s()
+        return
+
+    try:
+        raw = unwrap_call_result(config_result)
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        parsed = None
+    if isinstance(parsed, dict) and parsed.get("success") is False:
+        step.error = (parsed.get("error") or "set_canister_config_json failed")[:1990]
+        step.status = "failed"
+        jlog(task.name).error(f"step {step.idx} configure_canister_ids failed: {step.error}")
+        step.completed_at = now_s()
+        return
+
+    step.status = "completed"
+    step.result_json = json.dumps({"frontend_canister_id": frontend_id})[:1990]
+    jlog(task.name).info(f"step {step.idx} frontend canister id configured on backend")
     step.completed_at = now_s()
 
 
@@ -1217,6 +1352,7 @@ def _start_extensions_for_job(job, manifest: dict):
         "target_canister_id": job.backend_canister_id,
         "frontend_canister_id": job.frontend_canister_id or "",
         "registry_canister_id": registry_id,
+        "network": network,
     }
     ext_list = []
     for ext in raw_exts:
@@ -1258,6 +1394,7 @@ def _start_extensions_for_job(job, manifest: dict):
         steps = list(task.steps)
         jlog(job.name).info(f"built {len(steps)} steps for task {task_id}")
         job.ext_deploy_task_id = task_id
+        job.expected_step_count = len(steps)
         _schedule_step_runner(task_id, 0)
         jlog(job.name).info(f"extension task {task_id} scheduled")
     except Exception as e:
@@ -1306,6 +1443,7 @@ def _serialize_job(job: DeploymentJob) -> dict:
         "assets_verified": int(job.assets_verified or 0),
         "frontend_wasm_verified": int(job.frontend_wasm_verified or 0),
         "ext_deploy_task_id": job.ext_deploy_task_id or "",
+        "expected_step_count": int(job.expected_step_count or 0),
         "registry_canister_id": job.registry_canister_id or "",
         "error": job.error or "",
         "created_at": int(job.created_at or 0),
@@ -1315,9 +1453,51 @@ def _serialize_job(job: DeploymentJob) -> dict:
 
 def _job_to_view(job: DeploymentJob) -> DeploymentJobView:
     s = _serialize_job(job)
-    return DeploymentJobView(**{k: (nat64(v) if k.endswith("_at") else
-                                    int8(v) if k.endswith("_verified") else
-                                    str(v)) for k, v in s.items()})
+    return DeploymentJobView(
+        job_id=s["job_id"],
+        status=s["status"],
+        realm_name=s["realm_name"],
+        caller_principal=s["caller_principal"],
+        network=s["network"],
+        backend_canister_id=s["backend_canister_id"],
+        frontend_canister_id=s["frontend_canister_id"],
+        expected_wasm_hash=s["expected_wasm_hash"],
+        actual_wasm_hash=s["actual_wasm_hash"],
+        wasm_verified=int8(s["wasm_verified"]),
+        assets_verified=int8(s["assets_verified"]),
+        frontend_wasm_verified=int8(s["frontend_wasm_verified"]),
+        ext_deploy_task_id=s["ext_deploy_task_id"],
+        expected_step_count=nat32(s["expected_step_count"]),
+        registry_canister_id=s["registry_canister_id"],
+        error=s["error"],
+        created_at=nat64(s["created_at"]),
+        completed_at=nat64(s["completed_at"]),
+    )
+
+
+def _serialize_deploy_task(task: DeployTask) -> DeployTaskView:
+    steps = sorted(task.steps, key=lambda s: int(s.idx or 0))
+    step_views = []
+    completed = 0
+    for step in steps:
+        st = step.status or "pending"
+        if st == "completed":
+            completed += 1
+        step_views.append(DeployStepView(
+            idx=nat32(int(step.idx or 0)),
+            kind=str(step.kind or ""),
+            label=str(step.label or ""),
+            status=st,
+            error=str(step.error or "")[:500],
+        ))
+    total = len(step_views)
+    return DeployTaskView(
+        task_id=str(task.name or ""),
+        status=str(task.status or "queued"),
+        steps=step_views,
+        completed_count=nat32(completed),
+        total_count=nat32(total),
+    )
 
 
 def _upsert_job_ref(job: DeploymentJob) -> None:
@@ -1450,6 +1630,12 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         expected_hashes = manifest.get("expected_hashes", {})
         casals_manifest = bool(manifest.get("casals"))
         initial_status = "provisioning" if casals_manifest else "pending"
+        canister_ids = manifest.get("canister_ids") or {}
+        expected_steps = _count_expected_steps(
+            manifest,
+            canister_ids.get("backend", ""),
+            canister_ids.get("frontend", ""),
+        )
         DeploymentJob(
             name=job_id, status=initial_status, realm_name=realm_name[:128],
             caller_principal=requester,
@@ -1459,6 +1645,7 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
             registry_canister_id=registry_id,
             expected_wasm_hash=expected_hashes.get("backend_wasm", ""),
             expected_frontend_wasm_hash=expected_hashes.get("frontend_wasm", ""),
+            expected_step_count=expected_steps,
             created_at=now_s(),
         )
         _upsert_job_ref(DeploymentJob[job_id])
@@ -1552,6 +1739,39 @@ def get_deployment_job_status(job_id: text) -> ResultJobIdStatus:
         return ResultJobIdStatus(Ok=_job_to_view(job))
     except Exception as e:
         return ResultJobIdStatus(Err=ie(str(e)))
+
+@query
+def get_deploy_task_status(job_id: text) -> ResultDeployTaskStatus:
+    """Return extension/codex install steps for a deployment job (if started)."""
+    try:
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return ResultDeployTaskStatus(Err=ie(f"unknown job_id: {job_id}"))
+        task_id = (job.ext_deploy_task_id or "").strip()
+        expected = int(job.expected_step_count or 0)
+        if not task_id:
+            return ResultDeployTaskStatus(Ok=DeployTaskView(
+                task_id="",
+                status="none",
+                steps=[],
+                completed_count=nat32(0),
+                total_count=nat32(expected),
+            ))
+        list(DeployTask.instances())
+        list(DeployStep.instances())
+        task = DeployTask[task_id]
+        if task is None:
+            return ResultDeployTaskStatus(Ok=DeployTaskView(
+                task_id=task_id,
+                status="missing",
+                steps=[],
+                completed_count=nat32(0),
+                total_count=nat32(expected),
+            ))
+        return ResultDeployTaskStatus(Ok=_serialize_deploy_task(task))
+    except Exception as e:
+        return ResultDeployTaskStatus(Err=ie(str(e)))
 
 @query
 def get_deployment_manifest(job_id: text) -> ResultJobManifest:
