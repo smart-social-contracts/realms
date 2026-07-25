@@ -209,6 +209,27 @@ def install_extensions_from_source(extensions_path: str, env: dict) -> None:
 
 # ── Registry Resolution ──────────────────────────────────────────────────────
 
+def _parse_registry_realm_records(output: str) -> list[dict]:
+    """Parse list_realms Candid text into backend/frontend pairs.
+
+    Avoid matching ``frontend_canister_id = "…"`` as a realm ``id`` field
+    (the ``_id = "`` suffix would false-positive on ``canister_id = "``).
+    """
+    records = []
+    for block in re.findall(r"record\s*\{([^}]+)\}", output):
+        backend = re.search(r'^\s*id\s*=\s*"([^"]+)"', block.strip())
+        frontend = re.search(r'frontend_canister_id\s*=\s*"([^"]*)"', block)
+        if not backend:
+            continue
+        records.append(
+            {
+                "realm_backend": backend.group(1),
+                "realm_frontend": frontend.group(1) if frontend else "",
+            }
+        )
+    return records
+
+
 def resolve_canister_ids_from_registry(
     id_in_registry, network: str, registry_canister_id: str = None
 ) -> dict:
@@ -243,36 +264,37 @@ def resolve_canister_ids_from_registry(
             return {}
 
         output = result.stdout.strip()
+        records = _parse_registry_realm_records(output)
 
         # Parse realm records from Candid output
-        # Each record has: id (= backend canister ID), frontend_canister_id, etc.
         canister_ids = {}
 
         if isinstance(id_in_registry, int):
-            # Extract the Nth realm's canister IDs from the registry output
-            # Look for record patterns with id field
-            id_matches = re.findall(r'id\s*=\s*"([^"]+)"', output)
-            frontend_matches = re.findall(r'frontend_canister_id\s*=\s*"([^"]*)"', output)
-            token_matches = re.findall(r'token_canister_id\s*=\s*"([^"]*)"', output)
-            nft_matches = re.findall(r'nft_canister_id\s*=\s*"([^"]*)"', output)
-
             idx = id_in_registry - 1  # Convert to 0-based
-            if idx < len(id_matches):
-                canister_ids["realm_backend"] = id_matches[idx]
-                if idx < len(frontend_matches) and frontend_matches[idx]:
-                    canister_ids["realm_frontend"] = frontend_matches[idx]
-                if idx < len(token_matches) and token_matches[idx]:
-                    canister_ids["token_backend"] = token_matches[idx]
-                if idx < len(nft_matches) and nft_matches[idx]:
-                    canister_ids["nft_backend"] = nft_matches[idx]
-                print(f"   ✅ Resolved realm #{id_in_registry}: backend={canister_ids.get('realm_backend', 'N/A')}")
+            if 0 <= idx < len(records):
+                canister_ids.update(records[idx])
+                print(
+                    f"   ✅ Resolved realm #{id_in_registry}: "
+                    f"backend={canister_ids.get('realm_backend', 'N/A')}"
+                )
             else:
-                print(f"   ⚠️  Registry has {len(id_matches)} realms, index {id_in_registry} out of range")
+                print(
+                    f"   ⚠️  Registry has {len(records)} realms, "
+                    f"index {id_in_registry} out of range"
+                )
 
         elif isinstance(id_in_registry, str):
-            # Use the string directly as the backend canister ID
             canister_ids["realm_backend"] = id_in_registry
-            print(f"   ✅ Using canister ID directly: {id_in_registry}")
+            for record in records:
+                if record.get("realm_backend") != id_in_registry:
+                    continue
+                if record.get("realm_frontend"):
+                    canister_ids["realm_frontend"] = record["realm_frontend"]
+                break
+            print(
+                f"   ✅ Resolved backend={id_in_registry}"
+                f", frontend={canister_ids.get('realm_frontend', 'N/A')}"
+            )
 
         return canister_ids
 

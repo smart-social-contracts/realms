@@ -17,6 +17,7 @@
 
 import { Ed25519KeyIdentity, Secp256k1KeyIdentity } from '@dfinity/identity';
 
+export const TEST_IDENTITY_SESSION_KEY = 'test_identity_index';
 export const TEST_IDENTITY_MAGIC = [0xed, 0x57];
 /** Indices 0–1 shown as fixed cards in the join-page picker (Identity 1–2). */
 export const TEST_IDENTITY_FIXED_PICKER_MAX_INDEX = 1;
@@ -161,4 +162,68 @@ export function listTestIdentities(maxIndex = TEST_IDENTITY_FIXED_PICKER_MAX_IND
     items.push(getTestIdentityPersona(index));
   }
   return items;
+}
+
+export function getStoredTestIdentityIndex() {
+  if (typeof sessionStorage === 'undefined') return 0;
+  const raw = sessionStorage.getItem(TEST_IDENTITY_SESSION_KEY);
+  if (raw == null) return 0;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return normalizeTestIdentityIndex(parsed);
+}
+
+export function setStoredTestIdentityIndex(index) {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(TEST_IDENTITY_SESSION_KEY, String(normalizeTestIdentityIndex(index)));
+}
+
+export function clearStoredTestIdentityIndex() {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.removeItem(TEST_IDENTITY_SESSION_KEY);
+}
+
+/**
+ * Parse `?ti=` as a 1-based identity number (Identity 1 → ti=1, Identity 2 → ti=2).
+ * @param {string | null | undefined} raw
+ * @returns {number | null}
+ */
+export function parseTestIdentityNumberParam(raw) {
+  if (raw == null || raw === '') return null;
+  const parsed = Math.floor(Number(raw));
+  if (!Number.isFinite(parsed) || parsed < 1) return null;
+  const maxNumber = testIdentityNumber(TEST_IDENTITY_MAX_INDEX);
+  if (parsed > maxNumber) return null;
+  return parsed;
+}
+
+/** @returns {number | null} internal 0-based index when valid `?ti=` is present */
+export function readTestIdentityIndexFromUrl() {
+  if (typeof window === 'undefined') return null;
+  const number = parseTestIdentityNumberParam(
+    new URLSearchParams(window.location.search).get('ti'),
+  );
+  if (number == null) return null;
+  return identityNumberToIndex(number);
+}
+
+export function clearTestIdentityIndexFromUrl() {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('ti')) return;
+  url.searchParams.delete('ti');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+/**
+ * When `?ti=` is present: persist the index and strip the param from the URL.
+ * `ti` is a 1-based identity number (same as the join-page picker labels).
+ * @returns {number | null} the applied 0-based index, or null when `?ti=` was absent/invalid
+ */
+export function applyTestIdentityIndexFromUrl() {
+  const fromUrl = readTestIdentityIndexFromUrl();
+  if (fromUrl == null) return null;
+  setStoredTestIdentityIndex(fromUrl);
+  clearTestIdentityIndexFromUrl();
+  return fromUrl;
 }

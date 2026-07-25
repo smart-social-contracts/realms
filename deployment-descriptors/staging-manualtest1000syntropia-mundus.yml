@@ -1,0 +1,24 @@
+version: 2
+network: staging
+
+infra:
+  file_registry_canister_id: iebdk-kqaaa-aaaau-agoxq-cai
+  ii_derivation_origin: https://staging.realmsgos.org
+  test_identities_config: config/staging-test-identities.json
+
+mundus:
+  - name: manualtest1000syntropia
+    type: realm
+    display_name: manualtest1000syntropia
+    canister_id: epc7x-syaaa-aaaac-bfq3q-cai
+    frontend_canister_id: fcm3z-5qaaa-aaaac-bfq4a-cai
+    manifest: examples/demo/realm3/manifest.json
+
+parameters:
+  TEST_MODE: true
+  TEST_MODE_II_BYPASS: true
+  TEST_MODE_USER_SELF_REGISTRATION: true
+  TEST_MODE_DEMO_DATA: false
+  TEST_MODE_SKIP_TERMS: true
+  TEST_MODE_SKIP_PASSPORT_ZKPROOF: true
+  TEST_MODE_SKIP_AUTHENTICATION: true

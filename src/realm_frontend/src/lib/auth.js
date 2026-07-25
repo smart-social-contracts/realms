@@ -96,10 +96,12 @@ async function _createTestIdentity({ random = false, identityIndex = null } = {}
   const { createTestIdentityFromIndex } = await import('$lib/test-identities.js');
   // createTestIdentityFromIndex is sync; dynamic import keeps the initial bundle small.
   if (identityIndex != null && Number.isFinite(identityIndex)) {
-    const { normalizeTestIdentityIndex, testIdentityLabel } = await import('$lib/test-identities.js');
+    const { normalizeTestIdentityIndex, setStoredTestIdentityIndex, testIdentityLabel } =
+      await import('$lib/test-identities.js');
     const idx = normalizeTestIdentityIndex(identityIndex);
     _testIdentity = createTestIdentityFromIndex(idx);
     _testIdentityIndex = idx;
+    setStoredTestIdentityIndex(idx);
     console.log(
       `[TEST MODE] ${testIdentityLabel(idx)}: ${_testIdentity.getPrincipal().toText()}`,
     );
@@ -188,6 +190,12 @@ export async function login({ random = false, identityIndex = null } = {}) {
     } else {
       if (asParam) {
         console.warn(`[TEST MODE] ?as=${asParam} present but ?pem= missing — using test identity index`);
+      }
+      if (identityIndex == null && !random) {
+        const { applyTestIdentityIndexFromUrl, getStoredTestIdentityIndex } = await import(
+          '$lib/test-identities.js',
+        );
+        identityIndex = applyTestIdentityIndexFromUrl() ?? getStoredTestIdentityIndex();
       }
       identity = await _createTestIdentity({
         random,

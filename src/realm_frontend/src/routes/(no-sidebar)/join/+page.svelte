@@ -22,6 +22,7 @@
     isValidCustomIdentityNumber,
     testIdentityLabel,
     testIdentityNumber,
+    applyTestIdentityIndexFromUrl,
     TEST_IDENTITY_FIXED_PICKER_MAX_INDEX,
     TEST_IDENTITY_MAX_INDEX,
   } from '$lib/test-identities.js';
@@ -281,8 +282,19 @@
         currentStep = 'auth';
       }
 
+      /** When `?ti=` is on the URL, sign in immediately without showing the picker. */
+      let autoLoginIdentityIndex = null;
+      if ($testModeIIBypass) {
+        autoLoginIdentityIndex = applyTestIdentityIndexFromUrl();
+        if (autoLoginIdentityIndex != null) {
+          selectedTestIdentityIndex = autoLoginIdentityIndex;
+        }
+      }
+
       if ($isAuthenticated) {
         await advanceStepAfterAuth();
+      } else if (autoLoginIdentityIndex != null) {
+        await handleLogin({ identityIndex: autoLoginIdentityIndex });
       }
 
       targetsResolved = true;

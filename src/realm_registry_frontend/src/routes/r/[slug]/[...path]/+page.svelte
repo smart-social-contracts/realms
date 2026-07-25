@@ -110,9 +110,14 @@
 
   $: iframePath = subPath === '/' ? rootIframePath : subPath;
 
+  $: iframeQuery = (() => {
+    const ti = $page.url.searchParams.get('ti');
+    return ti != null && ti !== '' ? { ti } : {};
+  })();
+
   $: iframeSrc =
     realm && browser
-      ? realmIframeUrl(realm.frontendCanisterId, realm.slug, iframePath)
+      ? realmIframeUrl(realm.frontendCanisterId, realm.slug, iframePath, iframeQuery)
       : '';
 </script>
 

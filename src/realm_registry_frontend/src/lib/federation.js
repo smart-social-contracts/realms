@@ -31,13 +31,17 @@ export function realmFrontendOrigin(
 	return `https://${id}.icp0.io`;
 }
 
-export function realmIframeUrl(frontendCanisterId, slug, subPath = '') {
+export function realmIframeUrl(frontendCanisterId, slug, subPath = '', forwardedQuery = {}) {
 	const base = realmFrontendOrigin(frontendCanisterId, CONFIG.deploy_queue_network, {
 		portalIframe: true,
 	});
 	if (!base) return '';
 	const path = subPath.startsWith('/') ? subPath : subPath ? `/${subPath}` : '';
 	const q = new URLSearchParams({ portal: '1', slug: slug || '' });
+	for (const [key, value] of Object.entries(forwardedQuery)) {
+		if (value == null || value === '') continue;
+		q.set(key, String(value));
+	}
 	return `${base}${path}?${q.toString()}`;
 }
 

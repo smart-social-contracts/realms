@@ -167,3 +167,35 @@ export function listTestIdentities(maxIndex = TEST_IDENTITY_FIXED_PICKER_MAX_IND
   }
   return items;
 }
+
+/**
+ * Parse `?ti=` as a 1-based identity number (Identity 1 → ti=1, Identity 2 → ti=2).
+ * @param {string | null | undefined} raw
+ * @returns {number | null}
+ */
+export function parseTestIdentityNumberParam(raw) {
+  if (raw == null || raw === '') return null;
+  const parsed = Math.floor(Number(raw));
+  if (!Number.isFinite(parsed) || parsed < 1) return null;
+  const maxNumber = testIdentityNumber(TEST_IDENTITY_MAX_INDEX);
+  if (parsed > maxNumber) return null;
+  return parsed;
+}
+
+/** @returns {number | null} internal 0-based index when valid `?ti=` is present */
+export function readTestIdentityIndexFromUrl() {
+  if (typeof window === 'undefined') return null;
+  const number = parseTestIdentityNumberParam(
+    new URLSearchParams(window.location.search).get('ti'),
+  );
+  if (number == null) return null;
+  return identityNumberToIndex(number);
+}
+
+export function clearTestIdentityIndexFromUrl() {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('ti')) return;
+  url.searchParams.delete('ti');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}

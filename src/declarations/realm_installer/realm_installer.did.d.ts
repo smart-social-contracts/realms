@@ -1,6 +1,6 @@
-import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 
 export interface Account {
   'owner' : Principal,
@@ -133,7 +133,7 @@ export type Callback = ActorMethod<
 >;
 export interface CallbackStrategy {
   'token' : StreamingToken,
-  'callback' : Callback,
+  'callback' : [Principal, string],
 }
 export interface CanisterInfo {
   'canister_id' : string,
@@ -518,7 +518,7 @@ export interface HttpResponseIncoming {
   'status_code' : number,
 }
 export interface HttpTransform {
-  'function' : HttpTransformFunc,
+  'function' : [Principal, string],
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -824,7 +824,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : QueryArchiveFn,
+  'callback' : [Principal, string],
   'start' : bigint,
   'length' : bigint,
 }

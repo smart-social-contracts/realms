@@ -1,6 +1,6 @@
-import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 
 export interface Account {
   'owner' : Principal,
@@ -133,7 +133,7 @@ export type Callback = ActorMethod<
 >;
 export interface CallbackStrategy {
   'token' : StreamingToken,
-  'callback' : Callback,
+  'callback' : [Principal, string],
 }
 export interface CanisterInfo {
   'canister_id' : string,
@@ -409,11 +409,13 @@ export type ExtensionResult = { 'Ok' : ExtensionListing } |
   { 'Err' : string };
 export interface ExtensionsListRecord { 'extensions' : Array<string> }
 export interface FileRegistryService {
-  'get_backend_files_icc' : ActorMethod<[string, string, string], string>,
   'get_extension_manifest' : ActorMethod<[string], string>,
   'get_file_chunk_icc' : ActorMethod<[string, string, string, string], string>,
   'get_file_size_icc' : ActorMethod<[string, string], string>,
-  'get_frontend_files_icc' : ActorMethod<[string, string], string>,
+  'latest_version' : ActorMethod<[string], string>,
+  'list_codices' : ActorMethod<[], string>,
+  'list_extensions' : ActorMethod<[], string>,
+  'list_files_icc' : ActorMethod<[string], string>,
 }
 export interface ForceTransferArg {
   'to' : NftAccount,
@@ -518,7 +520,7 @@ export interface HttpResponseIncoming {
   'status_code' : number,
 }
 export interface HttpTransform {
-  'function' : HttpTransformFunc,
+  'function' : [Principal, string],
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -536,6 +538,11 @@ export interface ICRCLedger {
   'icrc1_balance_of' : ActorMethod<[Account], bigint>,
   'icrc1_fee' : ActorMethod<[], bigint>,
   'icrc1_transfer' : ActorMethod<[TransferArg], TransferResult>,
+}
+export interface Icrc1MetadataService {
+  'icrc1_decimals' : ActorMethod<[], number>,
+  'icrc1_name' : ActorMethod<[], string>,
+  'icrc1_symbol' : ActorMethod<[], string>,
 }
 export type InsertError = {
     'ValueTooLarge' : { 'max' : number, 'given' : number }
@@ -814,7 +821,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : QueryArchiveFn,
+  'callback' : [Principal, string],
   'start' : BlockIndex,
   'length' : bigint,
 }

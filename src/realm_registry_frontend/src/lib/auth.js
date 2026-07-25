@@ -6,6 +6,7 @@ import {
   createTestIdentityFromIndex,
   getStoredTestIdentityIndex,
   normalizeTestIdentityIndex,
+  readTestIdentityIndexFromUrl,
   setStoredTestIdentityIndex,
   testIdentityLabel,
   testIdentityPrincipal,
@@ -33,10 +34,7 @@ function _normalizeIdentityIndex(index) {
 }
 
 function _readIdentityIndexFromUrl() {
-  if (typeof window === 'undefined') return null;
-  const raw = new URLSearchParams(window.location.search).get('ti');
-  if (raw == null || raw === '') return null;
-  return _normalizeIdentityIndex(raw);
+  return readTestIdentityIndexFromUrl();
 }
 
 function _clearIdentityIndexFromUrl() {
