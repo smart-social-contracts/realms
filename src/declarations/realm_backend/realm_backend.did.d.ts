@@ -273,6 +273,9 @@ export interface DeleteCanisterSnapshotArgs {
   'canister_id' : Principal,
   'snapshot_id' : Uint8Array | number[],
 }
+export interface DemoRegistrationService {
+  'register_demo_citizens' : ActorMethod<[string], string>,
+}
 export interface DeploymentJobView {
   'status' : string,
   'expected_wasm_hash' : string,
@@ -408,6 +411,9 @@ export interface ExtensionListing {
 export type ExtensionResult = { 'Ok' : ExtensionListing } |
   { 'Err' : string };
 export interface ExtensionsListRecord { 'extensions' : Array<string> }
+export interface FederationService {
+  'federation_message' : ActorMethod<[string], string>,
+}
 export interface FileRegistryService {
   'get_extension_manifest' : ActorMethod<[string], string>,
   'get_file_chunk_icc' : ActorMethod<[string, string, string, string], string>,
@@ -1268,6 +1274,7 @@ export interface _SERVICE {
     [string, string, string],
     ExtensionCallResponse
   >,
+  'federation_message' : ActorMethod<[string], string>,
   'find_objects' : ActorMethod<
     [string, Array<[string, string]>],
     RealmResponse
@@ -1338,6 +1345,7 @@ export interface _SERVICE {
   >,
   'record_migration' : ActorMethod<[string], string>,
   'refresh_invoice' : ActorMethod<[string], string>,
+  'register_demo_citizens' : ActorMethod<[string], string>,
   'register_founder' : ActorMethod<[string], RealmResponse>,
   'register_quarter' : ActorMethod<[string, string], RealmResponse>,
   'register_realm_from_registry' : ActorMethod<[string], string>,

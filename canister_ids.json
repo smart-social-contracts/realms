@@ -1,17 +1,17 @@
 {
- "casals_frontend": {
-  "test": "qic2k-baaaa-aaaae-agvga-cai",
-  "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
-  "staging": "mcqbx-hyaaa-aaaaj-qsarq-cai"
- },
- "casals_backend": {
-  "test": "qthgp-3yaaa-aaaae-agveq-cai",
-  "demo": "jo3cj-faaaa-aaaac-bffea-cai",
-  "staging": "jj2e5-iyaaa-aaaac-bffeq-cai"
- },
- "ckbtc_indexer": {
-  "demo": "n5wcd-faaaa-aaaar-qaaea-cai"
- },
+  "casals_frontend": {
+    "test": "qic2k-baaaa-aaaae-agvga-cai",
+    "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
+    "staging": "mcqbx-hyaaa-aaaaj-qsarq-cai"
+  },
+  "casals_backend": {
+    "test": "qthgp-3yaaa-aaaae-agveq-cai",
+    "demo": "jo3cj-faaaa-aaaac-bffea-cai",
+    "staging": "jj2e5-iyaaa-aaaac-bffeq-cai"
+  },
+  "ckbtc_indexer": {
+    "demo": "n5wcd-faaaa-aaaar-qaaea-cai"
+  },
   "ckbtc_ledger": {
     "demo": "mxzaz-hqaaa-aaaar-qaada-cai"
   },
@@ -53,12 +53,12 @@
   },
   "realm_backend": {
     "demo": "h5vpp-qyaaa-aaaac-qai3a-cai",
-    "staging": "5mf73-iiaaa-aaaau-aggxq-cai",
+    "staging": "egxaj-cqaaa-aaaac-bfp7q-cai",
     "test": "ku6cv-2iaaa-aaaab-agrpa-cai"
   },
   "realm_frontend": {
     "demo": "gzya5-jyaaa-aaaac-qai5a-cai",
-    "staging": "7ryrt-3aaaa-aaaau-aggya-cai",
+    "staging": "alqqr-xqaaa-aaaac-bfqaa-cai",
     "test": "pqwsi-vyaaa-aaaau-agrbq-cai"
   },
   "realm_installer": {

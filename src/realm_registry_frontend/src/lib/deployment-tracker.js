@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import {
+  fetchDeployTaskStatus,
   fetchDeploymentJobStatus,
   installerJobToDeploymentRow,
   isActiveQueueStatus,
@@ -13,12 +14,23 @@ export function deploymentJobUrl(jobId) {
   return `/my-dashboard/deployments?job=${encodeURIComponent(id)}`;
 }
 
+function shouldFetchDeployTask(job) {
+  if (!job) return false;
+  const st = (job.status || '').toLowerCase();
+  if (st === 'extensions' || st === 'registering') return true;
+  return Boolean((job.ext_deploy_task_id || '').trim());
+}
+
 /** @returns {Promise<object|null>} deployment row or null if job missing */
 export async function loadDeploymentRow(jobId) {
   if (!browser || !jobId) return null;
   const raw = await fetchDeploymentJobStatus(jobId);
   if (!raw) return null;
-  return installerJobToDeploymentRow(raw);
+  let deployTask = null;
+  if (shouldFetchDeployTask(raw)) {
+    deployTask = await fetchDeployTaskStatus(jobId);
+  }
+  return installerJobToDeploymentRow(raw, deployTask);
 }
 
 /**

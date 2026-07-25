@@ -45,12 +45,6 @@ const STATUS_STAGE_INDEX = {
   cancelled: 0,
 };
 
-/** Approximate progress within the pipeline (not wall-clock time). */
-const STAGE_PERCENT = [8, 28, 45, 68, 88, 100];
-
-/** Relative effort per pipeline stage (queue → register). Used when we lack live observations. */
-const STAGE_DURATION_WEIGHTS = [1, 3, 2, 4, 3];
-
 const TERMINAL_STATUSES = new Set([
   'completed',
   'failed',
@@ -59,6 +53,88 @@ const TERMINAL_STATUSES = new Set([
 ]);
 
 const FAILED_STATUSES = new Set(['failed', 'failed_verification', 'cancelled']);
+
+/** Relative effort per pipeline stage (queue → register). Used when we lack live observations. */
+const STAGE_DURATION_WEIGHTS = [1, 3, 2, 4, 3];
+
+/** Weighted work units for percent calculation (not wall-clock). */
+const UNITS = {
+  queue: 1,
+  provisionBackend: 2,
+  provisionFrontend: 2,
+  provisionFinalize: 1,
+  verify: 1,
+  register: 2,
+  extensionStep: 1,
+};
+
+/**
+ * @param {object} job
+ * @param {object|null|undefined} deployTask
+ * @returns {{ completed: number, total: number, extensionTotal: number, extensionCompleted: number }}
+ */
+export function computeDeploymentUnits(job, deployTask) {
+  const status = (job.status || job.raw_status || '').toLowerCase();
+  let completed = 0;
+  let total = 0;
+
+  total += UNITS.queue;
+  if (status !== 'pending') completed += UNITS.queue;
+
+  total += UNITS.provisionBackend + UNITS.provisionFrontend + UNITS.provisionFinalize;
+  if ((job.backend_canister_id || '').trim()) completed += UNITS.provisionBackend;
+  if ((job.frontend_canister_id || '').trim()) completed += UNITS.provisionFrontend;
+  if (Number(job.assets_verified)) completed += UNITS.provisionFinalize;
+
+  total += UNITS.verify;
+  if (Number(job.wasm_verified) && Number(job.assets_verified)) {
+    completed += UNITS.verify;
+  } else if (['extensions', 'registering', 'completed'].includes(status)) {
+    completed += UNITS.verify;
+  }
+
+  const extensionTotal = Math.max(
+    Number(deployTask?.total_count ?? 0),
+    Number(job.expected_step_count ?? 0),
+    Array.isArray(deployTask?.steps) ? deployTask.steps.length : 0,
+  );
+  total += extensionTotal * UNITS.extensionStep;
+
+  let extensionCompleted = Number(deployTask?.completed_count ?? 0);
+  if (!deployTask && ['registering', 'completed'].includes(status)) {
+    extensionCompleted = extensionTotal;
+  }
+  extensionCompleted = Math.min(extensionCompleted, extensionTotal);
+  completed += extensionCompleted * UNITS.extensionStep;
+
+  total += UNITS.register;
+  if (status === 'completed') {
+    completed += UNITS.register;
+  } else if (status === 'registering') {
+    completed += Math.ceil(UNITS.register / 2);
+  }
+
+  return { completed, total, extensionTotal, extensionCompleted };
+}
+
+/**
+ * @param {object} job
+ * @param {object|null|undefined} deployTask
+ * @returns {number}
+ */
+export function computeDeploymentPercent(job, deployTask) {
+  const status = (job.status || job.raw_status || '').toLowerCase();
+  if (status === 'completed') return 100;
+
+  const { completed, total } = computeDeploymentUnits(job, deployTask);
+  if (total <= 0) return 0;
+
+  const raw = Math.round((100 * completed) / total);
+  if (FAILED_STATUSES.has(status)) {
+    return Math.max(0, Math.min(raw, 99));
+  }
+  return Math.max(0, Math.min(raw, 99));
+}
 
 export function toTimestampMs(value) {
   if (value == null || value === '') return null;
@@ -85,7 +161,6 @@ function stageIndexForJob(job) {
   const status = (job.status || job.raw_status || '').toLowerCase();
   let index = STATUS_STAGE_INDEX[status] ?? 0;
 
-  // Casals may create canisters while status is still pending briefly.
   if (status === 'pending' && (job.backend_canister_id || job.frontend_canister_id)) {
     index = Math.max(index, 1);
   }
@@ -93,33 +168,94 @@ function stageIndexForJob(job) {
   return { status, index };
 }
 
-function stageDescription(status, job, stage) {
+function shortId(id) {
+  const s = (id || '').trim();
+  return s.length > 8 ? `${s.slice(0, 5)}…` : s;
+}
+
+/**
+ * @param {object|null|undefined} deployTask
+ * @returns {Array<{ label: string, kind: string, status: string, error: string|null, state: string }>}
+ */
+export function buildExtensionSubSteps(deployTask) {
+  const steps = deployTask?.steps;
+  if (!Array.isArray(steps) || !steps.length) return [];
+
+  return steps.map((step) => {
+    const st = (step.status || '').toLowerCase();
+    let state = 'upcoming';
+    if (st === 'completed') state = 'done';
+    else if (st === 'failed') state = 'failed';
+    else if (st === 'running') state = 'active';
+
+    const kind = (step.kind || '').toLowerCase();
+    let label = step.label || step.kind || 'step';
+    if (kind === 'grant_frontend_access') {
+      label = 'Grant frontend access';
+    } else if (kind === 'extension') {
+      label = `Extension: ${step.label || 'unknown'}`;
+    } else if (kind === 'codex') {
+      label = `Codex: ${step.label || 'unknown'}`;
+    }
+
+    return {
+      label,
+      kind,
+      status: st,
+      error: (step.error || '').trim() || null,
+      state,
+    };
+  });
+}
+
+function stageDescription(status, job, stage, deployTask) {
   const backend = (job.backend_canister_id || '').trim();
   const frontend = (job.frontend_canister_id || '').trim();
+  const { extensionTotal, extensionCompleted } = computeDeploymentUnits(job, deployTask);
 
   if (status === 'provisioning') {
+    const parts = [];
+    if (backend) parts.push(`backend ${shortId(backend)} ready`);
+    if (frontend) parts.push(`frontend ${shortId(frontend)} ready`);
+    if (parts.length) {
+      const tail = Number(job.assets_verified)
+        ? 'Finalizing stand configuration…'
+        : frontend
+          ? 'Uploading frontend assets and verifying…'
+          : 'Creating frontend canister…';
+      return `${parts.join(', ')}. ${tail}`;
+    }
     return 'Provisioning canisters via Casals on the Internet Computer.';
   }
+
   if (status === 'pending' && !backend && !frontend) {
     return stage.description;
   }
+
   if (status === 'pending' || status === 'deploying') {
     const parts = [];
-    if (backend) parts.push(`backend ${backend.slice(0, 5)}…`);
-    if (frontend) parts.push(`frontend ${frontend.slice(0, 5)}…`);
+    if (backend) parts.push(`backend ${shortId(backend)}`);
+    if (frontend) parts.push(`frontend ${shortId(frontend)}`);
     if (parts.length) {
       return `${stage.description} (${parts.join(', ')})`;
     }
   }
+
   if (status === 'extensions') {
+    if (extensionTotal > 0) {
+      return `Installing extensions and codex (${extensionCompleted}/${extensionTotal} steps complete).`;
+    }
     return 'Installing codex, extensions, and realm configuration.';
   }
+
   if (status === 'registering') {
     return 'Finalizing registration and settling credits.';
   }
+
   if (status === 'failed_verification') {
     return 'Software verification failed — the installed build did not match the expected release.';
   }
+
   return stage.description;
 }
 
@@ -196,10 +332,11 @@ function resolveStageDurationsMs(stages, startMs, endMs, observedStarts) {
 
 /**
  * @param {object} job - installer job view or deployment row
- * @param {{ observedStageStarts?: Record<number, number>|null }} [options]
+ * @param {{ observedStageStarts?: Record<number, number>|null, deployTask?: object|null }} [options]
  * @returns {object} progress view model for UI
  */
 export function getDeploymentProgress(job, options = {}) {
+  const deployTask = options.deployTask ?? null;
   const { status, index: stageIndex } = stageIndexForJob(job);
   const isTerminal = TERMINAL_STATUSES.has(status);
   const isFailed = FAILED_STATUSES.has(status);
@@ -212,11 +349,9 @@ export function getDeploymentProgress(job, options = {}) {
       : stageIndex;
 
   const currentStage = DEPLOYMENT_PIPELINE[activeIndex] || DEPLOYMENT_PIPELINE[0];
-  const percent = isComplete
-    ? 100
-    : isFailed
-      ? STAGE_PERCENT[activeIndex] ?? 0
-      : STAGE_PERCENT[activeIndex] ?? 0;
+  const percent = computeDeploymentPercent(job, deployTask);
+  const { extensionTotal, extensionCompleted } = computeDeploymentUnits(job, deployTask);
+  const subSteps = buildExtensionSubSteps(deployTask);
 
   const stages = DEPLOYMENT_PIPELINE.map((stage, i) => {
     let state = 'upcoming';
@@ -259,9 +394,12 @@ export function getDeploymentProgress(job, options = {}) {
     currentLabel: isComplete ? 'Complete' : isFailed ? 'Failed' : currentStage.label,
     currentDescription: isFailed
       ? job.error || 'Deployment failed.'
-      : stageDescription(status, job, currentStage),
+      : stageDescription(status, job, currentStage, deployTask),
     percent,
     stages: stagesWithTiming,
+    subSteps,
+    extensionTotal,
+    extensionCompleted,
     isTerminal,
     isFailed,
     isComplete,

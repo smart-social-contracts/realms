@@ -189,6 +189,27 @@ export async function fetchDeploymentJobStatus(jobId) {
   return resultOk(raw);
 }
 
+/** @returns {Promise<object|null>} extension/codex install steps for a job */
+export async function fetchDeployTaskStatus(jobId) {
+  if (buildingOrTesting || !browser || !jobId) return null;
+  const actor = await createInstallerActor();
+  if (typeof actor.get_deploy_task_status !== 'function') return null;
+  const raw = await actor.get_deploy_task_status(jobId);
+  if (raw == null) return null;
+  if (typeof raw === 'object' && 'Err' in raw) return null;
+  const ok = resultOk(raw);
+  if (!ok) return null;
+  return {
+    ...ok,
+    total_count: Number(ok.total_count ?? 0),
+    completed_count: Number(ok.completed_count ?? 0),
+    steps: (ok.steps || []).map((step) => ({
+      ...step,
+      idx: Number(step.idx ?? 0),
+    })),
+  };
+}
+
 /** @returns {Promise<string|null>} manifest JSON for owner-authenticated caller */
 export async function fetchDeploymentManifest(jobId) {
   if (buildingOrTesting || !browser || !jobId) return null;
@@ -331,7 +352,7 @@ export async function destroyRealmJob(jobId, options = {}) {
  * Map installer job to the shape previously returned by the management HTTP API
  * so dashboard templates stay stable.
  */
-export function installerJobToDeploymentRow(job) {
+export function installerJobToDeploymentRow(job, deployTask = null) {
   const st = (job.status || '').toLowerCase();
   let uiStatus = st;
   if (
@@ -356,6 +377,8 @@ export function installerJobToDeploymentRow(job) {
     error: job.error || null,
     backend_canister_id: job.backend_canister_id || '',
     frontend_canister_id: job.frontend_canister_id || '',
+    expected_step_count: Number(job.expected_step_count || 0),
+    ext_deploy_task_id: job.ext_deploy_task_id || '',
     caller_principal: job.caller_principal || '',
     credits_charged: 0,
     earlier_deploy_count: 0,
@@ -364,6 +387,7 @@ export function installerJobToDeploymentRow(job) {
   row.progress = getDeploymentProgress(
     { ...job, raw_status: st },
     {
+      deployTask,
       observedStageStarts: getObservedStageStarts(
         job.job_id,
         toTimestampMs(job.created_at),

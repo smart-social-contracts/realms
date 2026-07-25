@@ -55,6 +55,9 @@
               {/if}
             </span>
             <span class="step-label">{stage.label}</span>
+            {#if stage.id === 'extensions' && stage.state === 'active' && progress.extensionTotal > 0}
+              <span class="step-detail">{progress.extensionCompleted}/{progress.extensionTotal}</span>
+            {/if}
             {#if stage.durationLabel && stage.state !== 'upcoming'}
               <span
                 class="step-duration"
@@ -67,6 +70,31 @@
               <span class="step-duration active">in progress</span>
             {/if}
           </li>
+          {#if stage.id === 'extensions' && progress.subSteps?.length && (stage.state === 'active' || stage.state === 'done' || progress.isFailed)}
+            <li class="sub-steps-wrap" aria-label="Extension install steps">
+              <ol class="sub-steps">
+                {#each progress.subSteps as subStep}
+                  <li class="sub-step" class:done={subStep.state === 'done'} class:active={subStep.state === 'active'} class:failed={subStep.state === 'failed'}>
+                    <span class="sub-marker" aria-hidden="true">
+                      {#if subStep.state === 'done'}
+                        ✓
+                      {:else if subStep.state === 'failed'}
+                        ✕
+                      {:else if subStep.state === 'active'}
+                        …
+                      {:else}
+                        ·
+                      {/if}
+                    </span>
+                    <span class="sub-label">{subStep.label}</span>
+                    {#if subStep.state === 'failed' && subStep.error}
+                      <span class="sub-error" title={subStep.error}>failed</span>
+                    {/if}
+                  </li>
+                {/each}
+              </ol>
+            </li>
+          {/if}
         {/if}
       {/each}
     </ol>
@@ -193,6 +221,69 @@
   .step-label {
     flex: 1;
     min-width: 0;
+  }
+
+  .step-detail {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: #2563eb;
+    flex-shrink: 0;
+  }
+
+  .sub-steps-wrap {
+    list-style: none;
+    margin: 0 0 0.25rem 1.75rem;
+    padding: 0;
+  }
+
+  .sub-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border-left: 2px solid #e5e5e5;
+    padding-left: 0.625rem;
+  }
+
+  .sub-step {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: #a3a3a3;
+  }
+
+  .sub-step.done {
+    color: #16a34a;
+  }
+
+  .sub-step.active {
+    color: #2563eb;
+    font-weight: 600;
+  }
+
+  .sub-step.failed {
+    color: #dc2626;
+  }
+
+  .sub-marker {
+    width: 0.875rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .sub-label {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .sub-error {
+    font-size: 0.6875rem;
+    color: #b91c1c;
+    flex-shrink: 0;
   }
 
   .step-duration {

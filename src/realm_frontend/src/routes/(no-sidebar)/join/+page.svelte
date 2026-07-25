@@ -81,10 +81,13 @@
 
   $: targetQuarterInfo = quarterDirectory.find((q) => q.canister_id === targetQuarterId) || null;
   // Assignment banner when federation has multiple quarters or target is a sub-quarter.
+  // Test mode adds a quarter picker so staging can register on any quarter.
   $: showQuarterBanner = !!targetQuarterId && (
+    $testMode ||
     quarterDirectory.length > 1 ||
     (!!capitalId && targetQuarterId !== capitalId)
   );
+  $: showTestModeQuarterPicker = $testMode && quarterDirectory.length > 0;
 
   $: welcomeImageUrl = $realmInfo.backgroundImageUrl || '/custom/background.png';
 
@@ -382,6 +385,22 @@
     } catch (e) {
       console.error('Failed to build quarter actor, falling back to capital:', e);
       targetActor = backend;
+    }
+  }
+
+  /** Test mode only: let the user pick any quarter before validate + join. */
+  async function handleTestModeQuarterChange(event) {
+    const qid = event.currentTarget.value;
+    if (!qid || qid === targetQuarterId) return;
+    const revalidateInvite = inviteValid && !!inviteCode;
+    if (revalidateInvite) {
+      inviteValid = false;
+      inviteProfile = '';
+      inviteError = '';
+    }
+    await selectQuarter(qid);
+    if (revalidateInvite) {
+      await validateInvite();
     }
   }
 
@@ -926,9 +945,27 @@
           {#if showQuarterBanner}
             <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
               <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
-              <div class="font-semibold text-gray-900 truncate">
-                {#if targetQuarterInfo}{formatQuarterLabel(targetQuarterInfo)}{:else}{targetQuarterId}{/if}
-              </div>
+              {#if showTestModeQuarterPicker}
+                <select
+                  id="test-mode-quarter"
+                  class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-gray-900 focus:ring-gray-900"
+                  value={targetQuarterId}
+                  on:change={handleTestModeQuarterChange}
+                >
+                  {#each quarterDirectory as quarter (quarter.canister_id)}
+                    <option value={quarter.canister_id}>
+                      {formatQuarterLabel(quarter)}{quarter.joinable === false ? ' (coordinator-only)' : ''}
+                    </option>
+                  {/each}
+                </select>
+                <p class="mt-2 text-xs text-gray-400">
+                  Test mode: choose any quarter to register on.
+                </p>
+              {:else}
+                <div class="font-semibold text-gray-900 truncate">
+                  {#if targetQuarterInfo}{formatQuarterLabel(targetQuarterInfo)}{:else}{targetQuarterId}{/if}
+                </div>
+              {/if}
             </div>
           {/if}
           
@@ -1019,9 +1056,27 @@
           {#if showQuarterBanner}
             <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
               <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
-              <div class="font-semibold text-gray-900 truncate">
-                {#if targetQuarterInfo}{formatQuarterLabel(targetQuarterInfo)}{:else}{targetQuarterId}{/if}
-              </div>
+              {#if showTestModeQuarterPicker}
+                <select
+                  id="test-mode-quarter"
+                  class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-gray-900 focus:ring-gray-900"
+                  value={targetQuarterId}
+                  on:change={handleTestModeQuarterChange}
+                >
+                  {#each quarterDirectory as quarter (quarter.canister_id)}
+                    <option value={quarter.canister_id}>
+                      {formatQuarterLabel(quarter)}{quarter.joinable === false ? ' (coordinator-only)' : ''}
+                    </option>
+                  {/each}
+                </select>
+                <p class="mt-2 text-xs text-gray-400">
+                  Test mode: choose any quarter to register on.
+                </p>
+              {:else}
+                <div class="font-semibold text-gray-900 truncate">
+                  {#if targetQuarterInfo}{formatQuarterLabel(targetQuarterInfo)}{:else}{targetQuarterId}{/if}
+                </div>
+              {/if}
             </div>
           {/if}
 

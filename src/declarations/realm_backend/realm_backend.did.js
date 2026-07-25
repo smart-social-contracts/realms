@@ -276,6 +276,7 @@ export const idlFactory = ({ IDL }) => {
         [ExtensionCallResponse],
         [],
       ),
+    'federation_message' : IDL.Func([IDL.Text], [IDL.Text], []),
     'find_objects' : IDL.Func(
         [IDL.Text, IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text))],
         [RealmResponse],
@@ -372,6 +373,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'record_migration' : IDL.Func([IDL.Text], [IDL.Text], []),
     'refresh_invoice' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'register_demo_citizens' : IDL.Func([IDL.Text], [IDL.Text], []),
     'register_founder' : IDL.Func([IDL.Text], [RealmResponse], []),
     'register_quarter' : IDL.Func([IDL.Text, IDL.Text], [RealmResponse], []),
     'register_realm_from_registry' : IDL.Func([IDL.Text], [IDL.Text], []),
