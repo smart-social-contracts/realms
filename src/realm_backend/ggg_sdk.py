@@ -123,6 +123,11 @@ class _Notifications:
         )
 
 
+class _Members:
+    def activate(self, user_id, **fields):
+        return _rpc("member.activate", user_id=user_id, **fields)
+
+
 class _Realm:
     """Entry point codices import as ``realm``."""
 
@@ -130,12 +135,19 @@ class _Realm:
         self.users = _Users()
         self.invoices = _Invoices()
         self.notifications = _Notifications()
+        self.members = _Members()
 
     def config(self):
         return _rpc("config.get")
 
     def now(self):
         return _rpc("time.now")
+
+    def info(self):
+        return _rpc("realm.get")
+
+    def currency(self):
+        return _rpc("currency.get")
 
 
 realm = _Realm()

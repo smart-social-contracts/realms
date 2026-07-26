@@ -484,24 +484,42 @@ def _build_codex_sandbox_source(codex_source: str) -> str:
     return loader + "\n" + codex_source
 
 
+def _codex_manifest(codex_id: str) -> dict:
+    from core.runtime_extensions import get_all_extension_manifests
+
+    return get_all_extension_manifests().get(codex_id) or {}
+
+
 def _codex_capabilities(codex_id: str) -> List[str]:
     """Verb capabilities the codex manifest declares (issue #265)."""
     try:
         from core import codex_hooks
-        from core.runtime_extensions import get_all_extension_manifests
 
-        manifest = get_all_extension_manifests().get(codex_id) or {}
-        return codex_hooks.codex_capabilities(manifest)
+        return codex_hooks.codex_capabilities(_codex_manifest(codex_id))
     except Exception as e:
         logger.warning(f"_codex_capabilities({codex_id}) failed: {e}")
         return []
 
 
+def _codex_hook_module_file(codex_id: str) -> str:
+    """Filename to spawn for a codex's sandboxed hooks: the manifest-declared
+    ``sandbox_module`` (self-contained SDK hooks), else ``entry.py``."""
+    try:
+        from core import codex_hooks
+
+        module = codex_hooks.codex_sandbox_module(_codex_manifest(codex_id))
+        return module or "entry.py"
+    except Exception:
+        return "entry.py"
+
+
 def call_codex_hook_in_sandbox(codex_id: str, hook_name: str, args: str) -> Any:
-    """Run ``entry.py::hook_name(args)`` of a bridge-aware codex in a fresh
+    """Run ``hook_name(args)`` of a bridge-native codex in a fresh
     subinterpreter, wired to the capability bridge, and return its plain-data
     result.
 
+    The module spawned is the codex's declared ``sandbox_module`` (a
+    self-contained ``ggg_sdk`` hook module), falling back to ``entry.py``.
     Unlike ``call_in_sandbox`` (empty-capability extension compute), this grants
     the codex its declared capabilities and installs
     ``core.codex_bridge.make_rpc_handler`` as the ``rpc`` handler so the codex
@@ -514,11 +532,12 @@ def call_codex_hook_in_sandbox(codex_id: str, hook_name: str, args: str) -> Any:
     from core import codex_bridge
     from core.runtime_extensions import EXTENSIONS_DIR
 
-    entry_path = os.path.join(EXTENSIONS_DIR, codex_id, "entry.py")
-    if not os.path.exists(entry_path):
-        raise FileNotFoundError(f"codex '{codex_id}' has no entry.py")
+    module_file = _codex_hook_module_file(codex_id)
+    module_path = os.path.join(EXTENSIONS_DIR, codex_id, module_file)
+    if not os.path.exists(module_path):
+        raise FileNotFoundError(f"codex '{codex_id}' has no {module_file}")
 
-    with open(entry_path, "r") as f:
+    with open(module_path, "r") as f:
         codex_source = f.read()
 
     source = _build_codex_sandbox_source(codex_source)

@@ -59,10 +59,11 @@ _NON_CONFIG_MANIFEST_KEYS = frozenset({
     # Wizard-editable parameter declarations (issue #253) — metadata about
     # the config, not config itself.
     "parameters",
-    # GGG API contract declaration + capability grants (issue #265) — plumbing,
-    # not config.
+    # GGG API contract declaration + capability grants + sandbox hook module
+    # (issue #265) — plumbing, not config.
     "ggg_api_version",
     "capabilities",
+    "sandbox_module",
 })
 
 
@@ -164,6 +165,29 @@ def declares_capabilities(manifest: dict) -> bool:
     in-process unchanged.
     """
     return isinstance(manifest, dict) and isinstance(manifest.get("capabilities"), list)
+
+
+def codex_sandbox_module(manifest: dict) -> Optional[str]:
+    """The self-contained SDK hook module a codex ships for sandboxed
+    execution (manifest ``sandbox_module``, e.g. ``"sandbox_hooks.py"``), or
+    ``None`` (issue #265).
+
+    This module — not ``entry.py`` — is what the router spawns in the
+    subinterpreter: it contains only ``ggg_sdk``-based hooks, so its module body
+    executes cleanly inside the sandbox (no ``_cdk`` / ``ggg`` / file-system
+    imports). ``entry.py`` remains the in-process fallback.
+    """
+    if not isinstance(manifest, dict):
+        return None
+    value = manifest.get("sandbox_module")
+    return value if isinstance(value, str) and value else None
+
+
+def is_bridge_codex(manifest: dict) -> bool:
+    """True when a codex is fully bridge-native: it declares both a
+    ``capabilities`` list and a ``sandbox_module``. Only such codices are
+    routed through the sandbox (issue #265)."""
+    return declares_capabilities(manifest) and codex_sandbox_module(manifest) is not None
 
 
 def get_active_codex() -> Optional[str]:
@@ -439,10 +463,10 @@ def _hook_runs_sandboxed(hook_name: str) -> bool:
 
     Requires both (a) the sandbox policy resolves this hook to ``sandbox``
     (``runtime_sandbox.should_sandbox_hook``) and (b) the active codex is
-    bridge-aware (declares a ``capabilities`` list). Legacy codices without
-    capabilities always take the in-process path (issue #265).
+    bridge-native (declares a ``capabilities`` list AND a ``sandbox_module``).
+    Legacy codices always take the in-process path (issue #265).
     """
-    if not declares_capabilities(_active_codex_manifest()):
+    if not is_bridge_codex(_active_codex_manifest()):
         return False
     try:
         from core import runtime_sandbox

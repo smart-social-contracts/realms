@@ -133,6 +133,104 @@ def _v_user_get(user_id: str = "", **kwargs: Any) -> Optional[dict]:
     return _project_user(User[user_id])
 
 
+def _v_realm_get(**kwargs: Any) -> Optional[dict]:
+    """Plain projection of the realm (identity + lifecycle stage)."""
+    from ggg import Realm
+
+    realms = Realm.instances()
+    if not realms:
+        return None
+    realm = realms[0]
+    return {
+        "id": getattr(realm, "id", None),
+        "name": getattr(realm, "name", None),
+        "status": getattr(realm, "status", None),
+        "accounting_currency": getattr(realm, "accounting_currency", None),
+        "open_registration": getattr(realm, "open_registration", None),
+    }
+
+
+def _v_currency_get(default: str = "REALMS", **kwargs: Any) -> str:
+    """Resolve the invoice/treasury currency symbol.
+
+    Mirrors the codices' ``invoice_currency`` helper: codex-pinned
+    ``currency.symbol`` from config, else ``Realm.accounting_currency``, else
+    *default*. Lets a sandboxed codex resolve currency without importing host
+    modules or replicating the fallback logic.
+    """
+    from core import codex_hooks
+
+    config = codex_hooks.get_config() or {}
+    block = config.get("currency")
+    if isinstance(block, dict):
+        symbol = str(block.get("symbol") or "").strip()
+        if symbol:
+            return symbol[:16]
+    try:
+        from ggg import Realm
+
+        realms = Realm.instances()
+        if realms:
+            acct = str(getattr(realms[0], "accounting_currency", "") or "").strip()
+            if acct:
+                return acct[:16]
+    except Exception:
+        pass
+    return (str(default) or "REALMS")[:16]
+
+
+# Member attributes a codex may set through ``member.activate`` (the codex
+# supplies its own membership policy; the host only whitelists which fields
+# may be written).
+_MEMBER_FIELDS = (
+    "identity_verification", "voting_eligibility", "public_benefits_eligibility",
+    "residence_permit", "tax_compliance", "criminal_record",
+)
+
+
+def _find_member(user_id: str):
+    from ggg import Member
+
+    for member in Member.instances():
+        user = getattr(member, "user", None)
+        if user is not None and getattr(user, "id", None) == user_id:
+            return member
+    return None
+
+
+def _v_member_activate(user_id: str = "", **kwargs: Any) -> dict:
+    """Create or update a member for *user_id* (idempotent).
+
+    Applies only whitelisted membership fields supplied by the codex. If a
+    member already exists, its fields are updated; otherwise a new member is
+    created bound to the user.
+    """
+    from ggg import Member, User
+
+    if not user_id:
+        raise ValueError("member.activate: user_id is required")
+    user = User[user_id]
+    if user is None:
+        raise ValueError(f"member.activate: user '{user_id}' not found")
+
+    fields = {k: kwargs[k] for k in _MEMBER_FIELDS if k in kwargs}
+    existing = _find_member(user_id)
+    if existing is not None:
+        for key, value in fields.items():
+            setattr(existing, key, value)
+        return {
+            "accepted": True,
+            "member_id": getattr(existing, "id", None),
+            "already_member": True,
+        }
+    member = Member(user=user, **fields)
+    return {
+        "accepted": True,
+        "member_id": getattr(member, "id", None),
+        "already_member": False,
+    }
+
+
 def _v_invoice_create(
     amount: float = 0.0,
     currency: str = "",
@@ -169,7 +267,7 @@ def _v_invoice_create(
 # hostile codex cannot smuggle constructor kwargs into the entity).
 _NOTIFICATION_FIELDS = (
     "topic", "title", "message", "sender", "recipient",
-    "read", "icon", "href", "color", "metadata",
+    "read", "icon", "href", "color", "metadata", "timestamp_created",
 )
 
 
@@ -191,8 +289,11 @@ def _v_notification_create(user_id: str = "", **kwargs: Any) -> dict:
 # widens the codex-facing API surface.
 VERBS: Dict[str, Callable[..., Any]] = {
     "config.get": _v_config_get,
+    "currency.get": _v_currency_get,
     "time.now": _v_time_now,
     "user.get": _v_user_get,
+    "realm.get": _v_realm_get,
+    "member.activate": _v_member_activate,
     "invoice.create": _v_invoice_create,
     "notification.create": _v_notification_create,
 }
