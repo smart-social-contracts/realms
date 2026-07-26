@@ -41,6 +41,13 @@ CODEX_KIND = "codex"
 # declares a higher version is refused (forward-compat gate, issue #244).
 SUPPORTED_CODEX_API_VERSIONS = frozenset({1})
 
+# GGG API contract versions this core understands (issue #265). A codex
+# declaring ``ggg_api_version`` promises to call the realm only through the
+# public ``ggg`` facade at this contract level; installs of an unsupported
+# version are refused. A missing value is treated as a legacy (pre-facade)
+# package and always accepted.
+SUPPORTED_GGG_API_VERSIONS = frozenset({1})
+
 # Manifest keys that are packaging/plumbing, not realm configuration.
 # Everything else in a codex manifest is served as config by the default
 # get_config implementation.
@@ -52,6 +59,8 @@ _NON_CONFIG_MANIFEST_KEYS = frozenset({
     # Wizard-editable parameter declarations (issue #253) — metadata about
     # the config, not config itself.
     "parameters",
+    # GGG API contract declaration (issue #265) — plumbing, not config.
+    "ggg_api_version",
 })
 
 
@@ -93,6 +102,39 @@ def unsupported_api_version(manifest: dict) -> Optional[str]:
             f"(this realm supports: {sorted(SUPPORTED_CODEX_API_VERSIONS)})"
         )
     return None
+
+
+def unsupported_ggg_api_version(manifest: dict) -> Optional[str]:
+    """Return an error message when a codex manifest declares a ``ggg_api_version``
+    this core does not support, else None (issue #265).
+
+    A missing ``ggg_api_version`` is treated as a legacy (pre-facade) package,
+    which is always accepted — the import scanner runs in warn mode for those
+    until the codex opts in to the versioned GGG contract.
+    """
+    raw = manifest.get("ggg_api_version")
+    if raw is None:
+        return None
+    try:
+        version = int(raw)
+    except (TypeError, ValueError):
+        return f"Invalid ggg_api_version: {raw!r}"
+    if version not in SUPPORTED_GGG_API_VERSIONS:
+        return (
+            f"Unsupported ggg_api_version {version} "
+            f"(this realm supports: {sorted(SUPPORTED_GGG_API_VERSIONS)})"
+        )
+    return None
+
+
+def declares_ggg_api(manifest: dict) -> bool:
+    """True when a codex manifest opts in to the versioned GGG contract.
+
+    Used to decide import-scan enforcement: codices that declare
+    ``ggg_api_version`` are held to the public-``ggg``-only rule, while legacy
+    packages are only warned (issue #265, Workstream A).
+    """
+    return isinstance(manifest, dict) and manifest.get("ggg_api_version") is not None
 
 
 def get_active_codex() -> Optional[str]:

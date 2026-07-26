@@ -129,6 +129,19 @@ from .land import (
     Zone,
 )
 
+# Public codex-facing facade (issue #265) - supported helpers a codex may call
+# instead of reaching into core.* internals.
+from .facade import (
+    check_access,
+    ensure_root_org,
+    extension_call,
+    extension_entity_class,
+    grant_root_authority_over_local_orgs,
+    iter_users,
+    user_has_profile,
+    user_in_department,
+)
+
 __all__ = [
     "AllocationRule",
     "AllocationRuleStatus",
@@ -232,6 +245,15 @@ __all__ = [
     "appoint",
     "department_personnel_cost",
     "position_key",
+    # Codex-facing facade helpers (issue #265)
+    "check_access",
+    "ensure_root_org",
+    "extension_call",
+    "extension_entity_class",
+    "grant_root_authority_over_local_orgs",
+    "iter_users",
+    "user_has_profile",
+    "user_in_department",
 ]
 
 
@@ -247,5 +269,9 @@ def classes() -> list[str]:
         'penalty_execute', 'penalty_waive', 'appeal_file', 'appeal_decide',
         'seed_justice_template',
         'license_issue', 'license_revoke', 'appoint', 'department_personnel_cost',
-        'position_key'
+        'position_key',
+        # Codex-facing facade helpers (issue #265) - functions, not entities
+        'check_access', 'ensure_root_org', 'extension_call', 'extension_entity_class',
+        'grant_root_authority_over_local_orgs', 'iter_users', 'user_has_profile',
+        'user_in_department',
     )]

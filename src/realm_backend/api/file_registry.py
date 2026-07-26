@@ -538,6 +538,25 @@ def install_extension_from_registry(
         if version_error:
             return json.dumps({"success": False, "error": f"Codex '{ext_id}': {version_error}"})
 
+        # 2b. GGG API version gate (issue #265). Missing => legacy, accepted.
+        ggg_version_error = codex_hooks.unsupported_ggg_api_version(manifest)
+        if ggg_version_error:
+            return json.dumps(
+                {"success": False, "error": f"Codex '{ext_id}': {ggg_version_error}"}
+            )
+
+        # 2c. Import policy scan (issue #265). A codex may import only the
+        #     public ``ggg`` API, never ``core.*`` or private ``ggg`` submodules.
+        #     Enforced (hard reject) once the codex opts in via ``ggg_api_version``;
+        #     legacy packages are scanned in warn mode so nothing breaks yet.
+        from core import codex_scan
+
+        scan_error = codex_scan.check_codex_imports(
+            ext_id, files, enforce=codex_hooks.declares_ggg_api(manifest)
+        )
+        if scan_error:
+            return json.dumps({"success": False, "error": scan_error})
+
         # 3. Singleton: exactly one codex per realm (same-id upgrade allowed).
         conflict = codex_hooks.singleton_violation(ext_id)
         if conflict:
