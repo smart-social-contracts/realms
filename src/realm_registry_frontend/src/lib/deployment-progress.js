@@ -117,6 +117,83 @@ export function computeDeploymentUnits(job, deployTask) {
   return { completed, total, extensionTotal, extensionCompleted };
 }
 
+function shortId(id) {
+  const s = (id || '').trim();
+  return s.length > 8 ? `${s.slice(0, 5)}…` : s;
+}
+
+/**
+ * Phase-based percent: each pipeline stage owns a slice of 0–100 so long
+ * provisioning/extension work is visible instead of being drowned out by the
+ * extension step count in the denominator.
+ */
+const PHASE = {
+  queue: { from: 0, to: 5 },
+  provision: { from: 5, to: 35 },
+  verify: { from: 35, to: 42 },
+  extensions: { from: 42, to: 92 },
+  register: { from: 92, to: 99 },
+};
+
+function lerpPhase(phaseKey, fraction) {
+  const phase = PHASE[phaseKey];
+  const t = Math.max(0, Math.min(1, fraction));
+  return Math.round(phase.from + t * (phase.to - phase.from));
+}
+
+/**
+ * @param {object} job
+ * @returns {Array<{ label: string, state: string, detail: string|null }>}
+ */
+export function buildProvisionSubSteps(job) {
+  const backend = (job.backend_canister_id || '').trim();
+  const frontend = (job.frontend_canister_id || '').trim();
+  const assets = Number(job.assets_verified) === 1;
+  const status = (job.status || job.raw_status || '').toLowerCase();
+  const inProvision =
+    status === 'provisioning' ||
+    status === 'deploying' ||
+    (status === 'pending' && (backend || frontend)) ||
+    (!assets && !['extensions', 'registering', 'completed'].includes(status));
+
+  const specs = [
+    {
+      id: 'backend',
+      label: 'Backend canister',
+      done: Boolean(backend),
+      detail: backend ? shortId(backend) : null,
+    },
+    {
+      id: 'frontend',
+      label: 'Frontend canister & assets',
+      done: Boolean(frontend) && assets,
+      detail: frontend ? shortId(frontend) : null,
+    },
+    {
+      id: 'finalize',
+      label: 'Stand configuration',
+      done: assets && Boolean(backend),
+      detail: null,
+    },
+  ];
+
+  let activeAssigned = false;
+  return specs.map((spec) => {
+    let state = 'upcoming';
+    if (spec.done) {
+      state = 'done';
+    } else if (inProvision && !activeAssigned) {
+      state = 'active';
+      activeAssigned = true;
+    }
+    return {
+      label: spec.label,
+      state,
+      detail: spec.detail,
+    };
+  });
+}
+
 /**
  * @param {object} job
  * @param {object|null|undefined} deployTask
@@ -126,14 +203,44 @@ export function computeDeploymentPercent(job, deployTask) {
   const status = (job.status || job.raw_status || '').toLowerCase();
   if (status === 'completed') return 100;
 
-  const { completed, total } = computeDeploymentUnits(job, deployTask);
-  if (total <= 0) return 0;
+  const backend = Boolean((job.backend_canister_id || '').trim());
+  const frontend = Boolean((job.frontend_canister_id || '').trim());
+  const assets = Number(job.assets_verified) === 1;
+  const verified = Number(job.wasm_verified) && assets;
+  const { extensionTotal, extensionCompleted } = computeDeploymentUnits(job, deployTask);
 
-  const raw = Math.round((100 * completed) / total);
-  if (FAILED_STATUSES.has(status)) {
-    return Math.max(0, Math.min(raw, 99));
+  let percent;
+
+  if (status === 'pending' && !backend) {
+    percent = lerpPhase('queue', 0.6);
+  } else if (
+    status === 'provisioning' ||
+    status === 'deploying' ||
+    (status === 'pending' && backend) ||
+    (!assets && !['extensions', 'registering', 'completed', 'failed', 'failed_verification', 'cancelled'].includes(status))
+  ) {
+    let fraction = 0.05;
+    if (backend) fraction += 0.3;
+    if (frontend) fraction += 0.35;
+    if (assets) fraction += 0.3;
+    percent = lerpPhase('provision', fraction);
+  } else if (status === 'verifying' || status === 'failed_verification') {
+    percent = lerpPhase('verify', verified ? 1 : 0.4);
+  } else if (status === 'extensions' || extensionTotal > 0) {
+    const doneFrac = extensionTotal > 0 ? extensionCompleted / extensionTotal : 0;
+    percent = lerpPhase('extensions', doneFrac);
+  } else if (status === 'registering') {
+    percent = lerpPhase('register', 0.55);
+  } else if (verified) {
+    percent = PHASE.verify.to;
+  } else {
+    percent = lerpPhase('queue', 1);
   }
-  return Math.max(0, Math.min(raw, 99));
+
+  if (FAILED_STATUSES.has(status)) {
+    return Math.max(PHASE.queue.from, Math.min(percent, 99));
+  }
+  return Math.max(0, Math.min(percent, 99));
 }
 
 export function toTimestampMs(value) {
@@ -166,11 +273,6 @@ function stageIndexForJob(job) {
   }
 
   return { status, index };
-}
-
-function shortId(id) {
-  const s = (id || '').trim();
-  return s.length > 8 ? `${s.slice(0, 5)}…` : s;
 }
 
 /**
@@ -336,7 +438,7 @@ function resolveStageDurationsMs(stages, startMs, endMs, observedStarts) {
  * @returns {object} progress view model for UI
  */
 export function getDeploymentProgress(job, options = {}) {
-  const deployTask = options.deployTask ?? null;
+  const deployTask = options?.deployTask ?? null;
   const { status, index: stageIndex } = stageIndexForJob(job);
   const isTerminal = TERMINAL_STATUSES.has(status);
   const isFailed = FAILED_STATUSES.has(status);
@@ -352,6 +454,7 @@ export function getDeploymentProgress(job, options = {}) {
   const percent = computeDeploymentPercent(job, deployTask);
   const { extensionTotal, extensionCompleted } = computeDeploymentUnits(job, deployTask);
   const subSteps = buildExtensionSubSteps(deployTask);
+  const provisionSubSteps = buildProvisionSubSteps(job);
 
   const stages = DEPLOYMENT_PIPELINE.map((stage, i) => {
     let state = 'upcoming';
@@ -375,7 +478,7 @@ export function getDeploymentProgress(job, options = {}) {
 
   const { durations: stageDurationMs, estimated: durationsEstimated } =
     startedAtMs != null
-      ? resolveStageDurationsMs(stages, startedAtMs, endMs, options.observedStageStarts ?? null)
+      ? resolveStageDurationsMs(stages, startedAtMs, endMs, options?.observedStageStarts ?? null)
       : { durations: {}, estimated: true };
 
   const stagesWithTiming = stages.map((stage, i) => {
@@ -398,6 +501,7 @@ export function getDeploymentProgress(job, options = {}) {
     percent,
     stages: stagesWithTiming,
     subSteps,
+    provisionSubSteps,
     extensionTotal,
     extensionCompleted,
     isTerminal,
@@ -421,6 +525,58 @@ export function getDeploymentStatusLabel(status) {
   if (progress.isFailed) return 'Failed';
   if (progress.isActive) return progress.currentLabel;
   return status || 'Unknown';
+}
+
+/**
+ * Recompute duration labels using a live clock (for ticking UI while polling).
+ *
+ * @param {object} progress - output of getDeploymentProgress
+ * @param {number} nowMs
+ * @param {Record<number, number>|null} [observedStageStarts]
+ * @returns {object}
+ */
+export function withLiveProgressTiming(progress, nowMs, observedStageStarts = null) {
+  if (!progress) return progress;
+
+  const startedAtMs = progress.startedAtMs;
+  const endMs = progress.finishedAtMs ?? nowMs;
+  const totalDurationMs =
+    startedAtMs && endMs >= startedAtMs ? endMs - startedAtMs : progress.totalDurationMs;
+
+  const stages = (progress.stages || []).map((stage, i) => {
+    if (stage.state !== 'active' && stage.state !== 'done') {
+      return stage;
+    }
+
+    const stageStart =
+      observedStageStarts?.[i] ??
+      (i === 0 ? startedAtMs : observedStageStarts?.[i - 1]) ??
+      startedAtMs;
+
+    if (stage.state === 'active' && stageStart) {
+      const durationMs = Math.max(0, nowMs - stageStart);
+      return {
+        ...stage,
+        durationMs,
+        durationLabel: formatDuration(durationMs),
+        durationEstimated: false,
+      };
+    }
+
+    if (stage.state === 'done' && stage.durationMs != null && !stage.durationEstimated) {
+      return stage;
+    }
+
+    return stage;
+  });
+
+  return {
+    ...progress,
+    stages,
+    totalDurationMs: totalDurationMs ?? progress.totalDurationMs,
+    totalDurationLabel:
+      totalDurationMs != null ? formatDuration(totalDurationMs) : progress.totalDurationLabel,
+  };
 }
 
 export function getDeploymentStatusColor(status) {

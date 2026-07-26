@@ -1,0 +1,19 @@
+# One-off frontend redeploy for ManualTest1000Syntropia (wizard-created realm).
+# The realm frontend was built with the old baked-in justice_litigation UI;
+# current source uses runtime extension loading only.
+version: 1
+
+object:
+  type: realm
+  subtypes: frontend
+  quarters: 1
+  manifest: ./examples/demo/realm3/manifest.json
+  core_codebase:
+    path: ./
+  extensions_codebase:
+    path: none
+  codices_codebase:
+    path: none
+  network: staging
+  id_in_registry: epc7x-syaaa-aaaac-bfq3q-cai
+  mode: upgrade

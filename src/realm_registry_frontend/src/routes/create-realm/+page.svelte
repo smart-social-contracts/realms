@@ -15,7 +15,7 @@
   import codicesConfig from '$lib/codices-config.json';
   import AuthControls from '$lib/components/AuthControls.svelte';
   import DeployProgressModal from '$lib/components/DeployProgressModal.svelte';
-  import { deploymentJobUrl } from '$lib/deployment-tracker.js';
+  import { deploymentJobUrl } from '$lib/deployment-url.js';
 
   // Auth state
   let isLoggedIn = false;
@@ -462,7 +462,12 @@
       const { ensureDefaultBranding } = await import('$lib/realm-branding-generator.js');
 
       setDeployStep('prepare');
-      await ensureDefaultBranding(formData);
+      await Promise.race([
+        ensureDefaultBranding(formData, { useAi: false }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Artwork generation timed out. Try again or upload images manually.')), 30000),
+        ),
+      ]);
 
       setDeployStep('upload');
       let branding = null;

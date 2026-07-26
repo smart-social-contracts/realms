@@ -1,47 +1,96 @@
 <script>
+  import { onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
+  import { withLiveProgressTiming } from '$lib/deployment-progress.js';
+  import { getObservedStageStarts } from '$lib/deployment-stage-timing.js';
+
   /** @type {import('$lib/deployment-progress.js').getDeploymentProgress extends (j: infer J) => infer R ? R : never} */
   export let progress;
   /** @type {'full' | 'compact'} */
   export let variant = 'full';
   /** @type {boolean} */
   export let showSteps = true;
+  /** Job id — enables live stage timers from session observations. */
+  export let jobId = '';
+  /** Updated every second while active; bind from parent for meta rows. */
+  export let liveTotalDurationLabel = '';
+
+  let nowMs = Date.now();
+  /** @type {ReturnType<typeof setInterval>|null} */
+  let clockTimer = null;
+
+  $: observedStarts = browser && jobId
+    ? getObservedStageStarts(jobId, progress?.startedAtMs ?? null)
+    : null;
+  $: displayProgress = progress?.isActive
+    ? withLiveProgressTiming(progress, nowMs, observedStarts)
+    : progress;
+  $: liveTotalDurationLabel = displayProgress?.totalDurationLabel || '';
+
+  function startClock() {
+    stopClock();
+    if (!browser || !progress?.isActive) return;
+    nowMs = Date.now();
+    clockTimer = setInterval(() => {
+      nowMs = Date.now();
+    }, 1000);
+  }
+
+  function stopClock() {
+    if (clockTimer) {
+      clearInterval(clockTimer);
+      clockTimer = null;
+    }
+  }
+
+  $: if (browser) {
+    if (progress?.isActive) {
+      if (!clockTimer) startClock();
+    } else {
+      stopClock();
+    }
+  }
+
+  onDestroy(stopClock);
 </script>
 
 <div class="deployment-progress" class:compact={variant === 'compact'}>
   <div class="progress-header">
     <div class="progress-label-row">
-      <span class="progress-label">{progress.currentLabel}</span>
-      <span class="progress-percent" aria-hidden="true">{progress.percent}%</span>
+      <span class="progress-label">{displayProgress.currentLabel}</span>
+      <span class="progress-percent" aria-hidden="true">{displayProgress.percent}%</span>
     </div>
     <div
       class="progress-track"
+      class:active={displayProgress.isActive && !displayProgress.isFailed}
       role="progressbar"
-      aria-valuenow={progress.percent}
+      aria-valuenow={displayProgress.percent}
       aria-valuemin="0"
       aria-valuemax="100"
       aria-label="Deployment progress"
     >
       <div
         class="progress-fill"
-        class:failed={progress.isFailed}
-        class:complete={progress.isComplete}
-        style="width: {progress.percent}%"
+        class:failed={displayProgress.isFailed}
+        class:complete={displayProgress.isComplete}
+        class:active={displayProgress.isActive && !displayProgress.isFailed && !displayProgress.isComplete}
+        style="width: {displayProgress.percent}%"
       ></div>
     </div>
-    <p class="progress-description">{progress.currentDescription}</p>
+    <p class="progress-description">{displayProgress.currentDescription}</p>
   </div>
 
-  {#if progress.isFailed && progress.error}
+  {#if displayProgress.isFailed && displayProgress.error}
     <div class="progress-error" role="alert">
       <strong>Deployment failed</strong>
-      <p>{progress.error}</p>
+      <p>{displayProgress.error}</p>
     </div>
   {/if}
 
   {#if showSteps && variant === 'full'}
     <ol class="progress-steps">
-      {#each progress.stages as stage, i}
-        {#if stage.id !== 'complete' || progress.isComplete}
+      {#each displayProgress.stages as stage, i}
+        {#if stage.id !== 'complete' || displayProgress.isComplete}
           <li class="progress-step" class:done={stage.state === 'done'} class:active={stage.state === 'active'} class:failed={stage.state === 'failed'}>
             <span class="step-marker" aria-hidden="true">
               {#if stage.state === 'done'}
@@ -55,25 +104,48 @@
               {/if}
             </span>
             <span class="step-label">{stage.label}</span>
-            {#if stage.id === 'extensions' && stage.state === 'active' && progress.extensionTotal > 0}
-              <span class="step-detail">{progress.extensionCompleted}/{progress.extensionTotal}</span>
+            {#if stage.id === 'extensions' && stage.state === 'active' && displayProgress.extensionTotal > 0}
+              <span class="step-detail">{displayProgress.extensionCompleted}/{displayProgress.extensionTotal}</span>
             {/if}
             {#if stage.durationLabel && stage.state !== 'upcoming'}
               <span
                 class="step-duration"
                 class:estimated={stage.durationEstimated}
+                class:ticking={stage.state === 'active'}
                 title={stage.durationEstimated ? 'Estimated stage duration' : 'Stage duration'}
               >
                 {stage.durationLabel}{#if stage.durationEstimated}~{/if}
               </span>
             {:else if stage.state === 'active'}
-              <span class="step-duration active">in progress</span>
+              <span class="step-duration active ticking">&lt;1s</span>
             {/if}
           </li>
-          {#if stage.id === 'extensions' && progress.subSteps?.length && (stage.state === 'active' || stage.state === 'done' || progress.isFailed)}
+          {#if stage.id === 'provision' && displayProgress.provisionSubSteps?.length && (stage.state === 'active' || stage.state === 'done')}
+            <li class="sub-steps-wrap" aria-label="Canister provisioning steps">
+              <ol class="sub-steps">
+                {#each displayProgress.provisionSubSteps as subStep}
+                  <li class="sub-step" class:done={subStep.state === 'done'} class:active={subStep.state === 'active'}>
+                    <span class="sub-marker" aria-hidden="true">
+                      {#if subStep.state === 'done'}
+                        ✓
+                      {:else if subStep.state === 'active'}
+                        …
+                      {:else}
+                        ·
+                      {/if}
+                    </span>
+                    <span class="sub-label">
+                      {subStep.label}{#if subStep.detail} ({subStep.detail}){/if}
+                    </span>
+                  </li>
+                {/each}
+              </ol>
+            </li>
+          {/if}
+          {#if stage.id === 'extensions' && displayProgress.subSteps?.length && (stage.state === 'active' || stage.state === 'done' || displayProgress.isFailed)}
             <li class="sub-steps-wrap" aria-label="Extension install steps">
               <ol class="sub-steps">
-                {#each progress.subSteps as subStep}
+                {#each displayProgress.subSteps as subStep}
                   <li class="sub-step" class:done={subStep.state === 'done'} class:active={subStep.state === 'active'} class:failed={subStep.state === 'failed'}>
                     <span class="sub-marker" aria-hidden="true">
                       {#if subStep.state === 'done'}
@@ -100,13 +172,13 @@
     </ol>
   {/if}
 
-  {#if progress.backendCanisterId || progress.frontendCanisterId}
+  {#if displayProgress.backendCanisterId || displayProgress.frontendCanisterId}
     <div class="canister-ids subtle">
-      {#if progress.backendCanisterId}
-        <span>Backend: {progress.backendCanisterId}</span>
+      {#if displayProgress.backendCanisterId}
+        <span>Backend: {displayProgress.backendCanisterId}</span>
       {/if}
-      {#if progress.frontendCanisterId}
-        <span>Frontend: {progress.frontendCanisterId}</span>
+      {#if displayProgress.frontendCanisterId}
+        <span>Frontend: {displayProgress.frontendCanisterId}</span>
       {/if}
     </div>
   {/if}
@@ -154,13 +226,35 @@
     background: #e5e5e5;
     border-radius: 999px;
     overflow: hidden;
+    position: relative;
+  }
+
+  .progress-track.active::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.45) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: progress-shimmer 2s linear infinite;
+    pointer-events: none;
   }
 
   .progress-fill {
     height: 100%;
     background: linear-gradient(90deg, #3b82f6, #2563eb);
     border-radius: 999px;
-    transition: width 0.4s ease;
+    transition: width 0.6s ease;
+    position: relative;
+    z-index: 1;
+  }
+
+  .progress-fill.active {
+    animation: progress-breathe 2.4s ease-in-out infinite;
   }
 
   .progress-fill.complete {
@@ -298,9 +392,9 @@
     color: #a3a3a3;
   }
 
-  .step-duration.active {
+  .step-duration.active,
+  .step-duration.ticking {
     color: #2563eb;
-    font-style: italic;
   }
 
   .progress-step.done .step-duration {
@@ -360,5 +454,39 @@
 
   .subtle {
     opacity: 0.9;
+  }
+
+  @keyframes progress-shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  @keyframes progress-breathe {
+    0%,
+    100% {
+      filter: brightness(1);
+    }
+    50% {
+      filter: brightness(1.08);
+    }
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .spinner {
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 2px solid #2563eb;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
   }
 </style>

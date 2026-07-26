@@ -40,6 +40,7 @@
   let manifestRaw = null;
   let manifestLoading = false;
   let manifestError = null;
+  let liveTotalDurationLabel = '';
 
   async function loadManifest() {
     if (!jobId || !userPrincipal) return;
@@ -271,7 +272,14 @@
           <span>{formatDate(deployment.progress.finishedAtMs)}</span>
         </div>
       {/if}
-      {#if deployment.progress?.totalDurationLabel}
+      {#if deployment.progress?.isActive || liveTotalDurationLabel}
+        <div class="meta-row">
+          <span class="meta-label">Total duration</span>
+          <span class="live-duration">
+            {liveTotalDurationLabel || deployment.progress?.totalDurationLabel || '—'}
+          </span>
+        </div>
+      {:else if deployment.progress?.totalDurationLabel}
         <div class="meta-row">
           <span class="meta-label">Total duration</span>
           <span>
@@ -288,6 +296,8 @@
 
       <DeploymentProgress
         progress={destroyProgress || deployment.progress}
+        jobId={destroyProgress ? '' : jobId}
+        bind:liveTotalDurationLabel
         variant="full"
         showSteps={true}
       />
@@ -339,7 +349,7 @@
       </div>
 
       {#if deployment.progress?.isActive}
-        <p class="refresh-note">This page refreshes automatically every 10 seconds.</p>
+        <p class="refresh-note">This page refreshes automatically every 5 seconds.</p>
       {/if}
     </div>
   {/if}
@@ -435,6 +445,10 @@
   .job-id {
     font-size: 0.8125rem;
     word-break: break-all;
+  }
+
+  .live-duration {
+    font-variant-numeric: tabular-nums;
   }
 
   .actions {

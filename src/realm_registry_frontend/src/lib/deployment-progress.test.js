@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildProvisionSubSteps,
   computeDeploymentPercent,
   computeDeploymentUnits,
   getDeploymentProgress,
+  withLiveProgressTiming,
 } from './deployment-progress.js';
 
 test('completed job is 100%', () => {
@@ -13,18 +15,31 @@ test('completed job is 100%', () => {
   );
 });
 
-test('provisioning with backend and frontend advances past flat stage percent', () => {
+test('provisioning with backend only is well below old fixed 28%', () => {
   const job = {
     status: 'provisioning',
     raw_status: 'provisioning',
     backend_canister_id: 'epc7x-syaaa-aaaac-bfq3q-cai',
-    frontend_canister_id: 'fcm3z-5qaaa-aaaac-bfq4a-cai',
+    frontend_canister_id: '',
     assets_verified: 0,
-    wasm_verified: 0,
+    wasm_verified: 1,
     expected_step_count: 33,
   };
   const percent = computeDeploymentPercent(job, null);
-  assert.ok(percent > 10 && percent < 40, `expected mid-range percent, got ${percent}`);
+  assert.ok(percent < 20, `expected under 20%, got ${percent}%`);
+});
+
+test('provisioning with backend and frontend is mid provision range', () => {
+  const job = {
+    status: 'provisioning',
+    raw_status: 'provisioning',
+    backend_canister_id: 'abc',
+    frontend_canister_id: 'def',
+    assets_verified: 0,
+    expected_step_count: 10,
+  };
+  const percent = computeDeploymentPercent(job, null);
+  assert.ok(percent >= 20 && percent <= 32, `expected 20-32%, got ${percent}%`);
 });
 
 test('provisioning with assets verified scores higher than canisters-only', () => {
@@ -56,10 +71,42 @@ test('extension steps increase percent proportionally', () => {
   const early = computeDeploymentPercent(job, { total_count: 10, completed_count: 2, steps: [] });
   const later = computeDeploymentPercent(job, { total_count: 10, completed_count: 8, steps: [] });
   assert.ok(later > early);
+  assert.ok(early >= 42 && later <= 92);
 });
 
-test('getDeploymentProgress exposes sub-steps during extensions', () => {
+test('withLiveProgressTiming ticks total and active stage duration', () => {
+  const now = 1_700_000_000_000;
   const progress = getDeploymentProgress(
+    {
+      status: 'provisioning',
+      raw_status: 'provisioning',
+      created_at: (now - 125000) / 1000,
+      backend_canister_id: 'abc',
+    },
+    null,
+  );
+  const live = withLiveProgressTiming(progress, now, { 1: now - 45000 });
+  assert.equal(live.totalDurationLabel, '2m 5s');
+  const activeStage = live.stages.find((s) => s.state === 'active');
+  assert.equal(activeStage?.durationLabel, '45s');
+});
+
+test('getDeploymentProgress exposes provision and extension sub-steps', () => {
+  const progress = getDeploymentProgress(
+    {
+      status: 'provisioning',
+      raw_status: 'provisioning',
+      backend_canister_id: 'abc',
+      frontend_canister_id: '',
+      assets_verified: 0,
+    },
+    null,
+  );
+  assert.ok(progress.provisionSubSteps.length >= 3);
+  assert.equal(progress.provisionSubSteps[0].state, 'done');
+  assert.equal(progress.provisionSubSteps[1].state, 'active');
+
+  const extProgress = getDeploymentProgress(
     {
       status: 'extensions',
       raw_status: 'extensions',
@@ -79,8 +126,8 @@ test('getDeploymentProgress exposes sub-steps during extensions', () => {
       },
     },
   );
-  assert.equal(progress.extensionTotal, 2);
-  assert.equal(progress.extensionCompleted, 1);
-  assert.equal(progress.subSteps.length, 2);
-  assert.match(progress.currentDescription, /1\/2/);
+  assert.equal(extProgress.extensionTotal, 2);
+  assert.equal(extProgress.extensionCompleted, 1);
+  assert.equal(extProgress.subSteps.length, 2);
+  assert.match(extProgress.currentDescription, /1\/2/);
 });

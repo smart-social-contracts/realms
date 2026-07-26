@@ -6,13 +6,9 @@ import {
   isActiveQueueStatus,
 } from '$lib/installer-queue.js';
 import { recordDeploymentStageObservation } from '$lib/deployment-stage-timing.js';
+import { deploymentJobUrl } from '$lib/deployment-url.js';
 
-/** Canonical URL for tracking a single deployment job. */
-export function deploymentJobUrl(jobId) {
-  const id = (jobId || '').trim();
-  if (!id) return '/my-dashboard?tab=realms';
-  return `/my-dashboard/deployments?job=${encodeURIComponent(id)}`;
-}
+export { deploymentJobUrl };
 
 function shouldFetchDeployTask(job) {
   if (!job) return false;
@@ -37,7 +33,7 @@ export async function loadDeploymentRow(jobId) {
  * Poll a deployment job until terminal. Calls `onUpdate(row)` each tick.
  * @returns {() => void} stop polling
  */
-export function startDeploymentJobPolling(jobId, onUpdate, intervalMs = 10000) {
+export function startDeploymentJobPolling(jobId, onUpdate, intervalMs = 5000) {
   if (!browser || !jobId) return () => {};
 
   let stopped = false;
