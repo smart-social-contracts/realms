@@ -29,10 +29,17 @@ Other hooks prefer sandbox per config but only actually run sandboxed once
 marked sandbox-compatible (plain-data contract); until then the legacy
 in-process ``exec()`` path is kept.
 
-Phase 1 scope for extensions: fresh-per-use (spawn, one call, close) with an
-EMPTY capability — pure compute over their JSON args, no rpc() bridge, no
-writes. Extensions that import host modules will fail to spawn; with
-``fallback_in_process`` they degrade gracefully with a warning.
+The sandbox primitive is **pure compute**: ``spawn_subinterpreter(source, hash)``
+then ``call_in_subinterpreter(handle, fn, kwargs)`` exchange deep-copied plain
+data; there is no live callback from the sandbox into the host. So:
+
+* **Extensions** run fresh-per-use (spawn, one call, close) as pure compute over
+  their JSON args — no host reads/writes. Extensions that import host modules
+  fail to spawn and, with ``fallback_in_process``, degrade with a warning.
+* **Codex hooks** use the *gather → compute → apply-effects* bridge
+  (``core.codex_bridge``): the host injects a plain-data ``context`` (reads), the
+  hook returns a plain-data list of intended effects, and the host authorizes and
+  applies them against the codex's declared capabilities. See issue #265.
 """
 
 import json
@@ -406,27 +413,46 @@ def build_proposal_code(patch: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Execution (Phase 1: fresh-per-use, empty capability)
+# Execution — real ``_basilisk_sandbox`` primitive (pure compute)
 # ---------------------------------------------------------------------------
+#
+# API (introspected in-canister, ic-basilisk 0.14.2):
+#   sha256(text) -> hex                    approve_hash(hex) / revoke_hash(hex)
+#   spawn_subinterpreter(source, hash) -> handle
+#   call_in_subinterpreter(handle, fn, kwargs=None) -> plain data
+#   close_subinterpreter(handle)           wasm_memory_pages()
+# There is no capability object, no rpc callback, and no instruction budget
+# parameter; the ``budget`` policy field is retained for observability only.
 
 
-def _deny_rpc(context_id: str, action: str, kwargs: dict) -> Any:
-    # Phase 1 spawns with allowed_actions=() so the C layer refuses every
-    # rpc() before this handler is reached; keep it as a hard backstop.
-    raise PermissionError(f"rpc '{action}' is not allowed in this sandbox")
+def _run_in_subinterpreter(source: str, function_name: str, kwargs: dict) -> Any:
+    """Spawn a fresh subinterpreter for *source*, call ``function_name`` with
+    *kwargs* (plain data), tear it down, and return its plain-data result."""
+    import _basilisk_sandbox
+
+    content_hash = _basilisk_sandbox.sha256(source)
+    _basilisk_sandbox.approve_hash(content_hash)
+    handle = _basilisk_sandbox.spawn_subinterpreter(source, content_hash)
+    try:
+        return _basilisk_sandbox.call_in_subinterpreter(
+            handle, function_name, kwargs
+        )
+    finally:
+        _basilisk_sandbox.close_subinterpreter(handle)
+        try:
+            _basilisk_sandbox.revoke_hash(content_hash)
+        except Exception:
+            pass
 
 
 def call_in_sandbox(ext_id: str, function_name: str, args: str) -> Any:
     """Run ``entry.py::function_name(args)`` of an installed extension in a
     fresh subinterpreter and return its (plain data) result.
 
-    Raises on any failure — missing entry.py, spawn/import failure, budget
-    exhaustion, non-plain-data result. The caller decides whether to fall
-    back in-process.
+    Pure compute over the JSON ``args`` string — no host reads/writes. Raises on
+    any failure (missing entry.py, spawn/import failure, non-plain-data result);
+    the caller decides whether to fall back in-process.
     """
-    import _basilisk_sandbox
-    from basilisk.sandbox import call_sandboxed, spawn_sandboxed
-
     from core.runtime_extensions import EXTENSIONS_DIR
 
     entry_path = os.path.join(EXTENSIONS_DIR, ext_id, "entry.py")
@@ -436,21 +462,8 @@ def call_in_sandbox(ext_id: str, function_name: str, args: str) -> Any:
     with open(entry_path, "r") as f:
         source = f.read()
 
-    content_hash = _basilisk_sandbox.sha256(source)
-    _basilisk_sandbox.approve_hash(content_hash)
-
-    capability = {"context_id": ext_id, "classes": {}, "allowed_actions": []}
-    budget = get_config().get("budget", DEFAULT_CONFIG["budget"])
-
-    logger.debug(
-        f"Sandboxing {ext_id}.{function_name} (budget={budget}, "
-        f"{len(source)} bytes)"
-    )
-    handle = spawn_sandboxed(source, content_hash, capability, _deny_rpc, budget)
-    try:
-        return call_sandboxed(handle, function_name, {"args": args})
-    finally:
-        _basilisk_sandbox.close_subinterpreter(handle)
+    logger.debug(f"Sandboxing {ext_id}.{function_name} ({len(source)} bytes)")
+    return _run_in_subinterpreter(source, function_name, {"args": args})
 
 
 # ---------------------------------------------------------------------------
@@ -459,10 +472,15 @@ def call_in_sandbox(ext_id: str, function_name: str, args: str) -> Any:
 
 
 def _ggg_sdk_source() -> str:
-    """Source of the in-sandbox ``ggg_sdk`` module (realm_backend/ggg_sdk.py)."""
-    sdk_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ggg_sdk.py")
-    with open(sdk_path, "r") as f:
-        return f.read()
+    """Source text of the in-sandbox ``ggg_sdk`` module.
+
+    In the canister the realm_backend modules are frozen to bytecode (no
+    ``__file__``, no ``loader.get_source``), so the SDK keeps its own source as
+    the ``GGG_SDK_SOURCE`` string constant — values survive freezing.
+    """
+    import ggg_sdk
+
+    return ggg_sdk.GGG_SDK_SOURCE
 
 
 def _build_codex_sandbox_source(codex_source: str) -> str:
@@ -470,13 +488,16 @@ def _build_codex_sandbox_source(codex_source: str) -> str:
     the subinterpreter, then the codex source.
 
     The subinterpreter spawns from a single source string, so the SDK is
-    embedded and registered in ``sys.modules`` before the codex runs. The SDK's
-    ``rpc`` calls resolve to the sandbox-injected ``rpc`` builtin. The codex may
-    then ``from ggg_sdk import hook, realm`` exactly as authored.
+    embedded and registered in ``sys.modules`` before the codex runs. The codex
+    may then ``from ggg_sdk import hook, realm`` exactly as authored; reads are
+    served from the injected ``context`` and writes are collected as effects
+    (no host callback).
     """
+    # The sandbox stdlib is minimal (no ``types`` module), so the module type is
+    # taken from ``sys`` itself.
     loader = (
-        "import sys as _sys, types as _types\n"
-        "_ggg_sdk = _types.ModuleType('ggg_sdk')\n"
+        "import sys as _sys\n"
+        "_ggg_sdk = type(_sys)('ggg_sdk')\n"
         "_GGG_SDK_SOURCE = " + repr(_ggg_sdk_source()) + "\n"
         "exec(compile(_GGG_SDK_SOURCE, 'ggg_sdk.py', 'exec'), _ggg_sdk.__dict__)\n"
         "_sys.modules['ggg_sdk'] = _ggg_sdk\n"
@@ -513,22 +534,47 @@ def _codex_hook_module_file(codex_id: str) -> str:
         return "entry.py"
 
 
+def _gather_hook_context(hook_name: str, args: str) -> dict:
+    """Build the plain-data reads a sandboxed hook may need (host-side).
+
+    The sandbox cannot call back into the host, so everything a hook might read
+    (``realm.config()``, ``realm.currency()``, ``realm.now()``, ``realm.info()``,
+    ``realm.users.get(id)``) is pre-projected here into a plain-data snapshot and
+    injected as the hook's ``context``. The user referenced in ``args`` (if any)
+    is pre-fetched so ``on_user_register`` can look it up.
+    """
+    from core import codex_bridge
+
+    context = {
+        "config": codex_bridge._v_config_get(),
+        "currency": codex_bridge._v_currency_get(),
+        "now": codex_bridge._v_time_now(),
+        "realm": codex_bridge._v_realm_get(),
+        "users": {},
+    }
+    try:
+        params = json.loads(args) if args else {}
+    except Exception:
+        params = {}
+    user_id = params.get("user_id") if isinstance(params, dict) else None
+    if user_id:
+        context["users"][user_id] = codex_bridge._v_user_get(user_id=user_id)
+    return context
+
+
 def call_codex_hook_in_sandbox(codex_id: str, hook_name: str, args: str) -> Any:
-    """Run ``hook_name(args)`` of a bridge-native codex in a fresh
-    subinterpreter, wired to the capability bridge, and return its plain-data
+    """Run ``hook_name`` of a bridge-native codex in a fresh subinterpreter using
+    the *gather → compute → apply-effects* bridge, and return its plain-data
     result.
 
     The module spawned is the codex's declared ``sandbox_module`` (a
-    self-contained ``ggg_sdk`` hook module), falling back to ``entry.py``.
-    Unlike ``call_in_sandbox`` (empty-capability extension compute), this grants
-    the codex its declared capabilities and installs
-    ``core.codex_bridge.make_rpc_handler`` as the ``rpc`` handler so the codex
-    can read/write the realm through authorized verbs only. Raises on any
-    failure; the caller decides whether to fall back in-process.
+    self-contained ``ggg_sdk`` hook module), falling back to ``entry.py``. The
+    host injects a plain-data ``context`` (pre-projected reads); the hook runs as
+    pure compute and returns an envelope ``{"ok", "effects", "result"}``; the host
+    then authorizes and applies the effects against the codex's declared
+    capabilities via ``core.codex_bridge.apply_effects``. Raises on any failure;
+    the caller decides whether to fall back in-process.
     """
-    import _basilisk_sandbox
-    from basilisk.sandbox import call_sandboxed, spawn_sandboxed
-
     from core import codex_bridge
     from core.runtime_extensions import EXTENSIONS_DIR
 
@@ -541,27 +587,37 @@ def call_codex_hook_in_sandbox(codex_id: str, hook_name: str, args: str) -> Any:
         codex_source = f.read()
 
     source = _build_codex_sandbox_source(codex_source)
-    content_hash = _basilisk_sandbox.sha256(source)
-    _basilisk_sandbox.approve_hash(content_hash)
-
     capabilities = _codex_capabilities(codex_id)
-    capability = {
-        "context_id": codex_id,
-        "classes": {},
-        "allowed_actions": list(capabilities),
-    }
-    handler = codex_bridge.make_rpc_handler(codex_id, capabilities)
-    budget = get_config().get("budget", DEFAULT_CONFIG["budget"])
+    context = _gather_hook_context(hook_name, args)
+
+    # Args cross the boundary pre-parsed: the sandbox stdlib has no ``json``.
+    try:
+        params = json.loads(args) if args else {}
+    except Exception:
+        params = {}
+    if not isinstance(params, dict):
+        params = {}
 
     logger.debug(
-        f"Sandboxing codex {codex_id}.{hook_name} "
-        f"(capabilities={capabilities}, budget={budget})"
+        f"Sandboxing codex {codex_id}.{hook_name} (capabilities={capabilities})"
     )
-    handle = spawn_sandboxed(source, content_hash, capability, handler, budget)
-    try:
-        return call_sandboxed(handle, hook_name, {"args": args})
-    finally:
-        _basilisk_sandbox.close_subinterpreter(handle)
+    payload = _run_in_subinterpreter(
+        source, hook_name, {"args": params, "context": context}
+    )
+
+    if not isinstance(payload, dict):
+        raise ValueError(
+            f"codex '{codex_id}' hook '{hook_name}' returned "
+            f"{type(payload).__name__}, expected an envelope dict"
+        )
+    if not payload.get("ok"):
+        return {"success": False, "error": payload.get("error", "codex hook failed")}
+
+    results = codex_bridge.apply_effects(
+        codex_id, capabilities, payload.get("effects") or []
+    )
+    result = codex_bridge.resolve_result(payload.get("result"), results)
+    return result if result is not None else {"success": True}
 
 
 def get_status() -> dict:
