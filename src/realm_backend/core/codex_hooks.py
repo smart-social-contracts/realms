@@ -59,8 +59,10 @@ _NON_CONFIG_MANIFEST_KEYS = frozenset({
     # Wizard-editable parameter declarations (issue #253) — metadata about
     # the config, not config itself.
     "parameters",
-    # GGG API contract declaration (issue #265) — plumbing, not config.
+    # GGG API contract declaration + capability grants (issue #265) — plumbing,
+    # not config.
     "ggg_api_version",
+    "capabilities",
 })
 
 
@@ -135,6 +137,33 @@ def declares_ggg_api(manifest: dict) -> bool:
     packages are only warned (issue #265, Workstream A).
     """
     return isinstance(manifest, dict) and manifest.get("ggg_api_version") is not None
+
+
+def codex_capabilities(manifest: dict) -> List[str]:
+    """The verb capabilities a codex manifest declares (issue #265).
+
+    Each entry is a ``"<domain>.<verb>"`` string naming a capability-bridge
+    verb the codex may invoke (``core.codex_bridge.VERBS``). Non-string / non-
+    list values are ignored. Returns ``[]`` for a manifest that declares none.
+    """
+    if not isinstance(manifest, dict):
+        return []
+    raw = manifest.get("capabilities")
+    if not isinstance(raw, list):
+        return []
+    return [c for c in raw if isinstance(c, str)]
+
+
+def declares_capabilities(manifest: dict) -> bool:
+    """True when a codex manifest carries a ``capabilities`` list (issue #265).
+
+    Presence of the key is the opt-in signal that a codex is written to the
+    capability-bridge contract (its hooks call the realm via ``rpc`` / the
+    ``ggg_sdk`` rather than reaching into host modules) and may therefore be
+    routed through the sandbox. Legacy codices lack the key and keep running
+    in-process unchanged.
+    """
+    return isinstance(manifest, dict) and isinstance(manifest.get("capabilities"), list)
 
 
 def get_active_codex() -> Optional[str]:
@@ -392,9 +421,73 @@ def get_dashboard_config() -> dict:
     return get_config().get("dashboard", {}) or {}
 
 
+def _active_codex_manifest() -> dict:
+    """Manifest of the active hook-API codex, or ``{}``."""
+    codex_id = get_active_codex()
+    if not codex_id:
+        return {}
+    try:
+        from core.runtime_extensions import get_all_extension_manifests
+
+        return get_all_extension_manifests().get(codex_id) or {}
+    except Exception:
+        return {}
+
+
+def _hook_runs_sandboxed(hook_name: str) -> bool:
+    """True when *hook_name* should be dispatched into the subinterpreter.
+
+    Requires both (a) the sandbox policy resolves this hook to ``sandbox``
+    (``runtime_sandbox.should_sandbox_hook``) and (b) the active codex is
+    bridge-aware (declares a ``capabilities`` list). Legacy codices without
+    capabilities always take the in-process path (issue #265).
+    """
+    if not declares_capabilities(_active_codex_manifest()):
+        return False
+    try:
+        from core import runtime_sandbox
+
+        return runtime_sandbox.should_sandbox_hook(hook_name)
+    except Exception as e:
+        logger.warning(f"_hook_runs_sandboxed({hook_name}) failed: {e}")
+        return False
+
+
+def _dispatch_sandboxed(codex_id: str, hook_name: str, args: dict) -> bool:
+    """Run a hook in the sandbox. Returns True when the event is considered
+    handled (so callers skip legacy fallbacks). Honors the sandbox
+    ``fallback_in_process`` policy on failure by signalling the caller to try
+    the in-process path (returns False)."""
+    from core import runtime_sandbox
+
+    try:
+        runtime_sandbox.call_codex_hook_in_sandbox(
+            codex_id, hook_name, json.dumps(args)
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Sandboxed codex {hook_name} failed for {codex_id}: {e}")
+        if runtime_sandbox.get_config().get("fallback_in_process"):
+            logger.warning(
+                f"Falling back to in-process for {hook_name} (codex {codex_id})"
+            )
+            return False
+        # No fallback: the hook was dispatched (and failed); don't double-fire.
+        return True
+
+
 def dispatch_on_user_register(user_id: str) -> bool:
     """Fire the ``on_user_register`` hook. Returns True when a hook-API
     codex handled the event (callers then skip legacy fallbacks)."""
+    codex_id = get_active_codex()
+    if codex_id and _hook_runs_sandboxed("on_user_register"):
+        handled = _dispatch_sandboxed(
+            codex_id, "on_user_register", {"user_id": user_id}
+        )
+        if handled:
+            return True
+        # else: fall through to the in-process path below.
+
     hook = get_hook("on_user_register")
     if hook is None:
         return False

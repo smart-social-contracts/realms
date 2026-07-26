@@ -77,10 +77,14 @@ KNOWN_CODEX_HOOKS = (
     "on_treasury_send",
 )
 
-# Hooks whose implementation uses only plain data (no ggg/ic imports) and can
-# therefore run inside a Phase-1 empty-capability sandbox. Empty until hooks
-# are rewritten to the sandboxed contract; legacy exec() remains for the rest.
-SANDBOX_COMPATIBLE_HOOKS = frozenset()
+# Hooks that reach the realm exclusively through the capability bridge
+# (``rpc`` / ``ggg_sdk``) and can therefore run inside a subinterpreter with a
+# real (non-empty) capability. A hook here only actually runs sandboxed when the
+# active codex is bridge-aware (declares ``capabilities``); legacy codices keep
+# the in-process exec() path regardless (issue #265, Workstream C).
+SANDBOX_COMPATIBLE_HOOKS = frozenset({
+    "on_user_register",
+})
 
 DEFAULT_CONFIG = {
     "enabled": True,
@@ -445,6 +449,98 @@ def call_in_sandbox(ext_id: str, function_name: str, args: str) -> Any:
     handle = spawn_sandboxed(source, content_hash, capability, _deny_rpc, budget)
     try:
         return call_sandboxed(handle, function_name, {"args": args})
+    finally:
+        _basilisk_sandbox.close_subinterpreter(handle)
+
+
+# ---------------------------------------------------------------------------
+# Codex hooks: sandboxed via the capability bridge (issue #265, Workstream C)
+# ---------------------------------------------------------------------------
+
+
+def _ggg_sdk_source() -> str:
+    """Source of the in-sandbox ``ggg_sdk`` module (realm_backend/ggg_sdk.py)."""
+    sdk_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ggg_sdk.py")
+    with open(sdk_path, "r") as f:
+        return f.read()
+
+
+def _build_codex_sandbox_source(codex_source: str) -> str:
+    """Prepend a loader that installs ``ggg_sdk`` as an importable module inside
+    the subinterpreter, then the codex source.
+
+    The subinterpreter spawns from a single source string, so the SDK is
+    embedded and registered in ``sys.modules`` before the codex runs. The SDK's
+    ``rpc`` calls resolve to the sandbox-injected ``rpc`` builtin. The codex may
+    then ``from ggg_sdk import hook, realm`` exactly as authored.
+    """
+    loader = (
+        "import sys as _sys, types as _types\n"
+        "_ggg_sdk = _types.ModuleType('ggg_sdk')\n"
+        "_GGG_SDK_SOURCE = " + repr(_ggg_sdk_source()) + "\n"
+        "exec(compile(_GGG_SDK_SOURCE, 'ggg_sdk.py', 'exec'), _ggg_sdk.__dict__)\n"
+        "_sys.modules['ggg_sdk'] = _ggg_sdk\n"
+    )
+    return loader + "\n" + codex_source
+
+
+def _codex_capabilities(codex_id: str) -> List[str]:
+    """Verb capabilities the codex manifest declares (issue #265)."""
+    try:
+        from core import codex_hooks
+        from core.runtime_extensions import get_all_extension_manifests
+
+        manifest = get_all_extension_manifests().get(codex_id) or {}
+        return codex_hooks.codex_capabilities(manifest)
+    except Exception as e:
+        logger.warning(f"_codex_capabilities({codex_id}) failed: {e}")
+        return []
+
+
+def call_codex_hook_in_sandbox(codex_id: str, hook_name: str, args: str) -> Any:
+    """Run ``entry.py::hook_name(args)`` of a bridge-aware codex in a fresh
+    subinterpreter, wired to the capability bridge, and return its plain-data
+    result.
+
+    Unlike ``call_in_sandbox`` (empty-capability extension compute), this grants
+    the codex its declared capabilities and installs
+    ``core.codex_bridge.make_rpc_handler`` as the ``rpc`` handler so the codex
+    can read/write the realm through authorized verbs only. Raises on any
+    failure; the caller decides whether to fall back in-process.
+    """
+    import _basilisk_sandbox
+    from basilisk.sandbox import call_sandboxed, spawn_sandboxed
+
+    from core import codex_bridge
+    from core.runtime_extensions import EXTENSIONS_DIR
+
+    entry_path = os.path.join(EXTENSIONS_DIR, codex_id, "entry.py")
+    if not os.path.exists(entry_path):
+        raise FileNotFoundError(f"codex '{codex_id}' has no entry.py")
+
+    with open(entry_path, "r") as f:
+        codex_source = f.read()
+
+    source = _build_codex_sandbox_source(codex_source)
+    content_hash = _basilisk_sandbox.sha256(source)
+    _basilisk_sandbox.approve_hash(content_hash)
+
+    capabilities = _codex_capabilities(codex_id)
+    capability = {
+        "context_id": codex_id,
+        "classes": {},
+        "allowed_actions": list(capabilities),
+    }
+    handler = codex_bridge.make_rpc_handler(codex_id, capabilities)
+    budget = get_config().get("budget", DEFAULT_CONFIG["budget"])
+
+    logger.debug(
+        f"Sandboxing codex {codex_id}.{hook_name} "
+        f"(capabilities={capabilities}, budget={budget})"
+    )
+    handle = spawn_sandboxed(source, content_hash, capability, handler, budget)
+    try:
+        return call_sandboxed(handle, hook_name, {"args": args})
     finally:
         _basilisk_sandbox.close_subinterpreter(handle)
 
