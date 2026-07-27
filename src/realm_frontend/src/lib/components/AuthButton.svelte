@@ -12,6 +12,7 @@
 	import T from '$lib/components/T.svelte';
 	import { IconCopy, IconLogin } from '@tabler/icons-svelte';
 	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
+	import { copyText } from '$lib/clipboard.js';
 
 	let principalText = '';
 	let showDropdown = false;
@@ -157,14 +158,13 @@
 	async function copyPrincipal(event) {
 		event.stopPropagation();
 		if (!$principal) return;
-		try {
-			await navigator.clipboard.writeText($principal);
+		if (await copyText($principal)) {
 			copiedPrincipal = true;
 			setTimeout(() => {
 				copiedPrincipal = false;
 			}, 2000);
-		} catch (error) {
-			console.error('Failed to copy principal:', error);
+		} else {
+			console.error('Failed to copy principal');
 		}
 	}
 </script>
