@@ -7,7 +7,9 @@
   import { ensureRegistryRuntimeFlags } from '$lib/stores/registryRuntimeFlags.js';
   import { syncAuthSession } from '$lib/stores/authSession.js';
   import RegistryAssistant from '$lib/components/RegistryAssistant.svelte';
+  import DeployProgressModal from '$lib/components/DeployProgressModal.svelte';
   import { assistantChrome } from '$lib/assistant-chrome.js';
+  import { deployProgress, closeDeployProgress } from '$lib/stores/deployProgress.js';
   import '../index.scss';
   import '$lib/theme/tokens.css';
 
@@ -56,6 +58,14 @@
   </div>
   <!-- Mundus-level AI assistant (float/dock); see issue #233. -->
   <RegistryAssistant />
+  <DeployProgressModal
+    open={$deployProgress.open}
+    phase={$deployProgress.phase}
+    activeStep={$deployProgress.activeStep}
+    uploadDetail={$deployProgress.uploadDetail}
+    errorMessage={$deployProgress.errorMessage}
+    on:dismiss={closeDeployProgress}
+  />
 {:else}
   <div class="loading-screen">
     <div class="spinner"></div>

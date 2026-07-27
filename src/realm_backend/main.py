@@ -6667,6 +6667,34 @@ def list_codex_packages() -> text:
 
 @update
 @require(Operations.EXTENSION_INSTALL)
+def resync_extension_frontends(args: text) -> Async[text]:
+    """Re-copy frontend bundles for all installed extensions.
+
+    Use after a frontend asset canister reinstall/redeploy wipes ``/ext/``
+    paths. Same-origin extension loading has no file_registry fallback.
+
+    Args (JSON): {
+        "registry_canister_id": str|null,   (defaults to realm's file registry)
+        "frontend_canister_id": str|null,   (defaults to realm's frontend)
+        "extension_ids": [str, ...]|null     (defaults to all installed)
+    }
+    """
+    try:
+        params = json.loads(args) if args else {}
+        registry_id = params.get("registry_canister_id") or ""
+        frontend_id = params.get("frontend_canister_id") or _get_frontend_canister_id()
+        extension_ids = params.get("extension_ids")
+
+        from api.file_registry import resync_extension_frontends as _resync
+
+        return (yield from _resync(registry_id, frontend_id, extension_ids))
+    except Exception as e:
+        logger.error(f"resync_extension_frontends error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.EXTENSION_INSTALL)
 def install_extension_from_registry(args: text) -> Async[text]:
     """Install an extension by pulling backend files from the file registry.
     Copies frontend bundles to the realm's frontend asset canister before

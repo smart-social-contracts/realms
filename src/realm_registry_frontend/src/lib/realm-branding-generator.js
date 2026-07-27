@@ -226,21 +226,34 @@ export async function generateRealmBackground(realmName, options = {}) {
   return renderToFile(drawBackgroundCanvas, 1600, 480, name, 'background.png', options.seed || '');
 }
 
-/** Fill missing logo/background on formData before deploy. */
-export async function ensureDefaultBranding(formData, options = {}) {
+/** Fill missing logo/background for deploy without mutating wizard form state. */
+export async function resolveDeployBranding(formData, options = {}) {
   const name = (formData?.name || 'Realm').trim() || 'Realm';
   const seed = options.seed || String(Date.now());
 
-  if (!formData.logo) {
-    const file = await generateRealmLogo(name, { seed, useAi: options.useAi });
-    formData.logo = file;
-    formData.logoPreview = URL.createObjectURL(file);
+  let logo = formData?.logo || null;
+  let background = formData?.background || null;
+
+  if (!logo) {
+    logo = await generateRealmLogo(name, { seed, useAi: options.useAi });
   }
-  if (!formData.background) {
-    const file = await generateRealmBackground(name, { seed, useAi: options.useAi });
-    formData.background = file;
-    formData.backgroundPreview = URL.createObjectURL(file);
+  if (!background) {
+    background = await generateRealmBackground(name, { seed, useAi: options.useAi });
   }
 
+  return { logo, background };
+}
+
+/** Fill missing logo/background on formData before deploy. */
+export async function ensureDefaultBranding(formData, options = {}) {
+  const { logo, background } = await resolveDeployBranding(formData, options);
+  formData.logo = logo;
+  formData.background = background;
+  if (!formData.logoPreview && logo) {
+    formData.logoPreview = URL.createObjectURL(logo);
+  }
+  if (!formData.backgroundPreview && background) {
+    formData.backgroundPreview = URL.createObjectURL(background);
+  }
   return formData;
 }

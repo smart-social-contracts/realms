@@ -1012,6 +1012,50 @@ def registry_install_command(canister: str, registry: str, ext_id: str, version:
         raise typer.Exit(1)
 
 
+def resync_frontends_command(
+    canister: str,
+    registry: Optional[str] = None,
+    frontend: Optional[str] = None,
+    network: str = "local",
+    identity: Optional[str] = None,
+):
+    """Re-copy installed extensions' frontend bundles onto the realm frontend."""
+    console.print(
+        f"[blue]Resyncing extension frontends on {canister} ({network})...[/blue]"
+    )
+    payload = {}
+    if registry:
+        payload["registry_canister_id"] = registry
+    if frontend:
+        payload["frontend_canister_id"] = frontend
+    candid_arg = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+    raw = _dfx_call(
+        canister, "resync_extension_frontends", candid_arg, network, identity, timeout=600,
+    )
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+    if result.get("success"):
+        synced = result.get("synced") or []
+        console.print(f"[green]  ✓ Resynced {len(synced)} extension frontend bundle(s)[/green]")
+        for item in synced:
+            console.print(
+                f"    - {item.get('extension_id')}@{item.get('version', '?')}"
+            )
+        skipped = result.get("skipped") or []
+        if skipped:
+            console.print(f"[yellow]  Skipped {len(skipped)} (no version/registry)[/yellow]")
+    else:
+        console.print(f"[red]  ✗ Resync failed[/red]")
+        for err in result.get("errors") or []:
+            console.print(f"    - {err.get('extension_id')}: {err.get('error')}")
+        if result.get("error"):
+            console.print(f"  {result['error']}")
+        raise typer.Exit(1)
+
+
 # ---------------------------------------------------------------------------
 # Codex CLI commands
 # ---------------------------------------------------------------------------
@@ -1738,7 +1782,7 @@ def codex_registry_install_command(canister: str, registry: str, codex_id: str, 
 def extension_command(
     action: str = typer.Argument(
         ...,
-        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests, runtime-install, runtime-uninstall, runtime-list, registry-install, publish",
+        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests, runtime-install, runtime-uninstall, runtime-list, registry-install, resync-frontends, publish",
     ),
     extension_id: Optional[str] = typer.Option(
         None, "--extension-id", help="Extension ID for package/uninstall operations"
@@ -1855,6 +1899,11 @@ def extension_command(
             console.print("[red]Error: --extension-id is required for registry-install[/red]")
             raise typer.Exit(1)
         registry_install_command(canister, registry, extension_id, version, network, identity)
+    elif action == "resync-frontends":
+        if not canister:
+            console.print("[red]Error: --canister is required for resync-frontends[/red]")
+            raise typer.Exit(1)
+        resync_frontends_command(canister, registry, None, network, identity)
     elif action == "publish":
         if not registry:
             console.print("[red]Error: --registry is required for publish[/red]")
@@ -1879,7 +1928,7 @@ def extension_command(
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print(
-            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list, registry-install, publish[/yellow]"
+            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list, registry-install, resync-frontends, publish[/yellow]"
         )
         raise typer.Exit(1)
 

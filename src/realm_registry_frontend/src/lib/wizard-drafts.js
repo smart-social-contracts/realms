@@ -36,6 +36,11 @@ export function serializeWizardFormData(formData) {
   };
 }
 
+const DRAFTS_UNAVAILABLE = {
+  success: false,
+  error: 'Wizard drafts are not available on this registry yet',
+};
+
 export async function saveWizardDraft({
   id,
   formData,
@@ -46,6 +51,9 @@ export async function saveWizardDraft({
 }) {
   const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
   const registry = await getAuthenticatedRegistryActor();
+  if (typeof registry.save_wizard_draft !== 'function') {
+    return DRAFTS_UNAVAILABLE;
+  }
   const draftPayload = wizardMeta
     ? withWizardMeta(formData || {}, wizardMeta)
     : serializeWizardFormData(formData || {});
@@ -75,6 +83,9 @@ export async function listWizardDrafts() {
 export async function loadWizardDraft(draftId) {
   const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
   const registry = await getAuthenticatedRegistryActor();
+  if (typeof registry.get_wizard_draft !== 'function') {
+    return null;
+  }
   const raw = await registry.get_wizard_draft(draftId);
   const data = parseJson(raw);
   if (!data?.success || !data.draft) return null;
@@ -97,6 +108,9 @@ export async function loadWizardDraft(draftId) {
 export async function deleteWizardDraft(draftId) {
   const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
   const registry = await getAuthenticatedRegistryActor();
+  if (typeof registry.delete_wizard_draft !== 'function') {
+    return DRAFTS_UNAVAILABLE;
+  }
   const raw = await registry.delete_wizard_draft(draftId);
   return parseJson(raw) || { success: false };
 }

@@ -45,6 +45,8 @@ export async function fetchRealmStage(backendCanisterId) {
     if (!data?.success) return null;
     return (data.realm_stage || 'alpha').trim().toLowerCase();
   } catch (err) {
+    const message = err?.message || String(err);
+    if (/not found|IC0301/i.test(message)) return null;
     console.warn('fetchRealmStage failed:', cid, err);
     return null;
   }

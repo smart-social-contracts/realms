@@ -1,7 +1,6 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { CONFIG } from '$lib/config.js';
@@ -14,8 +13,19 @@
   } from '$lib/shared-tokens.js';
   import codicesConfig from '$lib/codices-config.json';
   import AuthControls from '$lib/components/AuthControls.svelte';
-  import DeployProgressModal from '$lib/components/DeployProgressModal.svelte';
+  import { buildRealmDeploymentManifest } from '$lib/deployment-manifest.js';
+  import { getAuthenticatedRegistryActor } from '$lib/canisters.js';
+  import { uploadBrandingFiles, brandingNamespaceFor } from '$lib/branding-upload.js';
+  import { resolveDeployBranding } from '$lib/realm-branding-generator.js';
   import { deploymentJobUrl } from '$lib/deployment-url.js';
+  import { friendlyNetworkError, retryOnTransientNetworkError } from '$lib/network-retry.js';
+  import {
+    openDeployProgress,
+    setDeployProgressStep,
+    setDeployProgressUploadDetail,
+    failDeployProgress,
+    closeDeployProgress,
+  } from '$lib/stores/deployProgress.js';
 
   // Auth state
   let isLoggedIn = false;
@@ -38,13 +48,6 @@
   // Automatic deployment state
   let isDeploying = false;
   let deployError = null;
-  let deployModalOpen = false;
-  /** @type {'running' | 'error'} */
-  let deployModalPhase = 'running';
-  /** @type {'prepare' | 'upload' | 'submit' | 'redirect'} */
-  let deployActiveStep = 'prepare';
-  let deployUploadDetail = '';
-  let deployModalError = '';
 
   // Wizard draft persistence
   let draftId = null;
@@ -115,7 +118,7 @@
       }
       draftInitialized = true;
     } catch (e) {
-      console.error('Draft init failed:', e);
+      console.warn('Wizard draft init skipped:', e?.message || e);
       draftInitialized = true;
       loadingDeployVersions = false;
     }
@@ -400,27 +403,31 @@
   }
 
   function closeDeployModal() {
-    deployModalOpen = false;
-    deployModalPhase = 'running';
-    deployActiveStep = 'prepare';
-    deployUploadDetail = '';
+    closeDeployProgress();
     isDeploying = false;
+    draftLockedForDeploy = false;
   }
 
   function failAutomaticDeploy(message) {
     const text = message || 'Deployment failed. Please check your connection and try again.';
     deployError = text;
-    deployModalError = text;
-    deployModalPhase = 'error';
     isDeploying = false;
-    // Force the modal to stay open so the user sees the error; it can be dismissed explicitly.
-    deployModalOpen = true;
+    draftLockedForDeploy = false;
+    failDeployProgress(text);
+  }
+
+  /** Reject if `promise` does not settle within `ms` milliseconds. */
+  function withTimeout(promise, ms, message) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
   }
 
   /** @param {'prepare' | 'upload' | 'submit' | 'redirect'} step */
   function setDeployStep(step) {
-    deployActiveStep = step;
-    if (step !== 'upload') deployUploadDetail = '';
+    setDeployProgressStep(step);
   }
 
   /** @param {{ path?: string, uploaded?: number, total?: number, status?: string }} progress */
@@ -433,7 +440,7 @@
         ? 'Background'
         : base;
     if (progress.status === 'done') {
-      deployUploadDetail = `${friendly} uploaded`;
+      setDeployProgressUploadDetail(`${friendly} uploaded`);
       return;
     }
     const pct =
@@ -441,51 +448,61 @@
         ? Math.min(100, Math.round((progress.uploaded / progress.total) * 100))
         : null;
     const statusLabel = progress.status ? progress.status.replace(/_/g, ' ') : 'uploading';
-    deployUploadDetail = pct != null ? `${friendly} — ${statusLabel} (${pct}%)` : `${friendly} — ${statusLabel}`;
+    setDeployProgressUploadDetail(
+      pct != null ? `${friendly} — ${statusLabel} (${pct}%)` : `${friendly} — ${statusLabel}`,
+    );
+  }
+
+  function onDeployClick() {
+    void handleAutomaticDeploy().catch((err) => {
+      console.error('Deploy handler rejected:', err);
+      failAutomaticDeploy(err?.message || 'Deployment failed');
+    });
   }
 
   async function handleAutomaticDeploy() {
     if (!userPrincipal || userCredits < REQUIRED_CREDITS) return;
 
     isDeploying = true;
+    draftLockedForDeploy = true;
     deployError = null;
-    deployModalError = '';
-    deployModalPhase = 'running';
-    deployActiveStep = 'prepare';
-    deployUploadDetail = '';
-    deployModalOpen = true;
 
     try {
-      const { buildRealmDeploymentManifest } = await import('$lib/deployment-manifest.js');
-      const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
-      const { uploadBrandingFiles, brandingNamespaceFor } = await import('$lib/branding-upload.js');
-      const { ensureDefaultBranding } = await import('$lib/realm-branding-generator.js');
-
+      openDeployProgress();
       setDeployStep('prepare');
-      await Promise.race([
-        ensureDefaultBranding(formData, { useAi: false }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Artwork generation timed out. Try again or upload images manually.')), 30000),
-        ),
-      ]);
+
+      const brandingFiles = await withTimeout(
+        resolveDeployBranding(formData, { useAi: false }),
+        30000,
+        'Artwork generation timed out. Try again or upload images manually.',
+      );
 
       setDeployStep('upload');
       let branding = null;
-      if (formData.logo || formData.background) {
-        // Upload branding straight from the browser into the file_registry
-        // canister (signed by the user's II) — fully decentralized, no server.
-        branding = await uploadBrandingFiles({
-          logo: formData.logo,
-          background: formData.background,
-          namespace: brandingNamespaceFor(formData.name),
-          fileRegistryCanisterId: CONFIG.file_registry_canister_id,
-          onProgress: handleBrandingUploadProgress,
-        });
+      if (brandingFiles.logo || brandingFiles.background) {
+        branding = await withTimeout(
+          retryOnTransientNetworkError(() =>
+            uploadBrandingFiles({
+              logo: brandingFiles.logo,
+              background: brandingFiles.background,
+              namespace: brandingNamespaceFor(formData.name),
+              fileRegistryCanisterId: CONFIG.file_registry_canister_id,
+              onProgress: handleBrandingUploadProgress,
+            }),
+          ),
+          180000,
+          'Branding upload timed out. Check your connection and try again.',
+        );
       }
 
       setDeployStep('submit');
+      const manifestFormData = {
+        ...formData,
+        logo: brandingFiles.logo,
+        background: brandingFiles.background,
+      };
       const manifest = await buildRealmDeploymentManifest(
-        formData, CONFIG.default_deploy_queue_network, branding,
+        manifestFormData, CONFIG.default_deploy_queue_network, branding,
         {
           deployVersion: formData.deploy_version,
           useCasals: true,
@@ -497,7 +514,11 @@
       const manifestJson = JSON.stringify(manifest);
 
       const registry = await getAuthenticatedRegistryActor();
-      const raw = await registry.request_deployment(manifestJson);
+      const raw = await withTimeout(
+        retryOnTransientNetworkError(() => registry.request_deployment(manifestJson)),
+        120000,
+        'Deployment request timed out. Check your dashboard before retrying.',
+      );
       const result = typeof raw === 'string' ? JSON.parse(raw) : raw;
 
       if (!result?.success) {
@@ -506,7 +527,6 @@
       }
 
       setDeployStep('redirect');
-      await loadUserCredits();
       draftLockedForDeploy = true;
       if (draftId) {
         try {
@@ -520,15 +540,12 @@
           });
         } catch (_) { /* non-fatal */ }
       }
-      // Close the modal before navigating so the tracker page renders cleanly
-      // and any early failure there is visible instead of hidden behind the modal.
-      deployModalOpen = false;
-      await goto(deploymentJobUrl(result.job_id));
+      // Hard navigation avoids SPA teardown races with the progress overlay.
+      window.location.assign(deploymentJobUrl(result.job_id));
+      return;
     } catch (err) {
       console.error('Automatic deployment failed:', err);
-      failAutomaticDeploy(
-        err?.message || 'Deployment failed. Please check your connection and try again.',
-      );
+      failAutomaticDeploy(friendlyNetworkError(err));
     }
   }
 
@@ -604,6 +621,12 @@
   });
 
   let currentStep = 0;
+
+  onDestroy(() => {
+    closeDeployProgress();
+    isDeploying = false;
+    draftLockedForDeploy = false;
+  });
   let isSubmitting = false;
   let submitError = null;
 
@@ -637,7 +660,7 @@
     deploy_version: CONFIG.default_deploy_version || 'main',
   };
 
-  $: if (draftInitialized && browser) {
+  $: if (draftInitialized && browser && !draftLockedForDeploy) {
     void formData;
     void currentStep;
     scheduleDraftSave();
@@ -1688,7 +1711,7 @@
                   <button 
                     type="button" 
                     class="btn btn-primary btn-deploy" 
-                    on:click|stopPropagation={handleAutomaticDeploy}
+                    on:click|stopPropagation={onDeployClick}
                     disabled={isDeploying}
                   >
                     {#if isDeploying}
@@ -1812,15 +1835,6 @@
 </div>
 {/if}
 </div>
-
-<DeployProgressModal
-  open={deployModalOpen}
-  phase={deployModalPhase}
-  activeStep={deployActiveStep}
-  uploadDetail={deployUploadDetail}
-  errorMessage={deployModalError}
-  on:dismiss={closeDeployModal}
-/>
 
 <style>
   .page-shell {

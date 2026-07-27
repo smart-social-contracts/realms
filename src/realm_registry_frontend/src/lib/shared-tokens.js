@@ -5,6 +5,7 @@
  */
 
 import { Actor, HttpAgent } from '@dfinity/agent';
+import { Principal } from '@dfinity/principal';
 import { CONFIG } from '$lib/config.js';
 
 /** @typedef {{ registryKey: string, name: string, symbol: string, description: string, ledger: string, decimals?: number, source?: string }} SharedTokenOption */
@@ -41,9 +42,9 @@ export const SHARED_TOKEN_CATALOG = [
 		symbol: 'ckUSDC',
 		description: 'Chain-Key USDC — IC-native USD stablecoin',
 		ledgers: {
-			staging: 'xckus-ciaaa-aaaam-qbssa-cai',
-			demo: 'xckus-ciaaa-aaaam-qbssa-cai',
-			test: 'xckus-ciaaa-aaaam-qbssa-cai'
+			staging: 'xevnm-gaaaa-aaaar-qafnq-cai',
+			demo: 'xevnm-gaaaa-aaaar-qafnq-cai',
+			test: 'xevnm-gaaaa-aaaar-qafnq-cai'
 		},
 		decimals: 6
 	}
@@ -102,7 +103,10 @@ export async function loadSharedTokenMetadata(network = CONFIG.deploy_queue_netw
 			if (!ledger) return fallback;
 
 			try {
-				const actor = Actor.createActor(icrc1MetadataIdl, { agent, canisterId: ledger });
+				const actor = Actor.createActor(icrc1MetadataIdl, {
+					agent,
+					canisterId: Principal.fromText(ledger),
+				});
 				const [name, symbol, decimals] = await Promise.all([
 					actor.icrc1_name(),
 					actor.icrc1_symbol(),

@@ -36,6 +36,12 @@
 
   const stepOrder = STEPS.map((s) => s.id);
 
+  $: renderedSteps = STEPS.map((step, i) => ({
+    ...step,
+    index: i,
+    state: stepState(step.id),
+  }));
+
   /** @param {string} id */
   function stepState(id) {
     if (phase === 'error' && id === activeStep) return 'failed';
@@ -78,28 +84,27 @@
         </p>
 
         <ol class="steps" aria-label="Deployment preparation steps">
-          {#each STEPS as step, i}
-            {@const state = stepState(step.id)}
+          {#each renderedSteps as step (step.id)}
             <li
               class="step"
-              class:done={state === 'done'}
-              class:active={state === 'active'}
-              class:failed={state === 'failed'}
+              class:done={step.state === 'done'}
+              class:active={step.state === 'active'}
+              class:failed={step.state === 'failed'}
             >
               <span class="marker" aria-hidden="true">
-                {#if state === 'done'}
+                {#if step.state === 'done'}
                   ✓
-                {:else if state === 'failed'}
+                {:else if step.state === 'failed'}
                   ✕
-                {:else if state === 'active'}
+                {:else if step.state === 'active'}
                   <span class="spinner"></span>
                 {:else}
-                  {i + 1}
+                  {step.index + 1}
                 {/if}
               </span>
               <div class="step-body">
                 <span class="step-label">{step.label}</span>
-                {#if state === 'active'}
+                {#if step.state === 'active'}
                   <span class="step-hint">{step.hint}</span>
                   {#if step.id === 'upload' && uploadDetail}
                     <span class="step-detail">{uploadDetail}</span>

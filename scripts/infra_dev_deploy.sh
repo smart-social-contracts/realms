@@ -243,7 +243,7 @@ EOF
             "(record { to_principal = principal \"$deployer_principal\"; permission = variant { $perm } })" \
             --network "$NETWORK" --no-wallet 2>/dev/null || true
     done
-    (cd "$tmpdir" && dfx deploy frontend --network "$NETWORK" --yes --no-wallet)
+    (cd "$tmpdir" && dfx deploy frontend --network "$NETWORK" --yes --no-wallet --no-asset-upgrade)
     rm -rf "$tmpdir"
     trap - EXIT
 }

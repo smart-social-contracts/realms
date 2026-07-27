@@ -888,6 +888,74 @@ def _copy_frontend_to_asset_canister(
     return None
 
 
+def resync_extension_frontends(
+    registry_canister_id: str = "",
+    frontend_canister_id: str = None,
+    extension_ids: list = None,
+) -> Async[str]:
+    """Re-copy installed extensions' frontend bundles to the realm frontend.
+
+    Frontend asset canister reinstalls (and some wizard deploy paths before
+    ``frontend_canister_id`` was configured) leave ``/ext/{id}/{ver}/...``
+    missing. The SPA fallback then serves ``text/html`` for those URLs and
+    runtime extension loading fails with a MIME type error.
+    """
+    from core.runtime_extensions import get_extension_source, list_installed, _load_manifest
+
+    fe_canister = (frontend_canister_id or _get_realm_frontend_canister_id() or "").strip()
+    if not fe_canister:
+        return json.dumps({
+            "success": False,
+            "error": "no frontend_canister_id configured on this realm",
+        })
+
+    default_registry = (registry_canister_id or "").strip()
+    if not default_registry:
+        try:
+            from ggg import Realm
+
+            realms = Realm.instances()
+            if realms:
+                default_registry = (
+                    getattr(realms[0], "file_registry_canister_id", "") or ""
+                ).strip()
+        except Exception:
+            pass
+
+    ext_ids = extension_ids or list_installed()
+    synced = []
+    skipped = []
+    errors = []
+
+    for ext_id in ext_ids:
+        src = get_extension_source(ext_id) or {}
+        manifest = _load_manifest(ext_id) or {}
+        version = str(manifest.get("version") or src.get("version") or "")
+        reg_id = (src.get("registry_canister_id") or default_registry or "").strip()
+
+        if not version:
+            skipped.append({"extension_id": ext_id, "reason": "no installed version"})
+            continue
+        if not reg_id:
+            skipped.append({"extension_id": ext_id, "reason": "no registry_canister_id"})
+            continue
+
+        copy_err = yield from _copy_frontend_to_asset_canister(
+            reg_id, ext_id, version, fe_canister,
+        )
+        if copy_err:
+            errors.append({"extension_id": ext_id, "version": version, "error": copy_err})
+        else:
+            synced.append({"extension_id": ext_id, "version": version})
+
+    return json.dumps({
+        "success": len(errors) == 0,
+        "synced": synced,
+        "skipped": skipped,
+        "errors": errors,
+    })
+
+
 def install_branding_from_registry(
     registry_canister_id: str, namespace: str, files_map: dict, frontend_canister_id: str,
 ) -> Async[str]:
