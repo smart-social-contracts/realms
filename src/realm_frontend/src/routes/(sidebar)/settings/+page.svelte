@@ -26,8 +26,14 @@
 	let nickname = $state('');
 	let avatarUrl = $state('');
 	let profiles = $state<string[]>([]);
+	let email = $state('');
+	let emailNotificationsEnabled = $state(true);
+	let privateData: Record<string, any> = $state({});
 	let loadingUserStatus = $state(true);
 	let userStatusError = $state('');
+	let savingEmail = $state(false);
+	let emailSaveMessage = $state('');
+	let emailSaveError = $state('');
 
 	/** Federated membership probe (issue #156). */
 	let membershipHits = $state<MembershipHit[]>([]);
@@ -109,11 +115,49 @@
 			nickname = u.nickname || '';
 			avatarUrl = u.avatar || '';
 			profiles = u.profiles || [];
+			try {
+				privateData = JSON.parse(u.private_data || '{}');
+			} catch {
+				privateData = {};
+			}
+			email = privateData.email || '';
+			emailNotificationsEnabled = privateData.email_notifications_enabled !== false;
 		} else {
 			throw new Error(
 				(response && !response.success && response.data?.error) ||
 					'Could not fetch user status: Invalid response format.'
 			);
+		}
+	}
+
+	async function saveEmailPreferences() {
+		emailSaveMessage = '';
+		emailSaveError = '';
+		savingEmail = true;
+		try {
+			const normalizedEmail = email.trim().toLowerCase();
+			if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+				throw new Error('Please enter a valid email address.');
+			}
+			const updated = {
+				...privateData,
+				email: normalizedEmail,
+				email_notifications_enabled: emailNotificationsEnabled
+			};
+			const response = await quarterBackend.update_my_private_data(JSON.stringify(updated));
+			if (response && response.success) {
+				privateData = updated;
+				emailSaveMessage = 'Email preferences saved.';
+			} else {
+				throw new Error(
+					(response && !response.success && response.data?.error) ||
+						'Could not save email preferences.'
+				);
+			}
+		} catch (e: any) {
+			emailSaveError = e.message || 'Failed to save email preferences.';
+		} finally {
+			savingEmail = false;
 		}
 	}
 
@@ -275,6 +319,65 @@
 					{/if}
 				</div>
 			{/if}
+		</div>
+
+		<!-- Email notifications (issue #266) -->
+		<div class="col-span-full mt-6">
+			<Heading tag="h2" class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+				Email notifications
+			</Heading>
+			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+				<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+					Add an email address to receive realm notifications by email. You can turn email delivery off at any time.
+				</p>
+
+				{#if emailSaveMessage}
+					<div class="mb-4 text-sm text-green-600 dark:text-green-400">{emailSaveMessage}</div>
+				{/if}
+				{#if emailSaveError}
+					<div class="mb-4 text-sm text-red-600 dark:text-red-400">{emailSaveError}</div>
+				{/if}
+
+				<div class="space-y-4">
+					<div>
+						<label for="user-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+							Email address
+						</label>
+						<input
+							id="user-email"
+							type="email"
+							bind:value={email}
+							placeholder="you@example.com"
+							class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+						/>
+					</div>
+
+					<div class="flex items-center gap-3">
+						<label for="user-email-enabled" class="relative inline-flex items-center cursor-pointer">
+							<input
+								id="user-email-enabled"
+								type="checkbox"
+								bind:checked={emailNotificationsEnabled}
+								class="sr-only peer"
+							/>
+							<div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-300 dark:bg-gray-600 dark:peer-focus:ring-blue-800 after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+						</label>
+						<div>
+							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">Enable email notifications</span>
+							<p class="text-xs text-gray-500 dark:text-gray-400">When off, you will not receive emails even if the realm has email enabled.</p>
+						</div>
+					</div>
+
+					<button
+						type="button"
+						onclick={saveEmailPreferences}
+						disabled={savingEmail}
+						class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					>
+						{savingEmail ? 'Saving…' : 'Save email preferences'}
+					</button>
+				</div>
+			</div>
 		</div>
 
 		<!-- Multi-quarter membership (issue #156) -->

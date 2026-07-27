@@ -135,6 +135,63 @@ def apply_realm_config(config: dict) -> dict:
         realm.ai_assistant_enabled = bool(config["ai_assistant_enabled"])
         updated_fields.append(f"ai_assistant_enabled={realm.ai_assistant_enabled}")
 
+    if "email_service_config" in config:
+        email_config = config["email_service_config"]
+        if not isinstance(email_config, dict):
+            return {
+                "success": False,
+                "error": "email_service_config must be an object",
+            }
+        try:
+            md = json.loads(getattr(realm, "manifest_data", "") or "{}")
+            if not isinstance(md, dict):
+                md = {}
+        except (json.JSONDecodeError, TypeError):
+            md = {}
+
+        # Validate shape: only non-sensitive, realm-level settings are stored
+        # on-chain. SMTP credentials live in the off-chain worker env.
+        allowed_keys = {
+            "enabled",
+            "from_name",
+            "from_address",
+            "reply_to",
+            "events",
+            "templates",
+        }
+        if set(email_config.keys()) - allowed_keys:
+            return {
+                "success": False,
+                "error": (
+                    "email_service_config may only contain: "
+                    f"{', '.join(sorted(allowed_keys))}"
+                ),
+            }
+
+        # Normalize the events map so the UI always sees a consistent set.
+        default_events = {
+            "proposal_created": True,
+            "vote_reminder": True,
+            "vote_ended": True,
+            "mention": True,
+            "task_assigned": True,
+        }
+        events = email_config.get("events") or {}
+        if not isinstance(events, dict):
+            events = {}
+        normalized_events = {**default_events, **events}
+        email_config["events"] = normalized_events
+
+        md["email"] = email_config
+        serialized_md = json.dumps(md)
+        if len(serialized_md) > 4096:
+            return {
+                "success": False,
+                "error": f"manifest_data would exceed 4096 chars ({len(serialized_md)})",
+            }
+        realm.manifest_data = serialized_md
+        updated_fields.append(f"email={list(email_config.keys())}")
+
     if "logo_url" in config:
         realm.logo_url = config["logo_url"] or ""
         updated_fields.append(f"logo_url={realm.logo_url[:50]}...")
