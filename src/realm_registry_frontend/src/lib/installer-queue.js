@@ -352,7 +352,7 @@ export async function destroyRealmJob(jobId, options = {}) {
  * Map installer job to the shape previously returned by the management HTTP API
  * so dashboard templates stay stable.
  */
-export function installerJobToDeploymentRow(job, deployTask = null) {
+export function installerJobToDeploymentRow(job, deployTask = null, options = {}) {
   const st = (job.status || '').toLowerCase();
   let uiStatus = st;
   if (
@@ -388,12 +388,14 @@ export function installerJobToDeploymentRow(job, deployTask = null) {
     { ...job, raw_status: st },
     {
       deployTask,
+      codexDependencies: options?.codexDependencies ?? [],
       observedStageStarts: getObservedStageStarts(
         job.job_id,
         toTimestampMs(job.created_at),
       ),
     },
   );
+  row.deployTask = deployTask || null;
   return row;
 }
 

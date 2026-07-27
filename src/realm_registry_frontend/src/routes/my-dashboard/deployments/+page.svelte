@@ -7,7 +7,11 @@
   import DeploymentManifestPanel from '$lib/components/DeploymentManifestPanel.svelte';
   import { deploymentJobUrl, loadDeploymentRow, startDeploymentJobPolling } from '$lib/deployment-tracker.js';
   import { fetchDeploymentManifest } from '$lib/installer-queue.js';
-  import { recordDeploymentStageObservation } from '$lib/deployment-stage-timing.js';
+  import { CONFIG } from '$lib/config.js';
+  import { fetchCodexManifest } from '$lib/file-registry-client.js';
+  import { parseDeploymentManifest } from '$lib/deployment-manifest-view.js';
+  import { getDeploymentProgress } from '$lib/deployment-progress.js';
+  import { getObservedStageStarts, recordDeploymentStageObservation } from '$lib/deployment-stage-timing.js';
   import {
     findDraftForDeployment,
     draftResumeUrl,
@@ -41,6 +45,42 @@
   let manifestLoading = false;
   let manifestError = null;
   let liveTotalDurationLabel = '';
+  /** @type {string[]} */
+  let codexDependencies = [];
+
+  async function loadCodexDependencies() {
+    const manifest = parseDeploymentManifest(manifestRaw);
+    const pkg = manifest?.realm?.codex?.package;
+    const codexId = typeof pkg === 'string' ? pkg.trim() : '';
+    if (!codexId) {
+      codexDependencies = [];
+      return;
+    }
+    try {
+      const codexManifest = await fetchCodexManifest(CONFIG.file_registry_canister_id, codexId);
+      const deps = codexManifest?.dependencies;
+      codexDependencies = Array.isArray(deps)
+        ? deps.map(String).filter(Boolean)
+        : deps && typeof deps === 'object'
+          ? Object.keys(deps)
+          : [];
+    } catch {
+      codexDependencies = [];
+    }
+  }
+
+  $: if (manifestRaw) {
+    void loadCodexDependencies();
+  }
+
+  $: trackerProgress = deployment
+    ? getDeploymentProgress(deployment, {
+        deployTask: deployment.deployTask,
+        codexDependencies,
+        observedStageStarts:
+          browser && jobId ? getObservedStageStarts(jobId, deployment.progress?.startedAtMs ?? null) : null,
+      })
+    : null;
 
   async function loadManifest() {
     if (!jobId || !userPrincipal) return;
@@ -295,7 +335,7 @@
       {/if}
 
       <DeploymentProgress
-        progress={destroyProgress || deployment.progress}
+        progress={destroyProgress || trackerProgress || deployment.progress}
         jobId={destroyProgress ? '' : jobId}
         bind:liveTotalDurationLabel
         variant="full"

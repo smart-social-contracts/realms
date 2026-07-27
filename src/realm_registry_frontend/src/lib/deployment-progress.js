@@ -275,39 +275,131 @@ function stageIndexForJob(job) {
   return { status, index };
 }
 
+/** @param {string} state */
+export function extensionStatusLabel(state) {
+  switch (state) {
+    case 'done':
+      return 'Installed';
+    case 'active':
+      return 'In progress';
+    case 'failed':
+      return 'Failed';
+    default:
+      return 'Pending';
+  }
+}
+
+/** @param {object} step */
+function withStatusLabel(step) {
+  return {
+    ...step,
+    statusLabel: extensionStatusLabel(step.state),
+  };
+}
+
 /**
  * @param {object|null|undefined} deployTask
- * @returns {Array<{ label: string, kind: string, status: string, error: string|null, state: string }>}
+ * @param {string[]} [codexDependencies]
  */
-export function buildExtensionSubSteps(deployTask) {
+export function buildExtensionSubSteps(deployTask, codexDependencies = []) {
   const steps = deployTask?.steps;
-  if (!Array.isArray(steps) || !steps.length) return [];
+  const fromTask = !Array.isArray(steps) || !steps.length
+    ? []
+    : steps.map((step, index) => {
+        const st = (step.status || '').toLowerCase();
+        let state = 'upcoming';
+        if (st === 'completed') state = 'done';
+        else if (st === 'failed') state = 'failed';
+        else if (st === 'running') state = 'active';
 
-  return steps.map((step) => {
-    const st = (step.status || '').toLowerCase();
+        const kind = (step.kind || '').toLowerCase();
+        let label = step.label || step.kind || 'step';
+        let group = 'setup';
+
+        if (kind === 'configure_canister_ids') {
+          label = 'Configure canister IDs';
+        } else if (kind === 'grant_frontend_access') {
+          label = 'Grant frontend access';
+        } else if (kind === 'extension') {
+          label = step.label || 'unknown';
+          group = 'extension';
+        } else if (kind === 'codex') {
+          label = step.label || 'unknown';
+          group = 'codex';
+        }
+
+        return withStatusLabel({
+          id: `${kind}:${label}:${index}`,
+          label,
+          kind,
+          group,
+          status: st,
+          error: (step.error || '').trim() || null,
+          state,
+        });
+      });
+
+  const hasExtensionSteps = fromTask.some((step) => step.group === 'extension');
+  if (hasExtensionSteps || !codexDependencies.length) {
+    return fromTask;
+  }
+
+  const codexStep = fromTask.find((step) => step.group === 'codex');
+  const codexState = codexStep?.state || 'upcoming';
+  const bundled = codexDependencies.map((depId, index) => {
     let state = 'upcoming';
-    if (st === 'completed') state = 'done';
-    else if (st === 'failed') state = 'failed';
-    else if (st === 'running') state = 'active';
+    if (codexState === 'done') state = 'done';
+    else if (codexState === 'failed') state = 'failed';
+    else if (codexState === 'active') state = 'active';
 
-    const kind = (step.kind || '').toLowerCase();
-    let label = step.label || step.kind || 'step';
-    if (kind === 'grant_frontend_access') {
-      label = 'Grant frontend access';
-    } else if (kind === 'extension') {
-      label = `Extension: ${step.label || 'unknown'}`;
-    } else if (kind === 'codex') {
-      label = `Codex: ${step.label || 'unknown'}`;
-    }
-
-    return {
-      label,
-      kind,
-      status: st,
-      error: (step.error || '').trim() || null,
+    return withStatusLabel({
+      id: `bundled:${depId}:${index}`,
+      label: depId,
+      kind: 'extension',
+      group: 'extension',
+      status: state === 'done' ? 'completed' : state === 'active' ? 'running' : state === 'failed' ? 'failed' : 'pending',
+      error: codexStep?.error || null,
       state,
-    };
+      bundled: true,
+    });
   });
+
+  const setupSteps = fromTask.filter((step) => step.group === 'setup');
+  const codexSteps = fromTask.filter((step) => step.group === 'codex');
+  return [...setupSteps, ...bundled, ...codexSteps];
+}
+
+/**
+ * Group extension-install sub-steps for expandable UI (setup / extensions / codex).
+ *
+ * @param {object|null|undefined} deployTask
+ * @param {string[]} [codexDependencies]
+ */
+export function buildExtensionInstallGroups(deployTask, codexDependencies = []) {
+  const subSteps = buildExtensionSubSteps(deployTask, codexDependencies);
+  if (!subSteps.length) return [];
+
+  /** @type {Record<string, { id: string, label: string, steps: typeof subSteps }>} */
+  const byGroup = {
+    setup: { id: 'setup', label: 'Setup', steps: [] },
+    extension: { id: 'extension', label: 'Extensions', steps: [] },
+    codex: { id: 'codex', label: 'Codex', steps: [] },
+  };
+
+  for (const step of subSteps) {
+    const bucket = byGroup[step.group] || byGroup.setup;
+    bucket.steps.push(step);
+  }
+
+  return Object.values(byGroup)
+    .filter((group) => group.steps.length > 0)
+    .map((group) => ({
+      ...group,
+      completed: group.steps.filter((step) => step.state === 'done').length,
+      total: group.steps.length,
+      active: group.steps.some((step) => step.state === 'active'),
+      failed: group.steps.some((step) => step.state === 'failed'),
+    }));
 }
 
 function stageDescription(status, job, stage, deployTask) {
@@ -439,6 +531,7 @@ function resolveStageDurationsMs(stages, startMs, endMs, observedStarts) {
  */
 export function getDeploymentProgress(job, options = {}) {
   const deployTask = options?.deployTask ?? null;
+  const codexDependencies = options?.codexDependencies ?? [];
   const { status, index: stageIndex } = stageIndexForJob(job);
   const isTerminal = TERMINAL_STATUSES.has(status);
   const isFailed = FAILED_STATUSES.has(status);
@@ -453,7 +546,8 @@ export function getDeploymentProgress(job, options = {}) {
   const currentStage = DEPLOYMENT_PIPELINE[activeIndex] || DEPLOYMENT_PIPELINE[0];
   const percent = computeDeploymentPercent(job, deployTask);
   const { extensionTotal, extensionCompleted } = computeDeploymentUnits(job, deployTask);
-  const subSteps = buildExtensionSubSteps(deployTask);
+  const subSteps = buildExtensionSubSteps(deployTask, codexDependencies);
+  const extensionInstallGroups = buildExtensionInstallGroups(deployTask, codexDependencies);
   const provisionSubSteps = buildProvisionSubSteps(job);
 
   const stages = DEPLOYMENT_PIPELINE.map((stage, i) => {
@@ -501,6 +595,7 @@ export function getDeploymentProgress(job, options = {}) {
     percent,
     stages: stagesWithTiming,
     subSteps,
+    extensionInstallGroups,
     provisionSubSteps,
     extensionTotal,
     extensionCompleted,

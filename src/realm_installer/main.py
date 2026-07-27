@@ -50,6 +50,10 @@ class RealmRegistryService(Service):
     @service_update
     def deployment_succeeded(self, job_id: text, caller_principal: text) -> text: ...
 
+class FileRegistryService(Service):
+    @service_query
+    def get_extension_manifest(self, args: text) -> text: ...
+
 class CasalsService(Service):
     """Casals canister-lifecycle engine. All endpoints take a single JSON `args`
     string and return a JSON string ({"ok": true, ...} | {"ok": false, "error": …}).
@@ -1337,7 +1341,33 @@ def _provision_realm_token_canister(casals, job_id: str, stand: str, manifest: d
     )
     return token_id, token_cfg
 
-def _start_extensions_for_job(job, manifest: dict):
+def _fetch_codex_dependency_ids(registry_id: str, codex_id: str, version=None) -> Async[list]:
+    """Resolve codex package dependencies from the file registry manifest."""
+    reg = (registry_id or "").strip()
+    cid = (codex_id or "").strip()
+    if not reg or not cid:
+        return []
+    try:
+        registry = FileRegistryService(Principal.from_str(reg))
+        call_result: CallResult = yield registry.get_extension_manifest(json.dumps({
+            "ext_id": cid,
+            "version": version or None,
+        }))
+        raw = unwrap_call_result(call_result)
+        data = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(data, dict) or data.get("error"):
+            return []
+        raw_deps = data.get("dependencies") or []
+        if isinstance(raw_deps, dict):
+            return [str(k) for k in raw_deps if k]
+        if isinstance(raw_deps, list):
+            return [str(d) for d in raw_deps if d]
+        return []
+    except Exception as e:
+        _log.warning(f"codex dependency lookup failed for {cid}: {e}")
+        return []
+
+def _start_extensions_for_job(job, manifest: dict) -> Async[None]:
     realm_info = manifest.get("realm", {})
     network = (manifest.get("network") or "").strip()
     registry_id = manifest.get("file_registry_canister_id", "") or _FILE_REGISTRY_IDS.get(network, "")
@@ -1375,7 +1405,20 @@ def _start_extensions_for_job(job, manifest: dict):
     if codex_list:
         ext_manifest["codices"] = codex_list
 
-    jlog(job.name).info(f"resolved {len(codex_list)} codices")
+    seen = {str(e.get("id")) for e in ext_list if e.get("id")}
+    for cdx in codex_list:
+        cdx_id = (cdx.get("id") or "").strip()
+        if not cdx_id:
+            continue
+        deps = yield from _fetch_codex_dependency_ids(registry_id, cdx_id, cdx.get("version"))
+        for dep in deps:
+            if dep not in seen:
+                ext_list.append({"id": dep})
+                seen.add(dep)
+    if ext_list:
+        ext_manifest["extensions"] = ext_list
+
+    jlog(job.name).info(f"resolved {len(codex_list)} codices, {len(ext_list)} extension steps")
 
     if not ext_list and not codex_list:
         jlog(job.name).info("no extensions or codices to install, skipping to registration")
@@ -2411,7 +2454,7 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
         if bool(exts) or bool(cdx):
             job.status = "extensions"
             jlog(job_id).info("entering extensions phase (casals path)")
-            _start_extensions_for_job(job, manifest)
+            yield from _start_extensions_for_job(job, manifest)
         else:
             job.status = "registering"
             jlog(job_id).info("no extensions/codex; scheduling registration (casals path)")
@@ -2679,7 +2722,7 @@ def report_frontend_verified(args: text) -> Async[ResultReportFrontend]:
                 if has_work:
                     job.status = "extensions"
                     jlog(job_id).info("entering extensions phase")
-                    _start_extensions_for_job(job, manifest)
+                    yield from _start_extensions_for_job(job, manifest)
                 else:
                     job.status = "registering"
                     jlog(job_id).info("no work, skipping to registration")

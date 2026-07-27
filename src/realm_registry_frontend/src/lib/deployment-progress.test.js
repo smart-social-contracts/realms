@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildExtensionInstallGroups,
+  buildExtensionSubSteps,
   buildProvisionSubSteps,
   computeDeploymentPercent,
   computeDeploymentUnits,
@@ -130,4 +132,44 @@ test('getDeploymentProgress exposes provision and extension sub-steps', () => {
   assert.equal(extProgress.extensionCompleted, 1);
   assert.equal(extProgress.subSteps.length, 2);
   assert.match(extProgress.currentDescription, /1\/2/);
+});
+
+test('buildExtensionInstallGroups separates setup, extensions, and codex', () => {
+  const groups = buildExtensionInstallGroups({
+    steps: [
+      { kind: 'configure_canister_ids', label: 'configure_canister_ids', status: 'completed' },
+      { kind: 'grant_frontend_access', label: 'grant_frontend_access', status: 'completed' },
+      { kind: 'extension', label: 'public_dashboard', status: 'completed' },
+      { kind: 'extension', label: 'member_dashboard', status: 'running' },
+      { kind: 'codex', label: 'syntropia', status: 'pending' },
+    ],
+  });
+
+  assert.equal(groups.length, 3);
+  assert.equal(groups[0].label, 'Setup');
+  assert.equal(groups[0].completed, 2);
+  assert.equal(groups[1].label, 'Extensions');
+  assert.equal(groups[1].completed, 1);
+  assert.equal(groups[1].steps[1].label, 'member_dashboard');
+  assert.equal(groups[1].steps[1].statusLabel, 'In progress');
+  assert.equal(groups[2].label, 'Codex');
+  assert.equal(groups[2].steps[0].label, 'syntropia');
+});
+
+test('buildExtensionSubSteps expands codex dependencies when no extension steps exist', () => {
+  const steps = buildExtensionSubSteps(
+    {
+      steps: [
+        { kind: 'grant_frontend_access', label: 'grant_frontend_access', status: 'completed' },
+        { kind: 'codex', label: 'syntropia', status: 'completed' },
+      ],
+    },
+    ['access_manager', 'member_manager', 'zone_selector'],
+  );
+
+  const extensions = steps.filter((step) => step.group === 'extension');
+  assert.equal(extensions.length, 3);
+  assert.equal(extensions[0].label, 'access_manager');
+  assert.equal(extensions[0].statusLabel, 'Installed');
+  assert.equal(extensions[2].statusLabel, 'Installed');
 });

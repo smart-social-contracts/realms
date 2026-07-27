@@ -15,6 +15,13 @@
   /** Updated every second while active; bind from parent for meta rows. */
   export let liveTotalDurationLabel = '';
 
+  /** User toggled extension list visibility; null = follow auto rules. */
+  let extensionsExpandedOverride = null;
+
+  function toggleExtensionsExpanded() {
+    extensionsExpandedOverride = !extensionsExpanded;
+  }
+
   let nowMs = Date.now();
   /** @type {ReturnType<typeof setInterval>|null} */
   let clockTimer = null;
@@ -26,6 +33,18 @@
     ? withLiveProgressTiming(progress, nowMs, observedStarts)
     : progress;
   $: liveTotalDurationLabel = displayProgress?.totalDurationLabel || '';
+
+  $: extensionsStage = displayProgress?.stages?.find((stage) => stage.id === 'extensions');
+  $: hasExtensionSteps = (displayProgress?.extensionInstallGroups?.length || 0) > 0;
+  $: extensionsStageActive = extensionsStage?.state === 'active';
+  $: extensionsStageVisible =
+    extensionsStage?.state === 'active' ||
+    extensionsStage?.state === 'done' ||
+    displayProgress?.isFailed;
+  $: extensionsExpanded =
+    extensionsExpandedOverride != null
+      ? extensionsExpandedOverride
+      : extensionsStageActive || displayProgress?.isFailed;
 
   function startClock() {
     stopClock();
@@ -103,9 +122,27 @@
                 {i + 1}
               {/if}
             </span>
-            <span class="step-label">{stage.label}</span>
-            {#if stage.id === 'extensions' && stage.state === 'active' && displayProgress.extensionTotal > 0}
-              <span class="step-detail">{displayProgress.extensionCompleted}/{displayProgress.extensionTotal}</span>
+            {#if stage.id === 'extensions' && hasExtensionSteps && extensionsStageVisible}
+              <button
+                type="button"
+                class="step-toggle"
+                aria-expanded={extensionsExpanded}
+                aria-controls="extension-install-steps"
+                on:click={toggleExtensionsExpanded}
+              >
+                <span class="step-label">{stage.label}</span>
+                {#if displayProgress.extensionTotal > 0}
+                  <span class="step-detail">
+                    {displayProgress.extensionCompleted}/{displayProgress.extensionTotal}
+                  </span>
+                {/if}
+                <span class="step-chevron" class:expanded={extensionsExpanded} aria-hidden="true">▸</span>
+              </button>
+            {:else}
+              <span class="step-label">{stage.label}</span>
+              {#if stage.id === 'extensions' && stage.state === 'active' && displayProgress.extensionTotal > 0}
+                <span class="step-detail">{displayProgress.extensionCompleted}/{displayProgress.extensionTotal}</span>
+              {/if}
             {/if}
             {#if stage.durationLabel && stage.state !== 'upcoming'}
               <span
@@ -142,29 +179,52 @@
               </ol>
             </li>
           {/if}
-          {#if stage.id === 'extensions' && displayProgress.subSteps?.length && (stage.state === 'active' || stage.state === 'done' || displayProgress.isFailed)}
-            <li class="sub-steps-wrap" aria-label="Extension install steps">
-              <ol class="sub-steps">
-                {#each displayProgress.subSteps as subStep}
-                  <li class="sub-step" class:done={subStep.state === 'done'} class:active={subStep.state === 'active'} class:failed={subStep.state === 'failed'}>
-                    <span class="sub-marker" aria-hidden="true">
-                      {#if subStep.state === 'done'}
-                        ✓
-                      {:else if subStep.state === 'failed'}
-                        ✕
-                      {:else if subStep.state === 'active'}
-                        …
-                      {:else}
-                        ·
-                      {/if}
-                    </span>
-                    <span class="sub-label">{subStep.label}</span>
-                    {#if subStep.state === 'failed' && subStep.error}
-                      <span class="sub-error" title={subStep.error}>failed</span>
-                    {/if}
-                  </li>
-                {/each}
-              </ol>
+          {#if stage.id === 'extensions' && hasExtensionSteps && extensionsStageVisible && extensionsExpanded}
+            <li class="sub-steps-wrap" id="extension-install-steps" aria-label="Extension install steps">
+              {#each displayProgress.extensionInstallGroups as group (group.id)}
+                <div class="install-group">
+                  {#if displayProgress.extensionInstallGroups.length > 1}
+                    <div class="install-group-header">
+                      <span class="install-group-label">{group.label}</span>
+                      <span class="install-group-count">{group.completed}/{group.total}</span>
+                    </div>
+                  {/if}
+                  <ol class="sub-steps">
+                    {#each group.steps as subStep (subStep.id)}
+                      <li
+                        class="sub-step"
+                        class:done={subStep.state === 'done'}
+                        class:active={subStep.state === 'active'}
+                        class:failed={subStep.state === 'failed'}
+                      >
+                        <span class="sub-marker" aria-hidden="true">
+                          {#if subStep.state === 'done'}
+                            ✓
+                          {:else if subStep.state === 'failed'}
+                            ✕
+                          {:else if subStep.state === 'active'}
+                            …
+                          {:else}
+                            ·
+                          {/if}
+                        </span>
+                        <span class="sub-label">{subStep.label}</span>
+                        <span
+                          class="sub-status"
+                          class:done={subStep.state === 'done'}
+                          class:active={subStep.state === 'active'}
+                          class:failed={subStep.state === 'failed'}
+                        >
+                          {subStep.statusLabel}
+                        </span>
+                        {#if subStep.state === 'failed' && subStep.error}
+                          <span class="sub-error" title={subStep.error}>failed</span>
+                        {/if}
+                      </li>
+                    {/each}
+                  </ol>
+                </div>
+              {/each}
             </li>
           {/if}
         {/if}
@@ -317,6 +377,63 @@
     min-width: 0;
   }
 
+  .step-toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .step-toggle:hover .step-chevron {
+    color: #171717;
+  }
+
+  .step-chevron {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: #737373;
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .step-chevron.expanded {
+    transform: rotate(90deg);
+  }
+
+  .install-group + .install-group {
+    margin-top: 0.5rem;
+  }
+
+  .install-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.25rem 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #737373;
+  }
+
+  .install-group-count {
+    font-variant-numeric: tabular-nums;
+    color: #525252;
+  }
+
+  .install-group-label {
+    min-width: 0;
+  }
+
   .step-detail {
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
@@ -372,6 +489,27 @@
     flex: 1;
     min-width: 0;
     word-break: break-word;
+  }
+
+  .sub-status {
+    margin-left: auto;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #a3a3a3;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .sub-status.done {
+    color: #16a34a;
+  }
+
+  .sub-status.active {
+    color: #2563eb;
+  }
+
+  .sub-status.failed {
+    color: #dc2626;
   }
 
   .sub-error {
