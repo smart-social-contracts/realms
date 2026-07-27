@@ -3847,6 +3847,45 @@ def refresh_invoice(args: text) -> Async[text]:
         return json.dumps({"success": False, "error": str(e)})
 
 
+# Bump the version suffix whenever the default profile baselines in
+# Profiles.ALL_PROFILES gain operations that already-deployed realms must
+# receive on upgrade (e.g. the permission-based entry_access cutover).
+_PROFILE_BASELINE_FLAG = "profile_baseline:v2"
+
+
+def _sync_profile_baseline() -> void:
+    """Add newly introduced baseline operations to existing default profiles.
+
+    create_foundational_objects() seeds profiles only on first init, so an
+    already-deployed realm upgraded to a build whose Profiles baselines
+    gained operations would otherwise keep stale allowed_to lists and fail
+    the extension entry_access gates. Union-add only, once per baseline
+    version: admin-granted extras are preserved, and operations an admin
+    deliberately revokes after this sync stay revoked.
+    """
+    from ggg import Profiles, UserProfile
+
+    db = Database.get_instance()
+    if db.load("_system", _PROFILE_BASELINE_FLAG):
+        return
+    try:
+        for profile_def in Profiles.ALL_PROFILES:
+            profile = UserProfile[profile_def["name"]]
+            if not profile:
+                continue
+            current = [op for op in str(profile.allowed_to or "").split(",") if op]
+            missing = [op for op in profile_def["allowed_to"] if op not in current]
+            if missing:
+                profile.allowed_to = ",".join(current + missing)
+                logger.info(
+                    f"Profile '{profile_def['name']}': baseline sync added {missing}"
+                )
+        db.save("_system", _PROFILE_BASELINE_FLAG, "done")
+        logger.info("✅ Profile baseline sync complete")
+    except Exception as e:
+        logger.error(f"❌ Profile baseline sync failed: {e}")
+
+
 def create_foundational_objects() -> void:
     """Create the foundational objects required for every realm to operate."""
     from ggg import Calendar, Identity, Profiles, Realm, Treasury, User, UserProfile
@@ -4077,6 +4116,10 @@ def initialize() -> void:
 
     # Create foundational objects after entity registration
     create_foundational_objects()
+
+    # Bring existing realms' default profiles up to the current operations
+    # baseline (no-op on fresh realms and when already synced).
+    _sync_profile_baseline()
 
     # Ensure the realm's accounting currency token is in the registry.
     # register_token() is an upsert, so this is safe on every startup.

@@ -9,23 +9,27 @@ they already run with canister authority.
 Manifest declaration (``manifest.json``)::
 
     "entry_access": {
-      "default": "member",
+      "default": "realm.data_view",
       "functions": {
         "get_public_info": "public",
-        "transfer":        {"level": "admin", "governed": true},
+        "transfer":        {"level": "realm.admin", "governed": true},
         "assign_profile":  {"level": "role.assign", "governed": true, "org": "root"},
-        "join_committee":  {"level": "member", "governed": true, "org_from_arg": "department"}
+        "join_committee":  {"level": "org.manage_members", "governed": true, "org_from_arg": "department"}
       }
     }
 
 Access levels:
 
 - ``"public"`` — any caller, including anonymous.
-- ``"member"`` — any registered User (controllers / trusted principals /
-  test mode pass too).
-- ``"admin"`` — caller must hold ``realm.admin`` (admins hold ALL).
-- any other string — treated as an operation name for ``_check_access``
-  (e.g. ``"role.assign"``).
+- any other string — an operation name from the ``Operations`` catalog
+  (``ggg.system.user_profile``), checked via ``_check_access`` (e.g.
+  ``"realm.data_view"``, ``"role.assign"``). Controllers, trusted
+  principals, test mode, and governance replay pass any operation.
+
+The old profile-named levels ``"member"`` and ``"admin"`` are gone:
+profiles are bundles of operations assigned to users, not access levels.
+Which profiles carry which operations is data (``Profiles`` baselines,
+``Permission`` grants), never something this gate knows about.
 
 ``"governed": true`` adds the org-policy layer on top: when the governing
 org's policy is not 1/1, the call must be confirmed (``confirm: true`` in
@@ -45,10 +49,10 @@ If the named org does not exist, governance falls back to the root org
 
 FAIL-CLOSED RULES — this is the whole point:
 
-1. Extension has no ``entry_access`` at all  → every function is ``admin``.
+1. Extension has no ``entry_access`` at all  → every function is ``realm.admin``.
 2. Function not listed in ``functions``      → the manifest ``default``.
-3. No ``default`` declared                   → ``admin``.
-4. Malformed spec / resolution error         → ``admin``.
+3. No ``default`` declared                   → ``realm.admin``.
+4. Malformed spec / resolution error         → ``realm.admin``.
 
 A developer who forgets to declare access for a new function or a new
 extension gets an admin-only endpoint, never a member-open one.
@@ -62,11 +66,7 @@ from ic_python_logging import get_logger
 logger = get_logger("core.extension_access")
 
 # System-wide fallback when nothing is declared. Never weaken this.
-FAIL_CLOSED_LEVEL = "admin"
-
-# Marker operation used to probe _check_access bypasses (test mode,
-# controllers, trusted principals) without matching any real permission.
-_BYPASS_PROBE_OP = "__extension_access_bypass_probe__"
+FAIL_CLOSED_LEVEL = "realm.admin"
 
 
 def resolve_spec(manifest: Optional[dict], function_name: str) -> Dict[str, Any]:
@@ -120,23 +120,12 @@ def resolve_spec(manifest: Optional[dict], function_name: str) -> Dict[str, Any]
 
 def _level_allows(caller: str, level: str) -> bool:
     from core.access import _check_access
-    from ggg.system.user_profile import Operations
 
     if level == "public":
         return True
-    if level == "member":
-        try:
-            from ggg import User
-
-            if User[caller]:
-                return True
-        except Exception:
-            pass
-        # Controllers, trusted principals, and test mode still pass.
-        return _check_access(caller, _BYPASS_PROBE_OP)
-    if level == "admin":
-        return _check_access(caller, Operations.REALM_ADMIN)
-    # Any other string is an operation name.
+    # Everything else is an operation name from the Operations catalog.
+    # _check_access grants controllers, trusted principals, test mode, and
+    # governance replay a pass for any operation.
     return _check_access(caller, level)
 
 
