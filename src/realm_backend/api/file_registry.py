@@ -549,11 +549,17 @@ def install_extension_from_registry(
         #     public ``ggg`` API, never ``core.*`` or private ``ggg`` submodules.
         #     Enforced (hard reject) once the codex opts in via ``ggg_api_version``;
         #     legacy packages are scanned in warn mode so nothing breaks yet.
+        #     A crash in the scanner must never block an install: only a policy
+        #     violation it actually found is grounds for rejection.
         from core import codex_scan
 
-        scan_error = codex_scan.check_codex_imports(
-            ext_id, files, enforce=codex_hooks.declares_ggg_api(manifest)
-        )
+        try:
+            scan_error = codex_scan.check_codex_imports(
+                ext_id, files, enforce=codex_hooks.declares_ggg_api(manifest)
+            )
+        except Exception as scan_err:
+            logger.error(f"codex_scan[{ext_id}] failed, skipping scan: {scan_err}")
+            scan_error = ""
         if scan_error:
             return json.dumps({"success": False, "error": scan_error})
 
