@@ -1039,6 +1039,13 @@ The `@Browser` tool (Cursor IDE browser tab) works with ICP canister frontends. 
 dfx canister call <canister_id> is_principal_activated '("2eqns-rmzes-7npxw-dxpw2-qdy2s-mw6ix-svdo2-oya7o-a6ldc-sqgwh-bqe")' --network test
 ```
 
+**Gotcha — extension UIs live in an iframe**: runtime extensions render inside
+`<iframe class="realm-frame">`, and `@Browser` cannot reach inside one. Anything under
+`/extensions/<ext_id>` — tabs, forms, panels — is therefore unclickable with that tool, which
+looks like a broken page rather than a tool limit. Use Playwright instead (below); it can
+enter frames. Do not "fix" this by moving extension UIs out of the iframe: that frame is the
+isolation boundary for third-party extension code.
+
 ### Playwright (headless Chromium)
 
 For automated, repeatable, screenshot-based testing — or when you need to capture console output, intercept network calls, or interact with forms programmatically — use Playwright.
@@ -1097,6 +1104,13 @@ asyncio.run(test())
 #### Key tips
 
 - **Screenshots** are saved to `/tmp/` and can be viewed with the `Read` tool (it supports PNG).
+- **Reaching extension UIs**: they render in a nested frame, so `page.click(...)` on the top-level
+  page will miss. Walk `page.frames` and pick the one containing your target:
+
+```python
+target = next(f for f in page.frames if await f.locator("text=Advanced").count() > 0)
+await target.locator("text=Advanced").first.click()
+```
 - **`wait_for_timeout(3000–8000)`** after navigation or clicks — canister calls are async and can take several seconds on the IC boundary nodes.
 - **Same test mode identity caveat** applies — Playwright also gets the hardcoded `2eqns-rmzes-...` principal in test environments.
 - **Intercepting responses**: use `page.route("**/*", handler)` to log or modify HTTP requests/responses.
