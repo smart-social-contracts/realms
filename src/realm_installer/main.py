@@ -883,6 +883,7 @@ def _build_steps(task, manifest: dict) -> list:
                 "backend_canister_id": backend_id,
                 "frontend_canister_id": frontend_id,
                 "file_registry_canister_id": manifest.get("registry_canister_id", ""),
+                "marketplace_canister_id": manifest.get("marketplace_canister_id", ""),
                 "network": manifest.get("network", ""),
             }),
             status="pending",
@@ -1000,12 +1001,16 @@ def _execute_configure_canister_ids(task, step, args):
     registry_id = (args.get("file_registry_canister_id") or "").strip()
     if registry_id:
         payload["file_registry_canister_id"] = registry_id
+    marketplace_id = (args.get("marketplace_canister_id") or "").strip()
+    if marketplace_id:
+        payload["marketplace_canister_id"] = marketplace_id
     network = (args.get("network") or "").strip()
     if network:
         payload["network"] = network
 
     jlog(task.name).info(
-        f"setting canister config on backend {backend_id}: frontend={frontend_id}"
+        f"setting canister config on backend {backend_id}: frontend={frontend_id}, "
+        f"file_registry={registry_id or '–'}, marketplace={marketplace_id or '–'}"
     )
     config_json = json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"')
     config_arg = '("' + config_json + '")'
@@ -1378,10 +1383,27 @@ def _start_extensions_for_job(job, manifest: dict) -> Async[None]:
     raw_codex = realm_info.get("codex")
     jlog(job.name).info(f"raw extensions: {len(raw_exts)} items, codex: {type(raw_codex).__name__}={raw_codex}")
 
+    # The realm refuses packages that carry no approval from an approver it
+    # trusts, and its default approver is its marketplace. A realm that does
+    # not know its marketplace yet trusts nobody, so this has to reach the
+    # backend before the first install rather than at registration.
+    infra = manifest.get("infra") or {}
+    marketplace_id = (
+        manifest.get("marketplace_canister_id")
+        or infra.get("marketplace_canister_id")
+        or ""
+    )
+    if not marketplace_id:
+        jlog(job.name).warning(
+            "no marketplace in manifest: the realm will trust no approver and "
+            "refuse every package until one is configured"
+        )
+
     ext_manifest = {
         "target_canister_id": job.backend_canister_id,
         "frontend_canister_id": job.frontend_canister_id or "",
         "registry_canister_id": registry_id,
+        "marketplace_canister_id": marketplace_id,
         "network": network,
     }
     ext_list = []
