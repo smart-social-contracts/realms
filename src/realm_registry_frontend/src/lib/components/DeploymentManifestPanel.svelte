@@ -12,6 +12,8 @@
   export let frontendCanisterId = '';
   /** @type {boolean} */
   export let loading = false;
+  /** On-chain job status — used to pick registry vs realm branding URLs. */
+  export let rawStatus = '';
   /** @type {string|null} */
   export let error = null;
 
@@ -19,7 +21,10 @@
 
   $: manifest = parseDeploymentManifest(manifestRaw);
   $: summary = summarizeManifest(manifest);
-  $: brandingAssets = brandingAssetsFromManifest(manifest, { frontendCanisterId });
+  $: brandingAssets = brandingAssetsFromManifest(manifest, {
+    frontendCanisterId,
+    rawStatus,
+  });
   $: manifestJson = formatManifestJson(manifest);
 </script>
 
@@ -64,16 +69,17 @@
         {#each brandingAssets as asset (asset.key)}
           <div class="branding-card">
             <div class="branding-label">{asset.label}</div>
-            {#if asset.realmUrl}
-              <a href={asset.realmUrl} target="_blank" rel="noopener noreferrer" class="branding-link">
-                <img src={asset.realmUrl} alt={asset.label} class="branding-img" loading="lazy" />
+            {#if asset.primaryUrl}
+              <a href={asset.primaryUrl} target="_blank" rel="noopener noreferrer" class="branding-link">
+                <img src={asset.primaryUrl} alt={asset.label} class="branding-img" loading="lazy" />
               </a>
-              <div class="branding-caption">Live on realm</div>
-            {:else if asset.registryUrl}
-              <a href={asset.registryUrl} target="_blank" rel="noopener noreferrer" class="branding-link">
-                <img src={asset.registryUrl} alt={asset.label} class="branding-img" loading="lazy" />
-              </a>
-              <div class="branding-caption">File registry</div>
+              <div class="branding-caption">
+                {#if asset.primarySource === 'registry'}
+                  Uploaded to file registry
+                {:else}
+                  Live on realm
+                {/if}
+              </div>
             {/if}
           </div>
         {/each}

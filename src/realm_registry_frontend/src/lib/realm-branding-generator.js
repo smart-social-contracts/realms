@@ -234,6 +234,13 @@ export async function resolveDeployBranding(formData, options = {}) {
   let logo = formData?.logo || null;
   let background = formData?.background || null;
 
+  if (!logo && formData?.logoPreview) {
+    logo = await previewDataUrlToFile(formData.logoPreview, 'logo.png');
+  }
+  if (!background && formData?.backgroundPreview) {
+    background = await previewDataUrlToFile(formData.backgroundPreview, 'background.png');
+  }
+
   if (!logo) {
     logo = await generateRealmLogo(name, { seed, useAi: options.useAi });
   }
@@ -242,6 +249,21 @@ export async function resolveDeployBranding(formData, options = {}) {
   }
 
   return { logo, background };
+}
+
+/** Restore a wizard preview (data URL or blob URL) to a File for deploy upload. */
+export async function previewDataUrlToFile(preview, filename) {
+  const src = String(preview || '').trim();
+  if (!src) return null;
+  try {
+    const res = await fetch(src);
+    const blob = await res.blob();
+    if (!blob.size) return null;
+    const type = blob.type || 'image/png';
+    return new File([blob], filename, { type });
+  } catch {
+    return null;
+  }
 }
 
 /** Fill missing logo/background on formData before deploy. */

@@ -51,6 +51,14 @@ export function brandingAssetsFromManifest(manifest, opts = {}) {
 
   const frId = (branding.file_registry_canister_id || manifest?.infra?.file_registry_canister_id || '').trim();
   const frontendId = (opts.frontendCanisterId || '').trim();
+  const rawStatus = (opts.rawStatus || '').toLowerCase();
+  // User branding is pulled onto the realm frontend during registration.
+  // Until then /custom/* serves bundled template placeholders — show registry uploads.
+  const preferRegistry =
+    opts.preferRegistry === true ||
+    (!opts.preferRegistry &&
+      rawStatus &&
+      !['registering', 'completed'].includes(rawStatus));
   const ns = branding.namespace;
   const out = [];
 
@@ -64,7 +72,18 @@ export function brandingAssetsFromManifest(manifest, opts = {}) {
     const realmUrl = frontendId
       ? `https://${frontendId}.icp0.io${realmPath}`
       : null;
-    out.push({ key: assetKey, label, registryUrl, realmUrl });
+    const primaryUrl = preferRegistry ? (registryUrl || realmUrl) : (realmUrl || registryUrl);
+    const primarySource = preferRegistry
+      ? (registryUrl ? 'registry' : realmUrl ? 'realm' : null)
+      : (realmUrl ? 'realm' : registryUrl ? 'registry' : null);
+    out.push({
+      key: assetKey,
+      label,
+      registryUrl,
+      realmUrl,
+      primaryUrl,
+      primarySource,
+    });
   }
   return out;
 }

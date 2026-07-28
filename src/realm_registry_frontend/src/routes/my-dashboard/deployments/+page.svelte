@@ -345,6 +345,7 @@
       <DeploymentManifestPanel
         manifestRaw={manifestRaw}
         frontendCanisterId={deployment.frontend_canister_id || ''}
+        rawStatus={deployment.raw_status || deployment.status || ''}
         loading={manifestLoading}
         error={manifestError}
       />
