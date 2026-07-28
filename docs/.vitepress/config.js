@@ -21,6 +21,11 @@ function getVersion() {
 const version = getVersion()
 
 export default defineConfig({
+  vite: {
+    build: {
+      target: 'es2020',
+    },
+  },
   title: 'Realms',
   description: 'Governance Operating System Documentation',
   base: '/docs/',
