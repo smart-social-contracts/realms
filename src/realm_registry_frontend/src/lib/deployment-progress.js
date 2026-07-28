@@ -54,6 +54,25 @@ const TERMINAL_STATUSES = new Set([
 
 const FAILED_STATUSES = new Set(['failed', 'failed_verification', 'cancelled']);
 
+const EXTENSIONS_STAGE_INDEX = DEPLOYMENT_PIPELINE.findIndex((s) => s.id === 'extensions');
+
+/**
+ * True when the installer finished the run but some step failed.
+ *
+ * A partially installed realm still reaches status `completed`: its canisters
+ * exist and it is registered, so it keeps its dashboard entry and visit link.
+ * The installer records what went wrong in `error` (e.g. a codex that failed
+ * to install, which leaves the realm without its core extensions), and that
+ * must not be presented as a finished deployment.
+ *
+ * @param {object} job
+ * @returns {boolean}
+ */
+export function deploymentFinishedWithErrors(job) {
+  const status = (job?.raw_status || job?.status || '').toLowerCase();
+  return status === 'completed' && Boolean((job?.error || '').trim());
+}
+
 /** Relative effort per pipeline stage (queue → register). Used when we lack live observations. */
 const STAGE_DURATION_WEIGHTS = [1, 3, 2, 4, 3];
 
@@ -74,7 +93,7 @@ const UNITS = {
  * @returns {{ completed: number, total: number, extensionTotal: number, extensionCompleted: number }}
  */
 export function computeDeploymentUnits(job, deployTask) {
-  const status = (job.status || job.raw_status || '').toLowerCase();
+  const status = (job.raw_status || job.status || '').toLowerCase();
   let completed = 0;
   let total = 0;
 
@@ -149,7 +168,7 @@ export function buildProvisionSubSteps(job) {
   const backend = (job.backend_canister_id || '').trim();
   const frontend = (job.frontend_canister_id || '').trim();
   const assets = Number(job.assets_verified) === 1;
-  const status = (job.status || job.raw_status || '').toLowerCase();
+  const status = (job.raw_status || job.status || '').toLowerCase();
   const inProvision =
     status === 'provisioning' ||
     status === 'deploying' ||
@@ -200,8 +219,8 @@ export function buildProvisionSubSteps(job) {
  * @returns {number}
  */
 export function computeDeploymentPercent(job, deployTask) {
-  const status = (job.status || job.raw_status || '').toLowerCase();
-  if (status === 'completed') return 100;
+  const status = (job.raw_status || job.status || '').toLowerCase();
+  if (status === 'completed' && !deploymentFinishedWithErrors(job)) return 100;
 
   const backend = Boolean((job.backend_canister_id || '').trim());
   const frontend = Boolean((job.frontend_canister_id || '').trim());
@@ -237,7 +256,7 @@ export function computeDeploymentPercent(job, deployTask) {
     percent = lerpPhase('queue', 1);
   }
 
-  if (FAILED_STATUSES.has(status)) {
+  if (FAILED_STATUSES.has(status) || deploymentFinishedWithErrors(job)) {
     return Math.max(PHASE.queue.from, Math.min(percent, 99));
   }
   return Math.max(0, Math.min(percent, 99));
@@ -265,7 +284,7 @@ export function formatDuration(ms) {
 }
 
 function stageIndexForJob(job) {
-  const status = (job.status || job.raw_status || '').toLowerCase();
+  const status = (job.raw_status || job.status || '').toLowerCase();
   let index = STATUS_STAGE_INDEX[status] ?? 0;
 
   if (status === 'pending' && (job.backend_canister_id || job.frontend_canister_id)) {
@@ -534,14 +553,19 @@ export function getDeploymentProgress(job, options = {}) {
   const codexDependencies = options?.codexDependencies ?? [];
   const { status, index: stageIndex } = stageIndexForJob(job);
   const isTerminal = TERMINAL_STATUSES.has(status);
-  const isFailed = FAILED_STATUSES.has(status);
-  const isComplete = status === 'completed';
+  const finishedWithErrors = deploymentFinishedWithErrors(job);
+  const isFailed = FAILED_STATUSES.has(status) || finishedWithErrors;
+  const isComplete = status === 'completed' && !finishedWithErrors;
 
+  // A run that finished with errors stalled where the work actually failed —
+  // the extension/codex phase — not at the registration it went on to do.
   const activeIndex = isComplete
     ? DEPLOYMENT_PIPELINE.length - 1
-    : isFailed
-      ? Math.min(stageIndex, DEPLOYMENT_PIPELINE.length - 2)
-      : stageIndex;
+    : finishedWithErrors
+      ? EXTENSIONS_STAGE_INDEX
+      : isFailed
+        ? Math.min(stageIndex, DEPLOYMENT_PIPELINE.length - 2)
+        : stageIndex;
 
   const currentStage = DEPLOYMENT_PIPELINE[activeIndex] || DEPLOYMENT_PIPELINE[0];
   const percent = computeDeploymentPercent(job, deployTask);

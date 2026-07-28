@@ -6,6 +6,7 @@ import {
   buildProvisionSubSteps,
   computeDeploymentPercent,
   computeDeploymentUnits,
+  deploymentFinishedWithErrors,
   getDeploymentProgress,
   withLiveProgressTiming,
 } from './deployment-progress.js';
@@ -15,6 +16,69 @@ test('completed job is 100%', () => {
     computeDeploymentPercent({ status: 'completed', raw_status: 'completed' }, null),
     100,
   );
+});
+
+// A partially installed realm still reaches status 'completed' — the installer
+// registers it and records the failure in `error`. Reporting that as a finished
+// deployment is how a realm shipped without any of its dashboards.
+const PARTIAL_JOB = {
+  status: 'completed',
+  raw_status: 'completed',
+  backend_canister_id: 'icuo5-5aaaa-aaaac-bfrxa-cai',
+  frontend_canister_id: 'ifvij-qyaaa-aaaac-bfrxq-cai',
+  assets_verified: 1,
+  wasm_verified: 1,
+  expected_step_count: 18,
+  error: "partial extension install (1 failed): syntropia: module 'ast' has no attribute 'parse'",
+};
+
+const PARTIAL_TASK = { total_count: 18, completed_count: 17, steps: [] };
+
+test('deploymentFinishedWithErrors distinguishes a clean completion from a partial one', () => {
+  assert.equal(deploymentFinishedWithErrors(PARTIAL_JOB), true);
+  assert.equal(
+    deploymentFinishedWithErrors({ status: 'completed', raw_status: 'completed', error: '' }),
+    false,
+  );
+  assert.equal(
+    deploymentFinishedWithErrors({ status: 'extensions', raw_status: 'extensions', error: 'x' }),
+    false,
+  );
+});
+
+test('completed job with a failed step is not 100%', () => {
+  const percent = computeDeploymentPercent(PARTIAL_JOB, PARTIAL_TASK);
+  assert.ok(percent < 100, `expected under 100%, got ${percent}%`);
+  assert.ok(percent > 50, `expected most of the work counted, got ${percent}%`);
+});
+
+test('completed job with a failed step reports as failed, not complete', () => {
+  const progress = getDeploymentProgress(PARTIAL_JOB, { deployTask: PARTIAL_TASK });
+
+  assert.equal(progress.isComplete, false);
+  assert.equal(progress.isFailed, true);
+  assert.equal(progress.currentLabel, 'Failed');
+  assert.match(progress.currentDescription, /syntropia/);
+  assert.equal(progress.stages.find((s) => s.id === 'complete')?.state, 'upcoming');
+});
+
+test('completed job with a failed step blames the stage that actually failed', () => {
+  const progress = getDeploymentProgress(PARTIAL_JOB, { deployTask: PARTIAL_TASK });
+
+  assert.equal(progress.stages.find((s) => s.id === 'extensions')?.state, 'failed');
+  assert.equal(progress.stages.find((s) => s.id === 'verify')?.state, 'done');
+});
+
+test('cleanly completed job is still reported as complete', () => {
+  const progress = getDeploymentProgress(
+    { ...PARTIAL_JOB, error: '' },
+    { deployTask: { total_count: 18, completed_count: 18, steps: [] } },
+  );
+
+  assert.equal(progress.isComplete, true);
+  assert.equal(progress.isFailed, false);
+  assert.equal(progress.percent, 100);
+  assert.equal(progress.stages.find((s) => s.id === 'complete')?.state, 'done');
 });
 
 test('provisioning with backend only is well below old fixed 28%', () => {
@@ -132,6 +196,26 @@ test('getDeploymentProgress exposes provision and extension sub-steps', () => {
   assert.equal(extProgress.extensionCompleted, 1);
   assert.equal(extProgress.subSteps.length, 2);
   assert.match(extProgress.currentDescription, /1\/2/);
+});
+
+test('ui in_progress status does not mask raw extensions stage', () => {
+  const progress = getDeploymentProgress(
+    {
+      status: 'in_progress',
+      raw_status: 'extensions',
+      backend_canister_id: 'abc',
+      frontend_canister_id: 'def',
+      assets_verified: 1,
+      wasm_verified: 1,
+      expected_step_count: 18,
+    },
+    {
+      deployTask: { total_count: 18, completed_count: 2, steps: [] },
+    },
+  );
+  assert.equal(progress.currentLabel, 'Installing extensions');
+  assert.notEqual(progress.stages[0].state, 'active');
+  assert.equal(progress.stages.find((s) => s.id === 'extensions')?.state, 'active');
 });
 
 test('buildExtensionInstallGroups separates setup, extensions, and codex', () => {
