@@ -10,13 +10,20 @@ frontend). Purchase increments ``installs`` (the new counter that
 from typing import Any, Dict, List, Optional
 
 from _cdk import ic
+from api.licenses import has_active_license
 from core.models import ExtensionListingEntity, PurchaseEntity
 from ic_python_logging import get_logger
 
 logger = get_logger("api.extensions")
 
 
-VERIFY_STATUSES = ("unverified", "pending_audit", "verified", "rejected")
+VERIFY_STATUSES = (
+    "unverified",
+    "pending_review",
+    "pending_audit",
+    "verified",
+    "rejected",
+)
 
 
 def _is_controller() -> bool:
@@ -77,15 +84,26 @@ def create_extension(
     file_registry_namespace: str,
     download_url: str = "",
 ) -> Dict:
-    """Create or update an extension listing.
+    """Submit (or resubmit) an extension listing for review.
 
-    Open to any II principal — no developer license required to
-    publish. Updates require ownership (developer == caller) unless
-    the caller is a controller.
+    Requires an active developer license (issue #267): the license is what
+    ties a submission to an accountable identity, so it gates publishing and
+    not just audit eligibility. Updates additionally require ownership
+    (developer == caller) unless the caller is a controller.
+
+    A submission is never live on arrival — it starts in ``pending_review``
+    and a reviewer decides. Resubmitting resets that, since the reviewed
+    bytes are no longer the bytes on offer.
     """
     err = _validate_id(extension_id)
     if err:
         return {"success": False, "error": err}
+
+    if not has_active_license(developer) and not _is_controller():
+        return {
+            "success": False,
+            "error": "An active developer license is required to publish to the marketplace",
+        }
 
     now = _now()
     existing = ExtensionListingEntity[extension_id]
@@ -103,16 +121,20 @@ def create_extension(
         existing.download_url = download_url
         existing.is_active = True
         existing.updated_at = now
-        # Updating an extension version sends it back to "unverified" unless
-        # already verified — keeps the audit signal honest after code changes.
-        if existing.verification_status in (None, "rejected", "pending_audit"):
-            existing.verification_status = "unverified"
-            existing.verification_notes = ""
-        elif existing.verification_status == "verified":
-            existing.verification_status = "unverified"
-            existing.verification_notes = "Verification reset on version update"
+        # New bytes mean the previous review no longer describes what is on
+        # offer, whatever it concluded. Back to the queue.
+        was_verified = existing.verification_status == "verified"
+        existing.verification_status = "pending_review"
+        existing.verification_notes = (
+            "Review reset on version update" if was_verified else ""
+        )
         logger.info(f"updated extension listing {extension_id} v{version}")
-        return {"success": True, "extension_id": extension_id, "action": "updated"}
+        return {
+            "success": True,
+            "extension_id": extension_id,
+            "action": "updated",
+            "verification_status": "pending_review",
+        }
 
     ExtensionListingEntity(
         extension_id=extension_id,
@@ -128,14 +150,19 @@ def create_extension(
         download_url=download_url,
         installs=0,
         likes=0,
-        verification_status="unverified",
+        verification_status="pending_review",
         verification_notes="",
         is_active=True,
         created_at=now,
         updated_at=now,
     )
     logger.info(f"created extension listing {extension_id} v{version} by {developer}")
-    return {"success": True, "extension_id": extension_id, "action": "created"}
+    return {
+        "success": True,
+        "extension_id": extension_id,
+        "action": "created",
+        "verification_status": "pending_review",
+    }
 
 
 def delist_extension(developer: str, extension_id: str) -> Dict:

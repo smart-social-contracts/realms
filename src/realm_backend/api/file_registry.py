@@ -53,7 +53,12 @@ class FileRegistryService(Service):
     def get_file_size_icc(self, namespace: text, path: text) -> text: ...
 
     @service_query
-    def get_file_chunk_icc(self, namespace: text, path: text, offset: text, length: text) -> text: ...
+    def get_file_chunk_icc(
+        self, namespace: text, path: text, offset: text, length: text
+    ) -> text: ...
+
+    @service_query
+    def get_namespace_approval_icc(self, namespace: text) -> text: ...
 
 
 class _AssetStoreArg(Record):
@@ -178,12 +183,16 @@ def _unwrap_call_result(result) -> str:
     return str(result)
 
 
-def _pull_file_bytes(registry: "FileRegistryService", namespace: str, path: str) -> Async[bytes]:
+def _pull_file_bytes(
+    registry: "FileRegistryService", namespace: str, path: str
+) -> Async[bytes]:
     """Pull a stored file from the registry via chunked base64 reads."""
     data = bytearray()
     offset = 0
     for _ in range(4096):
-        res: CallResult = yield registry.get_file_chunk_icc(namespace, path, str(offset), "")
+        res: CallResult = yield registry.get_file_chunk_icc(
+            namespace, path, str(offset), ""
+        )
         raw = _unwrap_call_result(res)
         obj = json.loads(raw)
         if "error" in obj:
@@ -197,13 +206,18 @@ def _pull_file_bytes(registry: "FileRegistryService", namespace: str, path: str)
     return bytes(data)
 
 
-def _pull_namespace_file_text(registry: "FileRegistryService", namespace: str, path: str) -> Async[str]:
+def _pull_namespace_file_text(
+    registry: "FileRegistryService", namespace: str, path: str
+) -> Async[str]:
     data = yield from _pull_file_bytes(registry, namespace, path)
     return data.decode("utf-8", errors="replace")
 
 
 def _resolve_registry_namespace(
-    registry: "FileRegistryService", category: str, item_id: str, version: str,
+    registry: "FileRegistryService",
+    category: str,
+    item_id: str,
+    version: str,
 ) -> Async[tuple]:
     """Resolve (namespace, resolved_version). Returns (ns, ver, error_json)."""
     version = (version or "").strip()
@@ -217,9 +231,15 @@ def _resolve_registry_namespace(
                     break
             resolved = _resolve_version_from_published(published, version)
             if not resolved:
-                return "", "", json.dumps({
-                    "error": f"No published version of ext/{item_id} matches '{version}'",
-                })
+                return (
+                    "",
+                    "",
+                    json.dumps(
+                        {
+                            "error": f"No published version of ext/{item_id} matches '{version}'",
+                        }
+                    ),
+                )
             ns = f"ext/{item_id}/{resolved}".rstrip("/")
             return ns, resolved, None
 
@@ -229,7 +249,10 @@ def _resolve_registry_namespace(
         manifest = json.loads(_unwrap_call_result(manifest_res))
         if manifest.get("error"):
             return "", "", json.dumps({"error": manifest["error"]})
-        ns = (manifest.get("_namespace") or f"ext/{item_id}/{manifest.get('_version', '')}").rstrip("/")
+        ns = (
+            manifest.get("_namespace")
+            or f"ext/{item_id}/{manifest.get('_version', '')}"
+        ).rstrip("/")
         resolved = manifest.get("_version") or version or "unknown"
         return ns, resolved, None
 
@@ -244,13 +267,23 @@ def _resolve_registry_namespace(
         if not version or version.lower() == "latest":
             resolved = _resolve_version_from_published(published, "")
             if not resolved:
-                return "", "", json.dumps({"error": f"No versions found for codex/{item_id}"})
+                return (
+                    "",
+                    "",
+                    json.dumps({"error": f"No versions found for codex/{item_id}"}),
+                )
         elif _is_range_spec(version):
             resolved = _resolve_version_from_published(published, version)
             if not resolved:
-                return "", "", json.dumps({
-                    "error": f"No published version of codex/{item_id} matches '{version}'",
-                })
+                return (
+                    "",
+                    "",
+                    json.dumps(
+                        {
+                            "error": f"No published version of codex/{item_id} matches '{version}'",
+                        }
+                    ),
+                )
         else:
             resolved = version
         ns = f"codex/{item_id}/{resolved}".rstrip("/")
@@ -259,7 +292,9 @@ def _resolve_registry_namespace(
     return "", "", json.dumps({"error": f"Unknown category: {category}"})
 
 
-def _list_namespace_paths(registry: "FileRegistryService", namespace: str) -> Async[list]:
+def _list_namespace_paths(
+    registry: "FileRegistryService", namespace: str
+) -> Async[list]:
     raw: CallResult = yield registry.list_files_icc(namespace)
     listing = json.loads(_unwrap_call_result(raw))
     if isinstance(listing, dict) and listing.get("error"):
@@ -270,7 +305,9 @@ def _list_namespace_paths(registry: "FileRegistryService", namespace: str) -> As
 
 
 def _pull_namespace_files(
-    registry: "FileRegistryService", namespace: str, path_filter,
+    registry: "FileRegistryService",
+    namespace: str,
+    path_filter,
 ) -> Async[Dict[str, str]]:
     files = {}
     paths = yield from _list_namespace_paths(registry, namespace)
@@ -282,14 +319,112 @@ def _pull_namespace_files(
             size_obj = json.loads(_unwrap_call_result(size_res))
             if size_obj.get("error"):
                 continue
-            files[path] = yield from _pull_namespace_file_text(registry, namespace, path)
+            files[path] = yield from _pull_namespace_file_text(
+                registry, namespace, path
+            )
         except Exception as e:
             logger.warning(f"Skip {namespace}/{path}: {e}")
     return files
 
 
+def _trust_policy() -> tuple:
+    """This realm's (require_approval, trusted_approver_ids) policy.
+
+    Unreadable policy is treated as "enforce": not being able to tell whether
+    the realm opted out is not a reason to assume it did.
+    """
+    try:
+        from ggg import Realm
+
+        _realms = Realm.instances()
+        if not _realms:
+            return True, []
+        realm = _realms[0]
+        require = bool(getattr(realm, "require_marketplace_approval", True))
+        raw = (getattr(realm, "trusted_approvers", "") or "").strip()
+        approvers = [p.strip() for p in raw.split(",") if p.strip()]
+        if not approvers:
+            # Default: trust only the marketplace this realm was configured with.
+            marketplace = (getattr(realm, "marketplace_canister_id", "") or "").strip()
+            approvers = [marketplace] if marketplace else []
+        return require, approvers
+    except Exception as e:
+        logger.error(f"trust policy unreadable ({e}); enforcing approval")
+        return True, []
+
+
+def _check_marketplace_approval(
+    registry: "FileRegistryService",
+    namespace: str,
+) -> Async[str]:
+    """Empty string if `namespace` may be installed, else the reason it may not.
+
+    Fails closed. A registry too old to answer the question, an approval issued
+    by a principal this realm does not trust, and content that changed after it
+    was approved are all refusals — otherwise "approved" would mean whatever the
+    least trustworthy party in the chain wanted it to mean.
+    """
+    require, trusted = _trust_policy()
+    if not require:
+        logger.info(f"approval enforcement off; installing '{namespace}' unchecked")
+        return ""
+
+    hint = (
+        "A realm operator with the realm.configure.trust_policy right can allow "
+        "unapproved content from realm settings."
+    )
+    try:
+        raw: CallResult = yield registry.get_namespace_approval_icc(namespace)
+        payload = _unwrap_call_result(raw)
+        approval = json.loads(payload)
+    except Exception as e:
+        # Most likely an older file registry with no approval support at all.
+        return (
+            f"cannot verify marketplace approval for '{namespace}': the file "
+            f"registry did not answer ({e}). {hint}"
+        )
+
+    if not isinstance(approval, dict):
+        return f"cannot verify marketplace approval for '{namespace}': unexpected response. {hint}"
+    if approval.get("error"):
+        return (
+            f"cannot verify marketplace approval for '{namespace}': "
+            f"{approval['error']}. {hint}"
+        )
+
+    if not approval.get("approved"):
+        status = approval.get("status") or "unapproved"
+        if status == "approved" and not approval.get("content_matches"):
+            return (
+                f"'{namespace}' was approved, but its files have changed since "
+                f"the review — refusing to install unreviewed content. {hint}"
+            )
+        return (
+            f"'{namespace}' has not been approved by the marketplace "
+            f"(status: {status}). {hint}"
+        )
+
+    approver = (approval.get("approver") or "").strip()
+    if not trusted:
+        return (
+            f"'{namespace}' is approved by {approver}, but this realm trusts no "
+            f"approver (no marketplace configured). {hint}"
+        )
+    if approver not in trusted:
+        return (
+            f"'{namespace}' is approved by {approver}, which this realm does not "
+            f"trust (trusted: {', '.join(trusted)}). {hint}"
+        )
+
+    logger.info(f"'{namespace}' approved by {approver}")
+    return ""
+
+
 def _pull_extension_backend_files(
-    registry: "FileRegistryService", category: str, item_id: str, version: str,
+    registry: "FileRegistryService",
+    category: str,
+    item_id: str,
+    version: str,
 ) -> Async[tuple]:
     """Returns (files dict, resolved_version, error_json)."""
     namespace, resolved_version, err = yield from _resolve_registry_namespace(
@@ -298,22 +433,35 @@ def _pull_extension_backend_files(
     if err:
         return {}, "", err
 
+    refusal = yield from _check_marketplace_approval(registry, namespace)
+    if refusal:
+        return {}, resolved_version, json.dumps({"error": refusal})
+
     if category == "ext":
+
         def _filter(path: str) -> bool:
             return path.startswith("backend/") or path == "manifest.json"
+
     else:
+
         def _filter(path: str) -> bool:
             return True
 
     files = yield from _pull_namespace_files(registry, namespace, _filter)
     if not files:
         label = f"{category}/{item_id}"
-        return {}, resolved_version, json.dumps({"error": f"No backend files found for {label}"})
+        return (
+            {},
+            resolved_version,
+            json.dumps({"error": f"No backend files found for {label}"}),
+        )
     return files, resolved_version, None
 
 
 def _pull_extension_frontend_files(
-    registry: "FileRegistryService", ext_id: str, version: str,
+    registry: "FileRegistryService",
+    ext_id: str,
+    version: str,
 ) -> Async[tuple]:
     """Returns (files dict, resolved_version, error_json)."""
     namespace, resolved_version, err = yield from _resolve_registry_namespace(
@@ -322,8 +470,16 @@ def _pull_extension_frontend_files(
     if err:
         return {}, "", err
 
+    # Also checked on the backend pull during a normal install; repeated here
+    # because resync_extension_frontends re-copies bundles on its own.
+    refusal = yield from _check_marketplace_approval(registry, namespace)
+    if refusal:
+        return {}, resolved_version, json.dumps({"error": refusal})
+
     files = yield from _pull_namespace_files(
-        registry, namespace, lambda path: path.startswith("frontend/"),
+        registry,
+        namespace,
+        lambda path: path.startswith("frontend/"),
     )
     return files, resolved_version, None
 
@@ -356,7 +512,9 @@ def _format_failed_deps(codex_id: str, failed_deps: list) -> str:
 
 
 def _install_codex_dependencies(
-    registry_canister_id: str, codex_id: str, dependencies: Dict[str, str],
+    registry_canister_id: str,
+    codex_id: str,
+    dependencies: Dict[str, str],
     frontend_canister_id: str = None,
 ) -> Async[tuple]:
     """Install a codex's missing dependency extensions from the registry.
@@ -396,7 +554,13 @@ def _install_codex_dependencies(
                 {"extension": dep, "version": dep_result.get("version", "")}
             )
         else:
-            failed_deps.append({"extension": dep, "pin": pin, "error": dep_result.get("error", "unknown")})
+            failed_deps.append(
+                {
+                    "extension": dep,
+                    "pin": pin,
+                    "error": dep_result.get("error", "unknown"),
+                }
+            )
             logger.error(
                 f"Codex '{codex_id}': dependency '{dep}' (pin={pin or 'latest'}) "
                 f"failed to install: {dep_result}"
@@ -422,7 +586,7 @@ def _seed_codex_module_entities(ext_id: str, files: Dict[str, str]) -> list:
     for path, content in files.items():
         if not (path.startswith("modules/") and path.endswith(".py")):
             continue
-        name = path[len("modules/"):-3]
+        name = path[len("modules/") : -3]
         if not name or "/" in name:
             continue
         try:
@@ -440,7 +604,9 @@ def _seed_codex_module_entities(ext_id: str, files: Dict[str, str]) -> list:
 
 
 def install_extension_from_registry(
-    registry_canister_id: str, ext_id: str, version: str = None,
+    registry_canister_id: str,
+    ext_id: str,
+    version: str = None,
     frontend_canister_id: str = None,
 ) -> Async[str]:
     """Pull extension backend files from the file registry and install them.
@@ -479,7 +645,12 @@ def install_extension_from_registry(
         return json.dumps({"success": False, "error": err_obj.get("error", err)})
 
     if not raw_files:
-        return json.dumps({"success": False, "error": f"No backend files found for extension '{ext_id}'"})
+        return json.dumps(
+            {
+                "success": False,
+                "error": f"No backend files found for extension '{ext_id}'",
+            }
+        )
 
     # Strip "backend/" prefix — registry stores as backend/entry.py but
     # runtime_extensions expects entry.py at the extension root.
@@ -488,7 +659,11 @@ def install_extension_from_registry(
         clean = path.removeprefix("backend/") if path.startswith("backend/") else path
         # Legacy packages ship a minimal backend/manifest.json stub; never let
         # it clobber the authoritative root manifest.json (categories, labels).
-        if clean == "manifest.json" and path != "manifest.json" and "manifest.json" in raw_files:
+        if (
+            clean == "manifest.json"
+            and path != "manifest.json"
+            and "manifest.json" in raw_files
+        ):
             continue
         files[clean] = content
 
@@ -503,7 +678,9 @@ def install_extension_from_registry(
         manifest = {}
     is_codex = manifest.get("kind") == "codex"
 
-    fe_canister = (frontend_canister_id or _get_realm_frontend_canister_id() or "").strip()
+    fe_canister = (
+        frontend_canister_id or _get_realm_frontend_canister_id() or ""
+    ).strip()
 
     installed_deps = []
     failed_deps = []
@@ -523,20 +700,24 @@ def install_extension_from_registry(
             caller = ic.caller().to_str()
             is_internal = caller == ic.id().to_str() or caller == "2vxsx-fae"
             if not is_internal and not _check_access(caller, Operations.CODEX_INSTALL):
-                return json.dumps({
-                    "success": False,
-                    "error": (
-                        f"'{ext_id}' is a codex package; installing it requires "
-                        f"the {Operations.CODEX_INSTALL} permission"
-                    ),
-                })
+                return json.dumps(
+                    {
+                        "success": False,
+                        "error": (
+                            f"'{ext_id}' is a codex package; installing it requires "
+                            f"the {Operations.CODEX_INSTALL} permission"
+                        ),
+                    }
+                )
         except ImportError:
             pass  # test harness without access-control stack
 
         # 2. Hook API version gate.
         version_error = codex_hooks.unsupported_api_version(manifest)
         if version_error:
-            return json.dumps({"success": False, "error": f"Codex '{ext_id}': {version_error}"})
+            return json.dumps(
+                {"success": False, "error": f"Codex '{ext_id}': {version_error}"}
+            )
 
         # 2b. GGG API version gate (issue #265). Missing => legacy, accepted.
         ggg_version_error = codex_hooks.unsupported_ggg_api_version(manifest)
@@ -576,31 +757,37 @@ def install_extension_from_registry(
             registry_canister_id, ext_id, dependencies, fe_canister or None
         )
         if failed_deps:
-            return json.dumps({
-                "success": False,
-                "error": _format_failed_deps(ext_id, failed_deps),
-                "dependency_warnings": failed_deps,
-            })
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": _format_failed_deps(ext_id, failed_deps),
+                    "dependency_warnings": failed_deps,
+                }
+            )
 
     # Copy frontend bundles before installing backend so we never mark an
     # extension installed without its same-origin UI assets.
-    frontend_files, _fe_version, fe_pull_err = yield from _pull_extension_frontend_files(
-        registry, ext_id, resolved_version
+    frontend_files, _fe_version, fe_pull_err = (
+        yield from _pull_extension_frontend_files(registry, ext_id, resolved_version)
     )
     if fe_pull_err:
         err_obj = json.loads(fe_pull_err)
-        return json.dumps({"success": False, "error": err_obj.get("error", fe_pull_err)})
+        return json.dumps(
+            {"success": False, "error": err_obj.get("error", fe_pull_err)}
+        )
 
     frontend_copied = 0
     if frontend_files:
         if not fe_canister:
-            return json.dumps({
-                "success": False,
-                "error": (
-                    f"Extension '{ext_id}' has frontend files but no frontend_canister_id "
-                    f"is configured on this realm"
-                ),
-            })
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": (
+                        f"Extension '{ext_id}' has frontend files but no frontend_canister_id "
+                        f"is configured on this realm"
+                    ),
+                }
+            )
         copy_err = yield from _copy_frontend_to_asset_canister(
             registry_canister_id,
             ext_id,
@@ -621,10 +808,12 @@ def install_extension_from_registry(
         source_version=resolved_version,
     )
     if not ok:
-        return json.dumps({
-            "success": False,
-            "error": f"Failed to load extension '{ext_id}' after install",
-        })
+        return json.dumps(
+            {
+                "success": False,
+                "error": f"Failed to load extension '{ext_id}' after install",
+            }
+        )
 
     init_error = None
     seeded_modules = []
@@ -658,7 +847,10 @@ def install_extension_from_registry(
 
 
 def install_codex_from_registry(
-    registry_canister_id: str, codex_id: str, version: str = None, run_init: bool = True,
+    registry_canister_id: str,
+    codex_id: str,
+    version: str = None,
+    run_init: bool = True,
     frontend_canister_id: str = None,
 ) -> Async[str]:
     """Install a codex, preferring the unified extension pipeline (issue #244).
@@ -702,7 +894,10 @@ def install_codex_from_registry(
     if unified.get("success"):
         return unified_raw
     unified_error = str(unified.get("error") or "")
-    if "No published version" not in unified_error and "not found" not in unified_error.lower():
+    if (
+        "No published version" not in unified_error
+        and "not found" not in unified_error.lower()
+    ):
         # The package exists under ext/ but failed for a real reason
         # (singleton conflict, unsupported API version, load failure) —
         # surface that instead of silently installing a stale legacy copy.
@@ -723,7 +918,9 @@ def install_codex_from_registry(
         return json.dumps({"success": False, "error": err_obj.get("error", err)})
 
     if not files:
-        return json.dumps({"success": False, "error": f"No files found for codex '{codex_id}'"})
+        return json.dumps(
+            {"success": False, "error": f"No files found for codex '{codex_id}'"}
+        )
 
     logger.info(f"Got {len(files)} files from registry (version {resolved_version})")
 
@@ -745,7 +942,9 @@ def install_codex_from_registry(
         if not isinstance(codex_manifest, dict):
             codex_manifest = {}
     except (json.JSONDecodeError, TypeError) as e:
-        logger.error(f"Codex '{codex_id}': unreadable manifest.json, skipping dependency check: {e}")
+        logger.error(
+            f"Codex '{codex_id}': unreadable manifest.json, skipping dependency check: {e}"
+        )
         codex_manifest = {}
 
     dependencies = _resolve_codex_dependencies(codex_manifest, codex_id)
@@ -753,11 +952,13 @@ def install_codex_from_registry(
         registry_canister_id, codex_id, dependencies, frontend_id
     )
     if failed_deps:
-        return json.dumps({
-            "success": False,
-            "error": _format_failed_deps(codex_id, failed_deps),
-            "dependency_warnings": failed_deps,
-        })
+        return json.dumps(
+            {
+                "success": False,
+                "error": _format_failed_deps(codex_id, failed_deps),
+                "dependency_warnings": failed_deps,
+            }
+        )
 
     # Install via runtime_codex
     from core.runtime_codex import (
@@ -768,10 +969,12 @@ def install_codex_from_registry(
 
     ok = install_codex_package(package_name, files)
     if not ok:
-        return json.dumps({
-            "success": False,
-            "error": f"Failed to install codex package '{package_name}'",
-        })
+        return json.dumps(
+            {
+                "success": False,
+                "error": f"Failed to install codex package '{package_name}'",
+            }
+        )
 
     init_error = None
     if run_init:
@@ -857,19 +1060,21 @@ def _copy_frontend_to_asset_canister(
         asset_key = f"/ext/{ext_id}/{resolved_version}/{path}"
         content_type = _guess_content_type(path)
 
-        escaped = content.replace('\\', '\\\\').replace('"', '\\"')
+        escaped = content.replace("\\", "\\\\").replace('"', '\\"')
         candid_arg = (
             f'(record {{ key = "{asset_key}"; '
             f'content_type = "{content_type}"; '
             f'content_encoding = "identity"; '
             f'content = blob "{escaped}"; '
-            f'sha256 = null }})'
+            f"sha256 = null }})"
         )
 
         try:
             store_result: CallResult = yield ic.call_raw(
-                frontend_principal, "store",
-                ic.candid_encode(candid_arg), 0,
+                frontend_principal,
+                "store",
+                ic.candid_encode(candid_arg),
+                0,
             )
             if isinstance(store_result, dict) and "Err" in store_result:
                 msg = f"{asset_key}: {store_result['Err']}"
@@ -882,7 +1087,9 @@ def _copy_frontend_to_asset_canister(
             errors.append(msg)
             logger.error(f"Frontend store exception for {msg}")
 
-    logger.info(f"Copied {copied}/{len(files)} frontend files for {ext_id}@{resolved_version}")
+    logger.info(
+        f"Copied {copied}/{len(files)} frontend files for {ext_id}@{resolved_version}"
+    )
     if errors:
         preview = "; ".join(errors[:3])
         if len(errors) > 3:
@@ -906,14 +1113,22 @@ def resync_extension_frontends(
     missing. The SPA fallback then serves ``text/html`` for those URLs and
     runtime extension loading fails with a MIME type error.
     """
-    from core.runtime_extensions import get_extension_source, list_installed, _load_manifest
+    from core.runtime_extensions import (
+        get_extension_source,
+        list_installed,
+        _load_manifest,
+    )
 
-    fe_canister = (frontend_canister_id or _get_realm_frontend_canister_id() or "").strip()
+    fe_canister = (
+        frontend_canister_id or _get_realm_frontend_canister_id() or ""
+    ).strip()
     if not fe_canister:
-        return json.dumps({
-            "success": False,
-            "error": "no frontend_canister_id configured on this realm",
-        })
+        return json.dumps(
+            {
+                "success": False,
+                "error": "no frontend_canister_id configured on this realm",
+            }
+        )
 
     default_registry = (registry_canister_id or "").strip()
     if not default_registry:
@@ -943,27 +1158,39 @@ def resync_extension_frontends(
             skipped.append({"extension_id": ext_id, "reason": "no installed version"})
             continue
         if not reg_id:
-            skipped.append({"extension_id": ext_id, "reason": "no registry_canister_id"})
+            skipped.append(
+                {"extension_id": ext_id, "reason": "no registry_canister_id"}
+            )
             continue
 
         copy_err = yield from _copy_frontend_to_asset_canister(
-            reg_id, ext_id, version, fe_canister,
+            reg_id,
+            ext_id,
+            version,
+            fe_canister,
         )
         if copy_err:
-            errors.append({"extension_id": ext_id, "version": version, "error": copy_err})
+            errors.append(
+                {"extension_id": ext_id, "version": version, "error": copy_err}
+            )
         else:
             synced.append({"extension_id": ext_id, "version": version})
 
-    return json.dumps({
-        "success": len(errors) == 0,
-        "synced": synced,
-        "skipped": skipped,
-        "errors": errors,
-    })
+    return json.dumps(
+        {
+            "success": len(errors) == 0,
+            "synced": synced,
+            "skipped": skipped,
+            "errors": errors,
+        }
+    )
 
 
 def install_branding_from_registry(
-    registry_canister_id: str, namespace: str, files_map: dict, frontend_canister_id: str,
+    registry_canister_id: str,
+    namespace: str,
+    files_map: dict,
+    frontend_canister_id: str,
 ) -> Async[str]:
     """Pull per-realm branding images from the file registry and upload them to
     the realm's frontend asset canister (e.g. /custom/logo.png,
@@ -980,9 +1207,13 @@ def install_branding_from_registry(
     Returns (via yield): JSON string with {success, uploaded, errors}.
     """
     if not registry_canister_id:
-        return json.dumps({"success": False, "error": "registry_canister_id is required"})
+        return json.dumps(
+            {"success": False, "error": "registry_canister_id is required"}
+        )
     if not frontend_canister_id:
-        return json.dumps({"success": False, "error": "frontend_canister_id is required"})
+        return json.dumps(
+            {"success": False, "error": "frontend_canister_id is required"}
+        )
     if not files_map:
         return json.dumps({"success": False, "error": "files is required"})
 
@@ -1004,16 +1235,20 @@ def install_branding_from_registry(
 
         content_type = _guess_content_type(asset_key)
         try:
-            store_res: CallResult = yield asset.store({
-                "key": asset_key,
-                "content_type": content_type,
-                "content_encoding": "identity",
-                "content": data,
-                "sha256": None,
-            })
+            store_res: CallResult = yield asset.store(
+                {
+                    "key": asset_key,
+                    "content_type": content_type,
+                    "content_encoding": "identity",
+                    "content": data,
+                    "sha256": None,
+                }
+            )
             if isinstance(store_res, dict) and "Err" in store_res:
                 errors[asset_key] = f"store failed: {store_res['Err']}"
-                logger.warning(f"branding store failed for {asset_key}: {store_res['Err']}")
+                logger.warning(
+                    f"branding store failed for {asset_key}: {store_res['Err']}"
+                )
             else:
                 uploaded.append(asset_key)
                 logger.info(f"branding uploaded {asset_key} ({len(data)} bytes)")
@@ -1021,11 +1256,13 @@ def install_branding_from_registry(
             errors[asset_key] = f"store exception: {e}"
             logger.warning(f"branding store exception for {asset_key}: {e}")
 
-    return json.dumps({
-        "success": len(errors) == 0,
-        "uploaded": uploaded,
-        "errors": errors,
-        "namespace": namespace,
-        "registry_canister_id": registry_canister_id,
-        "frontend_canister_id": frontend_canister_id,
-    })
+    return json.dumps(
+        {
+            "success": len(errors) == 0,
+            "uploaded": uploaded,
+            "errors": errors,
+            "namespace": namespace,
+            "registry_canister_id": registry_canister_id,
+            "frontend_canister_id": frontend_canister_id,
+        }
+    )

@@ -13,6 +13,7 @@ Lookups accept the original id; we convert before hitting the entity.
 from typing import Any, Dict, List, Optional
 
 from _cdk import ic
+from api.licenses import has_active_license
 from core.models import CodexListingEntity, PurchaseEntity
 from ic_python_logging import get_logger
 
@@ -90,6 +91,12 @@ def create_codex(
     if err:
         return {"success": False, "error": err}
 
+    if not has_active_license(developer) and not _is_controller():
+        return {
+            "success": False,
+            "error": "An active developer license is required to publish to the marketplace",
+        }
+
     alias = _safe_codex_alias(codex_id)
     now = _now()
     existing = CodexListingEntity[alias]
@@ -107,14 +114,19 @@ def create_codex(
         existing.file_registry_namespace = file_registry_namespace
         existing.is_active = True
         existing.updated_at = now
-        if existing.verification_status in (None, "rejected", "pending_audit"):
-            existing.verification_status = "unverified"
-            existing.verification_notes = ""
-        elif existing.verification_status == "verified":
-            existing.verification_status = "unverified"
-            existing.verification_notes = "Verification reset on version update"
+        # New bytes, new review (issue #267).
+        was_verified = existing.verification_status == "verified"
+        existing.verification_status = "pending_review"
+        existing.verification_notes = (
+            "Review reset on version update" if was_verified else ""
+        )
         logger.info(f"updated codex listing {codex_id} v{version}")
-        return {"success": True, "codex_id": codex_id, "action": "updated"}
+        return {
+            "success": True,
+            "codex_id": codex_id,
+            "action": "updated",
+            "verification_status": "pending_review",
+        }
 
     CodexListingEntity(
         codex_alias=alias,
@@ -131,7 +143,7 @@ def create_codex(
         file_registry_namespace=file_registry_namespace,
         installs=0,
         likes=0,
-        verification_status="unverified",
+        verification_status="pending_review",
         verification_notes="",
         is_active=True,
         created_at=now,

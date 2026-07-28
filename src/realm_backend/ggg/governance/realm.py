@@ -15,7 +15,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 5
+    __version__ = 6
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -32,6 +32,10 @@ class Realm(Entity, TimestampedMixin):
             obj.setdefault("scale_requested_at", "")
         if from_version < 5:
             obj.setdefault("bootstrap_state", "")
+        if from_version < 6:
+            # Realms predating the trust policy adopt the secure default.
+            obj.setdefault("require_marketplace_approval", True)
+            obj.setdefault("trusted_approvers", "")
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.ALPHA)
@@ -74,6 +78,16 @@ class Realm(Entity, TimestampedMixin):
     # Comma-separated canister principal IDs trusted for inter-canister calls
     # (DAO controllers, AI agents, parent realms). These bypass User-based access checks.
     trusted_principals = String(max_length=2048, default="")
+    # Marketplace trust policy (issue #267). When True (default) the realm
+    # installs only extensions and codices carrying an approval from a trusted
+    # approver, and refuses content whose registry cannot prove one. Turning it
+    # off means accepting arbitrary unreviewed code, so it is governed by its
+    # own operation (realm.configure.trust_policy) rather than realm admin.
+    require_marketplace_approval = Boolean(default=True)
+    # Comma-separated principal ids whose approvals this realm honours.
+    # Empty => trust only the realm's configured marketplace_canister_id, so a
+    # third party approving its own package does not make it installable here.
+    trusted_approvers = String(max_length=1024, default="")
     # When False (default), all users must present an invite code to join.
     # When True, anyone can join as member without a code. Admin always requires a code.
     open_registration = Boolean(default=False)

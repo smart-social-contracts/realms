@@ -1,15 +1,16 @@
 """Unit tests for api/licenses.py, api/config.py, api/verification.py."""
 
-import pytest
-
-from marketplace_backend.api import codices as cx_api
 from marketplace_backend.api import config as cfg_api
 from marketplace_backend.api import extensions as ext_api
 from marketplace_backend.api import licenses as lic_api
 from marketplace_backend.api import verification as ver_api
 
+from .conftest import grant_license
+
 
 def _create_ext(extension_id="voting", developer="dev-1"):
+    """Publish a listing, licensing ``developer`` first — publishing is gated."""
+    grant_license(developer)
     return ext_api.create_extension(
         developer=developer,
         extension_id=extension_id,
@@ -129,13 +130,19 @@ def test_revoke_license_controller_only(as_caller):
 # ---------------------------------------------------------------------------
 
 def test_request_audit_requires_license(as_caller):
+    # Publishing itself needs a license, so an unlicensed owner is now only
+    # reachable by losing the license after the listing exists.
     as_caller("dev-1", controller=False)
     _create_ext()
+    as_caller("admin", controller=True)
+    assert lic_api.revoke_license("dev-1")["success"] is True
+
+    as_caller("dev-1", controller=False)
     r = ver_api.request_audit(caller="dev-1", item_kind="ext", item_id="voting")
     assert r["success"] is False
     assert "license" in r["error"].lower()
 
-    # Grant license, retry.
+    # Renew the license, retry.
     as_caller("admin", controller=True)
     lic_api.grant_manual_license(principal="dev-1", duration_seconds=3600, note="")
     as_caller("dev-1", controller=False)
@@ -155,13 +162,17 @@ def test_request_audit_only_owner(as_caller):
     assert "owner" in r["error"].lower()
 
 
-def test_set_verification_status_controller_only(as_caller):
+def test_set_verification_status_reviewers_only(as_caller):
     _create_ext()
     as_caller("anon", controller=False)
     r = ver_api.set_verification_status(item_kind="ext", item_id="voting", status="verified", notes="x")
     assert r["success"] is False
+    assert "reviewers only" in r["error"]
 
+    # An appointed reviewer decides without holding the canister's upgrade key.
     as_caller("admin", controller=True)
+    assert cfg_api.add_reviewer("reviewer-1")["success"] is True
+    as_caller("reviewer-1", controller=False)
     r2 = ver_api.set_verification_status(item_kind="ext", item_id="voting", status="verified", notes="ok")
     assert r2["success"] is True
     e = ext_api.get_extension_details("voting")["extension"]
@@ -176,16 +187,21 @@ def test_set_verification_status_validates_status(as_caller):
     assert r["success"] is False
 
 
-def test_list_pending_audits_controller_only(as_caller):
-    _create_ext()
-    as_caller("admin", controller=True)
-    lic_api.grant_manual_license(principal="dev-1", duration_seconds=3600, note="")
+def test_list_pending_audits_reviewers_only(as_caller):
+    # Both queued statuses belong in the queue: a fresh submission sits in
+    # pending_review, and an audit request moves a listing to pending_audit.
+    _create_ext("voting")
+    _create_ext("treasury")
     as_caller("dev-1", controller=False)
-    ver_api.request_audit(caller="dev-1", item_kind="ext", item_id="voting")
+    assert ver_api.request_audit(
+        caller="dev-1", item_kind="ext", item_id="treasury"
+    )["success"] is True
 
     as_caller("anon", controller=False)
     assert ver_api.list_pending_audits() == []
+
     as_caller("admin", controller=True)
+    cfg_api.add_reviewer("reviewer-1")
+    as_caller("reviewer-1", controller=False)
     rows = ver_api.list_pending_audits()
-    assert len(rows) == 1
-    assert rows[0]["item_id"] == "voting"
+    assert {row["item_id"] for row in rows} == {"voting", "treasury"}

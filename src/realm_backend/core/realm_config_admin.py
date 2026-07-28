@@ -62,14 +62,30 @@ def apply_realm_config(config: dict) -> dict:
             pass
         if not codex_pins_registration:
             realm.open_registration = bool(config["open_registration"])
-            updated_fields.append(
-                f"open_registration={realm.open_registration}"
-            )
+            updated_fields.append(f"open_registration={realm.open_registration}")
         else:
             logger.info(
                 "Skipping open_registration update — codex registration "
                 f"policy is authoritative ({realm.open_registration})"
             )
+
+    # Marketplace trust policy (issue #267). Guarded by its own operation at
+    # the endpoint, since switching it off admits unreviewed code.
+    if "require_marketplace_approval" in config:
+        realm.require_marketplace_approval = bool(
+            config["require_marketplace_approval"]
+        )
+        updated_fields.append(
+            f"require_marketplace_approval={realm.require_marketplace_approval}"
+        )
+
+    if "trusted_approvers" in config:
+        raw = config["trusted_approvers"]
+        if isinstance(raw, list):
+            raw = ",".join(str(p) for p in raw)
+        approvers = ",".join(p.strip() for p in str(raw or "").split(",") if p.strip())
+        realm.trusted_approvers = approvers
+        updated_fields.append(f"trusted_approvers={approvers or '(marketplace)'}")
 
     if "config_overrides" in config:
         # Per-deployment codex parameter overrides chosen in the creation
@@ -101,9 +117,7 @@ def apply_realm_config(config: dict) -> dict:
                 "error": f"manifest_data would exceed 4096 chars ({len(serialized_md)})",
             }
         realm.manifest_data = serialized_md
-        updated_fields.append(
-            f"config_overrides={list(merged_overrides.keys())}"
-        )
+        updated_fields.append(f"config_overrides={list(merged_overrides.keys())}")
 
         # The voting window lives on the Calendar entity (seconds), not in
         # manifest_data — sync it from the effective merged config so a
@@ -198,15 +212,21 @@ def apply_realm_config(config: dict) -> dict:
 
     if "background_image_url" in config:
         realm.background_image_url = config["background_image_url"] or ""
-        updated_fields.append(f"background_image_url={realm.background_image_url[:50]}...")
+        updated_fields.append(
+            f"background_image_url={realm.background_image_url[:50]}..."
+        )
 
     if "file_registry_canister_id" in config:
         realm.file_registry_canister_id = config["file_registry_canister_id"] or ""
-        updated_fields.append(f"file_registry_canister_id={realm.file_registry_canister_id}")
+        updated_fields.append(
+            f"file_registry_canister_id={realm.file_registry_canister_id}"
+        )
 
     if "marketplace_canister_id" in config:
         realm.marketplace_canister_id = config["marketplace_canister_id"] or ""
-        updated_fields.append(f"marketplace_canister_id={realm.marketplace_canister_id}")
+        updated_fields.append(
+            f"marketplace_canister_id={realm.marketplace_canister_id}"
+        )
 
     if "accounting_currency" in config:
         symbol = str(config["accounting_currency"] or "").strip()
@@ -259,10 +279,7 @@ def apply_realm_config(config: dict) -> dict:
     ):
         from api.tokens import register_treasury_token
 
-        sym = (
-            str(getattr(realm, "accounting_currency", "") or "").strip()
-            or "REALMS"
-        )
+        sym = str(getattr(realm, "accounting_currency", "") or "").strip() or "REALMS"
         indexer = str(config.get("token_indexer_canister_id") or "").strip()
         if not indexer:
             from api.tokens import get_treasury_token_indexer

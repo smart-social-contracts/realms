@@ -5,6 +5,8 @@ from marketplace_backend.api import extensions as ext_api
 from marketplace_backend.api import likes as likes_api
 from marketplace_backend.api import rankings as rank_api
 
+from .conftest import grant_license
+
 
 def _create_ext(extension_id="voting", **kw):
     base = dict(
@@ -20,6 +22,9 @@ def _create_ext(extension_id="voting", **kw):
         file_registry_namespace=f"ext/{extension_id}/0.1.0",
     )
     base.update(kw)
+    # Publishing is license-gated; the license is scaffolding here, not the
+    # subject of these tests.
+    grant_license(base["developer"])
     return ext_api.create_extension(**base)
 
 
@@ -38,6 +43,7 @@ def _create_codex(codex_id="dominion/x", **kw):
         file_registry_namespace=f"codex/{codex_id}/0.1.0",
     )
     base.update(kw)
+    grant_license(base["developer"])
     return cx_api.create_codex(**base)
 
 
@@ -86,7 +92,9 @@ def test_my_likes_returns_only_caller_rows():
 
 
 def test_top_extensions_ranks_by_installs_then_likes():
-    _create_ext("a"); _create_ext("b"); _create_ext("c")
+    _create_ext("a")
+    _create_ext("b")
+    _create_ext("c")
     ext_api.buy_extension("u1", "a")
     ext_api.buy_extension("u2", "a")
     ext_api.buy_extension("u1", "b")
@@ -97,7 +105,9 @@ def test_top_extensions_ranks_by_installs_then_likes():
 
 
 def test_top_extensions_by_likes():
-    _create_ext("a"); _create_ext("b"); _create_ext("c")
+    _create_ext("a")
+    _create_ext("b")
+    _create_ext("c")
     likes_api.like_item("u1", "ext", "b")
     likes_api.like_item("u2", "ext", "b")
     likes_api.like_item("u1", "ext", "a")

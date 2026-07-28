@@ -82,7 +82,7 @@ _short_aliases = ["core", "core.models", "api"]
 _api_short_modules = [
     "api.config", "api.extensions", "api.codices", "api.assistants",
     "api.likes", "api.rankings", "api.licenses", "api.verification",
-    "api.status",
+    "api.status", "api.approval",
 ]
 
 # 1. Install short-name aliases pointing at marketplace_backend.*.
@@ -101,6 +101,7 @@ rankings_api = sys.modules["api.rankings"]
 licenses_api = sys.modules["api.licenses"]
 config_api = sys.modules["api.config"]
 verification_api = sys.modules["api.verification"]
+approval_api = sys.modules["api.approval"]
 
 # 2. Drop the short-name aliases from sys.modules so other test
 #    suites that import a different package's `core`, `api`, or `_cdk`
@@ -194,6 +195,41 @@ def _reset_state():
     mock_ic.caller.return_value = "anon-principal"
     mock_ic.is_controller.return_value = False
     yield
+
+
+YEAR_SECONDS = 365 * 24 * 3600
+
+
+def grant_license(principal: str, *, duration_seconds: float = YEAR_SECONDS) -> None:
+    """Give ``principal`` an active developer license.
+
+    Publishing is license-gated, so suites whose subject is something else
+    (listings, likes, rankings, purchases) need one as scaffolding. The row is
+    written directly rather than through ``grant_manual_license`` so the
+    current caller and controller flags are left exactly as the test set them.
+
+    Deliberately not autouse: several tests exist to show that an unlicensed
+    principal is refused, and a blanket license would gut them.
+    """
+    from marketplace_backend.core.models import DeveloperLicenseEntity
+
+    now_ns = float(mock_ic.time())
+    expires_at = now_ns + float(duration_seconds) * 1_000_000_000
+    lic = DeveloperLicenseEntity[principal]
+    if lic is None:
+        DeveloperLicenseEntity(
+            principal=principal,
+            created_at=now_ns,
+            expires_at=expires_at,
+            last_payment_id="",
+            last_payment_amount_usd_cents=0,
+            payment_method="manual",
+            note="test license",
+            is_active=True,
+        )
+    else:
+        lic.expires_at = expires_at
+        lic.is_active = True
 
 
 @pytest.fixture

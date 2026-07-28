@@ -221,9 +221,22 @@ class MarketplaceConfigEntity(Entity):
         same pricing when creating a checkout session.
     """
     __alias__ = "id"
+    __version__ = 2
+
+    @classmethod
+    def migrate(cls, obj, from_version, to_version):
+        if from_version < 2:
+            # Config written before reviewers existed: no one is appointed, so
+            # only controllers can review until someone is.
+            obj.setdefault("reviewers", "")
+        return obj
 
     id                          = String(max_length=16)  # always "config"
     file_registry_canister_id   = String(max_length=64)
     billing_service_principal   = String(max_length=128)
     license_price_usd_cents     = Integer()
     license_duration_seconds    = Integer()
+    # Comma-separated principals allowed to review submissions (issue #267).
+    # Distinct from the controller list: reviewing content is a day-to-day job,
+    # holding the upgrade key is not.
+    reviewers                   = String(max_length=2048)

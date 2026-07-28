@@ -62,6 +62,10 @@ class Operations:
     REALM_CONFIGURE_CODEX = "realm.configure.codex"
     REALM_CONFIGURE_INFRASTRUCTURE = "realm.configure.infrastructure"
     REALM_CONFIGURE_TOKENS = "realm.configure.tokens"
+    # Whether this realm still requires marketplace approval for the code it
+    # installs, and whose approvals it honours. Separate from realm.configure
+    # because relaxing it admits unreviewed code into the realm.
+    REALM_CONFIGURE_TRUST_POLICY = "realm.configure.trust_policy"
     REALM_REGISTER = "realm.register"
     QUARTER_REGISTER = "quarter.register"
     QUARTER_DEREGISTER = "quarter.deregister"
@@ -302,6 +306,7 @@ class Profiles:
             Operations.REALM_CONFIGURE_CODEX,
             Operations.REALM_CONFIGURE_INFRASTRUCTURE,
             Operations.REALM_CONFIGURE_TOKENS,
+            Operations.REALM_CONFIGURE_TRUST_POLICY,
             Operations.REALM_MONITOR,
             Operations.TASK_VIEW,
             Operations.QUARTER_REGISTER,

@@ -56,8 +56,58 @@ def get_config() -> Dict:
             "billing_service_principal": cfg.billing_service_principal or "",
             "license_price_usd_cents": int(cfg.license_price_usd_cents or DEFAULT_LICENSE_PRICE_USD_CENTS),
             "license_duration_seconds": int(cfg.license_duration_seconds or DEFAULT_LICENSE_DURATION_SECONDS),
+            "reviewers": get_reviewers(),
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Reviewers (issue #267)
+#
+# Reviewing submissions is a job; controlling the canister is a key. Keeping
+# them separate means a reviewer can be added and removed without handing out
+# (or taking back) the ability to upgrade the marketplace.
+# ---------------------------------------------------------------------------
+
+
+def get_reviewers() -> list:
+    cfg = _ensure_config()
+    raw = getattr(cfg, "reviewers", "") or ""
+    return [p.strip() for p in raw.split(",") if p.strip()]
+
+
+def is_reviewer(principal: str) -> bool:
+    """Controllers are implicitly reviewers, so a fresh marketplace is usable
+    before anyone has been appointed."""
+    if _is_controller():
+        return True
+    return (principal or "").strip() in get_reviewers()
+
+
+def add_reviewer(principal: str) -> Dict:
+    err = _require_controller()
+    if not err["success"]:
+        return err
+    principal = (principal or "").strip()
+    if not principal:
+        return {"success": False, "error": "principal is required"}
+    reviewers = get_reviewers()
+    if principal not in reviewers:
+        reviewers.append(principal)
+        _ensure_config().reviewers = ",".join(reviewers)
+        logger.info(f"add_reviewer -> {principal}")
+    return {"success": True, "reviewers": reviewers}
+
+
+def remove_reviewer(principal: str) -> Dict:
+    err = _require_controller()
+    if not err["success"]:
+        return err
+    principal = (principal or "").strip()
+    reviewers = [p for p in get_reviewers() if p != principal]
+    _ensure_config().reviewers = ",".join(reviewers)
+    logger.info(f"remove_reviewer -> {principal}")
+    return {"success": True, "reviewers": reviewers}
 
 
 def get_file_registry_canister_id() -> str:

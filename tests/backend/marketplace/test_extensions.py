@@ -2,6 +2,8 @@
 
 from marketplace_backend.api import extensions as ext_api
 
+from .conftest import grant_license
+
 
 def _create(**overrides):
     base = dict(
@@ -18,6 +20,9 @@ def _create(**overrides):
         download_url="",
     )
     base.update(overrides)
+    # Publishing is license-gated; the license is scaffolding here, not the
+    # subject of these tests.
+    grant_license(base["developer"])
     return ext_api.create_extension(**base)
 
 
@@ -25,6 +30,7 @@ def test_create_then_get():
     r = _create()
     assert r["success"] is True
     assert r["action"] == "created"
+    assert r["verification_status"] == "pending_review"
 
     detail = ext_api.get_extension_details("voting")
     assert detail["success"] is True
@@ -32,12 +38,14 @@ def test_create_then_get():
     assert e["name"] == "Voting"
     assert e["installs"] == 0
     assert e["likes"] == 0
-    assert e["verification_status"] == "unverified"
+    assert e["verification_status"] == "pending_review"
     assert e["is_active"] is True
 
 
 def test_update_requires_owner(as_caller):
     _create()
+    # dev-2 is licensed so the refusal below is about ownership, not licensing.
+    grant_license("dev-2")
     # Different developer tries to update — should fail.
     r = ext_api.create_extension(
         developer="dev-2",
@@ -63,7 +71,7 @@ def test_update_requires_owner(as_caller):
     assert e["description"] == "updated"
 
 
-def test_update_resets_verified_to_unverified():
+def test_update_resets_verified_to_pending_review():
     _create()
     # Force a verified state, then push a new version.
     from marketplace_backend.core.models import ExtensionListingEntity
@@ -71,10 +79,11 @@ def test_update_resets_verified_to_unverified():
     listing.verification_status = "verified"
     listing.verification_notes = "looks good"
 
-    _create(version="0.2.0")
+    r = _create(version="0.2.0")
+    assert r["verification_status"] == "pending_review"
     e = ext_api.get_extension_details("voting")["extension"]
-    assert e["verification_status"] == "unverified"
-    assert "Verification reset" in e["verification_notes"]
+    assert e["verification_status"] == "pending_review"
+    assert "Review reset" in e["verification_notes"]
 
 
 def test_delist():

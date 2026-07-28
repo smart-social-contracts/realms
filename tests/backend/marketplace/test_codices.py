@@ -2,6 +2,8 @@
 
 from marketplace_backend.api import codices as cx_api
 
+from .conftest import grant_license
+
 
 def _create(**overrides):
     base = dict(
@@ -18,6 +20,9 @@ def _create(**overrides):
         file_registry_namespace="codex/syntropia/membership/0.1.0",
     )
     base.update(overrides)
+    # Publishing is license-gated; the license is scaffolding here, not the
+    # subject of these tests.
+    grant_license(base["developer"])
     return cx_api.create_codex(**base)
 
 
@@ -30,6 +35,7 @@ def test_slash_safe_alias_round_trip():
     assert c["codex_id"] == "syntropia/membership"
     assert c["codex_alias"] == "syntropia__membership"
     assert c["realm_type"] == "syntropia"
+    assert c["verification_status"] == "pending_review"
 
 
 def test_create_validates_id():

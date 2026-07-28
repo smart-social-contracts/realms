@@ -5699,6 +5699,17 @@ def update_realm_config(config_json: str) -> str:
                 "denied_operation": Operations.REALM_CONFIGURE_TOKENS,
             })
 
+        # Marketplace trust policy (issue #267): relaxing it lets unreviewed
+        # code into the realm, so it needs more than realm.configure.
+        trust_keys = {"require_marketplace_approval", "trusted_approvers"}
+        has_trust_change = bool(trust_keys & set(config.keys()))
+        if has_trust_change and not _check_access(caller, Operations.REALM_CONFIGURE_TRUST_POLICY):
+            return json.dumps({
+                "success": False,
+                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE_TRUST_POLICY}'",
+                "denied_operation": Operations.REALM_CONFIGURE_TRUST_POLICY,
+            })
+
         # Layer 2 — org policy (issue #262). Realm configuration is a
         # constitutional change: when the root policy is not 1/1, it must go
         # through a root-scoped proposal that replays apply_realm_config.

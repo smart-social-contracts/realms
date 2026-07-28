@@ -225,6 +225,7 @@ import traceback
 from typing import Optional
 
 from _cdk import (
+    Async,
     Opt,
     Principal,
     Record,
@@ -261,12 +262,19 @@ from api.codices import (
     list_codices as list_codices_impl,
     search_codices as search_codices_impl,
 )
+from api.approval import (
+    admin_approve_namespace as admin_approve_namespace_impl,
+    review_listing as review_listing_impl,
+)
 from api.config import (
+    add_reviewer as add_reviewer_impl,
     get_billing_service_principal,
     get_config,
     get_file_registry_canister_id,
     get_license_pricing,
+    get_reviewers,
     init_config_from_args,
+    remove_reviewer as remove_reviewer_impl,
     set_billing_service_principal as set_billing_service_principal_impl,
     set_file_registry_canister_id as set_file_registry_canister_id_impl,
     set_license_pricing as set_license_pricing_impl,
@@ -810,6 +818,66 @@ def set_file_registry_canister_id(canister_id: text) -> GenericResult:
         return {"Ok": r["file_registry_canister_id"]} if r["success"] else {"Err": r["error"]}
     except Exception as e:
         return {"Err": str(e)}
+
+
+@query
+def list_reviewers() -> Vec[text]:
+    """Principals allowed to decide on submissions (issue #267)."""
+    try:
+        return get_reviewers()
+    except Exception as e:
+        logger.error(f"list_reviewers: {e}")
+        return []
+
+
+@update
+def add_reviewer(principal: text) -> GenericResult:
+    try:
+        r = add_reviewer_impl(principal)
+        return {"Ok": ",".join(r["reviewers"])} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@update
+def remove_reviewer(principal: text) -> GenericResult:
+    try:
+        r = remove_reviewer_impl(principal)
+        return {"Ok": ",".join(r["reviewers"])} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@update
+def review_listing(item_kind: text, item_id: text, approve: bool, notes: text) -> Async[text]:
+    """Approve or reject a submission, stamping the decision onto the file
+    registry so realms can see it. Returns the result as a JSON string."""
+    try:
+        result = yield from review_listing_impl(
+            caller=str(ic.caller()),
+            item_kind=item_kind,
+            item_id=item_id,
+            approve=approve,
+            notes=notes,
+        )
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"review_listing: {e}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def admin_approve_namespace(namespace: text, notes: text) -> Async[text]:
+    """Controller-only migration tool: approve a registry namespace that has no
+    listing, attributing the approval to this canister."""
+    try:
+        result = yield from admin_approve_namespace_impl(
+            namespace=namespace, notes=notes
+        )
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"admin_approve_namespace: {e}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @query
