@@ -9,19 +9,14 @@
   "controls": {
     "list_view": "List view",
     "map_view": "Map view",
-    "create_realm": "Create Realm",
-    "marketplace": "Marketplace",
-    "architecture": "Architecture"
+    "create_realm": "Create a realm",
+    "marketplace": "Market place",
+    "architecture": "Infrastructure"
   },
   "hub": {
     "open": "Open Realms menu",
     "close": "Close Realms menu",
-    "tour_title": "Take a tour",
-    "tour_desc": "Globe, browser & assistant",
-    "marketplace_desc": "Extensions & services",
-    "create_realm_desc": "Deploy a new realm",
-    "architecture_desc": "Casals architecture",
-    "language_desc": "Interface language"
+    "tour_title": "What is this?"
   },
   "modal": {
     "title": "Create a Realm",

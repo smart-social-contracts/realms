@@ -107,9 +107,20 @@
             </span>
             <span class="hub-copy">
               <span class="hub-label">{$_('hub.tour_title')}</span>
-              <span class="hub-desc">{$_('hub.tour_desc')}</span>
             </span>
           </button>
+
+          <a href="/create-realm" class="hub-item" on:click={() => closePopovers()}>
+            <span class="hub-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </span>
+            <span class="hub-copy">
+              <span class="hub-label">{$_('controls.create_realm')}</span>
+            </span>
+          </a>
 
           {#if marketplaceUrl}
             <a
@@ -128,23 +139,9 @@
               </span>
               <span class="hub-copy">
                 <span class="hub-label">{$_('controls.marketplace')}</span>
-                <span class="hub-desc">{$_('hub.marketplace_desc')}</span>
               </span>
             </a>
           {/if}
-
-          <a href="/create-realm" class="hub-item" on:click={() => closePopovers()}>
-            <span class="hub-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </span>
-            <span class="hub-copy">
-              <span class="hub-label">{$_('controls.create_realm')}</span>
-              <span class="hub-desc">{$_('hub.create_realm_desc')}</span>
-            </span>
-          </a>
 
           <a
             href={architectureUrl}
@@ -167,7 +164,6 @@
             </span>
             <span class="hub-copy">
               <span class="hub-label">{$_('controls.architecture')}</span>
-              <span class="hub-desc">{$_('hub.architecture_desc')}</span>
             </span>
           </a>
 
@@ -191,7 +187,6 @@
             </span>
             <span class="hub-copy">
               <span class="hub-label">{$_('language.select')}</span>
-              <span class="hub-desc">{$_('hub.language_desc')}</span>
             </span>
           </button>
 
@@ -593,15 +588,6 @@
     color: #141414;
     line-height: 1.25;
     letter-spacing: -0.01em;
-  }
-
-  .hub-desc {
-    font-size: 0.8125rem;
-    line-height: 1.3;
-    color: rgba(23, 23, 23, 0.62);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .hub-locales {
