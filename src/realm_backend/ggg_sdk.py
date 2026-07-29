@@ -2,14 +2,16 @@
 
 The SDK runs *inside* the Basilisk subinterpreter, spawned via the real
 primitive ``_basilisk_sandbox.spawn_subinterpreter(source, hash)`` /
-``call_in_subinterpreter(handle, fn, kwargs)``. That primitive is **pure
-compute**: the host passes a plain-data ``context`` in and receives plain data
-out — there is NO live callback channel from the sandbox back into the host. The
-SDK therefore follows a *gather → compute → effects* model:
+``call_in_subinterpreter(handle, fn, kwargs)``. Only plain data crosses the
+boundary. The SDK follows a *gather → compute → effects* model:
 
   * **Reads** (``realm.config()``, ``realm.now()``, ``realm.currency()``,
     ``realm.info()``, ``realm.users.get(id)``) are served from the ``context``
-    the host injected when it invoked the hook. No host round-trip happens.
+    the host injected when it invoked the hook, with no round-trip. When a read
+    is not in the context — a user other than the triggering one, or a key the
+    hook's context spec deliberately omits — the SDK falls back to a live
+    ``rpc`` call, which the host authorizes against the codex's declared read
+    capabilities.
 
   * **Writes** (``realm.invoices.create()``, ``realm.notifications.create()``,
     ``realm.members.activate()``) do not execute inside the sandbox. They are
@@ -65,6 +67,30 @@ except ImportError:
     json = None
 
 _REF_TOKEN = "$eff:%d:%s"
+
+
+def _rpc(action, kwargs):
+    """Call a host *read* verb through the sandbox rpc bridge.
+
+    Returns ``(True, value)`` on success and ``(False, None)`` when no rpc
+    channel exists — host-side unit tests, or a canister image predating the
+    callback — so callers can fall back to the injected context.
+
+    A denial or host-side error is *not* swallowed: if a codex asks for
+    something it did not declare in ``capabilities``, the author should see the
+    failure rather than silently receive ``None``. ``@hook`` turns it into a
+    clean ``{"ok": False}`` envelope.
+    """
+    try:
+        _fn = rpc  # noqa: F821 - builtin injected by the subinterpreter
+    except NameError:
+        return (False, None)
+    if "action" in kwargs:
+        # The bridge spends the name ``action`` on the verb itself, so a verb
+        # kwarg of the same name would arrive as a duplicate argument. Caught
+        # here rather than as a confusing TypeError from the handler.
+        raise ValueError("rpc kwargs cannot contain 'action'")
+    return (True, _fn(action, **kwargs))
 
 
 class _State:
@@ -172,8 +198,38 @@ def iso_days_from(epoch_seconds, days):
 
 class _Users:
     def get(self, user_id):
-        """A user projection from the injected context, or ``None``."""
-        return (_state.context.get("users") or {}).get(user_id)
+        """A user projection, or ``None``.
+
+        Served from the injected context when the host pre-gathered this user
+        (the common case: the one the hook fired for), otherwise fetched live
+        over ``rpc`` and memoized for repeat lookups in the same call.
+        """
+        users = _state.context.get("users")
+        if users is None:
+            users = {}
+            _state.context["users"] = users
+        if user_id in users:
+            return users[user_id]
+        ok, value = _rpc("user.get", {"user_id": user_id})
+        if not ok:
+            return None
+        users[user_id] = value
+        return value
+
+
+class _Proposals:
+    def find_executed(self, target_principal, profile_name, change="assign"):
+        """An executed governance proposal authorizing one role change, or
+        ``None``. *change* is ``"assign"`` or ``"revoke"``.
+
+        Always a live read: an approval that landed a second ago has to count.
+        """
+        ok, value = _rpc("proposal.find_executed", {
+            "target_principal": target_principal,
+            "profile_name": profile_name,
+            "change": change,
+        })
+        return value if ok else None
 
 
 class _Invoices:
@@ -202,27 +258,88 @@ class _Members:
         kwargs.update(fields)
         return _state.record("member.activate", kwargs)
 
+    def assign_profile(self, user_id, profile_name):
+        """Record a ``member.assign_profile`` effect."""
+        return _state.record("member.assign_profile", {
+            "user_id": user_id,
+            "profile_name": profile_name,
+        })
+
+    def revoke_profile(self, user_id, profile_name):
+        """Record a ``member.revoke_profile`` effect."""
+        return _state.record("member.revoke_profile", {
+            "user_id": user_id,
+            "profile_name": profile_name,
+        })
+
+
+class _Treasury:
+    def transfer(self, to_principal, amount, treasury_name=""):
+        """Record a deferred ``treasury.transfer`` effect."""
+        return _state.record("treasury.transfer", {
+            "to_principal": to_principal,
+            "amount": amount,
+            "treasury_name": treasury_name,
+        })
+
+
+class _Init:
+    def apply_init_policy(self):
+        codex_id = _state.context.get("codex_id", "")
+        return _state.record("realm.apply_init_policy", {"codex_id": codex_id})
+
+    def seed_org(self, template="departments"):
+        codex_id = _state.context.get("codex_id", "")
+        return _state.record("org.seed_template", {
+            "codex_id": codex_id,
+            "template": template,
+        })
+
+    def seed_justice(self):
+        codex_id = _state.context.get("codex_id", "")
+        return _state.record("justice.seed_template", {"codex_id": codex_id})
+
 
 class _Realm:
     """Entry point codices import as ``realm``."""
 
     def __init__(self):
         self.users = _Users()
+        self.proposals = _Proposals()
         self.invoices = _Invoices()
         self.notifications = _Notifications()
         self.members = _Members()
+        self.treasury = _Treasury()
+        self.init = _Init()
+
+    def _read(self, key, verb, default):
+        """Context value for *key*, falling back to a live ``rpc`` read.
+
+        The host pre-gathers whatever a hook is likely to need, so the context
+        hit is the normal path. The fallback matters for hooks whose context
+        deliberately omits a key — notably ``get_config``, whose context cannot
+        contain ``config`` without the host re-entering the very hook it is
+        gathering for.
+        """
+        if key in _state.context:
+            value = _state.context.get(key)
+            return default if value is None else value
+        ok, value = _rpc(verb, {})
+        if not ok or value is None:
+            return default
+        return value
 
     def config(self):
-        return _state.context.get("config", {}) or {}
+        return self._read("config", "config.get", {})
 
     def now(self):
-        return _state.context.get("now", {"epoch": 0, "ns": 0})
+        return self._read("now", "time.now", {"epoch": 0, "ns": 0})
 
     def info(self):
-        return _state.context.get("realm", {}) or {}
+        return self._read("realm", "realm.get", {})
 
     def currency(self):
-        return _state.context.get("currency", "REALMS")
+        return self._read("currency", "currency.get", "REALMS")
 
 
 realm = _Realm()

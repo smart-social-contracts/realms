@@ -406,7 +406,6 @@ class RealmGenerator:
         
         Returns: Codex entity
         Note: Codex code will be loaded from the generated file during upload
-        Note: entity_method_overrides configuration is stored separately in a Storage entry
         """
         codex = Codex(
             name="user_registration_hook",
@@ -416,21 +415,14 @@ class RealmGenerator:
         return codex
     
     def get_codex_overrides_manifest(self) -> dict:
-        """Get entity method overrides configuration for Realm manifest
-        
-        Returns: Dict containing entity_method_overrides
+        """Realm manifest fragment contributed by the generated codices.
+
+        Used to declare entity_method_overrides, which let a codex monkey-patch
+        core GGG methods with exec()'d code. That mechanism was removed in
+        issue #265; the generated user_registration_hook codex is now picked up
+        as a sandboxed hook, so nothing needs declaring here.
         """
-        return {
-            "entity_method_overrides": [
-                {
-                    "entity": "User",
-                    "method": "user_register_posthook",
-                    "type": "staticmethod",
-                    "implementation": "Codex.user_registration_hook.user_register_posthook",
-                    "description": "Custom post-registration hook for new users"
-                }
-            ]
-        }
+        return {}
     
     def generate_scheduled_task(self) -> tuple:
         """Generate a scheduled task for the satoshi transfer codex
@@ -628,11 +620,9 @@ class RealmGenerator:
         Returns:
             Dict with keys:
                 - codex_files: List of copied file paths
-                - entity_method_overrides: List from codex manifest (or empty)
                 - extensions: List of extension names from codex manifest (or empty)
         """
         codex_files = []
-        entity_method_overrides = []
         extensions = []
         
         script_dir = Path(__file__).parent
@@ -646,14 +636,11 @@ class RealmGenerator:
         if common_dir.exists():
             print(f"  Loading shared codices from _common/")
             
-            # Load _common/manifest.json for entity_method_overrides
             common_manifest_path = common_dir / "manifest.json"
             if common_manifest_path.exists():
                 with open(common_manifest_path, 'r') as f:
                     common_manifest = json.load(f)
-                entity_method_overrides = common_manifest.get("entity_method_overrides", [])
                 extensions = common_manifest.get("extensions", [])
-                print(f"    Loaded {len(entity_method_overrides)} method overrides from _common/manifest.json")
             
             # Copy all .py files from _common/
             for source_file in common_dir.glob("*.py"):
@@ -666,31 +653,11 @@ class RealmGenerator:
         if codex_name and codex_dir and codex_dir.exists():
             print(f"  Loading package codices from {codex_name}/")
             
-            # Load package manifest.json if exists (for additional overrides/extensions)
             pkg_manifest_path = codex_dir / "manifest.json"
             if pkg_manifest_path.exists():
                 with open(pkg_manifest_path, 'r') as f:
                     pkg_manifest = json.load(f)
-                # Merge package overrides with common overrides (deduplicate by entity+method)
-                pkg_overrides = pkg_manifest.get("entity_method_overrides", [])
                 pkg_extensions = pkg_manifest.get("extensions", [])
-                if pkg_overrides:
-                    existing_keys = {(o["entity"], o["method"]) for o in entity_method_overrides}
-                    added = 0
-                    for override in pkg_overrides:
-                        key = (override["entity"], override["method"])
-                        if key in existing_keys:
-                            # Package override replaces common override
-                            entity_method_overrides = [
-                                o for o in entity_method_overrides
-                                if (o["entity"], o["method"]) != key
-                            ]
-                            entity_method_overrides.append(override)
-                        else:
-                            entity_method_overrides.append(override)
-                        existing_keys.add(key)
-                        added += 1
-                    print(f"    Added {added} method overrides from {codex_name}/manifest.json (deduped)")
                 if pkg_extensions:
                     extensions.extend(pkg_extensions)
             
@@ -703,11 +670,10 @@ class RealmGenerator:
         elif codex_name:
             print(f"  Warning: Codex package '{codex_name}' not found in {codices_dir}")
         
-        print(f"  Total: {len(codex_files)} codex files, {len(entity_method_overrides)} method overrides")
+        print(f"  Total: {len(codex_files)} codex files")
         
         return {
             "codex_files": codex_files,
-            "entity_method_overrides": entity_method_overrides,
             "extensions": extensions
         }
 

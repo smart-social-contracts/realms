@@ -1372,7 +1372,6 @@ export interface _SERVICE {
     string
   >,
   'reload_codex' : ActorMethod<[string], string>,
-  'reload_entity_method_overrides' : ActorMethod<[], string>,
   'report_quarter_population' : ActorMethod<[bigint], string>,
   'request_upgrade' : ActorMethod<[string], string>,
   'resolve_ref' : ActorMethod<[string], string>,

@@ -1,19 +1,23 @@
 """JSON-only effect bridge between sandboxed codices and the realm (issue #265).
 
-The Basilisk sandbox primitive (``_basilisk_sandbox.spawn_subinterpreter`` /
-``call_in_subinterpreter``) is **pure compute**: plain data goes in, plain data
-comes out, and there is NO channel for the sandboxed code to call back into the
-host mid-execution. So a codex hook cannot perform live reads/writes against the
-realm while it runs. Instead it follows a *gather → compute → apply-effects*
-flow:
+Only plain data crosses the sandbox boundary. A codex hook follows a
+*gather → compute → apply-effects* flow:
 
-  1. the host gathers the reads a hook may need (config, currency, time, realm,
-     the triggering user) into a plain-data **context** and passes it in;
-  2. the hook computes purely and returns a plain-data list of intended
-     **effects** — ``[{"verb": "<domain.verb>", "kwargs": {...}}, ...]`` — via
-     the in-sandbox ``ggg_sdk``; and
+  1. the host gathers the reads a hook is likely to need (config, currency,
+     time, realm, the triggering user) into a plain-data **context** and passes
+     it in;
+  2. the hook computes and returns a plain-data list of intended **effects** —
+     ``[{"verb": "<domain.verb>", "kwargs": {...}}, ...]`` — via the in-sandbox
+     ``ggg_sdk``; and
   3. the host applies that batch here, in ``apply_effects`` — the single trust
-     checkpoint.
+     checkpoint for writes.
+
+For reads a hook cannot anticipate (a scoped lookup that depends on values only
+known mid-computation), it may also call back into the host synchronously via
+the ``rpc`` builtin, handled by ``make_rpc_handler``. Reads are allowed live
+because they cannot mutate the realm; **writes are deliberately not**, so that
+every mutation arrives as one ordered batch the host authorizes at a single
+point rather than interleaved with arbitrary codex computation.
 
 For every effect ``apply_effects``:
 
@@ -279,6 +283,130 @@ _NOTIFICATION_FIELDS = (
 )
 
 
+def _v_proposal_find_executed(
+    target_principal: str = "",
+    profile_name: str = "",
+    change: str = "assign",
+    **kwargs: Any,
+) -> Optional[dict]:
+    """Find an executed governance proposal authorizing one role change.
+
+    *change* is ``"assign"`` or ``"revoke"``. It is not called ``action``
+    because the rpc bridge spends that name on the verb itself, and a kwarg
+    that shadows it would arrive as a duplicate argument.
+
+    Deliberately scoped: the codex asks "is *this* change approved?" and gets a
+    small projection or ``None``. The alternative — handing a codex every
+    proposal in the realm to filter itself — is both an unbounded read and a
+    much wider disclosure than the question requires.
+
+    Recognizes the legacy revocation encoding (a ``role_assignment`` proposal
+    whose ``profile_name`` is ``revoke_<profile>``) so existing proposals keep
+    authorizing the revocations they were voted for.
+    """
+    import json as _json
+
+    from ggg import Proposal
+
+    if not target_principal or not profile_name:
+        return None
+
+    wanted = "role_assignment" if change == "assign" else "role_revocation"
+    legacy_profile = "revoke_" + profile_name
+
+    for proposal in Proposal.instances():
+        if getattr(proposal, "status", None) != "executed":
+            continue
+        raw = getattr(proposal, "metadata", "") or ""
+        try:
+            meta = _json.loads(raw) if raw else {}
+        except Exception:
+            continue
+        if not isinstance(meta, dict):
+            continue
+        if meta.get("target_principal") != target_principal:
+            continue
+
+        matches = (
+            meta.get("proposal_type") == wanted
+            and meta.get("profile_name") == profile_name
+        ) or (
+            change == "revoke"
+            and meta.get("proposal_type") == "role_assignment"
+            and meta.get("profile_name") == legacy_profile
+        )
+        if matches:
+            return {
+                "id": getattr(proposal, "id", None),
+                "proposal_type": meta.get("proposal_type"),
+                "profile_name": meta.get("profile_name"),
+            }
+    return None
+
+
+def _v_member_assign_profile(user_id: str = "", profile_name: str = "", **kwargs: Any) -> dict:
+    """Assign *profile_name* to *user_id* (idempotent)."""
+    from ggg import User, UserProfile
+
+    if not user_id or not profile_name:
+        raise ValueError("member.assign_profile: user_id and profile_name are required")
+    target = User[user_id]
+    profile = UserProfile[profile_name]
+    if target is None:
+        raise ValueError(f"member.assign_profile: user '{user_id}' not found")
+    if profile is None:
+        raise ValueError(f"member.assign_profile: profile '{profile_name}' not found")
+    current = [p.name for p in target.profiles]
+    if profile_name not in current:
+        target.profiles.add(profile)
+    return {"success": True, "user_id": user_id, "profile_name": profile_name}
+
+
+def _v_member_revoke_profile(user_id: str = "", profile_name: str = "", **kwargs: Any) -> dict:
+    """Revoke *profile_name* from *user_id* (idempotent)."""
+    from ggg import User, UserProfile
+
+    if not user_id or not profile_name:
+        raise ValueError("member.revoke_profile: user_id and profile_name are required")
+    target = User[user_id]
+    profile = UserProfile[profile_name]
+    if target is None:
+        raise ValueError(f"member.revoke_profile: user '{user_id}' not found")
+    if profile is None:
+        raise ValueError(f"member.revoke_profile: profile '{profile_name}' not found")
+    current = [p.name for p in target.profiles]
+    if profile_name in current:
+        target.profiles.remove(profile)
+    return {"success": True, "user_id": user_id, "profile_name": profile_name}
+
+
+def _v_realm_apply_init_policy(codex_id: str = "", **kwargs: Any) -> dict:
+    """Apply post-install realm policy from an installed codex package."""
+    from core.codex_init_host import apply_init_policy
+
+    if not codex_id:
+        raise ValueError("realm.apply_init_policy: codex_id is required")
+    return apply_init_policy(codex_id)
+
+
+def _v_org_seed_template(codex_id: str = "", template: str = "departments", **kwargs: Any) -> dict:
+    """Seed organizations from a codex package data template."""
+    from core.codex_init_host import seed_org_template
+
+    if not codex_id:
+        raise ValueError("org.seed_template: codex_id is required")
+    return seed_org_template(codex_id, template=template or "departments")
+
+
+def _v_justice_seed_template(codex_id: str = "", **kwargs: Any) -> dict:
+    """Seed the justice court hierarchy from a codex package."""
+    from core.codex_init_host import seed_justice_from_package
+
+    if not codex_id:
+        raise ValueError("justice.seed_template: codex_id is required")
+    return seed_justice_from_package(codex_id)
+
+
 def _v_notification_create(user_id: str = "", **kwargs: Any) -> dict:
     """Create a ``Notification`` (optionally bound to *user_id*)."""
     from ggg import Notification, User
@@ -301,15 +429,29 @@ VERBS: Dict[str, Callable[..., Any]] = {
     "time.now": _v_time_now,
     "user.get": _v_user_get,
     "realm.get": _v_realm_get,
+    "proposal.find_executed": _v_proposal_find_executed,
     "member.activate": _v_member_activate,
+    "member.assign_profile": _v_member_assign_profile,
+    "member.revoke_profile": _v_member_revoke_profile,
     "invoice.create": _v_invoice_create,
     "notification.create": _v_notification_create,
+    "realm.apply_init_policy": _v_realm_apply_init_policy,
+    "org.seed_template": _v_org_seed_template,
+    "justice.seed_template": _v_justice_seed_template,
 }
+
+# Effects the host applies asynchronously (vault ICRC calls, etc.) rather than
+# inside ``apply_effects``'s synchronous batch.
+ASYNC_EFFECT_VERBS = frozenset({"treasury.transfer"})
+
+
+def _all_verbs():
+    return frozenset(VERBS) | ASYNC_EFFECT_VERBS
 
 
 def known_verbs() -> List[str]:
-    """Sorted list of every registered verb (capability) name."""
-    return sorted(VERBS)
+    """Sorted list of every registered capability name (sync + async effects)."""
+    return sorted(_all_verbs())
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +465,7 @@ def authorize(action: str, capabilities: List[str]) -> Optional[str]:
     An action is permitted only when it is a registered verb AND the codex
     declared it in its manifest ``capabilities``.
     """
-    if action not in VERBS:
+    if action not in VERBS and action not in ASYNC_EFFECT_VERBS:
         return f"unknown verb '{action}'"
     if action not in (capabilities or ()):
         return (
@@ -341,6 +483,71 @@ def reserved_domain_denied(action: str, context_id: str) -> Optional[str]:
     denied here. Today no domains are reserved, so this always allows.
     """
     return None
+
+
+# ---------------------------------------------------------------------------
+# Live reads over ``rpc`` (host callback from inside the subinterpreter)
+# ---------------------------------------------------------------------------
+
+# Verbs that only read realm state. A sandboxed hook may call these live,
+# mid-execution, through the ``rpc`` builtin. Writes are deliberately excluded:
+# they stay post-hoc effects so the host applies them as one authorized,
+# ordered, reviewable batch once the hook has returned, rather than letting a
+# hook interleave mutations with arbitrary computation.
+READ_VERBS = frozenset({
+    "config.get",
+    "currency.get",
+    "time.now",
+    "user.get",
+    "realm.get",
+    "proposal.find_executed",
+})
+
+
+def readable_capabilities(capabilities: List[str]) -> List[str]:
+    """The subset of *capabilities* a hook may invoke over ``rpc``."""
+    return sorted(set(capabilities or ()) & READ_VERBS)
+
+
+def make_rpc_handler(context_id: str, capabilities: List[str]):
+    """Build the host-side ``rpc`` handler for one sandboxed hook call.
+
+    Basilisk invokes this synchronously as ``handler(context_id, action,
+    kwargs)`` whenever sandboxed code calls ``rpc(...)``. It enforces the same
+    checks as ``apply_effects`` — read-only, registered, declared, not
+    reserved — and passes both arguments and result through ``to_plain`` so no
+    live object can cross the boundary in either direction.
+
+    Raising propagates into the sandbox as an exception, which the codex may
+    catch; it can never turn into an unauthorized read.
+    """
+    caps = list(capabilities or ())
+
+    def handler(ctx_id: str, action: str, kwargs: Any) -> Any:
+        if not isinstance(action, str):
+            raise PermissionError("rpc action must be a string")
+        if action not in READ_VERBS:
+            raise PermissionError(
+                f"rpc '{action}' is not a read verb; writes must be returned "
+                f"as effects so the host applies them after the hook returns"
+            )
+        auth_error = authorize(action, caps)
+        if auth_error:
+            logger.warning(
+                f"codex_bridge[{context_id}]: denied rpc '{action}': {auth_error}"
+            )
+            raise PermissionError(f"rpc '{action}' denied: {auth_error}")
+
+        reserved_error = reserved_domain_denied(action, context_id)
+        if reserved_error:
+            raise PermissionError(f"rpc '{action}' denied: {reserved_error}")
+
+        safe_kwargs = to_plain(kwargs or {})
+        if not isinstance(safe_kwargs, dict):
+            raise PermissionError(f"rpc '{action}' kwargs must be an object")
+        return to_plain(VERBS[action](**safe_kwargs))
+
+    return handler
 
 
 # ---------------------------------------------------------------------------
@@ -432,8 +639,11 @@ def _resolve_refs(value: Any, results: List[Any]) -> Any:
 
 
 def apply_effects(
-    context_id: str, capabilities: List[str], effects: List[Any]
-) -> List[Any]:
+    context_id: str,
+    capabilities: List[str],
+    effects: List[Any],
+    defer_async: bool = False,
+):
     """Authorize and apply a batch of sandbox-proposed effects, in order.
 
     ``effects`` is the plain-data list a sandboxed hook returned, each item
@@ -443,6 +653,10 @@ def apply_effects(
     validated). Returns the index-aligned list of per-effect results — the same
     list that backs reference resolution and the hook's return value.
 
+    When *defer_async* is True, effects whose verb is in ``ASYNC_EFFECT_VERBS``
+    are authorized and returned for the caller to apply asynchronously instead
+    of being dispatched here; the return value is ``(results, deferred)``.
+
     Raises ``PermissionError`` on any unauthorized/malformed effect; the caller
     decides whether to fall back in-process.
     """
@@ -451,6 +665,7 @@ def apply_effects(
         raise PermissionError("sandbox effects must be a list")
 
     results: List[Any] = []
+    deferred: List[dict] = []
     for i, effect in enumerate(effects):
         if not isinstance(effect, dict):
             raise PermissionError(f"effect #{i} must be an object")
@@ -477,8 +692,18 @@ def apply_effects(
             raise PermissionError(f"effect '{verb}' denied: {reserved_error}")
 
         resolved = _resolve_refs(safe_kwargs, results)
+        if verb in ASYNC_EFFECT_VERBS:
+            if defer_async:
+                deferred.append({"verb": verb, "kwargs": resolved})
+                results.append(None)
+                continue
+            raise PermissionError(
+                f"effect '{verb}' must be applied asynchronously by the host"
+            )
         result = to_plain(VERBS[verb](**resolved))
         results.append(result)
+    if defer_async:
+        return results, deferred
     return results
 
 

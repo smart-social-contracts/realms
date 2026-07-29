@@ -53,17 +53,30 @@ class TestRuntimeSandboxConfig(unittest.TestCase):
     def test_force_in_process_hook_rejects_sandbox(self):
         with self.assertRaises(ValueError):
             self.rs.update_config({
-                "codex_hooks": {"hooks": {"on_treasury_send": "sandbox"}}
+                "codex_hooks": {"hooks": {"on_federation_message": "sandbox"}}
             })
 
     def test_resolve_hook_not_compatible(self):
         self.rs.update_config({"enabled": True})
         with mock.patch.object(self.rs, "is_sandbox_available", return_value=True):
-            mode = self.rs.resolve_hook_mode("role_assign_prehook")
+            mode = self.rs.resolve_hook_mode("get_dashboard_config")
             self.assertIn("not sandbox-compatible", mode)
-            self.assertFalse(self.rs.should_sandbox_hook("role_assign_prehook"))
-        forced = self.rs.resolve_hook_mode("init")
+            self.assertFalse(self.rs.should_sandbox_hook("get_dashboard_config"))
+        forced = self.rs.resolve_hook_mode("on_federation_message")
         self.assertEqual(forced, "in_process (forced)")
+
+    def test_role_hooks_are_always_sandboxed(self):
+        """Role hooks have no in-process path left, so no setting reaches them."""
+        self.rs.update_config({
+            "enabled": False,
+            "codex_hooks": {
+                "default_mode": "in_process",
+                "hooks": {"role_assign_prehook": "in_process"},
+            },
+        })
+        for name in self.rs.ALWAYS_SANDBOXED_HOOKS:
+            self.assertEqual(self.rs.resolve_hook_mode(name), "sandbox (always)")
+            self.assertTrue(self.rs.should_sandbox_hook(name))
 
     def test_describe_patch(self):
         summary = self.rs.describe_config_patch({"enabled": False})

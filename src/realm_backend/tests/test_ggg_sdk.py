@@ -211,6 +211,112 @@ def test_effects_through_real_apply_round_trip(monkeypatch):
     assert result == {"success": True, "invoice_id": "inv-1"}
 
 
+# ---------------------------------------------------------------------------
+# Live reads over rpc when the context does not already hold them
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fake_rpc(monkeypatch):
+    """Install an ``rpc`` builtin the way the subinterpreter would.
+
+    Function globals resolve before builtins, so setting it on the module is
+    equivalent from the SDK's point of view.
+    """
+    calls = []
+
+    def _install(responses):
+        def _rpc(action, **kwargs):
+            calls.append((action, kwargs))
+            if action not in responses:
+                raise PermissionError("rpc '%s' denied" % action)
+            return responses[action]
+
+        monkeypatch.setattr(ggg_sdk, "rpc", _rpc, raising=False)
+        return calls
+
+    return _install
+
+
+def test_user_miss_falls_back_to_rpc(fake_rpc):
+    calls = fake_rpc({"user.get": {"id": "u2", "name": "Other"}})
+
+    @ggg_sdk.hook
+    def h(args):
+        return ggg_sdk.realm.users.get("u2")
+
+    env = h(args={}, context={"users": {"u1": {"id": "u1"}}})
+    assert env["result"] == {"id": "u2", "name": "Other"}
+    assert calls == [("user.get", {"user_id": "u2"})]
+
+
+def test_user_hit_does_not_call_rpc(fake_rpc):
+    calls = fake_rpc({"user.get": {"id": "u1", "name": "FromRpc"}})
+
+    @ggg_sdk.hook
+    def h(args):
+        return ggg_sdk.realm.users.get("u1")
+
+    env = h(args={}, context={"users": {"u1": {"id": "u1", "name": "FromContext"}}})
+    assert env["result"]["name"] == "FromContext"
+    assert calls == []
+
+
+def test_repeated_user_lookup_is_memoized(fake_rpc):
+    calls = fake_rpc({"user.get": {"id": "u2"}})
+
+    @ggg_sdk.hook
+    def h(args):
+        ggg_sdk.realm.users.get("u2")
+        ggg_sdk.realm.users.get("u2")
+        return None
+
+    h(args={}, context={"users": {}})
+    assert len(calls) == 1
+
+
+def test_missing_context_key_falls_back_to_rpc(fake_rpc):
+    """A hook whose context omits ``config`` can still read it live."""
+    calls = fake_rpc({"config.get": {"fees": {"registration": 9.0}}})
+
+    @ggg_sdk.hook
+    def h(args):
+        return ggg_sdk.realm.config()
+
+    env = h(args={}, context={"currency": "DOM"})  # no "config" key
+    assert env["result"] == {"fees": {"registration": 9.0}}
+    assert calls == [("config.get", {})]
+
+
+def test_reads_return_defaults_without_an_rpc_channel():
+    """Images predating the callback must degrade, not explode."""
+
+    @ggg_sdk.hook
+    def h(args):
+        return {
+            "config": ggg_sdk.realm.config(),
+            "currency": ggg_sdk.realm.currency(),
+            "user": ggg_sdk.realm.users.get("nobody"),
+        }
+
+    env = h(args={}, context={})
+    assert env["ok"] is True
+    assert env["result"] == {"config": {}, "currency": "REALMS", "user": None}
+
+
+def test_rpc_denial_surfaces_as_a_failed_hook(fake_rpc):
+    """An undeclared read fails the hook rather than silently returning None."""
+    fake_rpc({})  # every action denied
+
+    @ggg_sdk.hook
+    def h(args):
+        return ggg_sdk.realm.users.get("u2")
+
+    env = h(args={}, context={"users": {}})
+    assert env["ok"] is False
+    assert "denied" in env["error"]
+
+
 def test_undeclared_capability_is_denied(monkeypatch):
     """Exploit-1: an effect for an undeclared capability is refused at the host."""
     monkeypatch.setitem(

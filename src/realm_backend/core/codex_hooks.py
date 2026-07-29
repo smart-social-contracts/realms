@@ -13,8 +13,9 @@ implementation serving the manifest's config blocks):
                      membership, dashboard, ...}
     init(realm)                       post-install realm setup (idempotent)
     seed(realm)                       org/data seeding (idempotent)
-    on_user_register(user_id)         replaces entity_method_overrides on
-                                      User.user_register_posthook
+    on_user_register(user_id)         post-registration onboarding (replaced
+                                      the removed entity_method_overrides on
+                                      User.user_register_posthook)
     on_treasury_send(treasury, to, amount)   async treasury transfer hook
     on_invoice_accounting(invoice_id, event) realm-specific journal policy
     on_stage_change(from, to)         post-transition realm policy
@@ -76,6 +77,11 @@ _NON_CONFIG_MANIFEST_KEYS = frozenset({
 # filesystem each time. Invalidated on any codex/extension (un)install.
 _active_codex_cache: Optional[List[str]] = None  # [] = "known: none installed"
 _overrides_cache: Optional[Dict[str, str]] = None
+
+# Guards ``get_config`` against re-entering itself: resolving the config
+# dispatches the ``get_config`` hook, and a sandboxed hook may read ``config``
+# back through the bridge while it runs.
+_config_resolving: bool = False
 
 
 def invalidate_cache():
@@ -275,9 +281,17 @@ def get_hook(hook_name: str) -> Optional[Callable]:
 def call_hook(hook_name: str, args: Optional[dict] = None, default: Any = None) -> Any:
     """Call a hook on the active codex with JSON-encoded args.
 
-    Returns the parsed result (hooks return JSON strings or plain dicts),
-    or ``default`` when no codex implements the hook or the call fails.
+    Runs the hook in the subinterpreter when the sandbox policy and the codex
+    both support it, otherwise in-process. Returns the parsed result (hooks
+    return JSON strings or plain dicts), or ``default`` when no codex
+    implements the hook or the call fails.
     """
+    codex_id = get_active_codex()
+    if codex_id and _hook_runs_sandboxed(hook_name):
+        handled, result = _call_hook_sandboxed(codex_id, hook_name, args or {})
+        if handled:
+            return result if result is not None else default
+
     hook = get_hook(hook_name)
     if hook is None:
         return default
@@ -339,6 +353,8 @@ def get_config() -> dict:
     contract that makes codex ``parameters`` (critical mass, voting window,
     fees…) tunable per realm without republishing the codex.
     """
+    global _config_resolving
+
     base: Dict[str, Any] = {}
     try:
         from ggg import Realm
@@ -352,9 +368,20 @@ def get_config() -> dict:
     except Exception:
         base = {}
 
+    # Re-entered while already resolving — the sandboxed ``get_config`` hook is
+    # reading ``config.get`` through the bridge. Dispatching the hook again
+    # would recurse, so serve the stored manifest data and stop here.
+    if _config_resolving:
+        base.pop("config_overrides", None)
+        return base
+
     codex_config: Dict[str, Any] = {}
 
-    hooked = call_hook("get_config")
+    _config_resolving = True
+    try:
+        hooked = call_hook("get_config")
+    finally:
+        _config_resolving = False
     if isinstance(hooked, dict):
         codex_config = hooked.get("config", hooked) if "config" in hooked else hooked
     else:
@@ -477,27 +504,415 @@ def _hook_runs_sandboxed(hook_name: str) -> bool:
         return False
 
 
-def _dispatch_sandboxed(codex_id: str, hook_name: str, args: dict) -> bool:
-    """Run a hook in the sandbox. Returns True when the event is considered
-    handled (so callers skip legacy fallbacks). Honors the sandbox
-    ``fallback_in_process`` policy on failure by signalling the caller to try
-    the in-process path (returns False)."""
-    from core import runtime_sandbox
+def _call_hook_sandboxed(codex_id: str, hook_name: str, args: dict):
+    """Run a hook in the sandbox; return ``(handled, result)``.
+
+    ``handled`` is False *only* when the sandbox could not run the codex at all
+    and policy permits an in-process retry; the caller then takes the legacy
+    path.
+
+    Crucially, a refusal is never a reason to fall back. If the hook emitted an
+    effect it had not declared, or tried to hand a live object across the
+    boundary, the codex *did* run and was denied — retrying it in-process would
+    hand it the full host and turn every capability denial into a trivial
+    bypass. Only infrastructure failures (no sandbox in this image, spawn or
+    module load failed) are eligible for the fallback.
+    """
+    from core import codex_bridge, runtime_sandbox
 
     try:
-        runtime_sandbox.call_codex_hook_in_sandbox(
+        result = runtime_sandbox.call_codex_hook_in_sandbox(
             codex_id, hook_name, json.dumps(args)
         )
-        return True
+        return (True, result)
+    except (
+        runtime_sandbox.CodexHookError,
+        PermissionError,
+        codex_bridge.BridgeSerializationError,
+    ) as e:
+        logger.error(f"Sandboxed codex {hook_name} refused for {codex_id}: {e}")
+        return (True, None)
     except Exception as e:
         logger.error(f"Sandboxed codex {hook_name} failed for {codex_id}: {e}")
         if runtime_sandbox.get_config().get("fallback_in_process"):
             logger.warning(
                 f"Falling back to in-process for {hook_name} (codex {codex_id})"
             )
-            return False
-        # No fallback: the hook was dispatched (and failed); don't double-fire.
+            return (False, None)
+        return (True, None)
+
+
+# ---------------------------------------------------------------------------
+# Codex *entity* hooks (issue #265)
+# ---------------------------------------------------------------------------
+#
+# Some hooks do not live in a codex package: an extension installs them as a
+# ``Codex`` entity whose ``code`` column holds Python source. That source used
+# to be ``exec()``d in-process with full ``__builtins__``, which made the
+# governance vetoes guarding role assignment the *least* protected code in the
+# realm — unsandboxed, and invisible to the install-time import scanner, which
+# only ever sees files in a package. They now run in the subinterpreter over
+# the same capability bridge as package hooks.
+
+ROLE_HOOK_CODEX_NAMES = (
+    "role_management_hook",
+    "role_management_hook_codex",
+    "governance_policy_hook",
+)
+
+# Role hooks decide; they never write. A read-only grant is all they need.
+ROLE_HOOK_CAPABILITIES = (
+    "config.get",
+    "realm.get",
+    "time.now",
+    "user.get",
+    "proposal.find_executed",
+)
+
+REGISTRATION_HOOK_CODEX_NAMES = (
+    "user_registration_hook",
+    "user_registration_hook_codex",
+)
+
+# The legacy registration posthook onboards a new member: it reads the realm's
+# fee configuration and issues the welcome invoice and notification.
+REGISTRATION_HOOK_CAPABILITIES = (
+    "config.get",
+    "currency.get",
+    "realm.get",
+    "time.now",
+    "user.get",
+    "member.activate",
+    "invoice.create",
+    "notification.create",
+)
+
+# Federation policy used to live in ``Realm.federation_codex`` (or the seeded
+# ``quarter_assignment`` module entity) and was ``exec()``'d in-process with
+# live Quarter objects. It is pure compute over plain projections now: the
+# host passes quarters/populations in, the sandbox returns a canister id or a
+# deploy verdict. No capabilities — it cannot read or write the realm.
+FEDERATION_HOOK_CODEX_NAMES = (
+    "quarter_assignment",
+    "federation_codex",
+)
+
+# Appended after the federation source so legacy ``assign_quarter`` /
+# ``should_deploy_quarter`` functions (which expect attribute access) keep
+# working without rewriting every realm's Codex row.
+_FEDERATION_SANDBOX_ADAPTER = """
+from ggg_sdk import hook
+
+class _QuarterView:
+    def __init__(self, d):
+        d = d if isinstance(d, dict) else {}
+        self.canister_id = d.get("canister_id", "") or ""
+        self.name = d.get("name", "") or ""
+        self.population = int(d.get("population") or 0)
+
+@hook
+def assign_quarter_hook(args):
+    quarters = [_QuarterView(q) for q in (args.get("quarters") or [])]
+    result = assign_quarter(
+        args.get("principal") or "",
+        quarters,
+        args.get("preferred") or "",
+    )
+    return {"canister_id": str(result) if result else ""}
+
+@hook
+def should_deploy_quarter_hook(args):
+    return {
+        "deploy": bool(
+            should_deploy_quarter(
+                args.get("populations") or [],
+                args.get("network") or "",
+                None,
+            )
+        )
+    }
+"""
+
+
+def _entity_codex(names) -> tuple:
+    """``(name, source)`` of the first installed ``Codex`` entity in *names*."""
+    try:
+        from ggg.governance.codex import Codex
+
+        for codex in Codex.instances():
+            if codex.name in names and codex.code:
+                return (codex.name, str(codex.code))
+    except Exception as e:
+        logger.warning(f"_entity_codex({names}) failed: {e}")
+    return (None, None)
+
+
+def call_entity_hook(
+    names, capabilities, hook_name: str, args: dict, fail_closed: bool
+) -> Any:
+    """Run a hook from a ``Codex`` entity's ``code`` column in the sandbox.
+
+    Returns its plain-data result, or ``None`` when no matching codex
+    implements the hook (callers then apply the platform default). Presence is
+    decided by looking for ``def <hook_name>`` in the source, since asking the
+    sandbox would mean spawning it only to learn there was nothing to run.
+
+    When the hook cannot be evaluated, *fail_closed* decides what that means:
+    a gate raises ``PermissionError`` (a governance gate that fails open is not
+    a gate), while a posthook logs and continues, since the thing it reacts to
+    has already happened and refusing after the fact helps nobody.
+    """
+    name, source = _entity_codex(names)
+    if not source or ("def " + hook_name) not in source:
+        return None
+
+    from core import runtime_sandbox
+
+    try:
+        return runtime_sandbox.run_bridge_hook(
+            name, source, hook_name, args, list(capabilities)
+        )
+    except Exception as e:
+        logger.error(f"Codex entity hook {hook_name} ({name}) failed: {e}")
+        if fail_closed:
+            raise PermissionError(
+                f"'{hook_name}' could not be evaluated ({e}); the action is refused"
+            )
+        return None
+
+
+def call_role_hook(hook_name: str, args: dict, fail_closed: bool) -> Any:
+    """Run a role-management hook in the sandbox."""
+    return call_entity_hook(
+        ROLE_HOOK_CODEX_NAMES, ROLE_HOOK_CAPABILITIES, hook_name, args, fail_closed
+    )
+
+
+def call_registration_posthook(user_id: str) -> bool:
+    """Run the legacy ``user_register_posthook`` from a ``Codex`` entity.
+
+    Returns True when a codex implements it, whatever the outcome — the caller
+    only needs to know whether to fall through to the platform default. This is
+    the pre-hook-API fallback, reached only when no ``on_user_register`` codex
+    claimed the registration.
+    """
+    _, source = _entity_codex(REGISTRATION_HOOK_CODEX_NAMES)
+    if not source or "def user_register_posthook" not in source:
+        return False
+    call_entity_hook(
+        REGISTRATION_HOOK_CODEX_NAMES,
+        REGISTRATION_HOOK_CAPABILITIES,
+        "user_register_posthook",
+        {"user_id": user_id},
+        fail_closed=False,
+    )
+    return True
+
+
+def enforce_role_gate(
+    hook_name: str, user_id: str, profile_name: str, actor_principal: str
+) -> bool:
+    """Evaluate a role prehook and enforce its verdict.
+
+    Returns True when the change may proceed and raises ``PermissionError``
+    with the codex's reason when it may not. A hook returns the plain verdict
+    ``{"allowed": bool, "reason": str}`` — exceptions do not cross the sandbox
+    boundary, so a veto has to be data rather than a raised error.
+    """
+    result = call_role_hook(
+        hook_name,
+        {
+            "user_id": user_id,
+            "profile_name": profile_name,
+            "actor_principal": actor_principal,
+        },
+        fail_closed=True,
+    )
+    if result is None:
+        return True  # no codex opinion: the platform default is to allow
+
+    allowed = result.get("allowed", True) if isinstance(result, dict) else bool(result)
+    if allowed:
+        logger.info(
+            f"Role hook {hook_name} allowed '{profile_name}' for {user_id} "
+            f"(actor {actor_principal})"
+        )
         return True
+
+    reason = ""
+    if isinstance(result, dict):
+        reason = str(result.get("reason") or "")
+    reason = reason or (
+        f"'{profile_name}' requires an approved governance proposal"
+    )
+    logger.info(f"Role hook {hook_name} denied '{profile_name}' for {user_id}: {reason}")
+    raise PermissionError(reason)
+
+
+def notify_role_change(
+    hook_name: str, user_id: str, profile_name: str, actor_principal: str
+) -> None:
+    """Fire a role posthook. Never raises: the change already happened."""
+    try:
+        call_role_hook(
+            hook_name,
+            {
+                "user_id": user_id,
+                "profile_name": profile_name,
+                "actor_principal": actor_principal,
+            },
+            fail_closed=False,
+        )
+    except Exception as e:
+        logger.warning(f"Role posthook {hook_name} failed: {e}")
+
+
+def _federation_codex() -> tuple:
+    """``(name, source)`` of the federation policy codex, or ``(None, None)``.
+
+    Prefers the explicit ``Realm.federation_codex`` link; falls back to the
+    well-known module entities seeded from ``modules/quarter_assignment.py``.
+    """
+    try:
+        from ggg import Realm
+
+        realms = list(Realm.instances())
+        if realms:
+            linked = getattr(realms[0], "federation_codex", None)
+            if linked is not None and getattr(linked, "code", None):
+                name = getattr(linked, "name", None) or "federation_codex"
+                return (name, str(linked.code))
+    except Exception as e:
+        logger.warning(f"_federation_codex() linked lookup failed: {e}")
+    return _entity_codex(FEDERATION_HOOK_CODEX_NAMES)
+
+
+def _prepare_federation_source(source: str) -> str:
+    """Strip host-only imports and append the plain-data adapter.
+
+    The known first-party module imports ``datetime`` unused; that module is
+    not always available inside the subinterpreter. Custom federation code that
+    still imports ``ggg`` / ``_cdk`` will fail at spawn — callers choose
+    fail-closed (assign) vs fallback (scale).
+    """
+    kept = []
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped in ("from datetime import datetime", "import datetime"):
+            continue
+        if (
+            stripped.startswith("from ggg")
+            or stripped.startswith("import ggg")
+            or stripped.startswith("from _cdk")
+            or stripped.startswith("import _cdk")
+        ):
+            continue
+        kept.append(line)
+    return "\n".join(kept) + "\n" + _FEDERATION_SANDBOX_ADAPTER
+
+
+def project_quarter(quarter) -> dict:
+    """Plain projection of a Quarter entity for the federation sandbox."""
+    if isinstance(quarter, dict):
+        return {
+            "canister_id": quarter.get("canister_id", "") or "",
+            "name": quarter.get("name", "") or "",
+            "population": int(quarter.get("population") or 0),
+        }
+    return {
+        "canister_id": getattr(quarter, "canister_id", "") or "",
+        "name": getattr(quarter, "name", "") or "",
+        "population": int(getattr(quarter, "population", 0) or 0),
+    }
+
+
+def call_assign_quarter(
+    principal: str, quarters: list, preferred: str = ""
+) -> Optional[str]:
+    """Ask the federation codex which quarter a principal should join.
+
+    Returns a canister_id string, ``None`` when no federation policy is
+    installed (caller applies the platform default), or raises
+    ``PermissionError`` when the policy rejects the placement or cannot run.
+    Assignment is a gate: a broken policy must not silently fall through to
+    random placement.
+    """
+    name, source = _federation_codex()
+    if not source or "def assign_quarter" not in source:
+        return None
+
+    from core import runtime_sandbox
+
+    try:
+        result = runtime_sandbox.run_bridge_hook(
+            name,
+            _prepare_federation_source(source),
+            "assign_quarter_hook",
+            {
+                "principal": principal or "",
+                "quarters": [project_quarter(q) for q in (quarters or [])],
+                "preferred": preferred or "",
+            },
+            [],
+        )
+    except Exception as e:
+        logger.error(f"Federation assign_quarter ({name}) failed: {e}")
+        raise PermissionError(str(e)) from e
+
+    if isinstance(result, dict):
+        canister_id = result.get("canister_id") or ""
+        return str(canister_id) if canister_id else None
+    return str(result) if result else None
+
+
+def call_should_deploy_quarter(
+    populations: list, network: str = ""
+) -> Optional[bool]:
+    """Ask the federation codex whether to spawn another quarter.
+
+    Returns ``True``/``False`` from the policy, or ``None`` when no policy is
+    installed or it cannot be evaluated — callers then apply the built-in
+    default. Scaling must not stall because a codex is broken.
+    """
+    name, source = _federation_codex()
+    if not source or "def should_deploy_quarter" not in source:
+        return None
+
+    from core import runtime_sandbox
+
+    try:
+        result = runtime_sandbox.run_bridge_hook(
+            name,
+            _prepare_federation_source(source),
+            "should_deploy_quarter_hook",
+            {
+                "populations": [int(p or 0) for p in (populations or [])],
+                "network": network or "",
+            },
+            [],
+        )
+    except Exception as e:
+        logger.warning(
+            f"Federation should_deploy_quarter ({name}) failed, "
+            f"using platform default: {e}"
+        )
+        return None
+
+    if isinstance(result, dict) and "deploy" in result:
+        return bool(result["deploy"])
+    if isinstance(result, bool):
+        return result
+    return None
+
+
+def _dispatch_sandboxed(codex_id: str, hook_name: str, args: dict) -> bool:
+    """Run a hook in the sandbox, discarding its result.
+
+    Returns True when the event is considered handled (so callers skip legacy
+    fallbacks).
+    """
+    handled, _ = _call_hook_sandboxed(codex_id, hook_name, args)
+    return handled
 
 
 def dispatch_on_user_register(user_id: str) -> bool:
@@ -592,6 +1007,35 @@ def run_init(codex_id: str) -> Optional[str]:
     success (config-only codices need no init code).
     """
     try:
+        manifest = {}
+        try:
+            from core.runtime_extensions import get_all_extension_manifests
+
+            manifest = get_all_extension_manifests().get(codex_id) or {}
+        except Exception:
+            pass
+
+        if is_bridge_codex(manifest):
+            from core import runtime_sandbox
+
+            try:
+                result = runtime_sandbox.call_codex_hook_in_sandbox(
+                    codex_id, "init", json.dumps({})
+                )
+            except Exception as e:
+                import traceback
+
+                error = (
+                    f"Codex {codex_id}: sandbox init hook failed — {e}\n"
+                    f"{traceback.format_exc()}"
+                )
+                logger.error(error)
+                return error
+            if isinstance(result, dict) and result.get("success") is False:
+                return str(result.get("error") or "init hook failed")
+            logger.info(f"Codex {codex_id}: sandbox init hook executed")
+            return None
+
         from core.runtime_extensions import _load_module
 
         module = _load_module(codex_id)
@@ -615,3 +1059,84 @@ def run_init(codex_id: str) -> Optional[str]:
         error = f"Codex {codex_id}: init hook failed — {e}\n{traceback.format_exc()}"
         logger.error(error)
         return error
+
+
+def _treasury_send_sandboxed(codex_id: str, params: dict) -> dict:
+    """Run ``on_treasury_send`` in the sandbox; return transfer kwargs."""
+    from core import runtime_sandbox
+
+    from core.runtime_extensions import EXTENSIONS_DIR
+    import os
+
+    module_file = runtime_sandbox._codex_hook_module_file(codex_id)
+    module_path = os.path.join(EXTENSIONS_DIR, codex_id, module_file)
+    with open(module_path, "r", encoding="utf-8") as handle:
+        codex_source = handle.read()
+    capabilities = runtime_sandbox._codex_capabilities(codex_id)
+    context = runtime_sandbox._gather_hook_context(
+        "on_treasury_send", json.dumps(params)
+    )
+    _, deferred = runtime_sandbox.run_bridge_hook(
+        codex_id,
+        codex_source,
+        "on_treasury_send",
+        params,
+        capabilities,
+        context,
+        defer_async=True,
+    )
+    transfers = [d for d in deferred if d.get("verb") == "treasury.transfer"]
+    if len(transfers) != 1:
+        raise PermissionError(
+            "on_treasury_send must propose exactly one treasury.transfer effect"
+        )
+    return transfers[0].get("kwargs") or {}
+
+
+def treasury_send_async(treasury_name: str, to_principal: str, amount: int):
+    """Async generator: sandbox hook decides, host performs vault transfer.
+
+    Yields extension async calls. Returns ``None`` when no hook handled the
+    send (caller should fall back to ``Treasury.send_hook``).
+    """
+    params = {
+        "treasury_name": treasury_name,
+        "to_principal": to_principal,
+        "amount": amount,
+    }
+    codex_id = get_active_codex()
+
+    if codex_id and _hook_runs_sandboxed("on_treasury_send"):
+        from core import runtime_sandbox
+
+        try:
+            transfer_kwargs = _treasury_send_sandboxed(codex_id, params)
+        except (
+            runtime_sandbox.CodexHookError,
+            PermissionError,
+            RuntimeError,
+            FileNotFoundError,
+            OSError,
+        ) as e:
+            logger.error(f"Sandboxed on_treasury_send failed for {codex_id}: {e}")
+            raise
+    else:
+        hook = get_hook("on_treasury_send")
+        if hook is None:
+            return None
+        result = yield hook(json.dumps(params))
+        return result
+
+    try:
+        from core.extensions import extension_async_call
+    except ImportError:
+        extension_async_call = None
+    if extension_async_call is None:
+        raise RuntimeError("extension_async_call unavailable")
+
+    vault_args = json.dumps({
+        "to_principal": transfer_kwargs.get("to_principal", to_principal),
+        "amount": transfer_kwargs.get("amount", amount),
+    })
+    result = yield extension_async_call("vault", "transfer", vault_args)
+    return result

@@ -383,7 +383,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'reload_codex' : IDL.Func([IDL.Text], [IDL.Text], []),
-    'reload_entity_method_overrides' : IDL.Func([], [IDL.Text], []),
     'report_quarter_population' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'request_upgrade' : IDL.Func([IDL.Text], [IDL.Text], []),
     'resolve_ref' : IDL.Func([IDL.Text], [IDL.Text], ['query']),

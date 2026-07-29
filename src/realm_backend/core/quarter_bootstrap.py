@@ -67,7 +67,8 @@ def build_bootstrap_plan(spec):
     Returns a JSON-able dict consumed by ``advance_bootstrap``. Codex/extension
     items are only included when a ``registry_canister_id`` is present (nothing
     to pull from otherwise). Codices are installed before extensions because an
-    extension may depend on codex-provided overrides (entity_method_overrides).
+    extension may depend on entities and config the codex ``init``/``seed`` hooks
+    create.
     """
     spec = spec or {}
     registry = (spec.get("registry_canister_id") or "").strip()

@@ -198,3 +198,244 @@ def test_resolve_result_substitutes_refs():
         {"success": True, "invoice_id": "$eff:0:id"}, results
     )
     assert resolved == {"success": True, "invoice_id": "inv-7"}
+
+
+# ---------------------------------------------------------------------------
+# Live reads over rpc
+# ---------------------------------------------------------------------------
+
+
+def test_readable_capabilities_keeps_only_reads():
+    caps = ["config.get", "user.get", "invoice.create", "member.activate"]
+    assert codex_bridge.readable_capabilities(caps) == ["config.get", "user.get"]
+
+
+def test_rpc_serves_a_declared_read(monkeypatch):
+    monkeypatch.setitem(codex_bridge.VERBS, "user.get", lambda **kw: {"id": kw["user_id"]})
+    handler = codex_bridge.make_rpc_handler("codex-x", ["user.get"])
+    assert handler("codex-x", "user.get", {"user_id": "u1"}) == {"id": "u1"}
+
+
+def test_rpc_denies_undeclared_read(monkeypatch):
+    monkeypatch.setitem(codex_bridge.VERBS, "user.get", lambda **kw: {"id": "u1"})
+    handler = codex_bridge.make_rpc_handler("codex-x", [])
+    with pytest.raises(PermissionError):
+        handler("codex-x", "user.get", {"user_id": "u1"})
+
+
+def test_rpc_refuses_write_verbs_even_when_declared(fake_verb):
+    # Writes must arrive as effects so the host applies them as one authorized
+    # batch; a codex cannot mutate mid-computation by routing through rpc.
+    handler = codex_bridge.make_rpc_handler("codex-x", ["invoice.create"])
+    with pytest.raises(PermissionError):
+        handler("codex-x", "invoice.create", {"amount": 1})
+
+
+def test_rpc_refuses_unknown_verb():
+    handler = codex_bridge.make_rpc_handler("codex-x", ["treasury.drain"])
+    with pytest.raises(PermissionError):
+        handler("codex-x", "treasury.drain", {})
+
+
+def test_rpc_rejects_leaked_live_object(monkeypatch):
+    class Entity:
+        pass
+
+    monkeypatch.setitem(codex_bridge.VERBS, "realm.get", lambda **kw: Entity())
+    handler = codex_bridge.make_rpc_handler("codex-x", ["realm.get"])
+    with pytest.raises(BridgeSerializationError):
+        handler("codex-x", "realm.get", {})
+
+
+def test_rpc_rejects_non_string_action():
+    handler = codex_bridge.make_rpc_handler("codex-x", ["user.get"])
+    with pytest.raises(PermissionError):
+        handler("codex-x", 42, {})
+
+
+def test_rpc_rejects_non_dict_kwargs():
+    handler = codex_bridge.make_rpc_handler("codex-x", ["user.get"])
+    with pytest.raises(PermissionError):
+        handler("codex-x", "user.get", ["not", "an", "object"])
+
+
+# ---------------------------------------------------------------------------
+# proposal.find_executed
+# ---------------------------------------------------------------------------
+#
+# The verb the role-management hooks depend on. It exists so a codex can ask
+# "is this specific role change approved?" instead of being handed every
+# proposal in the realm to filter itself.
+
+
+class _FakeProposal:
+    def __init__(self, id, status, metadata):
+        self.id = id
+        self.status = status
+        self.metadata = metadata
+
+
+def _fake_proposals(monkeypatch, proposals):
+    import sys
+    import types
+
+    module = types.ModuleType("ggg")
+    module.Proposal = type(
+        "Proposal", (), {"instances": staticmethod(lambda: list(proposals))}
+    )
+    monkeypatch.setitem(sys.modules, "ggg", module)
+
+
+def _meta(**kw):
+    import json
+
+    return json.dumps(kw)
+
+
+def test_find_executed_matches_an_approved_assignment(monkeypatch):
+    _fake_proposals(monkeypatch, [
+        _FakeProposal("p1", "executed", _meta(
+            proposal_type="role_assignment",
+            target_principal="u1",
+            profile_name="admin",
+        )),
+    ])
+    found = codex_bridge.VERBS["proposal.find_executed"](
+        target_principal="u1", profile_name="admin", change="assign"
+    )
+    assert found["id"] == "p1"
+
+
+def test_find_executed_ignores_proposals_that_did_not_execute(monkeypatch):
+    _fake_proposals(monkeypatch, [
+        _FakeProposal("p1", "open", _meta(
+            proposal_type="role_assignment",
+            target_principal="u1",
+            profile_name="admin",
+        )),
+    ])
+    assert codex_bridge.VERBS["proposal.find_executed"](
+        target_principal="u1", profile_name="admin"
+    ) is None
+
+
+def test_find_executed_does_not_match_another_user(monkeypatch):
+    _fake_proposals(monkeypatch, [
+        _FakeProposal("p1", "executed", _meta(
+            proposal_type="role_assignment",
+            target_principal="u2",
+            profile_name="admin",
+        )),
+    ])
+    assert codex_bridge.VERBS["proposal.find_executed"](
+        target_principal="u1", profile_name="admin"
+    ) is None
+
+
+def test_find_executed_does_not_match_another_profile(monkeypatch):
+    _fake_proposals(monkeypatch, [
+        _FakeProposal("p1", "executed", _meta(
+            proposal_type="role_assignment",
+            target_principal="u1",
+            profile_name="observer",
+        )),
+    ])
+    assert codex_bridge.VERBS["proposal.find_executed"](
+        target_principal="u1", profile_name="admin"
+    ) is None
+
+
+def test_an_assignment_does_not_authorize_a_revocation(monkeypatch):
+    _fake_proposals(monkeypatch, [
+        _FakeProposal("p1", "executed", _meta(
+            proposal_type="role_assignment",
+            target_principal="u1",
+            profile_name="admin",
+        )),
+    ])
+    assert codex_bridge.VERBS["proposal.find_executed"](
+        target_principal="u1", profile_name="admin", change="revoke"
+    ) is None
+
+
+def test_find_executed_honors_the_legacy_revocation_encoding(monkeypatch):
+    # Proposals voted before role_revocation existed encoded revocation as a
+    # role_assignment for "revoke_<profile>"; they must keep working.
+    _fake_proposals(monkeypatch, [
+        _FakeProposal("p1", "executed", _meta(
+            proposal_type="role_assignment",
+            target_principal="u1",
+            profile_name="revoke_admin",
+        )),
+    ])
+    found = codex_bridge.VERBS["proposal.find_executed"](
+        target_principal="u1", profile_name="admin", change="revoke"
+    )
+    assert found["id"] == "p1"
+
+
+def test_find_executed_skips_unparseable_metadata(monkeypatch):
+    _fake_proposals(monkeypatch, [
+        _FakeProposal("p1", "executed", "{not json"),
+        _FakeProposal("p2", "executed", _meta(
+            proposal_type="role_assignment",
+            target_principal="u1",
+            profile_name="admin",
+        )),
+    ])
+    found = codex_bridge.VERBS["proposal.find_executed"](
+        target_principal="u1", profile_name="admin"
+    )
+    assert found["id"] == "p2"
+
+
+def test_find_executed_requires_both_a_target_and_a_profile(monkeypatch):
+    _fake_proposals(monkeypatch, [])
+    verb = codex_bridge.VERBS["proposal.find_executed"]
+    assert verb(target_principal="", profile_name="admin") is None
+    assert verb(target_principal="u1", profile_name="") is None
+
+
+def test_find_executed_returns_plain_data(monkeypatch):
+    _fake_proposals(monkeypatch, [
+        _FakeProposal("p1", "executed", _meta(
+            proposal_type="role_assignment",
+            target_principal="u1",
+            profile_name="admin",
+        )),
+    ])
+    handler = codex_bridge.make_rpc_handler("codex-x", ["proposal.find_executed"])
+    result = handler("codex-x", "proposal.find_executed", {
+        "target_principal": "u1", "profile_name": "admin",
+    })
+    assert result == {
+        "id": "p1", "proposal_type": "role_assignment", "profile_name": "admin",
+    }
+
+
+def test_find_executed_is_reachable_over_rpc():
+    # Role hooks read approvals mid-decision, so this has to be served live
+    # rather than collected as a post-hoc effect.
+    assert "proposal.find_executed" in codex_bridge.READ_VERBS
+    assert codex_bridge.readable_capabilities(["proposal.find_executed"]) == [
+        "proposal.find_executed"
+    ]
+
+
+def test_no_read_verb_shadows_the_rpc_action_parameter():
+    """``rpc(action, **kwargs)`` spends the name ``action`` on the verb, so a
+    verb kwarg of the same name arrives as a duplicate argument — a collision
+    that only shows up at call time, in the sandbox."""
+    import inspect
+
+    for name in codex_bridge.READ_VERBS:
+        params = inspect.signature(codex_bridge.VERBS[name]).parameters
+        assert "action" not in params, name
+
+
+def test_find_executed_is_denied_without_the_capability():
+    handler = codex_bridge.make_rpc_handler("codex-x", ["user.get"])
+    with pytest.raises(PermissionError):
+        handler("codex-x", "proposal.find_executed", {
+            "target_principal": "u1", "profile_name": "admin",
+        })

@@ -281,43 +281,6 @@ def _get_frontend_canister_id() -> str:
 
 logger = get_logger("main")
 
-def _make_codex_proxy(codex_name: str, func_name: str, method_type: str = "method"):
-    """Create a dynamic proxy that always exec()s the latest Codex code.
-
-    Instead of caching a function extracted from codex code at bind time,
-    this proxy re-reads the codex on every call so that governance proposals
-    that update a codex take effect immediately without a canister restart
-    or a reload_entity_method_overrides() call.
-    """
-
-    def _proxy(*args, **kwargs):
-        import ggg as _ggg
-        from _cdk import Async as _Async
-        from ggg import Codex as _Codex
-        from ic_python_logging import get_logger as _get_logger
-
-        target = _Codex[codex_name]
-        if not target or not target.code:
-            raise RuntimeError(f"Codex '{codex_name}' not found or has no code")
-        ns = {
-            "ic": ic,
-            "logger": _get_logger(f"codex.{codex_name}"),
-            "ggg": _ggg,
-            "Async": _Async,
-        }
-        exec(str(target.code), ns)
-        fn = ns.get(func_name)
-        if not fn:
-            raise RuntimeError(
-                f"Function '{func_name}' not found in Codex '{codex_name}'"
-            )
-        return fn(*args, **kwargs)
-
-    _proxy.__qualname__ = f"codex_proxy<{codex_name}.{func_name}>"
-    _proxy.__name__ = func_name
-    return _proxy
-
-
 # HTTP types used by http_transform endpoint
 from _cdk import (
     HttpResponse,
@@ -482,30 +445,25 @@ def get_extensions() -> RealmResponse:
 
 
 def _assign_quarter(principal: str, realm, quarters, preferred_quarter: str) -> str:
-    """Assign a quarter via federation_codex, or fall back to random.
+    """Assign a quarter via the sandboxed federation policy, or fall back.
 
-    The federation codex may define an ``assign_quarter(principal, quarters,
-    preferred_quarter)`` function.  It receives the list of active Quarter
-    entities and should return a canister_id string.  If the codex raises,
-    the error propagates to the caller so the user gets a clear rejection
-    reason (e.g. "quarter is full").
+    The federation codex (``Realm.federation_codex`` or the seeded
+    ``quarter_assignment`` module) may define ``assign_quarter``. It runs in
+    the subinterpreter over plain quarter projections (issue #265); a rejection
+    raises so the user sees why (e.g. "quarter is full").
 
-    When no codex is present the default behaviour is deterministic random
-    assignment (hash of principal) which guarantees uniform load.
+    When no policy is installed the default is deterministic random assignment
+    (hash of principal), which guarantees uniform load.
     """
     active_quarters = [q for q in quarters if q.status == "active"]
     if not active_quarters:
         return ""
 
-    codex = realm.federation_codex
-    if codex and codex.code:
-        ns = {}
-        exec(str(codex.code), ns)
-        assign_fn = ns.get("assign_quarter")
-        if assign_fn:
-            result = assign_fn(principal, active_quarters, preferred_quarter)
-            if result:
-                return str(result)
+    from core.codex_hooks import call_assign_quarter
+
+    result = call_assign_quarter(principal, active_quarters, preferred_quarter)
+    if result:
+        return str(result)
 
     # Default: deterministic random (hash-based)
     idx = hash(principal) % len(active_quarters)
@@ -1069,15 +1027,19 @@ def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
                     ),
                 )
 
-        # Run codex eligibility check if available
-        codex = realm.federation_codex
-        if codex and codex.code:
-            ns = {}
-            exec(str(codex.code), ns)
-            assign_fn = ns.get("assign_quarter")
-            if assign_fn:
-                target = target if not is_capital_target else None
-                assign_fn(caller, [target] if target else [], new_quarter_canister_id)
+        # Federation eligibility check (sandboxed; issue #265).
+        from core.codex_hooks import call_assign_quarter
+
+        try:
+            call_assign_quarter(
+                caller,
+                [target] if (not is_capital_target and target) else [],
+                new_quarter_canister_id,
+            )
+        except PermissionError as e:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=str(e))
+            )
 
         # Persist the new assignment on the User entity
         from ggg import User
@@ -4289,79 +4251,11 @@ def initialize() -> void:
 
             extension_status[extension_id] = status
 
-        # Load entity method overrides from Realm manifest
-        logger.info(
-            "\n🔧 Checking for Codex entity method overrides from Realm manifest..."
-        )
-        try:
-            import json
-
-            from ggg import Codex, Realm
-
-            realm = list(Realm.instances())[0] if Realm.instances() else None
-            logger.info(f"Realm found: {realm.name if realm else 'None'}")
-
-            if realm:
-                logger.info(f"Has manifest_data: {bool(realm.manifest_data)}")
-                if realm.manifest_data:
-                    logger.info(
-                        f"manifest_data length: {len(str(realm.manifest_data))}"
-                    )
-                    manifest = json.loads(str(realm.manifest_data))
-                    logger.info(f"Parsed manifest keys: {list(manifest.keys())}")
-
-                    overrides = manifest.get("entity_method_overrides", [])
-                    logger.info(f"Found {len(overrides)} entity method overrides")
-
-                    for o in overrides:
-                        try:
-                            if not all(
-                                [
-                                    o.get("entity"),
-                                    o.get("method"),
-                                    o.get("implementation"),
-                                ]
-                            ):
-                                logger.warning(f"Skipping incomplete override: {o}")
-                                continue
-                            entity_class = getattr(ggg, o["entity"], None)
-                            parts = o["implementation"].split(".")
-                            if (
-                                not entity_class
-                                or len(parts) != 3
-                                or parts[0] != "Codex"
-                            ):
-                                logger.warning(
-                                    f"Invalid override config: entity_class={entity_class}, parts={parts}"
-                                )
-                                continue
-                            target_codex = Codex[parts[1]]
-                            if not target_codex:
-                                logger.warning(f"Codex not found: {parts[1]}")
-                                continue
-                            method_type = o.get("type", "method")
-                            proxy = _make_codex_proxy(parts[1], parts[2], method_type)
-                            wrapper = (
-                                classmethod(proxy)
-                                if method_type == "classmethod"
-                                else (
-                                    staticmethod(proxy)
-                                    if method_type == "staticmethod"
-                                    else proxy
-                                )
-                            )
-                            setattr(entity_class, o["method"], wrapper)
-                            logger.info(
-                                f"  ✓ {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']} [dynamic proxy]"
-                            )
-                        except Exception as e:
-                            logger.error(f"Codex override error for {o}: {e}")
-                else:
-                    logger.warning("Realm.manifest_data is empty")
-        except Exception as e:
-            logger.error(
-                f"Failed to load entity method overrides from Realm manifest: {e}"
-            )
+        # Codex entity_method_overrides used to be applied here, monkey-patching
+        # core GGG methods with exec()'d Codex.code. Removed in issue #265:
+        # codices reach the realm through sandboxed hooks, and an override that
+        # *becomes* a host method cannot cross the sandbox boundary by design.
+        _warn_on_codex_overrides()
 
         # Print summary as a table
         logger.info("")
@@ -5807,97 +5701,34 @@ def set_sandbox_config(config_json: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@update
-@require(Operations.REALM_CONFIGURE_CODEX)
-def reload_entity_method_overrides() -> str:
+def _warn_on_codex_overrides() -> None:
+    """Log a migration notice for realms still carrying ``entity_method_overrides``.
+
+    The declarations are inert now, but a realm imported from an old snapshot
+    still has them in ``manifest_data``, and silently ignoring them would leave
+    an operator believing a governance policy is in force when it is not.
     """
-    Admin function to reload entity method overrides from Realm manifest.
-    This should be called after importing realm data that includes codexes and manifest_data.
-    """
-    logger.info("🔄 reload_entity_method_overrides() called")
     try:
         import json
 
-        import ggg
-        from ggg import Codex, Realm
+        from ggg import Realm
 
-        logger.info("📜 Looking for Codex['manifest']...")
-        realm_manifest = Codex["manifest"]
-        if not realm_manifest:
-            logger.error("❌ No Codex['manifest'] found")
-            return json.dumps({"success": False, "error": "No realm manifest found"})
-
-        logger.info(
-            f"✅ Found manifest codex (code length: {len(str(realm_manifest.code))} chars)"
-        )
-        manifest = json.loads(str(realm_manifest.code))
-        overrides = manifest.get("entity_method_overrides", [])
-        logger.info(f"📋 Found {len(overrides)} override(s) in manifest")
-
-        loaded_overrides = []
-        for i, o in enumerate(overrides):
-            logger.info(
-                f"  [{i+1}/{len(overrides)}] Processing: {o.get('entity', '?')}.{o.get('method', '?')}()"
+        realms = list(Realm.instances())
+        if not realms or not realms[0].manifest_data:
+            return
+        manifest = json.loads(str(realms[0].manifest_data))
+        overrides = manifest.get("entity_method_overrides") or []
+        if not overrides:
+            return
+        for o in overrides:
+            logger.warning(
+                f"Ignoring entity_method_override "
+                f"{o.get('entity')}.{o.get('method')}() -> {o.get('implementation')}: "
+                f"the mechanism was removed in issue #265. Port it to a sandboxed "
+                f"codex hook (see docs/reference/ENTITY_METHOD_OVERRIDES.md)."
             )
-            try:
-                if not all([o.get("entity"), o.get("method"), o.get("implementation")]):
-                    logger.warning(
-                        f"    ⚠️ Skipping - missing required fields (entity/method/implementation)"
-                    )
-                    continue
-
-                entity_class = getattr(ggg, o["entity"], None)
-                if not entity_class:
-                    logger.warning(
-                        f"    ⚠️ Skipping - entity class '{o['entity']}' not found in ggg"
-                    )
-                    continue
-
-                parts = o["implementation"].split(".")
-                if len(parts) != 3 or parts[0] != "Codex":
-                    logger.warning(
-                        f"    ⚠️ Skipping - invalid implementation format: {o['implementation']} (expected Codex.name.function)"
-                    )
-                    continue
-
-                codex_name = parts[1]
-                func_name = parts[2]
-                logger.info(f"    🔍 Looking for Codex['{codex_name}']...")
-                target_codex = Codex[codex_name]
-                if not target_codex:
-                    logger.warning(f"    ⚠️ Skipping - Codex['{codex_name}'] not found")
-                    continue
-
-                logger.info(
-                    f"    ✅ Found codex '{codex_name}' (code length: {len(str(target_codex.code))} chars)"
-                )
-
-                method_type = o.get("type", "method")
-                proxy = _make_codex_proxy(codex_name, func_name, method_type)
-                wrapper = (
-                    classmethod(proxy)
-                    if method_type == "classmethod"
-                    else staticmethod(proxy) if method_type == "staticmethod" else proxy
-                )
-                setattr(entity_class, o["method"], wrapper)
-                loaded_overrides.append(
-                    f"{o['entity']}.{o['method']}() -> {o['implementation']}"
-                )
-                logger.info(
-                    f"    ✅ Successfully loaded {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']} [dynamic proxy]"
-                )
-            except Exception as e:
-                logger.error(f"    ❌ Failed to reload override: {e}")
-
-        logger.info(
-            f"🏁 Completed: {len(loaded_overrides)}/{len(overrides)} overrides loaded successfully"
-        )
-        return json.dumps(
-            {"success": True, "loaded_overrides": loaded_overrides}, indent=2
-        )
     except Exception as e:
-        logger.error(f"❌ reload_entity_method_overrides failed: {e}")
-        return json.dumps({"success": False, "error": str(e)}, indent=2)
+        logger.warning(f"_warn_on_codex_overrides() failed: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -6587,34 +6418,31 @@ def install_codex(args: text) -> text:
     }
 
     Files should include manifest.json and *.py codex modules.
-    Each .py file (except init.py) creates/updates a Codex entity.
-    If run_init is true and init.py is present, it is executed after install.
+    Each .py file creates/updates a Codex entity. Packages that still ship
+    ``init.py`` are refused — use the ``init`` hook instead (issue #265).
+    ``run_init`` is accepted for callers but ignored.
     """
     try:
         params = json.loads(args)
         codex_id = params.get("codex_id")
         files = params.get("files", {})
-        run_init = params.get("run_init", True)
 
         if not codex_id:
             return json.dumps({"success": False, "error": "codex_id is required"})
         if not files:
             return json.dumps({"success": False, "error": "files dict is required"})
 
-        from core.runtime_codex import install_codex_package, run_codex_init
+        from core.runtime_codex import install_codex_package, legacy_init_py_error
+
+        init_py_error = legacy_init_py_error(codex_id, files)
+        if init_py_error:
+            return json.dumps({"success": False, "error": init_py_error})
 
         ok = install_codex_package(codex_id, files)
         if not ok:
             return json.dumps({"success": False, "error": f"Failed to install codex package '{codex_id}'"})
 
-        init_error = None
-        if run_init:
-            init_error = run_codex_init(codex_id)
-
-        result = {"success": True, "codex_id": codex_id, "files_count": len(files)}
-        if init_error:
-            result["init_warning"] = init_error
-        return json.dumps(result)
+        return json.dumps({"success": True, "codex_id": codex_id, "files_count": len(files)})
     except Exception as e:
         logger.error(f"install_codex error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
@@ -6661,19 +6489,19 @@ def reload_codex(args: text) -> text:
         if not codex_id:
             return json.dumps({"success": False, "error": "codex_id is required"})
 
-        from core.runtime_codex import reload_codex_package, run_codex_init
+        from core.runtime_codex import legacy_init_py_error, reload_codex_package
 
         ok = reload_codex_package(codex_id)
         if not ok:
             return json.dumps({"success": False, "error": f"Codex package '{codex_id}' not found"})
 
-        init_error = None
-        if run_init:
-            init_error = run_codex_init(codex_id)
-
+        # run_init used to exec init.py; that path is gone. If a package still
+        # has the file on disk, surface it rather than pretending setup ran.
         result = {"success": True, "codex_id": codex_id}
-        if init_error:
-            result["init_warning"] = init_error
+        if run_init:
+            init_py_error = legacy_init_py_error(codex_id)
+            if init_py_error:
+                result["init_warning"] = init_py_error
         return json.dumps(result)
     except Exception as e:
         logger.error(f"reload_codex error: {e}\n{traceback.format_exc()}")

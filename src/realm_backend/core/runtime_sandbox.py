@@ -29,17 +29,21 @@ Other hooks prefer sandbox per config but only actually run sandboxed once
 marked sandbox-compatible (plain-data contract); until then the legacy
 in-process ``exec()`` path is kept.
 
-The sandbox primitive is **pure compute**: ``spawn_subinterpreter(source, hash)``
-then ``call_in_subinterpreter(handle, fn, kwargs)`` exchange deep-copied plain
-data; there is no live callback from the sandbox into the host. So:
+All data crossing the boundary is deep-copied plain data. So:
 
 * **Extensions** run fresh-per-use (spawn, one call, close) as pure compute over
   their JSON args — no host reads/writes. Extensions that import host modules
   fail to spawn and, with ``fallback_in_process``, degrade with a warning.
 * **Codex hooks** use the *gather → compute → apply-effects* bridge
-  (``core.codex_bridge``): the host injects a plain-data ``context`` (reads), the
-  hook returns a plain-data list of intended effects, and the host authorizes and
-  applies them against the codex's declared capabilities. See issue #265.
+  (``core.codex_bridge``): the host injects a plain-data ``context`` of
+  pre-gathered reads, the hook may additionally make live *read* calls back into
+  the host via ``rpc`` (restricted to its declared read capabilities), and it
+  returns a plain-data list of intended writes that the host authorizes and
+  applies after the hook returns. See issue #265.
+
+Spawns are metered: the policy ``budget`` is a deterministic bytecode-instruction
+count enforced inside the interpreter loop (0 disables it). Images predating the
+extended spawn signature run unmetered — see ``supports_capabilities()``.
 """
 
 import json
@@ -54,11 +58,17 @@ CONFIG_PATH = "/sandbox_config.json"
 
 VALID_MODES = ("sandbox", "in_process")
 
+
+class CodexHookError(RuntimeError):
+    """A sandboxed codex hook ran and reported failure.
+
+    Distinct from an infrastructure failure: the codex's own code executed, so
+    re-running it in-process would run that code a second time *with full host
+    access*. Callers therefore treat this as handled and must not fall back.
+    """
+
 # Hooks that cannot cross a plain-data subinterpreter boundary.
 FORCE_IN_PROCESS_HOOKS = frozenset({
-    "init",
-    "seed",
-    "on_treasury_send",
     # Federation handlers create/read ggg entities (issue #263).
     "on_federation_message",
 })
@@ -91,6 +101,27 @@ KNOWN_CODEX_HOOKS = (
 # the in-process exec() path regardless (issue #265, Workstream C).
 SANDBOX_COMPATIBLE_HOOKS = frozenset({
     "on_user_register",
+    "on_treasury_send",
+    "init",
+    "seed",
+    "role_assign_prehook",
+    "role_assign_posthook",
+    "role_revoke_prehook",
+    "role_revoke_posthook",
+    "get_governance_params",
+})
+
+# Hooks with no in-process implementation left to fall back to: the role and
+# governance hooks, whose source lives in a ``Codex.code`` column rather than a
+# package. They are the gates that decide who may hold admin or treasurer, so
+# the break-glass override that other hooks keep does not apply here — there is
+# nothing to switch them back to (issue #265).
+ALWAYS_SANDBOXED_HOOKS = frozenset({
+    "role_assign_prehook",
+    "role_assign_posthook",
+    "role_revoke_prehook",
+    "role_revoke_posthook",
+    "get_governance_params",
 })
 
 DEFAULT_CONFIG = {
@@ -347,6 +378,8 @@ def resolve_hook_mode(hook_name: str) -> str:
     config = get_config()
     if hook_name in FORCE_IN_PROCESS_HOOKS:
         return "in_process (forced)"
+    if hook_name in ALWAYS_SANDBOXED_HOOKS:
+        return "sandbox (always)"
     if not config.get("enabled"):
         return "in_process (sandboxing disabled)"
     desired = _desired_hook_mode(hook_name, config)
@@ -361,7 +394,7 @@ def resolve_hook_mode(hook_name: str) -> str:
 
 def should_sandbox_hook(hook_name: str) -> bool:
     """True only when the hook will actually execute in a subinterpreter."""
-    return resolve_hook_mode(hook_name) == "sandbox"
+    return resolve_hook_mode(hook_name).startswith("sandbox")
 
 
 def describe_config_patch(patch: dict, current: Optional[dict] = None) -> str:
@@ -413,26 +446,97 @@ def build_proposal_code(patch: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Execution — real ``_basilisk_sandbox`` primitive (pure compute)
+# Execution — real ``_basilisk_sandbox`` primitive
 # ---------------------------------------------------------------------------
 #
-# API (introspected in-canister, ic-basilisk 0.14.2):
+# API (basilisk_sandbox.c):
 #   sha256(text) -> hex                    approve_hash(hex) / revoke_hash(hex)
-#   spawn_subinterpreter(source, hash) -> handle
+#   spawn_subinterpreter(source, hash, context_id="", allowed_actions=(),
+#                        rpc_handler=None, budget=10_000_000) -> handle
 #   call_in_subinterpreter(handle, fn, kwargs=None) -> plain data
 #   close_subinterpreter(handle)           wasm_memory_pages()
-# There is no capability object, no rpc callback, and no instruction budget
-# parameter; the ``budget`` policy field is retained for observability only.
+#
+# ``budget`` is a deterministic bytecode-instruction count decremented in the
+# interpreter's dispatch loop (never wall-clock, so it is replica-consistent);
+# 0 disables metering. ``rpc_handler`` is a main-interpreter callable invoked
+# synchronously as ``handler(context_id, action, kwargs)`` when sandboxed code
+# calls the injected ``rpc()`` builtin, restricted to ``allowed_actions``.
+#
+# Older images ship a two-argument ``spawn_subinterpreter``. The first spawn
+# probes for the extended form and every later spawn reuses the answer.
+
+_extended_spawn: Optional[bool] = None
 
 
-def _run_in_subinterpreter(source: str, function_name: str, kwargs: dict) -> Any:
-    """Spawn a fresh subinterpreter for *source*, call ``function_name`` with
-    *kwargs* (plain data), tear it down, and return its plain-data result."""
+def supports_capabilities() -> Optional[bool]:
+    """Whether this image's sandbox accepts capability/budget spawn arguments.
+
+    ``None`` until the first spawn has probed for it.
+    """
+    return _extended_spawn
+
+
+def _spawn_subinterpreter(
+    source: str,
+    content_hash: str,
+    context_id: str,
+    allowed_actions: Any,
+    rpc_handler: Any,
+    budget: int,
+):
+    """Spawn a subinterpreter, using the capability/budget arguments when the
+    running image supports them and falling back to the legacy two-argument
+    form when it does not."""
+    global _extended_spawn
     import _basilisk_sandbox
 
+    if _extended_spawn is not False:
+        try:
+            handle = _basilisk_sandbox.spawn_subinterpreter(
+                source,
+                content_hash,
+                context_id,
+                tuple(allowed_actions or ()),
+                rpc_handler,
+                budget,
+            )
+            _extended_spawn = True
+            return handle
+        except TypeError:
+            # Once the extended form is known to work, a TypeError means a
+            # genuinely bad argument and must not be masked by the retry.
+            if _extended_spawn:
+                raise
+            _extended_spawn = False
+            logger.warning(
+                "This image's _basilisk_sandbox.spawn_subinterpreter takes no "
+                "capability/budget arguments; sandboxed code runs unmetered "
+                "and without rpc on this image"
+            )
+    return _basilisk_sandbox.spawn_subinterpreter(source, content_hash)
+
+
+def _run_in_subinterpreter(
+    source: str,
+    function_name: str,
+    kwargs: dict,
+    context_id: str = "",
+    allowed_actions: Optional[List[str]] = None,
+    rpc_handler: Any = None,
+) -> Any:
+    """Spawn a fresh subinterpreter for *source*, call ``function_name`` with
+    *kwargs* (plain data), tear it down, and return its plain-data result.
+
+    The instruction budget comes from the sandbox policy (0 = unmetered).
+    """
+    import _basilisk_sandbox
+
+    budget = get_config().get("budget", DEFAULT_CONFIG["budget"])
     content_hash = _basilisk_sandbox.sha256(source)
     _basilisk_sandbox.approve_hash(content_hash)
-    handle = _basilisk_sandbox.spawn_subinterpreter(source, content_hash)
+    handle = _spawn_subinterpreter(
+        source, content_hash, context_id, allowed_actions, rpc_handler, budget
+    )
     try:
         return _basilisk_sandbox.call_in_subinterpreter(
             handle, function_name, kwargs
@@ -534,24 +638,54 @@ def _codex_hook_module_file(codex_id: str) -> str:
         return "entry.py"
 
 
-def _gather_hook_context(hook_name: str, args: str) -> dict:
-    """Build the plain-data reads a sandboxed hook may need (host-side).
+# Context keys the host pre-gathers for a hook, and the verb that produces
+# each. Anything a hook needs beyond its spec it fetches live over ``rpc``
+# (subject to its declared read capabilities), so this list is an optimization
+# — it saves a round-trip for the reads a hook almost certainly wants — not a
+# limit on what the hook can see.
+_CONTEXT_VERBS = {
+    "config": "_v_config_get",
+    "currency": "_v_currency_get",
+    "now": "_v_time_now",
+    "realm": "_v_realm_get",
+}
 
-    The sandbox cannot call back into the host, so everything a hook might read
-    (``realm.config()``, ``realm.currency()``, ``realm.now()``, ``realm.info()``,
-    ``realm.users.get(id)``) is pre-projected here into a plain-data snapshot and
-    injected as the hook's ``context``. The user referenced in ``args`` (if any)
-    is pre-fetched so ``on_user_register`` can look it up.
+_DEFAULT_CONTEXT_KEYS = ("config", "currency", "now", "realm")
+
+# Per-hook overrides of the default key set.
+#
+# ``get_config`` must not receive ``config``: gathering it calls
+# ``codex_hooks.get_config()``, which is the very thing dispatching this hook.
+# (``codex_hooks`` also guards re-entry, so a hook reading ``config.get`` over
+# rpc is safe too; omitting it here avoids the pointless round-trip.)
+_HOOK_CONTEXT_KEYS = {
+    "get_config": ("currency", "now", "realm"),
+}
+
+
+def _gather_hook_context(hook_name: str, args: str) -> dict:
+    """Build the plain-data reads to inject into a sandboxed hook.
+
+    Pre-projects the reads *this* hook is likely to want (per
+    ``_HOOK_CONTEXT_KEYS``) plus the user referenced in ``args``, so the common
+    case needs no host round-trip. Anything else the hook reads goes through
+    ``rpc``.
     """
     from core import codex_bridge
 
-    context = {
-        "config": codex_bridge._v_config_get(),
-        "currency": codex_bridge._v_currency_get(),
-        "now": codex_bridge._v_time_now(),
-        "realm": codex_bridge._v_realm_get(),
-        "users": {},
-    }
+    keys = _HOOK_CONTEXT_KEYS.get(hook_name, _DEFAULT_CONTEXT_KEYS)
+    context: dict = {"users": {}}
+    for key in keys:
+        verb = _CONTEXT_VERBS.get(key)
+        if not verb:
+            continue
+        try:
+            context[key] = getattr(codex_bridge, verb)()
+        except Exception as e:
+            # A read that fails to gather is simply absent; the hook can still
+            # request it over rpc and get a real error there.
+            logger.warning(f"context gather '{key}' for {hook_name} failed: {e}")
+
     try:
         params = json.loads(args) if args else {}
     except Exception:
@@ -559,6 +693,14 @@ def _gather_hook_context(hook_name: str, args: str) -> dict:
     user_id = params.get("user_id") if isinstance(params, dict) else None
     if user_id:
         context["users"][user_id] = codex_bridge._v_user_get(user_id=user_id)
+    return context
+
+
+def _inject_codex_context(context: dict, context_id: str) -> dict:
+    """Attach ``codex_id`` for init/seed hooks when *context_id* is a package id."""
+    if context_id and not context_id.startswith("proposal:"):
+        context = dict(context)
+        context["codex_id"] = context_id
     return context
 
 
@@ -586,7 +728,6 @@ def call_codex_hook_in_sandbox(codex_id: str, hook_name: str, args: str) -> Any:
     with open(module_path, "r") as f:
         codex_source = f.read()
 
-    source = _build_codex_sandbox_source(codex_source)
     capabilities = _codex_capabilities(codex_id)
     context = _gather_hook_context(hook_name, args)
 
@@ -598,26 +739,75 @@ def call_codex_hook_in_sandbox(codex_id: str, hook_name: str, args: str) -> Any:
     if not isinstance(params, dict):
         params = {}
 
+    return run_bridge_hook(
+        codex_id, codex_source, hook_name, params, capabilities, context
+    )
+
+
+def run_bridge_hook(
+    context_id: str,
+    codex_source: str,
+    hook_name: str,
+    params: dict,
+    capabilities: List[str],
+    context: Optional[dict] = None,
+    defer_async: bool = False,
+):
+    """Run *hook_name* from *codex_source* over the capability bridge.
+
+    The shared path behind every sandboxed codex hook, whatever its source: a
+    package's ``sandbox_module`` file, or the ``code`` column of a ``Codex``
+    entity (the role-management hooks). Spawns the SDK plus the source, calls
+    the hook with plain-data ``args``/``context``, then authorizes and applies
+    whatever effects it returned.
+
+    When *defer_async* is True, async effects (``treasury.transfer``) are
+    authorized but returned for the caller to apply; the return value is
+    ``(result, deferred)``.
+
+    Raises ``CodexHookError`` when the hook itself failed, ``PermissionError``
+    when it overstepped its capabilities; both mean the codex ran, so callers
+    must not retry it in-process.
+    """
+    from core import codex_bridge
+
+    source = _build_codex_sandbox_source(codex_source)
     logger.debug(
-        f"Sandboxing codex {codex_id}.{hook_name} (capabilities={capabilities})"
+        f"Sandboxing {context_id}.{hook_name} (capabilities={capabilities})"
     )
     payload = _run_in_subinterpreter(
-        source, hook_name, {"args": params, "context": context}
+        source,
+        hook_name,
+        {
+            "args": params,
+            "context": _inject_codex_context(context or {}, context_id),
+        },
+        context_id=context_id,
+        allowed_actions=codex_bridge.readable_capabilities(capabilities),
+        rpc_handler=codex_bridge.make_rpc_handler(context_id, capabilities),
     )
 
     if not isinstance(payload, dict):
-        raise ValueError(
-            f"codex '{codex_id}' hook '{hook_name}' returned "
+        raise CodexHookError(
+            f"'{context_id}' hook '{hook_name}' returned "
             f"{type(payload).__name__}, expected an envelope dict"
         )
     if not payload.get("ok"):
-        return {"success": False, "error": payload.get("error", "codex hook failed")}
+        raise CodexHookError(payload.get("error", "codex hook failed"))
+
+    if defer_async:
+        results, deferred = codex_bridge.apply_effects(
+            context_id,
+            capabilities,
+            payload.get("effects") or [],
+            defer_async=True,
+        )
+        return codex_bridge.resolve_result(payload.get("result"), results), deferred
 
     results = codex_bridge.apply_effects(
-        codex_id, capabilities, payload.get("effects") or []
+        context_id, capabilities, payload.get("effects") or []
     )
-    result = codex_bridge.resolve_result(payload.get("result"), results)
-    return result if result is not None else {"success": True}
+    return codex_bridge.resolve_result(payload.get("result"), results)
 
 
 def get_status() -> dict:

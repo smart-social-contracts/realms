@@ -432,12 +432,6 @@ export interface FederationService {
 }
 export interface FileRegistryService {
   'get_extension_manifest' : ActorMethod<[string], string>,
-  'get_file_chunk_icc' : ActorMethod<[string, string, string, string], string>,
-  'get_file_size_icc' : ActorMethod<[string, string], string>,
-  'latest_version' : ActorMethod<[string], string>,
-  'list_codices' : ActorMethod<[], string>,
-  'list_extensions' : ActorMethod<[], string>,
-  'list_files_icc' : ActorMethod<[string], string>,
 }
 export interface ForceTransferArg {
   'to' : NftAccount,

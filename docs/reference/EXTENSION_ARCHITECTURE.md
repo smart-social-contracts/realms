@@ -466,10 +466,12 @@ immediately, without a full page reload.
 ### Caveats
 
 - **Hot-loading**: backend extensions reload via `_load_module(force=True)`
-  in `core/runtime_extensions.py`. Codex `init.py` runs synchronously inside
-  the install update call, so a buggy `init.py` surfaces as the install
-  response — the UI displays the `init_warning` field returned by the
-  install call.
+  in `core/runtime_extensions.py`. Codex post-install setup is the `init`
+  hook in `backend/entry.py` (`core.codex_hooks.run_init`); a failure there
+  surfaces as the install response's `init_warning`. Packages that still
+  ship a legacy root-level `init.py` are refused at install time (issue
+  #265) — that file used to be `exec()`'d in-process and is no longer
+  supported.
 - **Frontend bundle**: a runtime extension's compiled UI is fetched from
   the file_registry the extension was installed from
   (see `extension-loader.ts`). After install the extension routes are

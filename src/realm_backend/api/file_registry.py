@@ -76,6 +76,30 @@ class AssetCanisterService(Service):
     def store(self, arg: _AssetStoreArg) -> void: ...
 
 
+def _entity_method_override_error(codex_id: str, manifest: dict) -> str:
+    """Refusal message when a codex manifest declares ``entity_method_overrides``.
+
+    That mechanism let a codex monkey-patch core GGG methods with ``exec()``'d
+    code running as the host; it was removed in issue #265. Installation is
+    refused rather than the declaration ignored, so an operator never ends up
+    believing a governance policy is in force when it silently is not.
+    """
+    overrides = manifest.get("entity_method_overrides") or []
+    if not overrides:
+        return ""
+    methods = ", ".join(
+        f"{o.get('entity')}.{o.get('method')}()"
+        for o in overrides
+        if isinstance(o, dict)
+    )
+    return (
+        f"Codex '{codex_id}' declares entity_method_overrides ({methods}), a "
+        f"mechanism removed in issue #265 because it runs codex code in-process "
+        f"with full host access. Port these to sandboxed hooks — see "
+        f"docs/reference/ENTITY_METHOD_OVERRIDES.md."
+    )
+
+
 def _resolve_codex_dependencies(manifest: dict, codex_id: str) -> Dict[str, str]:
     """Full dependency set of a codex manifest (issues #241/#242/#244).
 
@@ -726,7 +750,18 @@ def install_extension_from_registry(
                 {"success": False, "error": f"Codex '{ext_id}': {ggg_version_error}"}
             )
 
-        # 2c. Import policy scan (issue #265). A codex may import only the
+        # 2c. Legacy integration mechanisms removed in issue #265.
+        override_error = _entity_method_override_error(ext_id, manifest)
+        if override_error:
+            return json.dumps({"success": False, "error": override_error})
+
+        from core.runtime_codex import legacy_init_py_error
+
+        init_py_error = legacy_init_py_error(ext_id, files)
+        if init_py_error:
+            return json.dumps({"success": False, "error": init_py_error})
+
+        # 2d. Import policy scan (issue #265). A codex may import only the
         #     public ``ggg`` API, never ``core.*`` or private ``ggg`` submodules.
         #     Enforced (hard reject) once the codex opts in via ``ggg_api_version``;
         #     legacy packages are scanned in warn mode so nothing breaks yet.
@@ -947,6 +982,16 @@ def install_codex_from_registry(
         )
         codex_manifest = {}
 
+    override_error = _entity_method_override_error(codex_id, codex_manifest)
+    if override_error:
+        return json.dumps({"success": False, "error": override_error})
+
+    from core.runtime_codex import legacy_init_py_error
+
+    init_py_error = legacy_init_py_error(codex_id, files)
+    if init_py_error:
+        return json.dumps({"success": False, "error": init_py_error})
+
     dependencies = _resolve_codex_dependencies(codex_manifest, codex_id)
     installed_deps, failed_deps = yield from _install_codex_dependencies(
         registry_canister_id, codex_id, dependencies, frontend_id
@@ -960,12 +1005,10 @@ def install_codex_from_registry(
             }
         )
 
-    # Install via runtime_codex
-    from core.runtime_codex import (
-        apply_entity_method_overrides,
-        install_codex_package,
-        run_codex_init,
-    )
+    # Install via runtime_codex. Legacy init.py is refused above; the unified
+    # path runs ``codex_hooks.run_init`` instead. ``run_init`` is kept in the
+    # signature for callers but is a no-op here (issue #265).
+    from core.runtime_codex import install_codex_package
 
     ok = install_codex_package(package_name, files)
     if not ok:
@@ -976,12 +1019,6 @@ def install_codex_from_registry(
             }
         )
 
-    init_error = None
-    if run_init:
-        init_error = run_codex_init(package_name)
-
-    applied_overrides = apply_entity_method_overrides(package_name)
-
     result = {
         "success": True,
         "codex_id": codex_id,
@@ -989,14 +1026,11 @@ def install_codex_from_registry(
         "version": resolved_version,
         "files_count": len(files),
         "source": "registry",
-        "applied_overrides": applied_overrides,
         "dependencies": dependencies,
         "dependencies_installed": installed_deps,
     }
     if failed_deps:
         result["dependency_warnings"] = failed_deps
-    if init_error:
-        result["init_warning"] = init_error
     return json.dumps(result)
 
 

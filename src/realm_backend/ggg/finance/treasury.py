@@ -66,18 +66,18 @@ class Treasury(Entity, TimestampedMixin):
         logger.info(f"Treasury '{self.name}' sending {amount} tokens to {to_principal}")
 
         try:
-            from core.codex_hooks import get_hook
+            from core.codex_hooks import treasury_send_async
 
-            hook = get_hook("on_treasury_send")
-        except Exception:
-            hook = None
-        if hook is not None:
-            result = yield hook(json.dumps({
-                "treasury_name": self.name,
-                "to_principal": to_principal,
-                "amount": amount,
-            }))
-            return result
+            result = yield from treasury_send_async(
+                self.name, to_principal, amount
+            )
+            if result is not None:
+                return result
+        except Exception as e:
+            logger.error(
+                f"Treasury send hook failed for '{self.name}': {e}\n{traceback.format_exc()}"
+            )
+            raise
 
         result = yield self.send_hook(self, to_principal, amount)
 

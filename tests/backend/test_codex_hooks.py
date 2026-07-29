@@ -186,6 +186,30 @@ class TestGetConfig:
         )
         assert codex_hooks.get_config()["fees"]["registration"] == 9.0
 
+    def test_reentrant_get_config_does_not_redispatch_the_hook(self):
+        """A sandboxed ``get_config`` hook reading ``config`` back through the
+        bridge must not re-enter the hook that is producing it."""
+        _mock_ggg(manifest_data=json.dumps({"fees": {"registration": 2.0}}))
+        calls = []
+        module = MagicMock()
+
+        def _hook(args):
+            calls.append(args)
+            # Simulates the hook reading config.get over rpc mid-execution.
+            nested = codex_hooks.get_config()
+            return json.dumps({"nested_fee": nested["fees"]["registration"]})
+
+        module.get_config = _hook
+        _mock_runtime_extensions(
+            manifests={"agora": {"kind": "codex", "id": "agora"}},
+            modules={"agora": module},
+        )
+
+        config = codex_hooks.get_config()
+
+        assert len(calls) == 1  # dispatched once, not recursively
+        assert config["nested_fee"] == 2.0  # inner read saw the manifest data
+
     def test_no_codex_falls_back_to_manifest_data(self):
         _mock_ggg(manifest_data=json.dumps({"fees": {"registration": 2.0}}))
         _mock_runtime_extensions(manifests={})
@@ -478,3 +502,321 @@ class TestDependencyResolution:
         deps = self._resolve({"dependencies": []})
         for core_ext in CORE_EXTENSION_IDS:
             assert core_ext in deps
+
+
+class TestSandboxFallbackPolicy:
+    """Which sandbox failures may be retried in-process (issue #265).
+
+    A refusal must never earn the codex an in-process retry: the codex already
+    ran and was denied, so re-running it with full host access would turn every
+    capability check into a trivial bypass. Only infrastructure failures are
+    eligible for the fallback.
+    """
+
+    def _sandbox_raising(self, monkeypatch, error, fallback=True):
+        from core import runtime_sandbox
+
+        def _call(*args, **kwargs):
+            raise error
+
+        monkeypatch.setattr(
+            runtime_sandbox, "call_codex_hook_in_sandbox", _call
+        )
+        monkeypatch.setattr(
+            runtime_sandbox, "get_config", lambda: {"fallback_in_process": fallback}
+        )
+
+    def test_denied_capability_is_not_retried_in_process(self, monkeypatch):
+        self._sandbox_raising(
+            monkeypatch, PermissionError("effect 'treasury.drain' denied")
+        )
+        handled, result = codex_hooks._call_hook_sandboxed("agora", "h", {})
+        assert handled is True  # not retried, despite fallback being enabled
+        assert result is None
+
+    def test_leaked_object_is_not_retried_in_process(self, monkeypatch):
+        from core.codex_bridge import BridgeSerializationError
+
+        self._sandbox_raising(monkeypatch, BridgeSerializationError("live object"))
+        handled, _ = codex_hooks._call_hook_sandboxed("agora", "h", {})
+        assert handled is True
+
+    def test_hook_logic_failure_is_not_retried_in_process(self, monkeypatch):
+        from core.runtime_sandbox import CodexHookError
+
+        self._sandbox_raising(monkeypatch, CodexHookError("hook raised"))
+        handled, _ = codex_hooks._call_hook_sandboxed("agora", "h", {})
+        assert handled is True
+
+    def test_infrastructure_failure_falls_back_when_allowed(self, monkeypatch):
+        self._sandbox_raising(monkeypatch, RuntimeError("spawn failed"), fallback=True)
+        handled, _ = codex_hooks._call_hook_sandboxed("agora", "h", {})
+        assert handled is False  # caller retries in-process
+
+    def test_infrastructure_failure_fails_closed_when_disallowed(self, monkeypatch):
+        self._sandbox_raising(monkeypatch, RuntimeError("spawn failed"), fallback=False)
+        handled, _ = codex_hooks._call_hook_sandboxed("agora", "h", {})
+        assert handled is True
+
+    def test_successful_hook_result_is_returned(self, monkeypatch):
+        from core import runtime_sandbox
+
+        monkeypatch.setattr(
+            runtime_sandbox,
+            "call_codex_hook_in_sandbox",
+            lambda *a, **kw: {"fees": {"registration": 5.0}},
+        )
+        handled, result = codex_hooks._call_hook_sandboxed("agora", "get_config", {})
+        assert handled is True
+        assert result == {"fees": {"registration": 5.0}}
+
+
+AGORA_SOURCE = """
+def role_assign_prehook(args):
+    pass
+
+def get_governance_params(args):
+    pass
+"""
+
+
+class TestRoleHookDispatch:
+    """Role-management hooks from a ``Codex.code`` column (issue #265).
+
+    These used to be ``exec()``d in-process with full ``__builtins__``, which
+    made the gate deciding who may hold ``admin`` the least protected code in
+    the realm. They now go through the sandbox, and a gate that cannot be
+    evaluated denies rather than allows.
+    """
+
+    def _installed(self, monkeypatch, source=AGORA_SOURCE, name="role_management_hook"):
+        monkeypatch.setattr(
+            codex_hooks, "_entity_codex", lambda names: (name, source)
+        )
+
+    def _sandbox(self, monkeypatch, result=None, error=None):
+        from core import runtime_sandbox
+
+        calls = []
+
+        def _run(context_id, source, hook_name, params, capabilities, context=None):
+            calls.append({
+                "context_id": context_id,
+                "hook": hook_name,
+                "params": params,
+                "capabilities": capabilities,
+            })
+            if error is not None:
+                raise error
+            return result
+
+        monkeypatch.setattr(runtime_sandbox, "run_bridge_hook", _run)
+        return calls
+
+    def test_no_codex_installed_allows(self, monkeypatch):
+        monkeypatch.setattr(codex_hooks, "_entity_codex", lambda names: (None, None))
+        calls = self._sandbox(monkeypatch)
+        assert codex_hooks.enforce_role_gate("role_assign_prehook", "u1", "admin", "p")
+        assert calls == []
+
+    def test_unimplemented_hook_allows_without_spawning(self, monkeypatch):
+        self._installed(monkeypatch)
+        calls = self._sandbox(monkeypatch)
+        assert codex_hooks.enforce_role_gate("role_revoke_prehook", "u1", "admin", "p")
+        assert calls == []
+
+    def test_allowed_verdict_passes(self, monkeypatch):
+        self._installed(monkeypatch)
+        self._sandbox(monkeypatch, result={"allowed": True})
+        assert codex_hooks.enforce_role_gate("role_assign_prehook", "u1", "admin", "p")
+
+    def test_denied_verdict_raises_with_the_codex_reason(self, monkeypatch):
+        self._installed(monkeypatch)
+        self._sandbox(
+            monkeypatch, result={"allowed": False, "reason": "needs a vote"}
+        )
+        with pytest.raises(PermissionError, match="needs a vote"):
+            codex_hooks.enforce_role_gate("role_assign_prehook", "u1", "admin", "p")
+
+    def test_denied_verdict_without_a_reason_still_denies(self, monkeypatch):
+        self._installed(monkeypatch)
+        self._sandbox(monkeypatch, result={"allowed": False})
+        with pytest.raises(PermissionError, match="admin"):
+            codex_hooks.enforce_role_gate("role_assign_prehook", "u1", "admin", "p")
+
+    def test_unevaluable_gate_denies(self, monkeypatch):
+        """The whole point: a broken governance gate must not wave roles through."""
+        self._installed(monkeypatch)
+        self._sandbox(monkeypatch, error=RuntimeError("spawn failed"))
+        with pytest.raises(PermissionError):
+            codex_hooks.enforce_role_gate("role_assign_prehook", "u1", "admin", "p")
+
+    def test_capability_denial_denies_rather_than_retrying_in_process(
+        self, monkeypatch
+    ):
+        self._installed(monkeypatch)
+        self._sandbox(monkeypatch, error=PermissionError("verb 'user.set' denied"))
+        with pytest.raises(PermissionError):
+            codex_hooks.enforce_role_gate("role_assign_prehook", "u1", "admin", "p")
+
+    def test_hook_receives_plain_args_and_read_only_capabilities(self, monkeypatch):
+        self._installed(monkeypatch)
+        calls = self._sandbox(monkeypatch, result={"allowed": True})
+        codex_hooks.enforce_role_gate("role_assign_prehook", "u1", "admin", "alice")
+
+        assert len(calls) == 1
+        call = calls[0]
+        assert call["context_id"] == "role_management_hook"
+        assert call["params"] == {
+            "user_id": "u1",
+            "profile_name": "admin",
+            "actor_principal": "alice",
+        }
+        from core import codex_bridge
+
+        assert set(call["capabilities"]) <= codex_bridge.READ_VERBS
+
+    def test_posthook_failure_does_not_raise(self, monkeypatch):
+        """The role change already happened; refusing after the fact helps nobody."""
+        self._installed(monkeypatch, source="def role_assign_posthook(args): pass")
+        self._sandbox(monkeypatch, error=RuntimeError("spawn failed"))
+        codex_hooks.notify_role_change("role_assign_posthook", "u1", "admin", "p")
+
+    def test_registration_posthook_reports_when_no_codex_implements_it(
+        self, monkeypatch
+    ):
+        self._installed(monkeypatch, source="def something_else(args): pass")
+        self._sandbox(monkeypatch)
+        assert codex_hooks.call_registration_posthook("u1") is False
+
+    def test_registration_posthook_claims_the_registration(self, monkeypatch):
+        self._installed(monkeypatch, source="def user_register_posthook(args): pass")
+        calls = self._sandbox(monkeypatch, result=None)
+        assert codex_hooks.call_registration_posthook("u1") is True
+        assert calls[0]["params"] == {"user_id": "u1"}
+
+    def test_registration_posthook_still_claims_it_after_a_failure(self, monkeypatch):
+        """Falling through to the platform default would double-onboard the
+        user, so a failed hook must not look like an absent one."""
+        self._installed(monkeypatch, source="def user_register_posthook(args): pass")
+        self._sandbox(monkeypatch, error=RuntimeError("spawn failed"))
+        assert codex_hooks.call_registration_posthook("u1") is True
+
+    def test_registration_hook_may_write_but_only_through_declared_verbs(self):
+        from core import codex_bridge
+
+        caps = set(codex_hooks.REGISTRATION_HOOK_CAPABILITIES)
+        assert {"invoice.create", "notification.create"} <= caps
+        assert caps <= set(codex_bridge.VERBS)
+
+    def test_governance_params_survive_a_broken_codex(self, monkeypatch):
+        self._installed(monkeypatch)
+        self._sandbox(monkeypatch, error=RuntimeError("spawn failed"))
+        assert (
+            codex_hooks.call_role_hook(
+                "get_governance_params", {"proposal_type": "x"}, fail_closed=False
+            )
+            is None
+        )
+
+
+# ---------------------------------------------------------------------------
+# Federation assign / scale hooks (issue #265)
+# ---------------------------------------------------------------------------
+
+QUARTER_ASSIGNMENT_SOURCE = '''
+ASSIGNMENT_STRATEGY = "least_populated"
+
+def assign_quarter(principal, quarters, preferred):
+    if preferred:
+        for q in quarters:
+            if q.canister_id == preferred:
+                if q.population >= 100:
+                    raise ValueError("quarter is full")
+                return q.canister_id
+        raise ValueError("quarter not found")
+    target = min(quarters, key=lambda q: q.population)
+    return target.canister_id
+
+def should_deploy_quarter(populations, network, realm=None):
+    pops = [int(p or 0) for p in (populations or [])]
+    return bool(pops) and max(pops) >= 9
+'''
+
+
+class TestFederationHookDispatch:
+    def _install(self, monkeypatch, source=QUARTER_ASSIGNMENT_SOURCE, name="quarter_assignment"):
+        monkeypatch.setattr(
+            codex_hooks, "_federation_codex", lambda: (name, source)
+        )
+
+    def _sandbox(self, monkeypatch, result=None, error=None):
+        from core import runtime_sandbox
+
+        calls = []
+
+        def _run(context_id, source, hook_name, params, capabilities, context=None):
+            calls.append({
+                "context_id": context_id,
+                "hook": hook_name,
+                "params": params,
+                "capabilities": list(capabilities),
+                "source": source,
+            })
+            if error is not None:
+                raise error
+            return result
+
+        monkeypatch.setattr(runtime_sandbox, "run_bridge_hook", _run)
+        return calls
+
+    def test_no_policy_returns_none(self, monkeypatch):
+        monkeypatch.setattr(codex_hooks, "_federation_codex", lambda: (None, None))
+        assert codex_hooks.call_assign_quarter("p", [], "") is None
+        assert codex_hooks.call_should_deploy_quarter([1], "test") is None
+
+    def test_assign_projects_quarters_and_runs_sandboxed(self, monkeypatch):
+        self._install(monkeypatch)
+        calls = self._sandbox(monkeypatch, result={"canister_id": "q-1"})
+
+        class Q:
+            def __init__(self, cid, pop):
+                self.canister_id = cid
+                self.name = cid
+                self.population = pop
+
+        result = codex_hooks.call_assign_quarter("alice", [Q("q-1", 3), Q("q-2", 1)], "")
+        assert result == "q-1"
+        assert calls[0]["hook"] == "assign_quarter_hook"
+        assert calls[0]["capabilities"] == []
+        assert calls[0]["params"]["quarters"] == [
+            {"canister_id": "q-1", "name": "q-1", "population": 3},
+            {"canister_id": "q-2", "name": "q-2", "population": 1},
+        ]
+        assert "assign_quarter_hook" in calls[0]["source"]
+
+    def test_assign_rejection_is_fail_closed(self, monkeypatch):
+        self._install(monkeypatch)
+        self._sandbox(monkeypatch, error=RuntimeError("quarter is full"))
+        with pytest.raises(PermissionError, match="quarter is full"):
+            codex_hooks.call_assign_quarter("alice", [], "q-1")
+
+    def test_scale_returns_the_verdict(self, monkeypatch):
+        self._install(monkeypatch)
+        self._sandbox(monkeypatch, result={"deploy": True})
+        assert codex_hooks.call_should_deploy_quarter([9], "test") is True
+
+    def test_scale_failure_falls_open_to_the_default(self, monkeypatch):
+        self._install(monkeypatch)
+        self._sandbox(monkeypatch, error=RuntimeError("spawn failed"))
+        assert codex_hooks.call_should_deploy_quarter([9], "test") is None
+
+    def test_prepare_strips_host_imports(self):
+        prepared = codex_hooks._prepare_federation_source(
+            "from datetime import datetime\nfrom ggg import Quarter\n"
+            "def assign_quarter(p, q, pref): return 'x'\n"
+        )
+        assert "from datetime import datetime" not in prepared
+        assert "from ggg import Quarter" not in prepared
+        assert "def assign_quarter" in prepared
+        assert "assign_quarter_hook" in prepared

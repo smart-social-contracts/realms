@@ -359,3 +359,96 @@ def test_every_refusal_points_at_the_way_out():
     ):
         verdict, _ = check(responses=responses)
         assert "realm.configure.trust_policy" in verdict, verdict
+
+
+# ---------------------------------------------------------------------------
+# entity_method_overrides are refused at install time (issue #265)
+# ---------------------------------------------------------------------------
+#
+# The mechanism let a codex replace core GGG methods with exec()'d code running
+# as the host. Removing it silently would be worse than leaving it: a realm
+# would install a codex, see success, and run without the governance policy the
+# codex was written to enforce.
+
+
+def test_a_manifest_without_overrides_installs():
+    assert fr._entity_method_override_error("agora", {}) == ""
+    assert fr._entity_method_override_error("agora", {"entity_method_overrides": []}) == ""
+
+
+def test_declaring_an_override_refuses_the_install():
+    error = fr._entity_method_override_error("legacy", {
+        "entity_method_overrides": [
+            {"entity": "Treasury", "method": "send",
+             "implementation": "Codex.treasury_send_hook.send_hook"},
+        ],
+    })
+    assert error
+    assert "Treasury.send()" in error
+
+
+def test_the_refusal_names_every_override_and_the_way_forward():
+    error = fr._entity_method_override_error("legacy", {
+        "entity_method_overrides": [
+            {"entity": "User", "method": "user_register_posthook"},
+            {"entity": "Treasury", "method": "send"},
+        ],
+    })
+    assert "User.user_register_posthook()" in error
+    assert "Treasury.send()" in error
+    assert "sandboxed hooks" in error
+
+
+def test_a_malformed_override_entry_still_refuses():
+    # Garbage in the list is not a reason to let the install through.
+    error = fr._entity_method_override_error("legacy", {
+        "entity_method_overrides": ["not-an-object"],
+    })
+    assert error
+
+
+# ---------------------------------------------------------------------------
+# Legacy init.py is refused at install time (issue #265)
+# ---------------------------------------------------------------------------
+
+
+def test_a_package_without_init_py_is_fine(tmp_path, monkeypatch):
+    from core import runtime_codex
+
+    monkeypatch.setattr(runtime_codex, "_pkg_dir", lambda cid: str(tmp_path / cid))
+    assert runtime_codex.legacy_init_py_error("agora", {"manifest.json": "{}"}) == ""
+    assert runtime_codex.legacy_init_py_error("agora") == ""
+
+
+def test_init_py_in_the_file_dict_refuses_install():
+    from core import runtime_codex
+
+    error = runtime_codex.legacy_init_py_error(
+        "legacy", {"manifest.json": "{}", "init.py": "print('hi')"}
+    )
+    assert error
+    assert "init.py" in error
+    assert "init hook" in error
+
+
+def test_nested_init_py_path_is_also_refused():
+    from core import runtime_codex
+
+    error = runtime_codex.legacy_init_py_error(
+        "legacy", {"backend/init.py": "print('hi')"}
+    )
+    assert error
+
+
+def test_run_codex_init_never_executes(tmp_path, monkeypatch):
+    """Even a leftover call site must not exec the file."""
+    from core import runtime_codex
+
+    pkg = tmp_path / "legacy"
+    pkg.mkdir()
+    (pkg / "init.py").write_text("raise SystemExit('executed')")
+    monkeypatch.setattr(runtime_codex, "_pkg_dir", lambda cid: str(pkg))
+
+    error = runtime_codex.run_codex_init("legacy")
+    assert error
+    assert "init.py" in error

@@ -383,7 +383,6 @@ service : {
   "update_realm_config" : (text) -> (text);
   "get_sandbox_config" : () -> (text) query;
   "set_sandbox_config" : (text) -> (text);
-  "reload_entity_method_overrides" : () -> (text);
   "install_extension" : (text) -> (text);
   "uninstall_extension" : (text) -> (text);
   "list_runtime_extensions" : () -> (text) query;

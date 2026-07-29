@@ -8,8 +8,8 @@ unit-testable without a replica.
 Design (see issue #156):
 
 * The federation codex may define ``should_deploy_quarter(populations, network,
-  realm)`` to fully override the policy. When it does not, the built-in default
-  applies.
+  realm)`` to fully override the policy. It runs sandboxed over plain data
+  (issue #265). When it does not, the built-in default applies.
 * **Default rule:** scale when *every joinable* quarter has reached **90% of N**
   (i.e. there is no joinable quarter left with headroom). Using only the
   fullest quarter would keep minting forever after the first scale, because
@@ -110,20 +110,33 @@ def _ggg():
 
 
 def _codex_should_deploy_fn(realm):
-    """Extract a ``should_deploy_quarter`` callable from the federation codex.
+    """Return a sandboxed ``should_deploy_quarter`` callable, or None.
 
-    Returns None when no federation codex defines the hook (use the default).
+    The federation policy used to be ``exec()``'d in-process with full
+    builtins (issue #265). It now runs over the capability bridge; a missing
+    or broken policy returns None so ``resolve_should_scale`` applies the
+    built-in default. ``realm`` is accepted for call-site compatibility but
+    unused — lookup goes through ``core.codex_hooks``.
     """
-    codex = getattr(realm, "federation_codex", None)
-    if not codex or not getattr(codex, "code", None):
-        return None
+    del realm  # resolved inside call_should_deploy_quarter
     try:
-        ns = {"ggg": _ggg(), "__builtins__": __builtins__}
-        exec(compile(str(codex.code), "federation_codex.py", "exec"), ns)
-        fn = ns.get("should_deploy_quarter")
-        return fn if callable(fn) else None
+        from core import codex_hooks
     except Exception:
         return None
+
+    # Probe without spawning: no source / no function => no override.
+    name, source = codex_hooks._federation_codex()
+    if not source or "def should_deploy_quarter" not in source:
+        return None
+
+    def _fn(populations, network, realm=None):
+        verdict = codex_hooks.call_should_deploy_quarter(populations, network)
+        if verdict is None:
+            # Signal resolve_should_scale to fall through to the default.
+            raise RuntimeError("federation should_deploy_quarter unavailable")
+        return verdict
+
+    return _fn
 
 
 def quarter_populations(realm):

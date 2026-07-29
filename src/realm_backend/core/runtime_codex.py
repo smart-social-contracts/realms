@@ -6,7 +6,8 @@ Runtime Codex Manager — install/uninstall/reload codex packages at runtime.
     (manifest ``"kind": "codex"``) installed through the unified extension
     pipeline (``api.file_registry.install_extension_from_registry``) and
     integrated via the hook API (``core.codex_hooks``) instead of exec'd
-    ``init.py`` files and ``entity_method_overrides`` monkey-patching.
+    ``init.py`` files. The ``entity_method_overrides`` monkey-patching this
+    module used to apply was removed in issue #265.
     This module keeps already-deployed /codex_packages realms working for
     one release and will then be removed.
 
@@ -15,7 +16,8 @@ in the file registry.  This module handles:
 
   - Installing codex packages from a dict of {filename: content}
   - Creating/updating Codex entities in ic-python-db for each .py file
-  - Running init.py if present (sets up realm manifest, overrides, etc.)
+  - Refusing packages that still ship init.py (removed in issue #265;
+    use the ``init`` hook via ``core.codex_hooks.run_init`` instead)
   - Uninstalling codex packages (removes files + Codex entities)
   - Listing installed codex packages
 
@@ -177,35 +179,43 @@ def install_codex_package(codex_id: str, files: Dict[str, str]) -> bool:
     return True
 
 
-def run_codex_init(codex_id: str) -> Optional[str]:
-    """Run the init.py script for a codex package if it exists.
+def legacy_init_py_error(codex_id: str, files: Optional[dict] = None) -> str:
+    """Refusal message when a package still ships a legacy ``init.py``.
 
-    init.py typically sets up realm manifest, entity method overrides, etc.
-
-    Returns:
-        None on success, error message on failure.
+    That file used to be ``exec()``'d in-process with the host's ``ic`` after
+    install (issue #265). Modern packages use the ``init`` hook in
+    ``backend/entry.py`` instead (``core.codex_hooks.run_init``). Installation
+    is refused rather than the file ignored, so an operator never ends up
+    believing post-install setup ran when it silently did not.
     """
-    init_path = os.path.join(_pkg_dir(codex_id), "init.py")
-    if not os.path.exists(init_path):
-        logger.info(f"Codex package {codex_id}: no init.py found, skipping")
-        return None
+    if files is not None:
+        present = any(
+            name == "init.py" or str(name).endswith("/init.py") for name in files
+        )
+    else:
+        present = os.path.exists(os.path.join(_pkg_dir(codex_id), "init.py"))
+    if not present:
+        return ""
+    return (
+        f"Codex '{codex_id}' ships init.py, a mechanism removed in issue #265 "
+        f"because it ran codex code in-process with full host access. Move "
+        f"setup into the init hook in backend/entry.py "
+        f"(see docs/reference/EXTENSION_ARCHITECTURE.md)."
+    )
 
-    try:
-        with open(init_path, "r") as f:
-            code = f.read()
 
-        # Set __file__ so relative paths in init.py resolve correctly
-        # Inject 'ic' so codex init scripts can use ic.print() / ic.time() etc.
-        from _cdk import ic as _ic
+def run_codex_init(codex_id: str) -> Optional[str]:
+    """Legacy entry point retained so callers compile; never executes code.
 
-        ns = {"__file__": init_path, "__name__": f"codex_init_{codex_id}", "ic": _ic}
-        exec(compile(code, init_path, "exec"), ns)
-        logger.info(f"Codex package {codex_id}: init.py executed successfully")
-        return None
-    except Exception as e:
-        error = f"Codex package {codex_id}: init.py failed — {e}\n{traceback.format_exc()}"
+    Returns None when no ``init.py`` is present. Returns an error when one is,
+    so a reload/admin path cannot quietly re-introduce the old exec.
+    """
+    error = legacy_init_py_error(codex_id)
+    if error:
         logger.error(error)
         return error
+    logger.info(f"Codex package {codex_id}: no init.py found, skipping")
+    return None
 
 
 def uninstall_codex_package(codex_id: str) -> bool:
@@ -327,109 +337,3 @@ def get_extension_overrides() -> Dict[str, str]:
     return overrides
 
 
-# ---------------------------------------------------------------------------
-# Entity method override application
-# ---------------------------------------------------------------------------
-
-
-def _make_override_proxy(codex_name: str, func_name: str):
-    """Create a dynamic proxy that exec()s codex code on every call.
-
-    Re-reads the Codex entity each time so governance proposals that update
-    codex code take effect immediately without a canister restart.
-    """
-
-    def _proxy(*args, **kwargs):
-        import ggg as _ggg
-        from _cdk import Async as _Async
-        from _cdk import ic as _ic
-        from ggg import Codex as _Codex
-        from ic_python_logging import get_logger as _get_logger
-
-        target = _Codex[codex_name]
-        if not target or not target.code:
-            raise RuntimeError(f"Codex '{codex_name}' not found or has no code")
-        ns = {
-            "ic": _ic,
-            "logger": _get_logger(f"codex.{codex_name}"),
-            "ggg": _ggg,
-            "Async": _Async,
-        }
-        exec(str(target.code), ns)
-        fn = ns.get(func_name)
-        if not fn:
-            raise RuntimeError(
-                f"Function '{func_name}' not found in Codex '{codex_name}'"
-            )
-        return fn(*args, **kwargs)
-
-    _proxy.__qualname__ = f"codex_proxy<{codex_name}.{func_name}>"
-    _proxy.__name__ = func_name
-    return _proxy
-
-
-def apply_entity_method_overrides(codex_id: str) -> List[str]:
-    """Apply entity_method_overrides from a codex package's manifest.
-
-    Reads the manifest, resolves each override's entity class and codex, then
-    monkey-patches the entity class method with a dynamic proxy that exec()s
-    the latest codex code on every call.
-
-    Returns list of successfully applied override descriptions.
-    """
-    manifest = _load_manifest(codex_id)
-    if not manifest:
-        logger.info(f"Codex {codex_id}: no manifest, skipping overrides")
-        return []
-
-    overrides = manifest.get("entity_method_overrides", [])
-    if not overrides:
-        logger.info(f"Codex {codex_id}: no entity_method_overrides in manifest")
-        return []
-
-    import ggg
-    from ggg import Codex
-
-    applied = []
-    for o in overrides:
-        entity_name = o.get("entity")
-        method_name = o.get("method")
-        implementation = o.get("implementation")
-        method_type = o.get("type", "method")
-
-        if not all([entity_name, method_name, implementation]):
-            logger.warning(f"Codex {codex_id}: skipping incomplete override: {o}")
-            continue
-
-        parts = implementation.split(".")
-        if len(parts) != 3 or parts[0] != "Codex":
-            logger.warning(
-                f"Codex {codex_id}: invalid implementation format: {implementation}"
-            )
-            continue
-
-        codex_name = parts[1]
-        func_name = parts[2]
-
-        entity_class = getattr(ggg, entity_name, None)
-        if not entity_class:
-            logger.warning(f"Codex {codex_id}: entity '{entity_name}' not in ggg")
-            continue
-
-        target_codex = Codex[codex_name]
-        if not target_codex:
-            logger.warning(f"Codex {codex_id}: Codex['{codex_name}'] not found")
-            continue
-
-        proxy = _make_override_proxy(codex_name, func_name)
-        wrapper = (
-            classmethod(proxy)
-            if method_type == "classmethod"
-            else staticmethod(proxy) if method_type == "staticmethod" else proxy
-        )
-        setattr(entity_class, method_name, wrapper)
-        desc = f"{entity_name}.{method_name}() -> {implementation}"
-        applied.append(desc)
-        logger.info(f"Codex {codex_id}: applied override {desc}")
-
-    return applied

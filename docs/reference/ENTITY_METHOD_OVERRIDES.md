@@ -2,6 +2,8 @@
 
 Extensions can override methods on core GGG entity classes to customize behavior without modifying the core codebase. This powerful feature enables extensions to deeply integrate with the Realms platform.
 
+> **Codices cannot do this.** Overrides declared by a *codex* manifest were removed in issue #265, and a codex that declares `entity_method_overrides` is now refused at install time. See [Removed: codex overrides](#removed-codex-overrides) for the migration. Everything else on this page describes the *extension* mechanism, which is unchanged.
+
 ## Overview
 
 Entity method overrides allow extensions to:
@@ -278,9 +280,39 @@ When developing overrides:
 - Verify method signature matches expected parameters
 - Test implementation independently before installing
 
+## Removed: codex overrides
+
+A codex manifest used to be able to declare the same `entity_method_overrides`, with an `implementation` of the form `Codex.<codex_name>.<function>`:
+
+```json
+{
+  "entity": "Treasury",
+  "method": "send",
+  "type": "staticmethod",
+  "implementation": "Codex.treasury_send_hook.send_hook"
+}
+```
+
+This was removed in issue #265. Unlike the extension form — which binds a real function from an installed, reviewed extension module — the codex form built a proxy that re-read the `Codex` entity and `exec()`'d its `code` column on every call, with `ggg`, `ic` and `Async` in scope. That is unrestricted host access, granted to code stored in a database row, running as a core entity method. It was also invisible to the install-time import scanner, which only ever sees files in a package.
+
+Installing a codex that declares `entity_method_overrides` now fails with an error naming each override. A realm restored from an older snapshot still carrying the declarations in `manifest_data` starts normally, but logs a warning per override and does not apply them.
+
+### Migrating
+
+Codices reach the realm through sandboxed hooks. The two overrides that existed in practice map directly:
+
+| Removed override | Replacement hook |
+|---|---|
+| `User.user_register_posthook` | `on_user_register(args)` |
+| `Treasury.send` | `on_treasury_send(args)` — the hook decides and returns a `transfer` effect; the host performs the call |
+
+Hooks are declared in the codex manifest via `sandbox_module` and `capabilities`, take a single plain-data `args` dict, and reach the realm through `ggg_sdk`. See `codices/codices/agora/backend/sandbox_hooks.py` for a worked example.
+
+If you relied on an override with no hook equivalent, that is a gap worth filing rather than routing around: the point of the hook API is that every codex touchpoint is a named, capability-checked verb.
+
 ## Security Considerations
 
-Entity method overrides have full access to the entity and system state. Always:
+Entity method overrides have full access to the entity and system state. Unlike codex hooks, they are *not* sandboxed and *not* capability-checked — an override is the host method. That is why the mechanism is restricted to extensions, which are marketplace-reviewed and whose code ships as files the import scanner can read. Always:
 
 - Validate inputs thoroughly
 - Avoid exposing sensitive data in logs
