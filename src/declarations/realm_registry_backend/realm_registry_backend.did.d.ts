@@ -94,6 +94,12 @@ export interface AssistantListing {
 }
 export type AssistantResult = { 'Ok' : AssistantListing } |
   { 'Err' : string };
+export type AuthorityError = { 'GenericError' : GenericError } |
+  { 'NonExistingTokenId' : null } |
+  { 'Unauthorized' : null } |
+  { 'InvalidRecipient' : null };
+export type AuthorityResult = { 'Ok' : bigint } |
+  { 'Err' : AuthorityError };
 export interface BadBurn { 'min_burn_amount' : bigint }
 export interface BadFee { 'expected_fee' : bigint }
 export interface BillingStatusRecord {
@@ -172,6 +178,7 @@ export interface CasalsProvisionService {
 export interface CasalsService {
   'create_canister' : ActorMethod<[string], string>,
   'create_stand' : ActorMethod<[string], string>,
+  'destroy_realm_stand' : ActorMethod<[string], string>,
   'get_tree' : ActorMethod<[], string>,
   'orchestration_configure_baton' : ActorMethod<[string], string>,
   'orchestration_hand_to_baton' : ActorMethod<[string], string>,
@@ -266,6 +273,23 @@ export interface DeleteCanisterSnapshotArgs {
   'canister_id' : Principal,
   'snapshot_id' : Uint8Array | number[],
 }
+export interface DemoRegistrationService {
+  'register_demo_citizens' : ActorMethod<[string], string>,
+}
+export interface DeployStepView {
+  'idx' : number,
+  'status' : string,
+  'kind' : string,
+  'label' : string,
+  'error' : string,
+}
+export interface DeployTaskView {
+  'status' : string,
+  'task_id' : string,
+  'completed_count' : number,
+  'steps' : Array<DeployStepView>,
+  'total_count' : number,
+}
 export interface DeploymentJobView {
   'status' : string,
   'expected_wasm_hash' : string,
@@ -273,7 +297,9 @@ export interface DeploymentJobView {
   'backend_canister_id' : string,
   'ext_deploy_task_id' : string,
   'assets_verified' : number,
+  'expected_step_count' : number,
   'network' : string,
+  'frontend_wasm_verified' : number,
   'created_at' : bigint,
   'error' : string,
   'wasm_verified' : number,
@@ -401,13 +427,28 @@ export interface ExtensionListing {
 export type ExtensionResult = { 'Ok' : ExtensionListing } |
   { 'Err' : string };
 export interface ExtensionsListRecord { 'extensions' : Array<string> }
-export interface FileRegistryService {
-  'get_backend_files_icc' : ActorMethod<[string, string, string], string>,
-  'get_extension_manifest' : ActorMethod<[string], string>,
-  'get_file_chunk_icc' : ActorMethod<[string, string, string, string], string>,
-  'get_file_size_icc' : ActorMethod<[string, string], string>,
-  'get_frontend_files_icc' : ActorMethod<[string, string], string>,
+export interface FederationService {
+  'federation_message' : ActorMethod<[string], string>,
 }
+export interface FileRegistryService {
+  'set_namespace_approval' : ActorMethod<[string], string>,
+}
+export interface ForceTransferArg {
+  'to' : NftAccount,
+  'token_id' : bigint,
+  'memo' : [] | [string],
+}
+export interface ForcedTransferArgs {
+  'to' : TokenAccount,
+  'from' : TokenAccount,
+  'memo' : [] | [string],
+  'amount' : bigint,
+}
+export interface FreezeAccountArgs {
+  'account' : TokenAccount,
+  'reason' : [] | [string],
+}
+export interface FreezeArg { 'token_id' : bigint, 'reason' : [] | [string] }
 export interface GenericError { 'message' : string, 'error_code' : bigint }
 export type GenericResult = { 'Ok' : string } |
   { 'Err' : string };
@@ -513,6 +554,11 @@ export interface ICRCLedger {
   'icrc1_balance_of' : ActorMethod<[Account], bigint>,
   'icrc1_fee' : ActorMethod<[], bigint>,
   'icrc1_transfer' : ActorMethod<[TransferArg], TransferResult>,
+}
+export interface Icrc1MetadataService {
+  'icrc1_decimals' : ActorMethod<[], number>,
+  'icrc1_name' : ActorMethod<[], string>,
+  'icrc1_symbol' : ActorMethod<[], string>,
 }
 export type InsertError = {
     'ValueTooLarge' : { 'max' : number, 'given' : number }
@@ -647,7 +693,7 @@ export type MetadataValue = { 'Int' : bigint } |
   { 'Text' : string };
 export type MillisatoshiPerByte = bigint;
 export interface MintArg {
-  'token_id' : bigint,
+  'token_id' : [] | [bigint],
   'owner' : NftAccount,
   'metadata' : [] | [Array<[string, MetadataValue]>],
 }
@@ -663,7 +709,12 @@ export interface MintTx {
   'created_at_time' : [] | [bigint],
   'amount' : bigint,
 }
-export interface NFTService { 'mint' : ActorMethod<[MintArg], MintResult> }
+export interface NFTService {
+  'force_transfer' : ActorMethod<[ForceTransferArg], AuthorityResult>,
+  'freeze_token' : ActorMethod<[FreezeArg], AuthorityResult>,
+  'mint' : ActorMethod<[MintArg], MintResult>,
+  'unfreeze_token' : ActorMethod<[bigint], AuthorityResult>,
+}
 export interface NameResult { 'name' : string }
 export interface NftAccount {
   'owner' : Principal,
@@ -894,6 +945,8 @@ export interface ReportReadyOk {
 }
 export type ResultCasalsConfig = { 'Ok' : CasalsConfigView } |
   { 'Err' : InstallerError };
+export type ResultDeployTaskStatus = { 'Ok' : DeployTaskView } |
+  { 'Err' : InstallerError };
 export type ResultEnqueue = { 'Ok' : EnqueueOk } |
   { 'Err' : InstallerError };
 export type ResultJobCancel = { 'Ok' : JobStatusAck } |
@@ -974,6 +1027,21 @@ export interface TakeSnapshotOk {
 }
 export interface TimeStamp { 'timestamp_nanos' : bigint }
 export type TimerId = bigint;
+export interface TokenAccount {
+  'owner' : Principal,
+  'subaccount' : [] | [Uint8Array | number[]],
+}
+export type TokenAuthorityError = { 'GenericError' : string } |
+  { 'InsufficientBalance' : null } |
+  { 'Unauthorized' : null } |
+  { 'InvalidRecipient' : null };
+export type TokenAuthorityResult = { 'Ok' : bigint } |
+  { 'Err' : TokenAuthorityError };
+export interface TokenAuthorityService {
+  'forced_transfer' : ActorMethod<[ForcedTransferArgs], TokenAuthorityResult>,
+  'freeze_account' : ActorMethod<[FreezeAccountArgs], TokenAuthorityResult>,
+  'unfreeze_account' : ActorMethod<[TokenAccount], TokenAuthorityResult>,
+}
 export interface Tokens { 'e8s' : bigint }
 export interface Transaction {
   'memo' : bigint,

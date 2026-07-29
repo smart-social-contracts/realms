@@ -383,10 +383,12 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'reload_codex' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'reload_entity_method_overrides' : IDL.Func([], [IDL.Text], []),
     'report_quarter_population' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'request_upgrade' : IDL.Func([IDL.Text], [IDL.Text], []),
     'resolve_ref' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'resolve_token_ledger' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'resync_extension_frontends' : IDL.Func([IDL.Text], [IDL.Text], []),
     'revoke_delegation_json' : IDL.Func([IDL.Text], [IDL.Text], []),
     'send_realm_message' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],

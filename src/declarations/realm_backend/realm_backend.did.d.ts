@@ -434,6 +434,7 @@ export interface FileRegistryService {
   'get_extension_manifest' : ActorMethod<[string], string>,
   'get_file_chunk_icc' : ActorMethod<[string, string, string, string], string>,
   'get_file_size_icc' : ActorMethod<[string, string], string>,
+  'get_namespace_approval_icc' : ActorMethod<[string], string>,
   'latest_version' : ActorMethod<[string], string>,
   'list_codices' : ActorMethod<[], string>,
   'list_extensions' : ActorMethod<[], string>,
@@ -1372,10 +1373,12 @@ export interface _SERVICE {
     string
   >,
   'reload_codex' : ActorMethod<[string], string>,
+  'reload_entity_method_overrides' : ActorMethod<[], string>,
   'report_quarter_population' : ActorMethod<[bigint], string>,
   'request_upgrade' : ActorMethod<[string], string>,
   'resolve_ref' : ActorMethod<[string], string>,
   'resolve_token_ledger' : ActorMethod<[string], string>,
+  'resync_extension_frontends' : ActorMethod<[string], string>,
   'revoke_delegation_json' : ActorMethod<[string], string>,
   'send_realm_message' : ActorMethod<[string, string, string, string], string>,
   'set_canister_config' : ActorMethod<

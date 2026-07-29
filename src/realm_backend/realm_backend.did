@@ -402,6 +402,7 @@ service : {
   "install_codex_from_registry" : (text) -> (text);
   "install_branding_from_registry" : (text) -> (text);
   "register_realm_from_registry" : (text) -> (text);
+  "reload_entity_method_overrides" : () -> (text);
   "list_extensions" : (text) -> (RealmResponse) query;
   "get_canister_logs" : (opt nat, opt nat, opt text, opt text) -> (vec PublicLogEntry) query;
   "__browse__" : (text) -> (text) query;
