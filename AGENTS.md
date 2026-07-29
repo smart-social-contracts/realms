@@ -57,6 +57,49 @@ per realm.
 | **Frontend** (`src/realm_frontend/`) | `mundus deploy --canister frontend --version build` | `publish-build` (`component=frontend`) → `rollout` (`scope=frontend`) |
 | **Backend** (`src/realm_backend/`) | `mundus deploy --canister backend --version build` | `publish-build` (`component=both`) → `rollout` (`scope=backend`) |
 | **Extension** (`extensions/`) | `deploy-files` → re-install the extension | `deploy-files` → rollout (or re-install) |
+| **Registry / wizard UI** (`src/realm_registry_frontend/`) | [`scripts/infra_dev_deploy.sh`](#registry--wizard-ui-staging) | `publish-build` (`family=registry`) → `rollout` (`realm-registry`) — **see staging caveat below** |
+
+### Registry / wizard UI (staging)
+
+The **create-realm wizard** and **deployment status page** live in
+`src/realm_registry_frontend/` (`staging.realmsgos.org` / `staging.gos.earth`). They are
+**not** realm apps and **not** upgraded by `mundus deploy` or `ci-main` (which only
+publishes/rolls out `family=realm`).
+
+**After changing wizard or deployment-progress UI, you must deploy the registry frontend
+separately** or users will see stale behaviour (e.g. deployment stuck at “Queued” while
+the job is actually installing extensions on-chain).
+
+**Staging — use this today:**
+
+```bash
+export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
+dfx identity use deployer
+
+# 1. Publish artifacts + authorize in Casals catalog (optional but good before merge)
+python3 scripts/publish_build.py --environment staging --family registry \
+  --component both --from-main --identity deployer
+
+# 2. Update the LIVE wizard website (required for users to see UI changes)
+scripts/infra_dev_deploy.sh -e staging -f registry -c frontend
+# or both backend + frontend if registry backend changed too:
+# scripts/infra_dev_deploy.sh -e staging -f registry -c both
+```
+
+**Note:** `infra_dev_deploy.sh` backend build may need an explicit basilisk step first if
+`dfx build realm_registry_backend` produces no WASM — run
+`python -m basilisk realm_registry_backend src/realm_registry_backend/main.py`, then
+`gzip -kf .basilisk/realm_registry_backend/realm_registry_backend.wasm` before
+`dfx canister install …`.
+
+**Casals rollout (`realm-registry`) — blocked until Casals is upgraded on staging:**
+`realms rollout -e staging -t realm-registry -s frontend -v main` currently fails on
+`upgrade_to` (orchestration governance gate when the stand’s section is unset). The fix
+is in the `casals` submodule (`governance_requests.py`); deploy **Casals** to staging
+before relying on rollout for registry. Until then, step 2 above (`infra_dev_deploy.sh`)
+is the supported way to put registry UI changes live.
+
+**Hard-refresh** the browser (Ctrl+Shift+R) after deploy — asset canisters cache aggressively.
 
 ### Fast realm deploy (mundus) — default
 
@@ -256,7 +299,9 @@ Notes:
 - The registry footer version ≠ individual realm WASM version. Realm cards’
   “updated X ago” is catalog metadata, not proof of realm code version.
 - To align demo/staging registry UI with test after a mundus realm deploy, publish
-  and roll out the **`registry`** family (Casals path, `mode=upgrade`).
+  and roll out the **`registry`** family (Casals path, `mode=upgrade`) — or use
+  [`infra_dev_deploy.sh`](#registry--wizard-ui-staging) on staging while Casals rollout
+  for `realm-registry` is blocked (see above).
 
 ```bash
 # Per environment (example: staging)
@@ -337,7 +382,7 @@ realms rollout -e staging -t agora -s frontend -v main \
   --identity deployer --execute --yes
 ```
 
-To sync **registry** UI after a mundus deploy (footer version, etc.):
+To sync **registry** UI after a mundus deploy (footer version, wizard, deployment status):
 
 ```bash
 python3 scripts/publish_build.py --environment staging --family registry \
@@ -345,6 +390,10 @@ python3 scripts/publish_build.py --environment staging --family registry \
 realms rollout -e staging -t realm-registry -s both -m upgrade -v main \
   --identity deployer --execute --yes
 ```
+
+On **staging**, if rollout fails (known Casals `upgrade_to` issue), use
+[`infra_dev_deploy.sh -e staging -f registry -c frontend`](#registry--wizard-ui-staging)
+instead — see [Registry / wizard UI (staging)](#registry--wizard-ui-staging).
 
 ### Step 1 — Publish Build
 
