@@ -58,10 +58,22 @@ So containment is the type checker's job, not a reviewer's. A policy naming
 `Realm::UserProfile`, or another extension's types, has no applicable action and
 fails to validate at install time.
 
-This is also why `permit (principal, action, resource);` from an extension is
-harmless: the schema bounds what "everything" refers to, so it grants that
-extension full access to its own data and nothing else. We don't need to detect
-dangerous policies, because they can't be expressed.
+### What this does and does not buy
+
+It bounds the blast radius. It is not a substitute for reviewing an extension's
+policies.
+
+`permit (principal, action, resource);` from an extension **does** validate,
+because the schema bounds what "everything" refers to. What it cannot do is
+reach core data. What it very much does do is grant every realm user full access
+to every one of that extension's records — for procurement that means sealed
+bids readable before opening and scores editable by the vendors being scored.
+That is precisely the data the extension exists to protect.
+
+So the property is isolation, not safety: a careless or hostile policy can wreck
+its own extension without touching users, mandates or the treasury. Reviewing
+extension-owned policy still matters; containment only decides who is harmed
+when it is wrong.
 
 The deliberate exception is role membership — `principal in
 Realm::UserProfile::"admin"` does validate, so an extension can say "only realm
