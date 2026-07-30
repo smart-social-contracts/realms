@@ -62,6 +62,7 @@ from core.bridge_core import (  # noqa: F401
     check_capability,
     to_plain,
 )
+from core.call_origin import codex_call, dispatch
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +506,7 @@ def make_rpc_handler(context_id: str, capabilities: List[str]):
         safe_kwargs = to_plain(kwargs or {})
         if not isinstance(safe_kwargs, dict):
             raise PermissionError(f"rpc '{action}' kwargs must be an object")
-        return to_plain(VERBS[action](**safe_kwargs))
+        return to_plain(dispatch(VERBS, action, codex_call(context_id), **safe_kwargs))
 
     return handler
 
@@ -660,7 +661,7 @@ def apply_effects(
             raise PermissionError(
                 f"effect '{verb}' must be applied asynchronously by the host"
             )
-        result = to_plain(VERBS[verb](**resolved))
+        result = to_plain(dispatch(VERBS, verb, codex_call(context_id), **resolved))
         results.append(result)
     if defer_async:
         return results, deferred

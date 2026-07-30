@@ -62,8 +62,9 @@ jobs:
         # Blocking on purpose: these are pure source scans and in-memory unit
         # tests with no canister or DB, so a failure here is a real
         # regression. The exemption list may only shrink, no extension may
-        # take the caller's identity from its own call args, and every bridge
-        # verb must keep checking the caller's operation host-side.
+        # take the caller's identity from its own call args, every bridge verb
+        # must keep checking the caller's operation host-side, and no verb may
+        # be dispatched without its call origin.
         run: |
           python3 scripts/declare_extension_runtime.py --check
           pytest -q tests/backend/test_extension_caller_identity.py \
@@ -85,6 +86,7 @@ jobs:
                     tests/backend/test_sandbox_package_bundle.py \
                     tests/backend/department_docs/ \
                     tests/backend/test_time_utils.py \
+                    tests/backend/test_call_origin.py \
                     tests/backend/test_ggg_sdk_json_shim.py
       - name: Validate descriptors
         run: |

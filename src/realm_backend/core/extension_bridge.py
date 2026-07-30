@@ -64,6 +64,7 @@ from core.bridge_core import (  # noqa: F401
     check_capability,
     to_plain,
 )
+from core.call_origin import dispatch, extension_call
 
 logger = get_logger("core.extension_bridge")
 
@@ -1180,7 +1181,12 @@ def make_rpc_handler(
             # extension cannot address another extension's namespace.
             safe_kwargs["ext_id"] = ext_id
 
-        result = VERBS[action](caller=caller, **safe_kwargs)
+        # The origin travels with the call so a Cedar decision downstream can
+        # tell an extension apart from host code. Without it the guardrails
+        # keyed on `context.extension` silently pass.
+        result = dispatch(
+            VERBS, action, extension_call(ext_id), caller=caller, **safe_kwargs
+        )
         return to_plain(result)
 
     return handler

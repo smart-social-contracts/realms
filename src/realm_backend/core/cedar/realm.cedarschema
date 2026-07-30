@@ -1,0 +1,675 @@
+namespace Realm {
+    entity AllocationRule {
+        description?: String,
+        id?: String,
+        proposal_id?: String,
+        rules?: String,
+        source_fund_code?: String,
+        status?: String,
+    };
+
+    entity Appeal {
+        decided_date?: String,
+        decision?: String,
+        decision_reasoning?: String,
+        filed_date?: String,
+        grounds?: String,
+        id?: String,
+        metadata?: String,
+        status?: String,
+        appellant?: User,
+        appellate_court?: Court,
+        new_verdict?: Verdict,
+        original_case?: Case,
+        original_verdict?: Verdict,
+    };
+
+    entity Appointment {
+        ended_at?: Long,
+        started_at?: Long,
+        status?: String,
+        position?: Position,
+        user?: User,
+    };
+
+    entity Balance {
+        amount?: Long,
+        id?: String,
+        instrument?: String,
+        tag?: String,
+        user?: User,
+    };
+
+    entity Budget {
+        actual_amount?: Long,
+        budget_type?: String,
+        category?: String,
+        description?: String,
+        id?: String,
+        name?: String,
+        planned_amount?: Long,
+        status?: String,
+        fiscal_period?: FiscalPeriod,
+        fund?: Fund,
+        proposal?: Proposal,
+    };
+
+    entity Calendar {
+        benefit_cycle?: Long,
+        codex_release_cycle?: Long,
+        custom_cycles?: String,
+        epoch?: Long,
+        fiscal_period?: Long,
+        license_review_cycle?: Long,
+        name?: String,
+        service_payment_cycle?: Long,
+        voting_window?: Long,
+        realm?: Realm,
+    };
+
+    entity Call {
+        is_async?: Bool,
+        codex?: Codex,
+        task_step?: TaskStep,
+    };
+
+    entity Case {
+        case_number?: String,
+        closed_date?: String,
+        description?: String,
+        filed_date?: String,
+        metadata?: String,
+        status?: String,
+        title?: String,
+        court?: Court,
+        defendant?: User,
+        plaintiff?: User,
+        verdict?: Verdict,
+    };
+
+    entity Codex {
+        checksum?: String,
+        name?: String,
+        url?: String,
+        federation?: Realm,
+    };
+
+    entity Contract {
+        metadata?: String,
+        name?: String,
+        status?: String,
+        mandate?: Mandate,
+    };
+
+    entity Court {
+        description?: String,
+        jurisdiction?: String,
+        level?: String,
+        metadata?: String,
+        name?: String,
+        status?: String,
+        codex?: Codex,
+        justice_system?: JusticeSystem,
+        license?: License,
+        parent_court?: Court,
+    };
+
+    entity Delegation {
+        accepted_at?: Long,
+        delegate?: String,
+        expires_at?: Long,
+        granted_by?: String,
+        grantor?: String,
+        id?: String,
+        label?: String,
+        requires_acceptance?: Long,
+        revoked_at?: Long,
+        revoked_by?: String,
+        scope_json?: String,
+        status?: String,
+    };
+
+    entity Department {
+        description?: String,
+        is_root?: Bool,
+        name?: String,
+        policy_quorum_percent?: Long,
+        policy_threshold_m?: Long,
+        policy_threshold_n?: Long,
+        policy_veto_principals?: String,
+        fund?: Fund,
+        head?: User,
+        parent?: Department,
+    };
+
+    entity DepartmentAuthority {
+        description?: String,
+        id?: String,
+        permissions?: String,
+        target_org_name?: String,
+        target_quarter_canister_id?: String,
+        grantor?: Department,
+        target?: Department,
+    };
+
+    entity Dispute {
+        actions_taken?: String,
+        case_title?: String,
+        description?: String,
+        dispute_id?: String,
+        metadata?: String,
+        status?: String,
+        verdict?: String,
+        defendant?: User,
+        requester?: User,
+    };
+
+    entity EntityMigration {
+        entity_type?: String,
+        moved_at?: String,
+        next_ref?: String,
+        prev_ref?: String,
+        signature?: String,
+        subject?: String,
+    };
+
+    entity Extension {
+        description?: String,
+        name?: String,
+    };
+
+    entity FederationMessage {
+        body?: String,
+        msg_id?: String,
+        response?: String,
+        source?: String,
+        topic?: String,
+    };
+
+    entity FiscalPeriod {
+        end_date?: String,
+        id?: String,
+        name?: String,
+        start_date?: String,
+        status?: String,
+    };
+
+    entity Fund {
+        code?: String,
+        description?: String,
+        fund_type?: String,
+        name?: String,
+        department?: Department,
+        realm?: Realm,
+    };
+
+    entity Human {
+        date_of_birth?: String,
+        h3_index?: String,
+        name?: String,
+        user?: User,
+    };
+
+    entity Identity {
+        metadata?: String,
+        type?: String,
+        human?: Human,
+    };
+
+    entity Instrument {
+        metadata?: String,
+        name?: String,
+        principal_id?: String,
+    };
+
+    entity Invoice {
+        currency?: String,
+        due_date?: String,
+        id?: String,
+        metadata?: String,
+        paid_at?: String,
+        payment_amount_raw?: Long,
+        payment_currency?: String,
+        payment_nonce?: Long,
+        status?: String,
+        user?: User,
+    };
+
+    entity Judge {
+        appointment_date?: String,
+        id?: String,
+        metadata?: String,
+        specialization?: String,
+        status?: String,
+        court?: Court,
+        member?: Member,
+    };
+
+    entity JusticeSystem {
+        description?: String,
+        metadata?: String,
+        name?: String,
+        status?: String,
+        system_type?: String,
+        license?: License,
+        realm?: Realm,
+    };
+
+    entity Land {
+        id?: String,
+        land_type?: String,
+        metadata?: String,
+        nft_token_id?: String,
+        registered_by?: String,
+        size_height?: Long,
+        size_width?: Long,
+        status?: String,
+        x_coordinate?: Long,
+        y_coordinate?: Long,
+        owner_organization?: Organization,
+        owner_user?: User,
+    };
+
+    entity LedgerEntry {
+        category?: String,
+        credit?: Long,
+        currency?: String,
+        debit?: Long,
+        description?: String,
+        entry_date?: String,
+        entry_type?: String,
+        id?: String,
+        reference?: String,
+        tags?: String,
+        transaction_id?: String,
+        appeal?: Appeal,
+        case?: Case,
+        contract?: Contract,
+        fiscal_period?: FiscalPeriod,
+        fund?: Fund,
+        invoice?: Invoice,
+        organization?: Organization,
+        penalty?: Penalty,
+        transfer?: Transfer,
+        user?: User,
+    };
+
+    entity License {
+        description?: String,
+        expires_at?: Long,
+        issued_at?: Long,
+        issuing_authority?: String,
+        license_type?: String,
+        metadata?: String,
+        name?: String,
+        status?: String,
+        court?: Court,
+        justice_system?: JusticeSystem,
+        organization?: Organization,
+    };
+
+    entity Mandate {
+        metadata?: String,
+        name?: String,
+    };
+
+    entity MarketPlace {
+        metadata?: String,
+        name?: String,
+        principal_id?: String,
+    };
+
+    entity Member {
+        id?: String,
+        judge?: Judge,
+        user?: User,
+    };
+
+    entity MenuCategoryConfig {
+        category_id?: String,
+        label?: String,
+        position?: Long,
+    };
+
+    entity MenuDepartmentVisibility {
+        extension_name?: String,
+        visible?: Bool,
+        department?: Department,
+    };
+
+    entity MenuItemConfig {
+        category_id?: String,
+        extension_name?: String,
+        position?: Long,
+    };
+
+    entity NFTToken {
+        canister_id?: String,
+        description?: String,
+        enabled?: String,
+        id?: String,
+        name?: String,
+        nft_type?: String,
+        supply_cap?: Long,
+        symbol?: String,
+        total_supply?: Long,
+    };
+
+    entity Notification {
+        audience_type?: String,
+        color?: String,
+        href?: String,
+        icon?: String,
+        message?: String,
+        metadata?: String,
+        origin_realm?: String,
+        read?: Bool,
+        read_by?: String,
+        recipient?: String,
+        sender?: String,
+        title?: String,
+        topic?: String,
+        visibility?: String,
+        department?: Department,
+        user?: User,
+    };
+
+    entity Organization {
+        name?: String,
+        license?: License,
+    };
+
+    entity PaymentAccount {
+        address?: String,
+        currency?: String,
+        id?: String,
+        is_active?: Bool,
+        is_verified?: Bool,
+        label?: String,
+        metadata?: String,
+        network?: String,
+        user?: User,
+    };
+
+    entity Penalty {
+        currency?: String,
+        description?: String,
+        due_date?: String,
+        executed_date?: String,
+        id?: String,
+        metadata?: String,
+        penalty_type?: String,
+        status?: String,
+        target_user?: User,
+        verdict?: Verdict,
+    };
+
+    entity Permission {
+        category?: String,
+        description?: String,
+        name?: String,
+        scope?: String,
+    };
+
+    entity Position {
+        description?: String,
+        headcount?: Long,
+        key?: String,
+        salary_amount?: Long,
+        salary_period?: String,
+        status?: String,
+        title?: String,
+        department?: Department,
+        profile?: UserProfile,
+    };
+
+    entity Proposal {
+        code_checksum?: String,
+        code_url?: String,
+        description?: String,
+        metadata?: String,
+        org_scope?: String,
+        proposal_id?: String,
+        status?: String,
+        title?: String,
+        voting_deadline?: String,
+        proposer?: User,
+    };
+
+    entity Quarter {
+        canister_id?: String,
+        index?: Long,
+        name?: String,
+        population?: Long,
+        status?: String,
+        federation?: Realm,
+    };
+
+    entity QuarterResident {
+        "principal"?: String,
+        quarter_canister_id?: String,
+    };
+
+    entity Realm {
+        accounting_currency?: String,
+        accounting_currency_decimals?: Long,
+        ai_assistant_enabled?: Bool,
+        auto_scale_enabled?: Bool,
+        background_image_url?: String,
+        bootstrap_state?: String,
+        federation_realm_id?: String,
+        file_registry_canister_id?: String,
+        frontend_canister_id?: String,
+        installed_version?: String,
+        installer_canister_id?: String,
+        is_capital?: Bool,
+        is_quarter?: Bool,
+        logo_url?: String,
+        manifest_data?: String,
+        manifesto?: String,
+        marketplace_canister_id?: String,
+        name?: String,
+        network?: String,
+        nft_canister_id?: String,
+        open_registration?: Bool,
+        principal_id?: String,
+        quarter_join_mode?: String,
+        require_marketplace_approval?: Bool,
+        scale_in_flight?: Bool,
+        scale_requested_at?: String,
+        status?: String,
+        test_mode?: Bool,
+        test_mode_demo_data?: Bool,
+        test_mode_ii_bypass?: Bool,
+        test_mode_skip_authentication?: Bool,
+        test_mode_skip_passport_zkproof?: Bool,
+        test_mode_skip_terms?: Bool,
+        test_mode_user_self_registration?: Bool,
+        token_canister_id?: String,
+        trusted_approvers?: String,
+        trusted_principals?: String,
+        welcome_message?: String,
+        calendar?: Calendar,
+        federation_codex?: Codex,
+        treasury?: Treasury,
+    };
+
+    entity RegistrationCode {
+        code?: String,
+        code_hash?: String,
+        created_by?: String,
+        department?: String,
+        email?: String,
+        expires_at?: Long,
+        frontend_url?: String,
+        max_uses?: Long,
+        metadata?: String,
+        position?: String,
+        principals_redeemed?: String,
+        profile?: String,
+        revoked?: Long,
+        used?: Long,
+        used_at?: Long,
+        user_id?: String,
+        uses_count?: Long,
+    };
+
+    entity Registry {
+        description?: String,
+        name?: String,
+        principal_id?: String,
+    };
+
+    entity Service {
+        description?: String,
+        due_date?: String,
+        link?: String,
+        metadata?: String,
+        name?: String,
+        provider?: String,
+        service_id?: String,
+        status?: String,
+        user?: User,
+    };
+
+    entity Task {
+        metadata?: String,
+        name?: String,
+        status?: String,
+        step_to_execute?: Long,
+    };
+
+    entity TaskExecution {
+        completed_at?: Long,
+        name?: String,
+        result?: String,
+        started_at?: Long,
+        status?: String,
+        task?: Task,
+    };
+
+    entity TaskSchedule {
+        disabled?: Bool,
+        last_run_at?: Long,
+        name?: String,
+        repeat_every?: Long,
+        run_at?: Long,
+        task?: Task,
+    };
+
+    entity TaskStep {
+        run_next_after?: Long,
+        status?: String,
+        timer_id?: Long,
+        call?: Call,
+        task?: Task,
+    };
+
+    entity Token {
+        decimals?: Long,
+        fee?: Long,
+        indexer?: String,
+        ledger?: String,
+        name?: String,
+    };
+
+    entity Trade {
+        metadata?: String,
+        contract?: Contract,
+        transfer_1?: Transfer,
+        transfer_2?: Transfer,
+    };
+
+    entity Transfer {
+        amount?: Long,
+        id?: String,
+        instrument?: String,
+        principal_from?: String,
+        principal_to?: String,
+        status?: String,
+        subaccount?: String,
+        tags?: String,
+        timestamp?: String,
+        invoice?: Invoice,
+    };
+
+    entity Treasury {
+        balance?: Long,
+        name?: String,
+        realm?: Realm,
+    };
+
+    entity TreasuryConfig {
+        anchor_month?: Long,
+        auto_allocate?: String,
+        epoch_length?: String,
+        epoch_minutes?: Long,
+        id?: String,
+        source_fund_code?: String,
+    };
+
+    entity User in [Department, UserProfile] {
+        avatar?: String,
+        home_quarter?: String,
+        id?: String,
+        nickname?: String,
+        human?: Human,
+        member?: Member,
+    };
+
+    entity UserProfile {
+        allowed_to?: String,
+        description?: String,
+        name?: String,
+    };
+
+    entity Verdict {
+        decision?: String,
+        id?: String,
+        issued_date?: String,
+        metadata?: String,
+        reasoning?: String,
+        appeal?: Appeal,
+        case?: Case,
+        issued_by?: Judge,
+    };
+
+    entity Vote {
+        metadata?: String,
+        vote_choice?: String,
+        proposal?: Proposal,
+        voter?: User,
+    };
+
+    entity Zone {
+        description?: String,
+        h3_index?: String,
+        metadata?: String,
+        name?: String,
+        zone_type?: String,
+        land?: Land,
+        user?: User,
+    };
+
+    action read;
+
+    action write;
+
+    action "appeal.decide" in [write]
+        appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };
+
+    action "entity.create" in [write]
+        appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };
+
+    action "entity.delete" in [write]
+        appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };
+
+    action "entity.get" in [read]
+        appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };
+
+    action "entity.list" in [read]
+        appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };
+
+    action "entity.update" in [write]
+        appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };
+}
