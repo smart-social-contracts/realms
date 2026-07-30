@@ -64,7 +64,8 @@ def apply_sandbox_config_change(
         if new_config.get("enabled") and not runtime_sandbox.is_sandbox_available():
             warning = (
                 "Sandboxing enabled but this canister image has no "
-                "_basilisk_sandbox — calls will use the fallback policy"
+                "_basilisk_sandbox — every extension resolving to 'sandbox' "
+                "will fail its calls (there is no in-process fallback)"
             )
         logger.info(f"Sandbox config applied directly: {summary}")
         return {
@@ -138,10 +139,6 @@ def _validate_patch(patch: dict) -> None:
             or patch["budget"] < 0
         ):
             raise ValueError("'budget' must be a non-negative integer")
-    if "fallback_in_process" in patch and not isinstance(
-        patch["fallback_in_process"], bool
-    ):
-        raise ValueError("'fallback_in_process' must be a boolean")
     if "extensions" in patch:
         if not isinstance(patch["extensions"], dict):
             raise ValueError("'extensions' must be an object of {ext_id: mode}")
@@ -157,6 +154,15 @@ def _validate_patch(patch: dict) -> None:
                 raise ValueError(
                     f"extension '{ext_id}' is a core/system extension and "
                     f"cannot be sandboxed"
+                )
+            if (
+                mode == "sandbox"
+                and runtime_sandbox.manifest_runtime_mode(ext_id) == "in_process"
+            ):
+                raise ValueError(
+                    f"extension '{ext_id}' declares \"runtime\": \"in_process\" "
+                    f"and cannot be sandboxed — it imports host modules, so the "
+                    f"spawn would fail and there is no in-process fallback"
                 )
     if "codex_hooks" in patch:
         raw = patch["codex_hooks"]

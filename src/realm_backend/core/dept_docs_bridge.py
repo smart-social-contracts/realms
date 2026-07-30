@@ -1,0 +1,299 @@
+"""``department.*`` and ``dept_doc.*`` verbs (issue #271).
+
+Encrypted documents shared with a department. The canister never sees plaintext:
+``ciphertext`` is an opaque AES-GCM blob, and who can decrypt it is governed by
+``KeyEnvelope`` records at scope ``dept:<department>:doc:<id>``, managed through
+the realm's existing generic grant/revoke endpoints. None of that changes here.
+
+What changes is who decides *access to the record*. In-process, the extension
+made those calls itself — ``_can_manage_department`` and ``_can_view_department``
+lived in ``entry.py``. Those are the checks that decide whether one department
+can read another's documents, so leaving them in extension code and giving the
+sandbox generic ``ext_entity.*`` CRUD over the same rows would have been a
+downgrade dressed as a port: the extension would still be the thing deciding.
+
+So the documents stay extension-owned storage, but every read is projected and
+every write is checked here, against the same two roles as before:
+
+* **manage** (create, retitle, attach ciphertext, delete) — department head or
+  realm admin, via ``core.crypto_scopes``' policy, which is the same policy the
+  key-envelope grants use.
+* **view** (list, get) — anyone in the department, plus managers.
+
+Returning ciphertext to any department member is deliberate and unchanged: it is
+encrypted, and holding it is useless without a KeyEnvelope.
+"""
+
+from typing import Any, Dict, List, Optional
+
+from ic_python_logging import get_logger
+
+logger = get_logger("core.dept_docs_bridge")
+
+EXT_ID = "department_docs"
+DOC_TYPE = "DepartmentDocument"
+
+
+# ---------------------------------------------------------------------------
+# Authorization — one source, used by both the read and write verbs
+# ---------------------------------------------------------------------------
+
+
+def _auth_context():
+    from core.crypto_scopes import production_context
+
+    return production_context()
+
+
+def can_manage(department: str, caller: str) -> bool:
+    """Department head or realm admin: the roles that may share and revoke."""
+    if not department or not caller:
+        return False
+    ctx = _auth_context()
+    return bool(
+        ctx.is_realm_admin(caller) or ctx.is_department_head(department, caller)
+    )
+
+
+def _department(name: str):
+    from ggg import Department
+
+    try:
+        return Department[name]
+    except Exception:
+        return None
+
+
+def is_member(department: str, caller: str) -> bool:
+    """Forward membership check — no full user scan (issue #242)."""
+    if not department or not caller:
+        return False
+    dept = _department(department)
+    if dept is None:
+        return False
+    head = getattr(dept, "head", None)
+    if head is not None and str(getattr(head, "id", "")) == caller:
+        return True
+    try:
+        from core.membership import user_in_department
+        from ggg import User
+
+        return bool(user_in_department(User[caller], dept))
+    except Exception:
+        return caller in member_principals(department)
+
+
+def can_view(department: str, caller: str) -> bool:
+    return can_manage(department, caller) or is_member(department, caller)
+
+
+def member_principals(department: str) -> List[str]:
+    dept = _department(department)
+    if dept is None:
+        return []
+    try:
+        from core.membership import department_member_principals
+
+        return list(department_member_principals(dept, include_head=True))
+    except Exception as e:
+        logger.warning(f"member_principals({department}): {e}")
+        return []
+
+
+def _require_manage(department: str, caller: str, what: str) -> None:
+    if not can_manage(department, caller):
+        raise PermissionError(
+            f"{what} requires being head of '{department}' or a realm admin"
+        )
+
+
+def _require_view(department: str, caller: str, what: str) -> None:
+    if not can_view(department, caller):
+        raise PermissionError(f"{what} requires membership of '{department}'")
+
+
+# ---------------------------------------------------------------------------
+# Storage — the extension's own namespaced entity
+# ---------------------------------------------------------------------------
+
+
+def _doc_class():
+    from core import extension_bridge
+
+    return extension_bridge.own_entity_class(EXT_ID, DOC_TYPE)
+
+
+def _load(doc_id: Any):
+    doc = _doc_class()[doc_id]
+    if not doc:
+        raise ValueError(f"document '{doc_id}' not found")
+    return doc
+
+
+def _doc_department(doc) -> str:
+    return getattr(doc, "department", "") or ""
+
+
+def project(doc, caller: str, include_ciphertext: bool = False) -> Dict[str, Any]:
+    """Plain data for one document. ``ciphertext`` only when asked for, so a
+    listing does not ship every blob in the department."""
+    out = {
+        "id": doc._id,
+        "title": getattr(doc, "title", "") or "",
+        "department": _doc_department(doc),
+        "scope": getattr(doc, "scope", "") or "",
+        "created_by": getattr(doc, "created_by", "") or "",
+        "created_at": getattr(doc, "timestamp_created", "") or "",
+        "can_manage": can_manage(_doc_department(doc), caller),
+    }
+    if include_ciphertext:
+        out["ciphertext"] = getattr(doc, "ciphertext", "") or ""
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Reads
+# ---------------------------------------------------------------------------
+
+
+def v_department_list(caller: str = "", **kwargs) -> dict:
+    """Departments this caller can see, with member principals.
+
+    Managers need the member list to pick who to share a document with; members
+    get it for their own department. A caller who is in neither role sees an
+    empty list rather than an error — there is nothing secret about the fact
+    that other departments exist, but their membership is not this caller's.
+    """
+    from ggg import Department
+
+    out = []
+    for dept in Department.instances():
+        name = getattr(dept, "name", "") or ""
+        if not name or not can_view(name, caller):
+            continue
+        out.append({
+            "name": name,
+            "description": getattr(dept, "description", "") or "",
+            "can_manage": can_manage(name, caller),
+            "members": member_principals(name),
+        })
+    out.sort(key=lambda d: d["name"])
+    return {"departments": out}
+
+
+def v_doc_list(caller: str = "", department: str = "", **kwargs) -> dict:
+    """Document metadata, filtered to departments the caller can view.
+
+    The filter is applied here, not passed to the extension to apply, which is
+    the whole point of the port: a caller cannot widen it.
+    """
+    wanted = (department or "").strip()
+    if wanted and not can_view(wanted, caller):
+        raise PermissionError(f"not a member of '{wanted}'")
+
+    docs = []
+    for doc in _doc_class().instances():
+        dept = _doc_department(doc)
+        if wanted and dept != wanted:
+            continue
+        if not can_view(dept, caller):
+            continue
+        docs.append(project(doc, caller))
+
+    docs.sort(key=lambda d: str(d.get("created_at", "")), reverse=True)
+    return {"documents": docs, "total": len(docs)}
+
+
+def v_doc_get(caller: str = "", id: Any = None, **kwargs) -> dict:
+    """One document including its ciphertext, for client-side decryption."""
+    if id is None:
+        raise ValueError("id is required")
+    doc = _load(id)
+    _require_view(_doc_department(doc), caller, "reading this document")
+    return project(doc, caller, include_ciphertext=True)
+
+
+# ---------------------------------------------------------------------------
+# Writes
+# ---------------------------------------------------------------------------
+
+
+def v_doc_create(
+    caller: str = "", department: str = "", title: str = "", **kwargs
+) -> dict:
+    """Create an empty document and return its id and key scope.
+
+    Empty on purpose: the scope embeds the new id, so the client cannot encrypt
+    until the row exists. ``set_ciphertext`` is the second half.
+    """
+    department = (department or "").strip()
+    title = (title or "").strip()
+    if not department:
+        raise ValueError("department is required")
+    if not title:
+        raise ValueError("title is required")
+    if _department(department) is None:
+        raise ValueError(f"department '{department}' not found")
+
+    _require_manage(department, caller, "creating a document")
+
+    doc = _doc_class()(
+        department=department,
+        title=title,
+        ciphertext="",
+        scope="",
+        created_by=caller,
+    )
+    scope = f"dept:{department}:doc:{doc._id}"
+    doc.scope = scope
+
+    logger.info(f"dept_doc.create: {doc._id} in {department} by {caller}")
+    return {"id": doc._id, "scope": scope}
+
+
+def v_doc_set_ciphertext(
+    caller: str = "", id: Any = None, ciphertext: str = "", **kwargs
+) -> dict:
+    """Attach or replace the encrypted blob.
+
+    Gated on manage rather than view: a member who could overwrite the
+    ciphertext could destroy a document they are only supposed to read.
+    """
+    if id is None:
+        raise ValueError("id is required")
+    doc = _load(id)
+    _require_manage(_doc_department(doc), caller, "editing this document")
+
+    doc.ciphertext = ciphertext or ""
+    return {"id": doc._id}
+
+
+def v_doc_delete(caller: str = "", id: Any = None, **kwargs) -> dict:
+    """Delete a document.
+
+    Any ``KeyEnvelope`` left at the scope is harmless — it wraps a DEK for data
+    that no longer exists — and a manager can revoke them through the realm's
+    generic revoke endpoint. The scope is returned so the caller can.
+    """
+    if id is None:
+        raise ValueError("id is required")
+    doc = _load(id)
+    department = _doc_department(doc)
+    _require_manage(department, caller, "deleting this document")
+
+    scope = getattr(doc, "scope", "") or ""
+    doc.delete()
+    logger.info(f"dept_doc.delete: {id} in {department} by {caller}")
+    return {"id": id, "scope": scope}
+
+
+VERBS = {
+    "department.list": v_department_list,
+    "dept_doc.list": v_doc_list,
+    "dept_doc.get": v_doc_get,
+    "dept_doc.create": v_doc_create,
+    "dept_doc.set_ciphertext": v_doc_set_ciphertext,
+    "dept_doc.delete": v_doc_delete,
+}
+
+READ_VERBS = frozenset({"department.list", "dept_doc.list", "dept_doc.get"})

@@ -46,6 +46,37 @@ def create_extension_entity_class(extension_name):
     return ExtensionEntity
 
 
+def _has_backend(ext_id: str) -> bool:
+    """True when the extension ships an ``entry.py`` to execute.
+
+    Frontend-only extensions have nothing to isolate, so they skip the sandbox
+    branch entirely and take the ordinary "no such function" path rather than
+    failing on a spawn that has no source to spawn.
+    """
+    import os
+
+    try:
+        from core.runtime_extensions import EXTENSIONS_DIR
+    except Exception:
+        return True
+    return os.path.exists(os.path.join(EXTENSIONS_DIR, ext_id, "entry.py"))
+
+
+def _authenticated_caller() -> str:
+    """The principal invoking this extension call.
+
+    Read once, here at the host boundary, and handed to the bridge. Everything
+    the sandboxed extension is allowed to see or change is scoped to this
+    value, and the extension has no way to influence it.
+    """
+    try:
+        from basilisk import ic
+
+        return ic.caller().to_str()
+    except Exception:
+        return ""
+
+
 def call_extension_function(extension_name: str, function_name: str, args: str):
     logger.debug(f"Calling extension '{extension_name}' function '{function_name}'")
 
@@ -54,30 +85,34 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
         from core.runtime_extensions import get_func, resolve_extension_id
 
         resolved = resolve_extension_id(extension_name)
-        if runtime_sandbox.should_sandbox(resolved):
-            fallback = runtime_sandbox.get_config().get("fallback_in_process", True)
+        if runtime_sandbox.should_sandbox(resolved) and _has_backend(resolved):
+            # No fallback: an extension resolved to ``sandbox`` never runs with
+            # host access. Retrying in-process would turn any spawn failure —
+            # including one the extension can provoke — into full privilege.
             if not runtime_sandbox.is_sandbox_available():
-                if not fallback:
-                    raise RuntimeError(
-                        f"Extension '{resolved}' requires sandboxed execution "
-                        f"but this canister image has no sandbox support"
-                    )
-                logger.warning(
-                    f"Sandboxing enabled for '{resolved}' but _basilisk_sandbox "
-                    f"is unavailable in this image; running in-process"
+                raise RuntimeError(
+                    f"Extension '{resolved}' resolves to sandboxed execution "
+                    f"but this canister image has no _basilisk_sandbox. Install "
+                    f"an image with sandbox support, or declare "
+                    f"\"runtime\": \"in_process\" in its manifest."
                 )
-            else:
-                try:
-                    return runtime_sandbox.call_in_sandbox(
-                        resolved, function_name, args
-                    )
-                except Exception as sandbox_err:
-                    if not fallback:
-                        raise
-                    logger.warning(
-                        f"Sandboxed call {resolved}.{function_name} failed "
-                        f"({sandbox_err}); falling back to in-process execution"
-                    )
+            caller = _authenticated_caller()
+            if runtime_sandbox.is_async_extension_function(resolved, function_name):
+                # A generator, not a value: the outcall inside it is what ends
+                # the message. Only reachable through ``extension_async_call``,
+                # since a query cannot make an inter-canister call at all.
+                from core import async_bridge
+
+                return async_bridge.run_with_effects(
+                    resolved,
+                    function_name,
+                    args,
+                    caller,
+                    runtime_sandbox.extension_capabilities(resolved),
+                )
+            return runtime_sandbox.call_extension_in_sandbox(
+                resolved, function_name, args, caller=caller
+            )
 
         func = get_func(extension_name, function_name)
         logger.debug(f"Got function from registry: {func}")

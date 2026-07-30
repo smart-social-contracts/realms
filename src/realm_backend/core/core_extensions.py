@@ -15,6 +15,12 @@ CORE_EXTENSION_IDS: FrozenSet[str] = frozenset({
     "admin_dashboard",
     "vault",
     "codex_viewer",
+    # Platform-plane extensions: these administer the realm rather than run on
+    # top of it, so they hold host privilege by design and are never sandboxed.
+    "task_monitor",      # runs codex code via core.execution.run_code
+    "access_manager",    # departments, positions, payroll, policy admin
+    "mundus_explorer",   # queries the registry canister for sibling realms
+    "role_manager",      # profiles, permissions, registration codes
 })
 
 # Mundus-level RegistryAssistant owns the chat UI; no in-realm consumer extension.

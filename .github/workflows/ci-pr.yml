@@ -58,6 +58,34 @@ jobs:
           pip install pytest
       - name: CLI unit tests
         run: pytest -v cli/tests/ || true
+      - name: Extension privilege ratchet
+        # Blocking on purpose: these are pure source scans and in-memory unit
+        # tests with no canister or DB, so a failure here is a real
+        # regression. The exemption list may only shrink, no extension may
+        # take the caller's identity from its own call args, and every bridge
+        # verb must keep checking the caller's operation host-side.
+        run: |
+          python3 scripts/declare_extension_runtime.py --check
+          pytest -q tests/backend/test_extension_caller_identity.py \
+                    tests/backend/test_sandbox_exemption_ratchet.py \
+                    tests/backend/test_extension_manifest_contract.py \
+                    tests/backend/test_extension_bridge.py \
+                    tests/backend/test_extension_bridge_verbs.py \
+                    tests/backend/test_extension_owned_entities.py \
+                    tests/backend/test_land_bridge.py \
+                    tests/backend/test_extension_grants.py \
+                    tests/backend/test_notification_bridge.py \
+                    tests/backend/test_console_bridge.py \
+                    tests/backend/test_async_bridge.py \
+                    tests/backend/test_treasury_bridge.py \
+                    tests/backend/test_procurement_bridge.py \
+                    tests/backend/test_procurement_sandboxed.py \
+                    tests/backend/test_justice_bridge.py \
+                    tests/backend/test_justice_sandboxed.py \
+                    tests/backend/test_sandbox_package_bundle.py \
+                    tests/backend/department_docs/ \
+                    tests/backend/test_time_utils.py \
+                    tests/backend/test_ggg_sdk_json_shim.py
       - name: Validate descriptors
         run: |
           for f in deployment-descriptors/*-mundus*.yml; do

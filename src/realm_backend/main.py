@@ -5661,11 +5661,13 @@ def set_sandbox_config(config_json: str) -> str:
 
     Accepted keys: enabled (bool), default_mode ("sandbox"|"in_process"),
     extensions ({ext_id: mode, null clears an override}), codex_hooks
-    ({default_mode, hooks}), budget (int >= 0), fallback_in_process (bool).
+    ({default_mode, hooks}), budget (int >= 0).
     Optionally wrap as ``{"patch": {...}, "confirm": true}`` when root
     department policy requires a governance vote.
 
-    Requires ``realm.configure``. Core/system extensions cannot be sandboxed.
+    Requires ``realm.configure``. Core/system extensions cannot be sandboxed,
+    nor can extensions declaring ``"runtime": "in_process"``. There is no
+    in-process fallback: a sandboxed call that cannot spawn fails.
     """
     logger.info("🔧 set_sandbox_config() called")
     try:

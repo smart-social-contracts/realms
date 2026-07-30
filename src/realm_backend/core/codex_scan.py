@@ -39,8 +39,17 @@ _FORBIDDEN_ROOTS = ("core",)
 # X``. A dotted path (``ggg.system.user_profile``) reaches private internals.
 _GGG_ROOT = "ggg"
 
+# A *sandboxed extension* is stricter than a codex: a subinterpreter has no
+# host modules at all, so importing any of these is not a style problem but a
+# guaranteed failure at call time. The bridge is reached through ``ggg_sdk``.
+_SANDBOX_FORBIDDEN_ROOTS = ("core", "ggg", "basilisk", "_cdk")
+
 _OPENERS = "([{"
 _CLOSERS = ")]}"
+
+# Scan policies.
+CODEX_POLICY = "codex"          # public ``ggg`` allowed, ``core.*`` is not
+SANDBOX_POLICY = "sandbox"      # no host modules whatsoever
 
 
 class Violation(NamedTuple):
@@ -50,11 +59,21 @@ class Violation(NamedTuple):
     reason: str
 
 
-def _module_forbidden(module: str) -> str:
+def _module_forbidden(module: str, policy: str = CODEX_POLICY) -> str:
     """Return a human reason if importing *module* is disallowed, else ''."""
     if not module:
         return ""
     root = module.split(".")[0]
+
+    if policy == SANDBOX_POLICY:
+        if root in _SANDBOX_FORBIDDEN_ROOTS:
+            return (
+                f"imports host module '{module}', which does not exist inside a "
+                f"subinterpreter; use 'from ggg_sdk import ctx' and the "
+                f"capability bridge instead"
+            )
+        return ""
+
     if root in _FORBIDDEN_ROOTS:
         return (
             f"imports host-internal '{module}'; call the realm through the "
@@ -175,14 +194,15 @@ def _split_from(statement: str) -> Optional[Tuple[str, str]]:
 
 
 def _scan_statement(
-    filename: str, lineno: int, statement: str, violations: List[Violation]
+    filename: str, lineno: int, statement: str, violations: List[Violation],
+    policy: str = CODEX_POLICY,
 ) -> None:
     text = statement.strip()
     keyword = _first_word(text)
 
     if keyword == "import":
         for name in _imported_names(text.lstrip()[len("import") :]):
-            reason = _module_forbidden(name)
+            reason = _module_forbidden(name, policy)
             if reason:
                 violations.append(Violation(filename, lineno, f"import {name}", reason))
         return
@@ -195,7 +215,7 @@ def _scan_statement(
         # Relative imports (``from . import x``) are a codex's own siblings.
         if module.startswith("."):
             return
-        reason = _module_forbidden(module)
+        reason = _module_forbidden(module, policy)
         if reason:
             names = ", ".join(_imported_names(raw_names))
             violations.append(
@@ -203,7 +223,9 @@ def _scan_statement(
             )
 
 
-def scan_source(filename: str, source: str) -> List[Violation]:
+def scan_source(
+    filename: str, source: str, policy: str = CODEX_POLICY
+) -> List[Violation]:
     """Read one source string and return its import-policy violations."""
     violations: List[Violation] = []
     if not source:
@@ -217,21 +239,53 @@ def scan_source(filename: str, source: str) -> List[Violation]:
             continue
         statement, last = _join_continuations(lines, i)
         for part in statement.split(";"):
-            _scan_statement(filename, i + 1, part, violations)
+            _scan_statement(filename, i + 1, part, violations, policy)
         i = last + 1
     return violations
 
 
-def scan_codex_files(files: Dict[str, str]) -> List[Violation]:
-    """Scan every ``.py`` file in a codex package's ``{filename: content}`` map."""
+def scan_codex_files(
+    files: Dict[str, str], policy: str = CODEX_POLICY
+) -> List[Violation]:
+    """Scan every ``.py`` file in a package's ``{filename: content}`` map."""
     violations: List[Violation] = []
     for filename, content in (files or {}).items():
         if not isinstance(filename, str) or not filename.endswith(".py"):
             continue
         if not isinstance(content, str):
             continue
-        violations.extend(scan_source(filename, content))
+        violations.extend(scan_source(filename, content, policy))
     return violations
+
+
+def check_extension_imports(
+    ext_id: str, files: Dict[str, str], enforce: bool
+) -> str:
+    """Scan an extension destined for the sandbox and report host imports.
+
+    Same warn-then-enforce shape as :func:`check_codex_imports`, but against
+    the stricter sandbox policy: inside a subinterpreter there is no ``ggg``
+    either, so an extension that still imports it cannot run there at all.
+
+    Warn mode exists so the scanner can be pointed at the whole extension
+    catalogue and report the distance left to travel without blocking anyone.
+    """
+    violations = scan_codex_files(files, SANDBOX_POLICY)
+    for v in violations:
+        logger.warning(
+            f"extension_scan[{ext_id}]: {v.filename}:{v.lineno}: "
+            f"{v.statement} — {v.reason}"
+        )
+    if not violations:
+        return ""
+    if enforce:
+        first = violations[0]
+        return (
+            f"Extension '{ext_id}' cannot run sandboxed: "
+            f"{first.filename}:{first.lineno}: {first.statement} — {first.reason} "
+            f"({len(violations)} violation(s) total)."
+        )
+    return ""
 
 
 def check_codex_imports(ext_id: str, files: Dict[str, str], enforce: bool) -> str:

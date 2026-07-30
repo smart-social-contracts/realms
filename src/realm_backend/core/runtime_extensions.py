@@ -348,6 +348,24 @@ def install_extension(
 
     _seed_extension_entity(ext_id, manifest)
 
+    # Entities an extension declares in its manifest are registered here, on
+    # the host, rather than by the extension calling
+    # create_extension_entity_class at import time — a sandboxed extension has
+    # no way to build an ORM class. Failure is fatal: the extension's storage
+    # would silently not exist.
+    try:
+        from core.extension_bridge import register_declared_entities
+
+        registered = register_declared_entities(ext_id, manifest)
+        if registered:
+            logger.info(
+                f"Extension {ext_id}: registered declared entities "
+                f"({', '.join(registered)})"
+            )
+    except Exception as e:
+        logger.error(f"Extension {ext_id}: invalid 'entities' declaration — {e}")
+        return False
+
     has_entry = os.path.exists(os.path.join(ext_path, "entry.py"))
     if has_entry:
         # Backend-bearing extension — entry.py MUST load cleanly, otherwise

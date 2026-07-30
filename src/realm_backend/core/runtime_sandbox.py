@@ -15,14 +15,28 @@ Policy file (persistent FS, survives upgrades): /sandbox_config.json
             "default_mode": "sandbox",
             "hooks": {"role_assign_prehook": "sandbox" | "in_process", ...}
         },
-        "budget": 10000000,            # per-spawn instruction budget (0 = unmetered)
-        "fallback_in_process": true    # degrade to in-process if sandbox fails
+        "budget": 10000000             # per-spawn instruction budget (0 = unmetered)
     }
 
-Core/system extensions (CORE_EXTENSION_IDS or manifest "system": true) are
-NEVER sandboxed regardless of config — they are part of the trusted platform
-surface and depend on host modules (ggg, core) that do not exist inside a
-sandbox.
+**There is no in-process fallback.** An extension or hook that resolves to
+``sandbox`` either runs in the subinterpreter or fails; it is never retried
+with full host access. Silently degrading to in-process turned every spawn
+failure into a privilege escalation and made the sandbox unfalsifiable — you
+could not tell from the outside whether isolation was in effect.
+
+Running in-process is therefore a *declaration*, never a runtime discovery.
+Three things can make it one, all of them visible before a call happens:
+
+* Core/system extensions (CORE_EXTENSION_IDS or manifest ``"system": true``)
+  are never sandboxed — they are the trusted platform surface and depend on
+  host modules (``ggg``, ``core``) that do not exist inside a sandbox.
+* An extension manifest may declare ``"runtime": "in_process"``, which is
+  required for any extension that imports host modules. Admins cannot override
+  such an extension to ``sandbox``: the spawn is known in advance to fail.
+* An admin (or governance proposal) may set ``extensions: {id: "in_process"}``.
+
+``get_status`` reports the resolved mode and its reason for every installed
+extension, so the trusted set is auditable in Realm Settings.
 
 Certain codex hooks are structurally forced in-process (async / broad seeding).
 Other hooks prefer sandbox per config but only actually run sandboxed once
@@ -33,7 +47,7 @@ All data crossing the boundary is deep-copied plain data. So:
 
 * **Extensions** run fresh-per-use (spawn, one call, close) as pure compute over
   their JSON args — no host reads/writes. Extensions that import host modules
-  fail to spawn and, with ``fallback_in_process``, degrade with a warning.
+  cannot spawn and must declare ``"runtime": "in_process"`` in their manifest.
 * **Codex hooks** use the *gather → compute → apply-effects* bridge
   (``core.codex_bridge``): the host injects a plain-data ``context`` of
   pre-gathered reads, the hook may additionally make live *read* calls back into
@@ -48,7 +62,8 @@ extended spawn signature run unmetered — see ``supports_capabilities()``.
 
 import json
 import os
-from typing import Any, List, Optional
+import re
+from typing import Any, Dict, List, Optional
 
 from ic_python_logging import get_logger
 
@@ -133,7 +148,6 @@ DEFAULT_CONFIG = {
         "hooks": {},
     },
     "budget": 10_000_000,
-    "fallback_in_process": True,
 }
 
 _config_cache: Optional[dict] = None
@@ -190,7 +204,6 @@ def get_config() -> dict:
         "extensions": {},
         "codex_hooks": _normalize_codex_hooks(DEFAULT_CONFIG["codex_hooks"]),
         "budget": DEFAULT_CONFIG["budget"],
-        "fallback_in_process": DEFAULT_CONFIG["fallback_in_process"],
     }
     try:
         if os.path.exists(CONFIG_PATH):
@@ -215,8 +228,6 @@ def get_config() -> dict:
                     and stored["budget"] >= 0
                 ):
                     config["budget"] = stored["budget"]
-                if "fallback_in_process" in stored:
-                    config["fallback_in_process"] = bool(stored["fallback_in_process"])
     except Exception as e:
         logger.warning(f"Could not read {CONFIG_PATH} ({e}); using defaults")
 
@@ -260,11 +271,6 @@ def update_config(patch: dict) -> dict:
             raise ValueError("'budget' must be a non-negative integer")
         config["budget"] = patch["budget"]
 
-    if "fallback_in_process" in patch:
-        if not isinstance(patch["fallback_in_process"], bool):
-            raise ValueError("'fallback_in_process' must be a boolean")
-        config["fallback_in_process"] = patch["fallback_in_process"]
-
     if "extensions" in patch:
         if not isinstance(patch["extensions"], dict):
             raise ValueError("'extensions' must be an object of {ext_id: mode}")
@@ -281,6 +287,17 @@ def update_config(patch: dict) -> dict:
                 raise ValueError(
                     f"extension '{ext_id}' is a core/system extension and "
                     f"cannot be sandboxed"
+                )
+            if mode == "sandbox" and _is_codex_package(ext_id):
+                raise ValueError(
+                    f"'{ext_id}' is a codex — its hooks are isolated per-hook by "
+                    f"the capability bridge, not by this setting"
+                )
+            if mode == "sandbox" and manifest_runtime_mode(ext_id) == "in_process":
+                raise ValueError(
+                    f"extension '{ext_id}' declares \"runtime\": \"in_process\" "
+                    f"and cannot be sandboxed — it imports host modules, so the "
+                    f"spawn would fail and there is no in-process fallback"
                 )
             config["extensions"][ext_id] = mode
 
@@ -352,15 +369,71 @@ def is_system_extension(ext_id: str) -> bool:
         return False
 
 
+def _is_codex_package(ext_id: str) -> bool:
+    """True for ``kind: codex`` packages.
+
+    A codex's isolation is decided per *hook* by the capability bridge
+    (``sandbox_module`` + declared capabilities), not by this switch. Its
+    ``entry.py`` is the legacy in-process implementation and imports host
+    modules, so it must never be routed through ``call_in_sandbox``.
+    """
+    try:
+        from core.runtime_extensions import _load_manifest
+
+        manifest = _load_manifest(ext_id) or {}
+    except Exception:
+        return False
+    return manifest.get("kind") == "codex"
+
+
+def manifest_runtime_mode(ext_id: str) -> Optional[str]:
+    """The execution mode an extension's manifest declares, if any.
+
+    An extension whose ``entry.py`` imports host modules (``ggg``, ``core``,
+    ``basilisk``) cannot spawn in a subinterpreter, and with no fallback that
+    is a hard failure at call time. Such extensions declare
+    ``"runtime": "in_process"`` so the trusted set is known from the manifest
+    rather than discovered from a stack trace.
+    """
+    try:
+        from core.runtime_extensions import _load_manifest
+
+        manifest = _load_manifest(ext_id) or {}
+    except Exception:
+        return None
+    mode = manifest.get("runtime")
+    return mode if mode in VALID_MODES else None
+
+
+def resolve_mode(ext_id: str) -> tuple:
+    """Resolve one extension's execution mode. Returns ``(mode, reason)``.
+
+    Reason is a short human string for the admin UI; the mode is authoritative
+    and is never revised at call time.
+    """
+    config = get_config()
+    if is_system_extension(ext_id):
+        return "in_process", "core/system extension"
+    if _is_codex_package(ext_id):
+        return "in_process", "codex (hooks isolated via capability bridge)"
+    if not config.get("enabled"):
+        return "in_process", "sandboxing disabled"
+
+    declared = manifest_runtime_mode(ext_id)
+    if declared == "in_process":
+        return "in_process", "declared by manifest"
+
+    override = config.get("extensions", {}).get(ext_id)
+    if override in VALID_MODES:
+        return override, "admin override"
+    if declared == "sandbox":
+        return "sandbox", "declared by manifest"
+    return config.get("default_mode"), "realm default"
+
+
 def should_sandbox(ext_id: str) -> bool:
     """Decide the execution mode for one (override-resolved) extension id."""
-    config = get_config()
-    if not config.get("enabled"):
-        return False
-    if is_system_extension(ext_id):
-        return False
-    mode = config.get("extensions", {}).get(ext_id) or config.get("default_mode")
-    return mode == "sandbox"
+    return resolve_mode(ext_id)[0] == "sandbox"
 
 
 def _desired_hook_mode(hook_name: str, config: Optional[dict] = None) -> str:
@@ -407,14 +480,6 @@ def describe_config_patch(patch: dict, current: Optional[dict] = None) -> str:
         )
     if "default_mode" in patch and patch["default_mode"] != current.get("default_mode"):
         parts.append(f"extension default → {patch['default_mode']}")
-    if "fallback_in_process" in patch and patch["fallback_in_process"] != current.get(
-        "fallback_in_process"
-    ):
-        parts.append(
-            "enable in-process fallback"
-            if patch["fallback_in_process"]
-            else "disable in-process fallback"
-        )
     if "budget" in patch and patch["budget"] != current.get("budget"):
         parts.append(f"budget → {patch['budget']}")
     if isinstance(patch.get("extensions"), dict) and patch["extensions"]:
@@ -553,9 +618,13 @@ def call_in_sandbox(ext_id: str, function_name: str, args: str) -> Any:
     """Run ``entry.py::function_name(args)`` of an installed extension in a
     fresh subinterpreter and return its (plain data) result.
 
-    Pure compute over the JSON ``args`` string — no host reads/writes. Raises on
-    any failure (missing entry.py, spawn/import failure, non-plain-data result);
-    the caller decides whether to fall back in-process.
+    Pure compute over the JSON ``args`` string — no host reads/writes, since a
+    subinterpreter has no ``ggg``/``core``/``basilisk``. Extensions needing host
+    data go through the capability bridge instead.
+
+    Raises on any failure (missing entry.py, spawn/import failure, non-plain-data
+    result). Failures are terminal: there is no in-process fallback, because one
+    that silently restored full privilege would make the sandbox advisory.
     """
     from core.runtime_extensions import EXTENSIONS_DIR
 
@@ -587,9 +656,239 @@ def _ggg_sdk_source() -> str:
     return ggg_sdk.GGG_SDK_SOURCE
 
 
-def _build_codex_sandbox_source(codex_source: str) -> str:
+def _extension_capabilities(ext_id: str) -> List[str]:
+    """Bridge capabilities the extension manifest declares.
+
+    Absent or malformed means an empty list: an extension gets nothing it did
+    not ask for in writing.
+    """
+    try:
+        manifest = _codex_manifest(ext_id)
+        declared = manifest.get("capabilities") or []
+        return [c for c in declared if isinstance(c, str)]
+    except Exception as e:
+        logger.warning(f"_extension_capabilities({ext_id}) failed: {e}")
+        return []
+
+
+def extension_capabilities(ext_id: str) -> List[str]:
+    """Public accessor for an extension's declared capabilities."""
+    return _extension_capabilities(ext_id)
+
+
+def call_extension_in_sandbox(
+    ext_id: str, function_name: str, args: str, caller: str = ""
+) -> Any:
+    """Run ``entry.py::function_name(args)`` sandboxed, over the capability
+    bridge, and return its plain-data result.
+
+    Same contract as :func:`call_in_sandbox` — the extension keeps its
+    ``f(args: str) -> str`` signature — but the subinterpreter also gets the
+    ``ggg_sdk`` module and an ``rpc`` channel into
+    :mod:`core.extension_bridge`, so it can reach realm data without importing
+    ``ggg``.
+
+    *caller* is the authenticated principal, injected here and closed over by
+    the handler. Sandboxed code has no way to influence it.
+
+    Raises on any failure; there is no in-process fallback.
+    """
+    from core import extension_bridge
+
+    capabilities = _extension_capabilities(ext_id)
+    source = _build_codex_sandbox_source(
+        _extension_source(ext_id), _extension_package_modules(ext_id)
+    )
+
+    logger.debug(
+        f"Sandboxing extension {ext_id}.{function_name} "
+        f"(caller={caller}, capabilities={capabilities})"
+    )
+    return _run_in_subinterpreter(
+        source,
+        function_name,
+        {"args": args},
+        context_id=ext_id,
+        allowed_actions=sorted(
+            set(capabilities) & set(extension_bridge.VERBS)
+        ),
+        rpc_handler=extension_bridge.make_rpc_handler(
+            ext_id, capabilities, caller
+        ),
+    )
+
+
+def _extension_source(ext_id: str) -> str:
+    from core.runtime_extensions import EXTENSIONS_DIR
+
+    entry_path = os.path.join(EXTENSIONS_DIR, ext_id, "entry.py")
+    if not os.path.exists(entry_path):
+        raise FileNotFoundError(f"extension '{ext_id}' has no entry.py")
+    with open(entry_path, "r") as f:
+        return f.read()
+
+
+# Package name the bundled sibling modules are registered under. Fixed rather
+# than derived from the extension id: a subinterpreter serves one extension, so
+# there is nothing to collide with, and an id with a hyphen would not be a valid
+# module name.
+SANDBOX_PACKAGE = "_ext"
+
+_RELATIVE_IMPORT = re.compile(
+    r"^\s*from\s+\.(?P<module>\w+)?\s+import\s+(?P<names>.+)$", re.MULTILINE
+)
+
+
+def _module_dependencies(source: str) -> List[str]:
+    """Sibling modules a module imports, from ``from . import x`` and
+    ``from .x import y``."""
+    deps = []
+    for match in _RELATIVE_IMPORT.finditer(source):
+        module = match.group("module")
+        if module:
+            deps.append(module)
+        else:
+            # ``from . import a, b as c`` — the names are modules.
+            for part in match.group("names").split(","):
+                name = part.strip().split(" as ")[0].strip()
+                if name and name.isidentifier():
+                    deps.append(name)
+    return deps
+
+
+def _order_modules(sources: Dict[str, str]) -> List[str]:
+    """Dependency order for the sibling modules.
+
+    ``from .constants import VALID_TRANSITIONS`` needs ``constants`` already
+    executed, so import order is load-bearing and cannot just be alphabetical.
+    A cycle is reported rather than guessed at: the remaining modules go last in
+    a stable order, which is correct for ``from . import x`` (the module object
+    is populated in place) and will fail loudly for a ``from .x import name``
+    that genuinely cannot be satisfied.
+    """
+    remaining = dict(sources)
+    ordered: List[str] = []
+
+    while remaining:
+        ready = sorted(
+            name for name, source in remaining.items()
+            if all(
+                dep in ordered or dep not in sources
+                for dep in _module_dependencies(source)
+            )
+        )
+        if not ready:
+            leftover = sorted(remaining)
+            logger.warning(
+                f"sandbox bundle: import cycle among {leftover}; loading in "
+                f"name order, which works for 'from . import x' but not for "
+                f"'from .x import name'"
+            )
+            ordered.extend(leftover)
+            break
+        ordered.extend(ready)
+        for name in ready:
+            remaining.pop(name)
+
+    return ordered
+
+
+def _extension_package_modules(ext_id: str) -> List[tuple]:
+    """``(module_name, source)`` for an extension's sibling modules, in load order.
+
+    The in-process loader imports the extension directory as a package so
+    ``entry.py`` can do ``from . import roles``. A subinterpreter has no
+    filesystem and ``sys.path == []``, so the same modules are read here and
+    registered in the sandbox's ``sys.modules`` instead — the mechanism
+    ``ggg_sdk`` already uses.
+    """
+    from core.runtime_extensions import EXTENSIONS_DIR
+
+    ext_path = os.path.join(EXTENSIONS_DIR, ext_id)
+    if not os.path.isdir(ext_path):
+        return []
+
+    sources: Dict[str, str] = {}
+    for filename in sorted(os.listdir(ext_path)):
+        if not filename.endswith(".py") or filename in ("entry.py", "__init__.py"):
+            continue
+        try:
+            with open(os.path.join(ext_path, filename), "r") as f:
+                sources[filename[:-3]] = f.read()
+        except OSError as e:
+            logger.warning(f"{ext_id}: cannot read {filename}: {e}")
+
+    return [(name, sources[name]) for name in _order_modules(sources)]
+
+
+def is_async_extension_function(ext_id: str, function_name: str) -> bool:
+    """Whether the manifest declares this entry point as effect-driven."""
+    from core import async_bridge
+
+    try:
+        functions = async_bridge.declared_async_functions(_codex_manifest(ext_id))
+    except ValueError as e:
+        logger.warning(f"{ext_id}: bad async_functions declaration: {e}")
+        return False
+    return function_name in functions
+
+
+def call_extension_round(
+    ext_id: str,
+    function_name: str,
+    args: str,
+    caller: str = "",
+    resolved: Optional[dict] = None,
+) -> Any:
+    """One round of an effect-driven extension call.
+
+    Returns the dispatcher's status dict: ``{"status": "ok", "value": ...}`` or
+    ``{"status": "effect", "request": ...}``. Driven by
+    :func:`core.async_bridge.run_with_effects`, which owns the loop and the
+    outcall.
+
+    Write verbs are refused for the whole call. The body replays once per round,
+    so a write here would be applied once per round, and there is no transaction
+    to roll back — see ``async_bridge.ASYNC_WRITE_RULE``.
+    """
+    from core import extension_bridge
+
+    capabilities = _extension_capabilities(ext_id)
+    source = _build_codex_sandbox_source(
+        _extension_source(ext_id), _extension_package_modules(ext_id)
+    )
+
+    logger.debug(
+        f"Sandboxing async extension round {ext_id}.{function_name} "
+        f"(caller={caller}, resolved={sorted((resolved or {}).keys())})"
+    )
+    return _run_in_subinterpreter(
+        source,
+        "__ext_async_round__",
+        {
+            "args": args,
+            "__fn__": function_name,
+            "__resolved__": dict(resolved or {}),
+        },
+        context_id=ext_id,
+        allowed_actions=sorted(
+            set(capabilities) & set(extension_bridge.READ_VERBS)
+        ),
+        rpc_handler=extension_bridge.make_rpc_handler(
+            ext_id, capabilities, caller, allow_writes=False
+        ),
+    )
+
+
+def _build_codex_sandbox_source(
+    codex_source: str, package_modules: Optional[List[tuple]] = None
+) -> str:
     """Prepend a loader that installs ``ggg_sdk`` as an importable module inside
     the subinterpreter, then the codex source.
+
+    *package_modules* is ``(name, source)`` for an extension's sibling modules,
+    bundled in so a multi-file extension can be sandboxed at all — see
+    :func:`_extension_package_modules`.
 
     The subinterpreter spawns from a single source string, so the SDK is
     embedded and registered in ``sys.modules`` before the codex runs. The codex
@@ -606,7 +905,63 @@ def _build_codex_sandbox_source(codex_source: str) -> str:
         "exec(compile(_GGG_SDK_SOURCE, 'ggg_sdk.py', 'exec'), _ggg_sdk.__dict__)\n"
         "_sys.modules['ggg_sdk'] = _ggg_sdk\n"
     )
-    return loader + "\n" + codex_source
+    if package_modules:
+        loader += _package_loader(package_modules)
+    return loader + "\n" + codex_source + "\n" + _ASYNC_DISPATCHER
+
+
+def _package_loader(modules: List[tuple]) -> str:
+    """Loader for an extension's sibling modules.
+
+    Registers a package and each submodule in the sandbox's ``sys.modules``, then
+    sets ``__name__``/``__package__`` on the spawned source so that ``from .
+    import roles`` in ``entry.py`` resolves. Nothing here touches ``sys.path``
+    (which is empty) — the relative import finds the already-registered module.
+    """
+    pkg = SANDBOX_PACKAGE
+    out = [
+        f"_ext_pkg = type(_sys)({pkg!r})",
+        # An empty __path__ makes it a package for the import machinery without
+        # giving it anywhere on disk to search.
+        "_ext_pkg.__path__ = []",
+        f"_sys.modules[{pkg!r}] = _ext_pkg",
+    ]
+    for name, source in modules:
+        full = f"{pkg}.{name}"
+        out += [
+            f"_m = type(_sys)({full!r})",
+            f"_m.__package__ = {pkg!r}",
+            f"_sys.modules[{full!r}] = _m",
+            f"exec(compile({source!r}, {name + '.py'!r}, 'exec'), _m.__dict__)",
+            f"setattr(_ext_pkg, {name!r}, _m)",
+        ]
+    # Set last: until now the loader itself is running at top level, and a
+    # __package__ in scope would make any relative import here resolve oddly.
+    out += [f"__package__ = {pkg!r}", f"__name__ = {pkg + '.entry'!r}"]
+    return "\n".join(out) + "\n"
+
+
+# Entry point for one round of an async extension call (issue #279). Appended to
+# the spawned source rather than living in ``ggg_sdk`` because it has to resolve
+# the extension's own functions, which are in this module's globals.
+#
+# It returns a status dict instead of the function's value so the host can tell
+# "here is the answer" from "I need an outcall first" without inspecting types.
+# ``_ggg_sdk`` is the module object the loader built, used directly rather than
+# looked up in ``sys.modules``: ``NeedEffect`` is a distinct class per exec of
+# the SDK source, so resolving it late could compare against a different class
+# than the one the extension raised and let the request escape as an error.
+_ASYNC_DISPATCHER = '''
+def __ext_async_round__(args, __fn__, __resolved__):
+    _ggg_sdk.ctx.services._resolved = __resolved__ or {}
+    _fn = globals().get(__fn__)
+    if _fn is None:
+        raise AttributeError("extension has no function " + str(__fn__))
+    try:
+        return {"status": "ok", "value": _fn(args)}
+    except _ggg_sdk.NeedEffect as _need:
+        return {"status": "effect", "request": _need.request}
+'''
 
 
 def _codex_manifest(codex_id: str) -> dict:
@@ -714,8 +1069,8 @@ def call_codex_hook_in_sandbox(codex_id: str, hook_name: str, args: str) -> Any:
     host injects a plain-data ``context`` (pre-projected reads); the hook runs as
     pure compute and returns an envelope ``{"ok", "effects", "result"}``; the host
     then authorizes and applies the effects against the codex's declared
-    capabilities via ``core.codex_bridge.apply_effects``. Raises on any failure;
-    the caller decides whether to fall back in-process.
+    capabilities via ``core.codex_bridge.apply_effects``. Raises on any failure,
+    which is terminal — there is no in-process fallback.
     """
     from core import codex_bridge
     from core.runtime_extensions import EXTENSIONS_DIR
@@ -812,18 +1167,29 @@ def run_bridge_hook(
 
 def get_status() -> dict:
     """Effective status for the admin API: config + availability + the
-    resolved mode of every installed extension and known codex hook."""
+    resolved mode of every installed extension and known codex hook.
+
+    ``extensions`` carries the structured per-extension view; ``resolved_modes``
+    is the human-readable form kept for existing callers.
+    """
     from core.runtime_extensions import list_installed
 
     config = get_config()
     resolved = {}
+    ext_meta = []
     for ext_id in list_installed():
-        if is_system_extension(ext_id):
-            resolved[ext_id] = "in_process (system)"
-        elif not config.get("enabled"):
-            resolved[ext_id] = "in_process (sandboxing disabled)"
-        else:
-            resolved[ext_id] = "sandbox" if should_sandbox(ext_id) else "in_process"
+        mode, reason = resolve_mode(ext_id)
+        resolved[ext_id] = mode if mode == "sandbox" else f"{mode} ({reason})"
+        ext_meta.append({
+            "id": ext_id,
+            "resolved_mode": mode,
+            "reason": reason,
+            # Locked extensions cannot be sandboxed at all, so the admin UI
+            # offers no override for them.
+            "locked": is_system_extension(ext_id)
+            or _is_codex_package(ext_id)
+            or manifest_runtime_mode(ext_id) == "in_process",
+        })
 
     hook_modes = {name: resolve_hook_mode(name) for name in KNOWN_CODEX_HOOKS}
     hook_meta = []
@@ -844,6 +1210,7 @@ def get_status() -> dict:
         "available": is_sandbox_available(),
         "config": config,
         "resolved_modes": resolved,
+        "extensions": ext_meta,
         "hook_modes": hook_modes,
         "hooks": hook_meta,
         "caller_can_configure": None,  # filled by callers that know the principal

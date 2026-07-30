@@ -507,16 +507,19 @@ def _hook_runs_sandboxed(hook_name: str) -> bool:
 def _call_hook_sandboxed(codex_id: str, hook_name: str, args: dict):
     """Run a hook in the sandbox; return ``(handled, result)``.
 
-    ``handled`` is False *only* when the sandbox could not run the codex at all
-    and policy permits an in-process retry; the caller then takes the legacy
-    path.
+    ``handled`` is always True: once a hook has been dispatched into the
+    sandbox there is no in-process retry, whatever went wrong.
 
-    Crucially, a refusal is never a reason to fall back. If the hook emitted an
-    effect it had not declared, or tried to hand a live object across the
-    boundary, the codex *did* run and was denied — retrying it in-process would
-    hand it the full host and turn every capability denial into a trivial
-    bypass. Only infrastructure failures (no sandbox in this image, spawn or
-    module load failed) are eligible for the fallback.
+    A refusal was never a reason to fall back — if the hook emitted an effect
+    it had not declared, or tried to hand a live object across the boundary,
+    the codex *did* run and was denied, and retrying it in-process would hand
+    it the full host and turn every capability denial into a trivial bypass.
+    Infrastructure failures (no sandbox in this image, spawn or module load
+    failed) are now treated the same way, because an attacker who can provoke
+    one would otherwise get exactly that bypass for free.
+
+    Callers still reach the legacy in-process path for *legacy* codices, which
+    never enter the sandbox at all (``_hook_runs_sandboxed`` returns False).
     """
     from core import codex_bridge, runtime_sandbox
 
@@ -534,11 +537,6 @@ def _call_hook_sandboxed(codex_id: str, hook_name: str, args: dict):
         return (True, None)
     except Exception as e:
         logger.error(f"Sandboxed codex {hook_name} failed for {codex_id}: {e}")
-        if runtime_sandbox.get_config().get("fallback_in_process"):
-            logger.warning(
-                f"Falling back to in-process for {hook_name} (codex {codex_id})"
-            )
-            return (False, None)
         return (True, None)
 
 

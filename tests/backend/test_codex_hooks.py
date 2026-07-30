@@ -505,15 +505,16 @@ class TestDependencyResolution:
 
 
 class TestSandboxFallbackPolicy:
-    """Which sandbox failures may be retried in-process (issue #265).
+    """No sandbox failure is ever retried in-process (issue #265).
 
     A refusal must never earn the codex an in-process retry: the codex already
     ran and was denied, so re-running it with full host access would turn every
-    capability check into a trivial bypass. Only infrastructure failures are
-    eligible for the fallback.
+    capability check into a trivial bypass. Infrastructure failures are treated
+    the same way — an attacker able to provoke one would otherwise get that
+    bypass for free — so ``handled`` is always True.
     """
 
-    def _sandbox_raising(self, monkeypatch, error, fallback=True):
+    def _sandbox_raising(self, monkeypatch, error):
         from core import runtime_sandbox
 
         def _call(*args, **kwargs):
@@ -522,16 +523,13 @@ class TestSandboxFallbackPolicy:
         monkeypatch.setattr(
             runtime_sandbox, "call_codex_hook_in_sandbox", _call
         )
-        monkeypatch.setattr(
-            runtime_sandbox, "get_config", lambda: {"fallback_in_process": fallback}
-        )
 
     def test_denied_capability_is_not_retried_in_process(self, monkeypatch):
         self._sandbox_raising(
             monkeypatch, PermissionError("effect 'treasury.drain' denied")
         )
         handled, result = codex_hooks._call_hook_sandboxed("agora", "h", {})
-        assert handled is True  # not retried, despite fallback being enabled
+        assert handled is True
         assert result is None
 
     def test_leaked_object_is_not_retried_in_process(self, monkeypatch):
@@ -548,15 +546,11 @@ class TestSandboxFallbackPolicy:
         handled, _ = codex_hooks._call_hook_sandboxed("agora", "h", {})
         assert handled is True
 
-    def test_infrastructure_failure_falls_back_when_allowed(self, monkeypatch):
-        self._sandbox_raising(monkeypatch, RuntimeError("spawn failed"), fallback=True)
-        handled, _ = codex_hooks._call_hook_sandboxed("agora", "h", {})
-        assert handled is False  # caller retries in-process
-
-    def test_infrastructure_failure_fails_closed_when_disallowed(self, monkeypatch):
-        self._sandbox_raising(monkeypatch, RuntimeError("spawn failed"), fallback=False)
-        handled, _ = codex_hooks._call_hook_sandboxed("agora", "h", {})
+    def test_infrastructure_failure_is_not_retried_in_process(self, monkeypatch):
+        self._sandbox_raising(monkeypatch, RuntimeError("spawn failed"))
+        handled, result = codex_hooks._call_hook_sandboxed("agora", "h", {})
         assert handled is True
+        assert result is None
 
     def test_successful_hook_result_is_returned(self, monkeypatch):
         from core import runtime_sandbox

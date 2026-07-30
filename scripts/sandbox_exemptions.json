@@ -1,0 +1,64 @@
+{
+  "_comment": [
+    "Non-core extensions still allowed to run in-process instead of sandboxed.",
+    "",
+    "This list may only SHRINK. It is enforced by",
+    "tests/backend/test_sandbox_exemption_ratchet.py:",
+    "  - a new extension may not be added (write it sandbox-clean instead);",
+    "  - an entry that no longer needs the exemption must be deleted.",
+    "",
+    "An entry leaves this list in one of two ways, and they are not equivalent:",
+    "",
+    "  1. Ported. The extension moves onto the capability bridge, its backend",
+    "     stops importing ggg / core / basilisk / _cdk, \"runtime\":",
+    "     \"in_process\" comes off its manifest, and the entry is deleted.",
+    "     Privilege is actually removed.",
+    "",
+    "  2. Promoted to core. The extension is added to /core-extensions.json",
+    "     because it administers the realm rather than runs on top of it, so",
+    "     the survey stops considering it. Privilege is NOT removed — it is",
+    "     reclassified as intentional, and moves from this audited list into",
+    "     the trusted platform surface.",
+    "",
+    "Only (1) is progress. (2) is a claim that sandboxing the extension was",
+    "never the right goal, and it should be argued per extension, not used to",
+    "make this number go down.",
+    "",
+    "Each entry records the host roots that currently block sandboxing and the",
+    "issue tracking the port, so the ratchet count and the open-issue count",
+    "stay the same number.",
+    "",
+    "Core/system extensions are not listed: they are never sandboxed by design."
+  ],
+  "exempt": {
+    "demo_simulator": "_cdk, core, ggg",
+    "passport_verification": "basilisk, core, ggg"
+  },
+  "tracking_issues": {
+    "demo_simulator": 270,
+    "passport_verification": 275
+  },
+  "_async_bridge_issue": 279,
+  "_promoted_to_core": {
+    "_comment": [
+      "Left this list via route (2) above rather than being ported. Recorded so",
+      "the drop in the count stays traceable to a decision.",
+      "",
+      "task_monitor, access_manager and role_manager are the realm's execution,",
+      "governance and RBAC admin planes. Sandboxing them was never coherent: the",
+      "verbs it would take are the ones that confer authority, and a capability",
+      "to grant arbitrary permissions is not narrower than host access — it is",
+      "equivalent to it, wearing a verb name.",
+      "",
+      "mundus_explorer is the weak one. It is a 161-line read-only federation",
+      "browser that was blocked only on the async outcall in #279, and #279 has",
+      "since landed (effect-style, see core/async_bridge.py). The reason it was",
+      "promoted no longer holds, so it is now the one entry here that is worth",
+      "reopening — it would be a small port on machinery that already exists."
+    ],
+    "task_monitor": 278,
+    "access_manager": 268,
+    "mundus_explorer": 274,
+    "role_manager": 277
+  }
+}

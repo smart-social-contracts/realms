@@ -1,52 +1,39 @@
-"""Unit tests for the department_docs extension backend (CRUD + dept authz).
+"""Department-document authorization, now enforced host-side (issue #271).
 
-We load the extension's ``entry.py`` by file path and exercise it against the
-real in-memory ``ggg`` entity store (``Department`` / ``DepartmentDocument`` /
-``User``). The caller principal and the scope-authorization context are both
-injected via monkeypatching so the test needs no live canister or RBAC.
+These assertions used to run against the extension's own ``entry.py``, which is
+where the access decisions lived. After the port they live in
+``core.dept_docs_bridge``, so that is what is tested — the same cases, moved to
+the side of the boundary that now decides them.
+
+That relocation is the point of the port, and the tests are worth reading as a
+statement of it: a sandboxed extension calling ``dept_doc.list`` cannot widen the
+department filter, because the filter is applied here.
+
+Three roles throughout:
+
+  head      department head — may manage (create, edit, delete) and view
+  member    in the department — may view only
+  outsider  neither — may not see that the documents exist
 """
 
-import importlib.util
-import json
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 _ROOT = Path(__file__).resolve().parents[3]
 _BACKEND_SRC = _ROOT / "src" / "realm_backend"
-_ENTRY_PATH = (
-    _ROOT / "extensions" / "extensions" / "department_docs" / "backend" / "entry.py"
-)
-
-# ggg must be importable before we load the entry module.
 if str(_BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(_BACKEND_SRC))
+sys.modules.setdefault("_cdk", MagicMock())
+
+from core import dept_docs_bridge as ddb  # noqa: E402
 
 
-class FakeP:
-    def __init__(self, c):
-        self._c = c
+class FakeAuthContext:
+    """Stands in for ``core.crypto_scopes.production_context``."""
 
-    def to_str(self):
-        return self._c
-
-
-class FakeIc:
-    def __init__(self):
-        self._c = ""
-
-    def set_caller(self, c):
-        self._c = c
-
-    def caller(self):
-        return FakeP(self._c)
-
-    def time(self):
-        return 0
-
-
-class FakeCtx:
     def __init__(self, admins=None, heads=None):
         self.admins = set(admins or [])
         self.heads = dict(heads or {})
@@ -58,167 +45,287 @@ class FakeCtx:
         return self.heads.get(department) == caller
 
 
-@pytest.fixture()
-def env():
-    """Load entry.py fresh and wire fakes + a sample department."""
-    from ggg import Department, User
+class FakeDoc:
+    """A stand-in for the extension-owned ``DepartmentDocument`` row."""
 
-    spec = importlib.util.spec_from_file_location("_dept_docs_entry", _ENTRY_PATH)
-    entry = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(entry)
+    _next = [1]
 
-    # The extension now owns its DepartmentDocument entity; register it the same
-    # way the host does at init.
-    entry.register_entities()
+    def __init__(self, **fields):
+        self.__dict__.update(fields)
+        self._id = f"doc{FakeDoc._next[0]}"
+        FakeDoc._next[0] += 1
+        self.timestamp_created = f"2025-01-{FakeDoc._next[0]:02d} 10:00:00"
+        self.deleted = False
+        FakeDocClass.rows.append(self)
 
-    fake_ic = FakeIc()
-    entry._ic = fake_ic
+    def delete(self):
+        self.deleted = True
+        if self in FakeDocClass.rows:
+            FakeDocClass.rows.remove(self)
 
-    # Unique department name per test run to avoid cross-test alias collisions.
-    dept_name = f"Finance_{id(entry) % 100000}"
 
-    head = User(id=f"head_{dept_name}")
-    member = User(id=f"member_{dept_name}")
-    outsider = User(id=f"outsider_{dept_name}")
-    dept = Department(name=dept_name, description="Money", head=head)
-    # Membership is stored one-way on the user (issue #242).
-    member.departments.add(dept)
+class FakeDocClass:
+    rows = []
 
-    entry._auth_ctx = lambda: FakeCtx(
-        admins={"admin1"}, heads={dept_name: head.id}
+    def __new__(cls, **fields):
+        return FakeDoc(**fields)
+
+    @staticmethod
+    def instances():
+        return list(FakeDocClass.rows)
+
+    @staticmethod
+    def by_id(doc_id):
+        for row in FakeDocClass.rows:
+            if row._id == doc_id:
+                return row
+        return None
+
+
+@pytest.fixture
+def realm(monkeypatch):
+    """One department: a head, a member, and an outsider."""
+    FakeDocClass.rows = []
+
+    dept_name = "Finance"
+    head, member, outsider = "head1", "member1", "outsider1"
+
+    class Dept:
+        name = dept_name
+        description = "Money"
+
+        class head_user:
+            id = head
+
+    Dept.head = Dept.head_user
+
+    class Department:
+        @staticmethod
+        def instances():
+            return [Dept]
+
+        def __class_getitem__(cls, name):
+            return Dept if name == dept_name else None
+
+    monkeypatch.setitem(sys.modules, "ggg", MagicMock(Department=Department))
+    monkeypatch.setattr(
+        ddb, "_auth_context",
+        lambda: FakeAuthContext(admins={"admin1"}, heads={dept_name: head}),
+    )
+    monkeypatch.setattr(ddb, "_department", lambda n: Dept if n == dept_name else None)
+    monkeypatch.setattr(
+        ddb, "member_principals", lambda n: [head, member] if n == dept_name else []
+    )
+    monkeypatch.setattr(
+        ddb, "is_member",
+        lambda d, c: d == dept_name and c in (head, member),
     )
 
+    class Holder:
+        def __getitem__(self, doc_id):
+            return FakeDocClass.by_id(doc_id)
+
+        def __call__(self, **fields):
+            return FakeDoc(**fields)
+
+        def instances(self):
+            return FakeDocClass.instances()
+
+    monkeypatch.setattr(ddb, "_doc_class", lambda: Holder())
+
     return {
-        "entry": entry,
-        "ic": fake_ic,
-        "dept": dept_name,
-        "head": head.id,
-        "member": member.id,
-        "outsider": outsider.id,
+        "dept": dept_name, "head": head, "member": member,
+        "outsider": outsider, "admin": "admin1",
     }
 
 
-def _call(entry, fn, caller, **args):
-    entry._ic.set_caller(caller)
-    return json.loads(getattr(entry, fn)(args))
+# ---------------------------------------------------------------------------
+# Create
+# ---------------------------------------------------------------------------
 
 
 class TestCreate:
-    def test_head_can_create(self, env):
-        e = env["entry"]
-        res = _call(e, "create_document", env["head"], department=env["dept"], title="Budget")
-        assert res["success"] is True
-        assert res["data"]["scope"] == f"dept:{env['dept']}:doc:{res['data']['id']}"
+    def test_head_can_create(self, realm):
+        out = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="Budget"
+        )
+        assert out["scope"] == f"dept:{realm['dept']}:doc:{out['id']}"
 
-    def test_admin_can_create(self, env):
-        e = env["entry"]
-        res = _call(e, "create_document", "admin1", department=env["dept"], title="Budget")
-        assert res["success"] is True
+    def test_admin_can_create(self, realm):
+        out = ddb.v_doc_create(
+            caller=realm["admin"], department=realm["dept"], title="Budget"
+        )
+        assert out["id"]
 
-    def test_member_cannot_create(self, env):
-        e = env["entry"]
-        res = _call(e, "create_document", env["member"], department=env["dept"], title="X")
-        assert res["success"] is False
+    def test_member_cannot_create(self, realm):
+        with pytest.raises(PermissionError):
+            ddb.v_doc_create(
+                caller=realm["member"], department=realm["dept"], title="X"
+            )
 
-    def test_outsider_cannot_create(self, env):
-        e = env["entry"]
-        res = _call(e, "create_document", env["outsider"], department=env["dept"], title="X")
-        assert res["success"] is False
+    def test_outsider_cannot_create(self, realm):
+        with pytest.raises(PermissionError):
+            ddb.v_doc_create(
+                caller=realm["outsider"], department=realm["dept"], title="X"
+            )
 
-    def test_title_required(self, env):
-        e = env["entry"]
-        res = _call(e, "create_document", env["head"], department=env["dept"], title="  ")
-        assert res["success"] is False
+    def test_title_required(self, realm):
+        with pytest.raises(ValueError, match="title"):
+            ddb.v_doc_create(
+                caller=realm["head"], department=realm["dept"], title="  "
+            )
+
+    def test_unknown_department_is_rejected(self, realm):
+        with pytest.raises(ValueError, match="not found"):
+            ddb.v_doc_create(caller=realm["admin"], department="Nope", title="X")
+
+
+# ---------------------------------------------------------------------------
+# Read, and attaching the blob
+# ---------------------------------------------------------------------------
 
 
 class TestSetAndGet:
-    def test_set_ciphertext_and_get(self, env):
-        e = env["entry"]
-        created = _call(e, "create_document", env["head"], department=env["dept"], title="Budget")
-        doc_id = created["data"]["id"]
-
-        setr = _call(e, "set_document_ciphertext", env["head"], id=doc_id, ciphertext="enc:v=2:x")
-        assert setr["success"] is True
-
-        # Member can view (and would decrypt client-side if granted a key).
-        got = _call(e, "get_document", env["member"], id=doc_id)
-        assert got["success"] is True
-        assert got["data"]["ciphertext"] == "enc:v=2:x"
-        assert got["data"]["can_manage"] is False
-
-    def test_head_get_can_manage(self, env):
-        e = env["entry"]
-        created = _call(e, "create_document", env["head"], department=env["dept"], title="B")
-        got = _call(e, "get_document", env["head"], id=created["data"]["id"])
-        assert got["data"]["can_manage"] is True
-
-    def test_outsider_cannot_get(self, env):
-        e = env["entry"]
-        created = _call(e, "create_document", env["head"], department=env["dept"], title="B")
-        got = _call(e, "get_document", env["outsider"], id=created["data"]["id"])
-        assert got["success"] is False
-
-    def test_member_cannot_set_ciphertext(self, env):
-        e = env["entry"]
-        created = _call(e, "create_document", env["head"], department=env["dept"], title="B")
-        setr = _call(
-            e, "set_document_ciphertext", env["member"], id=created["data"]["id"], ciphertext="y"
+    def test_set_ciphertext_and_get(self, realm):
+        doc = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="Budget"
         )
-        assert setr["success"] is False
+        ddb.v_doc_set_ciphertext(
+            caller=realm["head"], id=doc["id"], ciphertext="enc:v=2:x"
+        )
+
+        got = ddb.v_doc_get(caller=realm["member"], id=doc["id"])
+        assert got["ciphertext"] == "enc:v=2:x"
+        assert got["can_manage"] is False
+
+    def test_head_get_can_manage(self, realm):
+        doc = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="B"
+        )
+        assert ddb.v_doc_get(caller=realm["head"], id=doc["id"])["can_manage"] is True
+
+    def test_outsider_cannot_get(self, realm):
+        doc = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="B"
+        )
+        with pytest.raises(PermissionError):
+            ddb.v_doc_get(caller=realm["outsider"], id=doc["id"])
+
+    def test_member_cannot_set_ciphertext(self, realm):
+        """A member who could overwrite the blob could destroy a document they
+        are only entitled to read."""
+        doc = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="B"
+        )
+        with pytest.raises(PermissionError):
+            ddb.v_doc_set_ciphertext(caller=realm["member"], id=doc["id"], ciphertext="y")
+
+    def test_listing_omits_ciphertext(self, realm):
+        """A listing must not ship every blob in the department."""
+        doc = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="B"
+        )
+        ddb.v_doc_set_ciphertext(caller=realm["head"], id=doc["id"], ciphertext="big")
+        rows = ddb.v_doc_list(caller=realm["member"])["documents"]
+        assert rows and all("ciphertext" not in r for r in rows)
+
+    def test_missing_document_is_an_error(self, realm):
+        with pytest.raises(ValueError, match="not found"):
+            ddb.v_doc_get(caller=realm["head"], id="nope")
+
+
+# ---------------------------------------------------------------------------
+# List and delete
+# ---------------------------------------------------------------------------
 
 
 class TestListAndDelete:
-    def test_member_lists_own_department_docs(self, env):
-        e = env["entry"]
-        _call(e, "create_document", env["head"], department=env["dept"], title="Doc1")
-        listed = _call(e, "list_documents", env["member"])
-        assert listed["success"] is True
-        titles = [d["title"] for d in listed["data"]["documents"] if d["department"] == env["dept"]]
-        assert "Doc1" in titles
+    def test_member_lists_own_department_docs(self, realm):
+        ddb.v_doc_create(caller=realm["head"], department=realm["dept"], title="Doc1")
+        rows = ddb.v_doc_list(caller=realm["member"])["documents"]
+        assert "Doc1" in [r["title"] for r in rows]
 
-    def test_outsider_does_not_see_docs(self, env):
-        e = env["entry"]
-        _call(e, "create_document", env["head"], department=env["dept"], title="Secret")
-        listed = _call(e, "list_documents", env["outsider"])
-        in_dept = [d for d in listed["data"]["documents"] if d["department"] == env["dept"]]
-        assert in_dept == []
+    def test_outsider_does_not_see_docs(self, realm):
+        ddb.v_doc_create(caller=realm["head"], department=realm["dept"], title="Secret")
+        assert ddb.v_doc_list(caller=realm["outsider"])["documents"] == []
 
-    def test_head_can_delete(self, env):
-        e = env["entry"]
-        created = _call(e, "create_document", env["head"], department=env["dept"], title="Trash")
-        delr = _call(e, "delete_document", env["head"], id=created["data"]["id"])
-        assert delr["success"] is True
+    def test_outsider_cannot_filter_to_a_department(self, realm):
+        """Naming the department explicitly must not be a way around the scope,
+        and it fails loudly rather than returning an empty list."""
+        ddb.v_doc_create(caller=realm["head"], department=realm["dept"], title="Secret")
+        with pytest.raises(PermissionError, match="not a member"):
+            ddb.v_doc_list(caller=realm["outsider"], department=realm["dept"])
 
-    def test_member_cannot_delete(self, env):
-        e = env["entry"]
-        created = _call(e, "create_document", env["head"], department=env["dept"], title="Trash")
-        delr = _call(e, "delete_document", env["member"], id=created["data"]["id"])
-        assert delr["success"] is False
+    def test_head_can_delete(self, realm):
+        doc = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="Trash"
+        )
+        out = ddb.v_doc_delete(caller=realm["head"], id=doc["id"])
+        assert out["scope"] == doc["scope"]
+        assert ddb.v_doc_list(caller=realm["head"])["documents"] == []
+
+    def test_member_cannot_delete(self, realm):
+        doc = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="Trash"
+        )
+        with pytest.raises(PermissionError):
+            ddb.v_doc_delete(caller=realm["member"], id=doc["id"])
+
+    def test_delete_returns_the_scope_for_key_revocation(self, realm):
+        """Orphaned KeyEnvelopes are harmless but revocable, and the caller
+        needs the scope to revoke them."""
+        doc = ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title="T"
+        )
+        assert ddb.v_doc_delete(caller=realm["head"], id=doc["id"])["scope"].startswith(
+            f"dept:{realm['dept']}:doc:"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Departments
+# ---------------------------------------------------------------------------
 
 
 class TestListDepartments:
-    def test_member_sees_their_department(self, env):
-        e = env["entry"]
-        res = _call(e, "list_departments", env["member"])
-        assert res["success"] is True
-        names = [d["name"] for d in res["data"]["departments"]]
-        assert env["dept"] in names
+    def test_member_sees_their_department(self, realm):
+        names = [d["name"] for d in ddb.v_department_list(caller=realm["member"])["departments"]]
+        assert realm["dept"] in names
 
-    def test_head_marked_as_manager(self, env):
-        e = env["entry"]
-        res = _call(e, "list_departments", env["head"])
-        dept = next(d for d in res["data"]["departments"] if d["name"] == env["dept"])
+    def test_head_marked_as_manager(self, realm):
+        dept = ddb.v_department_list(caller=realm["head"])["departments"][0]
         assert dept["can_manage"] is True
-        assert env["member"] in dept["members"]
+        assert realm["member"] in dept["members"]
 
-    def test_outsider_excluded(self, env):
-        e = env["entry"]
-        res = _call(e, "list_departments", env["outsider"])
-        names = [d["name"] for d in res["data"]["departments"]]
-        assert env["dept"] not in names
+    def test_member_is_not_marked_as_manager(self, realm):
+        dept = ddb.v_department_list(caller=realm["member"])["departments"][0]
+        assert dept["can_manage"] is False
+
+    def test_outsider_excluded(self, realm):
+        assert ddb.v_department_list(caller=realm["outsider"])["departments"] == []
 
 
-def test_unknown_method(env):
-    e = env["entry"]
-    res = json.loads(e.extension_sync_call("nope", {}))
-    assert res["success"] is False
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
+
+
+def test_verbs_are_registered_with_the_bridge():
+    from core import extension_bridge as eb
+
+    for verb in ddb.VERBS:
+        assert verb in eb.VERBS, f"{verb} is not reachable from the bridge"
+    for verb in ddb.READ_VERBS:
+        assert verb in eb.READ_VERBS, f"{verb} must be classified as a read"
+
+
+def test_write_verbs_are_not_classified_as_reads():
+    """A write misfiled as a read would be permitted during an async replay,
+    where it would be applied once per round."""
+    from core import extension_bridge as eb
+
+    writes = set(ddb.VERBS) - set(ddb.READ_VERBS)
+    assert writes == {
+        "dept_doc.create", "dept_doc.set_ciphertext", "dept_doc.delete",
+    }
+    assert not writes & eb.READ_VERBS

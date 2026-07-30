@@ -51,50 +51,17 @@ logger = get_logger("core.codex_bridge")
 # ---------------------------------------------------------------------------
 # Strict plain-data serializer (boundary crossing, both directions)
 # ---------------------------------------------------------------------------
+#
+# Shared with ``core.extension_bridge`` — the boundary is defended identically
+# whoever is behind it. Re-exported here so the long-standing
+# ``codex_bridge.to_plain`` import path keeps working.
 
-# Maximum nesting depth accepted at the boundary (mirrors the Basilisk C
-# marshaller's own depth cap; keeps a hostile codex from building a payload
-# that blows the host stack during validation).
-_MAX_DEPTH = 32
-
-
-class BridgeSerializationError(TypeError):
-    """A value at the sandbox boundary is not plain JSON-safe data."""
-
-
-def to_plain(value: Any, _depth: int = 0) -> Any:
-    """Return *value* iff it is strictly plain JSON-safe data, else raise.
-
-    Accepts ``None``, ``bool``, ``int``, ``float``, ``str``, ``list``/``tuple``
-    (recursively; tuples become lists) and ``dict`` with ``str`` keys
-    (recursively). Everything else — entities, callables, exceptions, sets,
-    bytes, custom objects — is rejected. This is the only thing allowed to hand
-    data back into the sandbox.
-    """
-    if _depth > _MAX_DEPTH:
-        raise BridgeSerializationError(
-            f"value nests deeper than the {_MAX_DEPTH}-level boundary limit"
-        )
-    # ``bool`` is a subclass of ``int``; both are fine. Check it explicitly so
-    # the intent is clear.
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, (list, tuple)):
-        return [to_plain(item, _depth + 1) for item in value]
-    if isinstance(value, dict):
-        out: Dict[str, Any] = {}
-        for key, item in value.items():
-            if not isinstance(key, str):
-                raise BridgeSerializationError(
-                    f"dict keys must be str at the sandbox boundary, got "
-                    f"{type(key).__name__}"
-                )
-            out[key] = to_plain(item, _depth + 1)
-        return out
-    raise BridgeSerializationError(
-        f"{type(value).__name__} is not permitted across the sandbox boundary; "
-        f"verbs must return plain JSON data, never live objects"
-    )
+from core.bridge_core import (  # noqa: F401
+    MAX_DEPTH as _MAX_DEPTH,
+    BridgeSerializationError,
+    check_capability,
+    to_plain,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -465,14 +432,7 @@ def authorize(action: str, capabilities: List[str]) -> Optional[str]:
     An action is permitted only when it is a registered verb AND the codex
     declared it in its manifest ``capabilities``.
     """
-    if action not in VERBS and action not in ASYNC_EFFECT_VERBS:
-        return f"unknown verb '{action}'"
-    if action not in (capabilities or ()):
-        return (
-            f"capability '{action}' not granted to this codex "
-            f"(declare it in the manifest 'capabilities' list)"
-        )
-    return None
+    return check_capability(action, capabilities, _all_verbs(), subject="codex")
 
 
 def reserved_domain_denied(action: str, context_id: str) -> Optional[str]:
