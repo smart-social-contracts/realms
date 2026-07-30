@@ -17,12 +17,13 @@
 // sandboxed extension, and absent for host code. It is the only way a policy can
 // tell the two apart, since both arrive as the same principal.
 //
-// WARNING: G1 and G2 fail *open* if the host omits `context.extension`. An
-// extension-originated call that arrives without it is indistinguishable from
-// host code and passes both rules. Setting it is therefore not optional
-// plumbing — it is the enforcement point, and it needs a test that fails when a
-// call path forgets. The host already knows the value; it threads `ext_id`
-// through `make_rpc_handler(ext_id, ...)` in `core/extension_bridge.py`.
+// G1 and G2 fail *open* without `context.extension`: an extension-originated
+// call that arrives without it is indistinguishable from host code and passes
+// both rules. So setting it is the enforcement point, not incidental plumbing.
+// `core/call_origin.py` carries it ambiently and its `dispatch` takes the origin
+// positionally, making omission a TypeError rather than a silent pass; a source
+// scan in CI stops new code from reaching the verb registries directly and
+// re-opening the hole. See `tests/backend/test_call_origin.py`.
 
 // ---------------------------------------------------------------------------
 // G1 — An extension may never write core realm state.
