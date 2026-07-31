@@ -116,12 +116,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build artifacts
+      # Build artifacts. The base build defaults to the Cedar template, so the
+      # release WASM a new realm pulls from the registry authorizes too.
       - name: Build backend WASM
         run: |
           export CANISTER_CANDID_PATH="$(pwd)/src/realm_backend/realm_backend.did"
-          python -m basilisk realm_backend src/realm_backend/main.py
-          gzip -k .basilisk/realm_backend/realm_backend.wasm
+          python3 scripts/build_base_wasm.py --gzip
           mv .basilisk/realm_backend/realm_backend.wasm.gz ./realm_backend.wasm.gz
           echo "✅ Backend WASM built ($(stat -c%s realm_backend.wasm.gz) bytes)"
 
