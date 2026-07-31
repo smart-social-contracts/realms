@@ -651,9 +651,11 @@ namespace Realm {
         user?: User,
     };
 
-    action read;
+    action read
+        appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };
 
-    action write;
+    action write
+        appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };
 
     action "appeal.decide" in [write]
         appliesTo { principal: [User], resource: [AllocationRule, Appeal, Appointment, Balance, Budget, Calendar, Call, Case, Codex, Contract, Court, Delegation, Department, DepartmentAuthority, Dispute, EntityMigration, Extension, FederationMessage, FiscalPeriod, Fund, Human, Identity, Instrument, Invoice, Judge, JusticeSystem, Land, LedgerEntry, License, Mandate, MarketPlace, Member, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, NFTToken, Notification, Organization, PaymentAccount, Penalty, Permission, Position, Proposal, Quarter, QuarterResident, Realm, RegistrationCode, Registry, Service, Task, TaskExecution, TaskSchedule, TaskStep, Token, Trade, Transfer, Treasury, TreasuryConfig, User, UserProfile, Verdict, Vote, Zone], context: { extension?: String } };

@@ -1117,6 +1117,44 @@ def authorize(action: str, capabilities: List[str]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 
+def _cedar_check(action: str, caller: str, kwargs: dict) -> None:
+    """Ask the realm's policies about this call, if policies are enforcing.
+
+    A second gate, not a replacement for the capability check above. The
+    capability check answers "did this extension declare it wants this verb";
+    this answers "may this caller do it to this row, given what the realm
+    forbids". An extension can hold a capability it may not exercise.
+
+    Only the generic entity verbs name a resource. That is enough for the
+    guardrails, which turn on the resource *type* — reading a UserProfile is
+    refused whichever verb asks. Verbs that reach core state by another route are
+    still covered, because they map to ``write`` and G1 forbids extension writes
+    outright rather than enumerating what is protected.
+    """
+    from core import cedar_authz
+
+    if not cedar_authz.enabled():
+        return
+
+    resource_type = ""
+    resource_id = ""
+    if action in ("entity.get", "entity.list", "entity.create", "entity.update",
+                  "entity.delete"):
+        resource_type = str(kwargs.get("type") or "")
+        # A listing names no row, but it must still reach Cedar as a resource of
+        # that *type*, or a rule refusing to expose profiles would let
+        # `entity.list(type="UserProfile")` past — the case it most needs to
+        # catch. The placeholder id stands for "any row of this type".
+        resource_id = str(kwargs.get("id") or "") or ("*" if resource_type else "")
+
+    cedar_authz.check(
+        caller,
+        cedar_authz.action_for(action, action in READ_VERBS),
+        resource_type,
+        resource_id,
+    )
+
+
 def make_rpc_handler(
     ext_id: str,
     capabilities: List[str],
@@ -1184,6 +1222,13 @@ def make_rpc_handler(
         # The origin travels with the call so a Cedar decision downstream can
         # tell an extension apart from host code. Without it the guardrails
         # keyed on `context.extension` silently pass.
+        # Asked inside an origin, because the guardrails only fire when the
+        # context says the call came from an extension. Asked *before* the verb
+        # runs, so a refusal costs nothing and reads nothing. Each `with` needs
+        # its own context manager — these are single-use.
+        with extension_call(ext_id):
+            _cedar_check(action, caller, safe_kwargs)
+
         result = dispatch(
             VERBS, action, extension_call(ext_id), caller=caller, **safe_kwargs
         )

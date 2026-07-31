@@ -328,6 +328,19 @@ class StreamingToken(Record):
 
 
 @query
+def policy_status() -> str:
+    """Whether Cedar is actually deciding calls, as JSON.
+
+    A realm running without enforcement should be able to say so out loud. The
+    failure worth catching is a deployment that believes it has Cedar and does
+    not: every request succeeds, nothing is enforced, and no behaviour differs.
+    """
+    from core import cedar_authz
+
+    return json.dumps(cedar_authz.status())
+
+
+@query
 def status() -> RealmResponse:
     try:
         logger.info("Status query executed")
@@ -4102,6 +4115,27 @@ def initialize() -> void:
 
     # Register OS-level wallet transfer hook for permission enforcement
     _register_wallet_transfer_hook()
+
+    # Load the realm's authorization policies before any extension runs, so an
+    # extension cannot make a call in the window before the guardrails exist.
+    # This sits here rather than in post_upgrade because the WASI filesystem is
+    # not mounted during that hook and the policy files read as absent (#281).
+    try:
+        from core import cedar_authz
+
+        if cedar_authz.load():
+            logger.info("Cedar policies loaded; realm guardrails are enforcing")
+        elif cedar_authz.available():
+            logger.warning(
+                f"Cedar present but not enforcing: {cedar_authz.status()['error']}"
+            )
+        else:
+            logger.info(
+                "No Cedar module in this build; the Python access checks remain "
+                "the only gate"
+            )
+    except Exception as e:
+        logger.warning(f"Cedar policy load skipped: {e}")
 
     # Initialize all installed extensions
     logger.info("Discovering and initializing extensions...")
