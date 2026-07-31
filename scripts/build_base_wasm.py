@@ -62,6 +62,31 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
+# Realms authorize, so they build on the Cedar-enabled CPython template rather
+# than the plain one. basilisk honours an explicit BASILISK_TEMPLATE_WASM over
+# everything else, but it must be a local file, so this fetches it to a cache
+# and points there. CI, deploy.py and the wizard then all produce Cedar-enabled
+# realms without each remembering to ask. An operator can still point at any
+# template by setting the variable themselves.
+_CEDAR_TEMPLATE_URL = (
+    "https://github.com/smart-social-contracts/basilisk/releases/download/"
+    "cpython-wasm-3.13.0-ic1/cpython_canister_template_cedar.wasm"
+)
+
+
+def _cedar_template_path() -> str:
+    """Fetch the Cedar template to a local cache and return its path."""
+    import urllib.request
+
+    cache_dir = Path.home() / ".cache" / "realms" / "templates"
+    dest = cache_dir / "cpython_canister_template_cedar.wasm"
+    if not dest.exists():
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        print(f"   ⬇️  fetching Cedar template: {_CEDAR_TEMPLATE_URL}")
+        urllib.request.urlretrieve(_CEDAR_TEMPLATE_URL, dest)
+    return str(dest)
+
+
 # ── Stub source — must stay in sync with what ─────────────────────────────────
 # .github/workflows/publish-base-wasm.yml previously injected inline.
 # When we change one, we change the other in the same PR.
@@ -101,7 +126,9 @@ def get_all_extension_manifests():
     return EXTENSION_MANIFESTS
 '''
 
-EXTENSION_IMPORTS_PY = "# No baked-in extensions in base WASM (Issue #168 — Layered Realm).\n"
+EXTENSION_IMPORTS_PY = (
+    "# No baked-in extensions in base WASM (Issue #168 — Layered Realm).\n"
+)
 
 
 def _detect_repo_root(start: Path) -> Path:
@@ -142,7 +169,9 @@ def _write_stubs(target: Path) -> None:
     target.mkdir(parents=True, exist_ok=True)
     (target / "__init__.py").write_text(INIT_PY, encoding="utf-8")
     (target / "registry.py").write_text(REGISTRY_PY, encoding="utf-8")
-    (target / "extension_manifests.py").write_text(EXTENSION_MANIFESTS_PY, encoding="utf-8")
+    (target / "extension_manifests.py").write_text(
+        EXTENSION_MANIFESTS_PY, encoding="utf-8"
+    )
     (target / "extension_imports.py").write_text(EXTENSION_IMPORTS_PY, encoding="utf-8")
 
 
@@ -159,7 +188,12 @@ def _run_basilisk(repo_root: Path, *, dry_run: bool) -> Path:
         # Fake the path so callers can keep going.
         return repo_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
 
-    rc = subprocess.run(cmd, cwd=str(repo_root)).returncode
+    env = dict(os.environ)
+    if not env.get("BASILISK_TEMPLATE_WASM"):
+        env["BASILISK_TEMPLATE_WASM"] = _cedar_template_path()
+        print(f"   🌲 template: {env['BASILISK_TEMPLATE_WASM']}")
+
+    rc = subprocess.run(cmd, cwd=str(repo_root), env=env).returncode
     if rc != 0:
         raise SystemExit(f"basilisk build failed (rc={rc})")
 
@@ -182,18 +216,37 @@ def _gzip(wasm_path: Path) -> Path:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--repo-root", type=Path, default=None,
-                   help="Override repo root detection (default: walk up from this script)")
-    p.add_argument("--gzip", action="store_true",
-                   help="Also produce realm_backend.wasm.gz next to the WASM")
-    p.add_argument("--keep-stubs", action="store_true",
-                   help="Leave the stub extension_packages/ in place after build")
-    p.add_argument("--dry-run", action="store_true",
-                   help="Inject stubs and report what would happen, but skip basilisk")
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "--repo-root",
+        type=Path,
+        default=None,
+        help="Override repo root detection (default: walk up from this script)",
+    )
+    p.add_argument(
+        "--gzip",
+        action="store_true",
+        help="Also produce realm_backend.wasm.gz next to the WASM",
+    )
+    p.add_argument(
+        "--keep-stubs",
+        action="store_true",
+        help="Leave the stub extension_packages/ in place after build",
+    )
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Inject stubs and report what would happen, but skip basilisk",
+    )
     args = p.parse_args(argv)
 
-    repo_root = args.repo_root.resolve() if args.repo_root else _detect_repo_root(Path(__file__).parent)
+    repo_root = (
+        args.repo_root.resolve()
+        if args.repo_root
+        else _detect_repo_root(Path(__file__).parent)
+    )
     ext_pkgs_dir = repo_root / "src" / "realm_backend" / "extension_packages"
 
     print(f"📦 Building base realm_backend WASM (Issue #168)")
