@@ -10,7 +10,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
-	import { IconCopy, IconLogin } from '@tabler/icons-svelte';
+	import { IconCheck, IconCopy, IconLogin } from '@tabler/icons-svelte';
 	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
 	import { copyText } from '$lib/clipboard.js';
 
@@ -209,12 +209,18 @@
 						</p>
 						<button
 							type="button"
-							class="shrink-0 p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+							class="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 {copiedPrincipal
+								? 'text-green-600 dark:text-green-400'
+								: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}"
 							title={copiedPrincipal ? 'Copied!' : 'Copy principal'}
 							aria-label={copiedPrincipal ? 'Copied' : 'Copy principal'}
 							on:click={copyPrincipal}
 						>
-							<IconCopy size={14} />
+							{#if copiedPrincipal}
+								<IconCheck size={14} />
+							{:else}
+								<IconCopy size={14} />
+							{/if}
 						</button>
 					</div>
 					<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
