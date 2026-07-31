@@ -19,7 +19,6 @@ directly — see ``tests/backend/test_call_origin.py``, which fails if anything
 does.
 """
 
-from contextlib import contextmanager
 from typing import Any, Callable, Dict, Mapping, Optional
 
 # The origin of the call currently being dispatched, or None for host code.
@@ -27,20 +26,31 @@ from typing import Any, Callable, Dict, Mapping, Optional
 _CURRENT: Optional[Dict[str, str]] = None
 
 
-@contextmanager
-def origin(**facts: str):
+class origin:
     """Declare the origin of the calls made inside this block.
 
     Restores the previous value on the way out, including when the body raises,
     so a verb that refuses does not leave the next call wearing its origin.
+
+    A context manager written by hand rather than with ``contextlib.contextmanager``:
+    the frozen stdlib baked into the canister template does not carry it, and a
+    module that fails to import takes the whole canister down with it.
     """
-    global _CURRENT
-    previous = _CURRENT
-    _CURRENT = {k: v for k, v in facts.items() if v}
-    try:
-        yield
-    finally:
-        _CURRENT = previous
+
+    def __init__(self, **facts: str):
+        self._facts = {k: v for k, v in facts.items() if v}
+        self._previous: Optional[Dict[str, str]] = None
+
+    def __enter__(self):
+        global _CURRENT
+        self._previous = _CURRENT
+        _CURRENT = self._facts
+        return self
+
+    def __exit__(self, *exc: object):
+        global _CURRENT
+        _CURRENT = self._previous
+        return False
 
 
 def extension_call(ext_id: str):

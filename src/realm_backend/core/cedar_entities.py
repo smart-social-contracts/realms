@@ -20,10 +20,10 @@ not be affordable is projecting everything, which is why the slice is narrow
 rather than convenient.
 """
 
-import os
 from typing import Any, Dict, List, Optional
 
-_SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "cedar", "realm.cedarschema")
+from core.cedar_policies import SCHEMA
+
 _CACHE: Dict[str, Any] = {}
 
 # Attributes Cedar must never see, whatever a policy asks for. Encrypted values
@@ -62,15 +62,11 @@ def declared_types() -> frozenset:
     if cached is not None:
         return cached
     types = set()
-    try:
-        with open(_SCHEMA_PATH) as fh:
-            for line in fh:
-                line = line.strip()
-                if line.startswith("entity "):
-                    name = line[len("entity ") :].split(" in ")[0]
-                    types.add(name.split("{")[0].split(";")[0].strip())
-    except OSError:
-        pass
+    for line in SCHEMA.splitlines():
+        line = line.strip()
+        if line.startswith("entity "):
+            name = line[len("entity ") :].split(" in ")[0]
+            types.add(name.split("{")[0].split(";")[0].strip())
     resolved = frozenset(types)
     _CACHE["types"] = resolved
     return resolved

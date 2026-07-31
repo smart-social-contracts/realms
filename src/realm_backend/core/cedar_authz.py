@@ -21,10 +21,10 @@ happen is a deployment that believes it has Cedar and silently does not, which i
 why :func:`require_enforcement` exists for a realm that wants that guarantee.
 """
 
-import os
 from typing import Any, List, Optional
 
 from core.call_origin import current as current_origin
+from core.cedar_policies import GUARDRAILS, POLICIES, SCHEMA
 
 try:  # pragma: no cover - exercised by which artifact the canister is built on
     from ic_basilisk_toolkit import cedar as _cedar
@@ -35,10 +35,6 @@ except ImportError:  # pragma: no cover
     class CedarError(Exception):
         """Placeholder so callers can catch one exception type either way."""
 
-
-_POLICY_DIR = os.path.join(os.path.dirname(__file__), "cedar")
-_SCHEMA = os.path.join(_POLICY_DIR, "realm.cedarschema")
-_GUARDRAILS = os.path.join(_POLICY_DIR, "guardrails.cedar")
 
 _state = {"loaded": False, "attempted": False, "warnings": [], "error": ""}
 
@@ -96,16 +92,12 @@ def load(extra_policies: str = "") -> bool:
         _state["error"] = "no native Cedar module in this build"
         return False
 
-    try:
-        with open(_SCHEMA) as fh:
-            schema = fh.read()
-        with open(_GUARDRAILS) as fh:
-            policies = fh.read()
-    except OSError as exc:
-        _state["error"] = f"cannot read policy files: {exc}"
-        _log(f"cedar_authz: {_state['error']}")
-        return False
-
+    # Policy text comes from the embedded constants in core.cedar_policies, not
+    # the filesystem: bundled canister modules have no `__file__`, and a WASI
+    # `open()` finds nothing. The .cedar files remain the source of truth and CI
+    # keeps this copy current, so a stale embed cannot silently change behaviour.
+    schema = SCHEMA
+    policies = f"{GUARDRAILS}\n\n{POLICIES}"
     if extra_policies:
         policies = f"{policies}\n\n{extra_policies}"
 
@@ -136,16 +128,12 @@ def declared_actions() -> frozenset:
     if cached is not None:
         return cached
     actions = set()
-    try:
-        with open(_SCHEMA) as fh:
-            for line in fh:
-                line = line.strip()
-                if not line.startswith("action "):
-                    continue
-                name = line[len("action ") :].split(" in ")[0].split(";")[0].strip()
-                actions.add(name.strip('"'))
-    except OSError:
-        pass
+    for line in SCHEMA.splitlines():
+        line = line.strip()
+        if not line.startswith("action "):
+            continue
+        name = line[len("action ") :].split(" in ")[0].split(";")[0].strip()
+        actions.add(name.strip('"'))
     resolved = frozenset(actions)
     _state["actions"] = resolved
     return resolved
