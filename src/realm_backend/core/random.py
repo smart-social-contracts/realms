@@ -6,6 +6,7 @@ Uses ic.time() + counter instead.
 """
 
 import hashlib
+
 from _cdk import ic
 
 # Ensures uniqueness even if multiple IDs are generated in the same ic.time() call

@@ -56,14 +56,13 @@ logger = get_logger("core.codex_bridge")
 # whoever is behind it. Re-exported here so the long-standing
 # ``codex_bridge.to_plain`` import path keeps working.
 
-from core.bridge_core import (  # noqa: F401
-    MAX_DEPTH as _MAX_DEPTH,
+from core.bridge_core import MAX_DEPTH as _MAX_DEPTH  # noqa: F401
+from core.bridge_core import (
     BridgeSerializationError,
     check_capability,
     to_plain,
 )
 from core.call_origin import codex_call, dispatch
-
 
 # ---------------------------------------------------------------------------
 # Verb registry — the GGG-public operations a codex may invoke
@@ -163,8 +162,12 @@ def _v_currency_get(default: str = "REALMS", **kwargs: Any) -> str:
 # supplies its own membership policy; the host only whitelists which fields
 # may be written).
 _MEMBER_FIELDS = (
-    "identity_verification", "voting_eligibility", "public_benefits_eligibility",
-    "residence_permit", "tax_compliance", "criminal_record",
+    "identity_verification",
+    "voting_eligibility",
+    "public_benefits_eligibility",
+    "residence_permit",
+    "tax_compliance",
+    "criminal_record",
 )
 
 
@@ -246,8 +249,17 @@ def _v_invoice_create(
 # Fields a codex may set on a notification (everything else is ignored so a
 # hostile codex cannot smuggle constructor kwargs into the entity).
 _NOTIFICATION_FIELDS = (
-    "topic", "title", "message", "sender", "recipient",
-    "read", "icon", "href", "color", "metadata", "timestamp_created",
+    "topic",
+    "title",
+    "message",
+    "sender",
+    "recipient",
+    "read",
+    "icon",
+    "href",
+    "color",
+    "metadata",
+    "timestamp_created",
 )
 
 
@@ -312,7 +324,9 @@ def _v_proposal_find_executed(
     return None
 
 
-def _v_member_assign_profile(user_id: str = "", profile_name: str = "", **kwargs: Any) -> dict:
+def _v_member_assign_profile(
+    user_id: str = "", profile_name: str = "", **kwargs: Any
+) -> dict:
     """Assign *profile_name* to *user_id* (idempotent)."""
     from ggg import User, UserProfile
 
@@ -330,7 +344,9 @@ def _v_member_assign_profile(user_id: str = "", profile_name: str = "", **kwargs
     return {"success": True, "user_id": user_id, "profile_name": profile_name}
 
 
-def _v_member_revoke_profile(user_id: str = "", profile_name: str = "", **kwargs: Any) -> dict:
+def _v_member_revoke_profile(
+    user_id: str = "", profile_name: str = "", **kwargs: Any
+) -> dict:
     """Revoke *profile_name* from *user_id* (idempotent)."""
     from ggg import User, UserProfile
 
@@ -357,7 +373,9 @@ def _v_realm_apply_init_policy(codex_id: str = "", **kwargs: Any) -> dict:
     return apply_init_policy(codex_id)
 
 
-def _v_org_seed_template(codex_id: str = "", template: str = "departments", **kwargs: Any) -> dict:
+def _v_org_seed_template(
+    codex_id: str = "", template: str = "departments", **kwargs: Any
+) -> dict:
     """Seed organizations from a codex package data template."""
     from core.codex_init_host import seed_org_template
 
@@ -455,14 +473,16 @@ def reserved_domain_denied(action: str, context_id: str) -> Optional[str]:
 # they stay post-hoc effects so the host applies them as one authorized,
 # ordered, reviewable batch once the hook has returned, rather than letting a
 # hook interleave mutations with arbitrary computation.
-READ_VERBS = frozenset({
-    "config.get",
-    "currency.get",
-    "time.now",
-    "user.get",
-    "realm.get",
-    "proposal.find_executed",
-})
+READ_VERBS = frozenset(
+    {
+        "config.get",
+        "currency.get",
+        "time.now",
+        "user.get",
+        "realm.get",
+        "proposal.find_executed",
+    }
+)
 
 
 def readable_capabilities(capabilities: List[str]) -> List[str]:

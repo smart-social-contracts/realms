@@ -49,22 +49,21 @@ hostile extension.
 
 from typing import Any, Callable, Dict, List, Optional
 
-from ic_python_logging import get_logger
-
 from core import console_bridge as _console_bridge
 from core import dept_docs_bridge as _dept_docs_bridge
-from core import treasury_bridge as _treasury_bridge
 from core import extension_grants as _extension_grants
+from core import justice as _justice
 from core import land_bridge as _land_bridge
 from core import notification_bridge as _notification_bridge
-from core import justice as _justice
 from core import procurement as _procurement
+from core import treasury_bridge as _treasury_bridge
 from core.bridge_core import (  # noqa: F401
     BridgeSerializationError,
     check_capability,
     to_plain,
 )
 from core.call_origin import dispatch, extension_call
+from ic_python_logging import get_logger
 
 logger = get_logger("core.extension_bridge")
 
@@ -84,17 +83,19 @@ SUPPORTED_EXTENSION_API_VERSIONS = frozenset({1})
 # an identity gets it from the host-injected ``caller``; anything arriving
 # under one of these names is a bug or an attack, so it is refused loudly
 # rather than silently dropped.
-RESERVED_KWARGS = frozenset({
-    "caller",
-    "caller_principal",
-    "user_id",
-    "user_principal",
-    "principal",
-    "owner_id",
-    "requester",
-    "requester_id",
-    "acting_user",
-})
+RESERVED_KWARGS = frozenset(
+    {
+        "caller",
+        "caller_principal",
+        "user_id",
+        "user_principal",
+        "principal",
+        "owner_id",
+        "requester",
+        "requester_id",
+        "acting_user",
+    }
+)
 
 # Admin verbs still need to *address* a member, which is a different claim
 # from *being* one. Those take ``subject``, deliberately outside the set above:
@@ -147,8 +148,14 @@ class EntityPolicy:
         Operation that lifts ``scope="owner"``, for registrar/admin tooling.
     """
 
-    def __init__(self, fields, scope="owner", owner_field=None,
-                 unscoped_operation=None, filters=()):
+    def __init__(
+        self,
+        fields,
+        scope="owner",
+        owner_field=None,
+        unscoped_operation=None,
+        filters=(),
+    ):
         self.fields = tuple(fields)
         self.scope = scope
         self.owner_field = owner_field
@@ -182,8 +189,10 @@ def _project(row, policy: "EntityPolicy") -> dict:
     for field in policy.fields:
         value = getattr(row, field, None)
         # Relations collapse to their id; a live entity must never cross.
-        if value is not None and hasattr(value, "id") and not isinstance(
-            value, (str, int, float, bool)
+        if (
+            value is not None
+            and hasattr(value, "id")
+            and not isinstance(value, (str, int, float, bool))
         ):
             value = getattr(value, "id", None)
         if value is None or isinstance(value, (str, int, float, bool)):
@@ -277,8 +286,9 @@ def _visible_rows(policy: EntityPolicy, caller: str, where: dict):
 # ---------------------------------------------------------------------------
 
 
-def _v_entity_list(caller="", capabilities=(), type="", where=None, limit=1000,
-                   **kwargs) -> dict:
+def _v_entity_list(
+    caller="", capabilities=(), type="", where=None, limit=1000, **kwargs
+) -> dict:
     """List rows of *type* visible to the caller."""
     policy = _policy_for(type, list(capabilities))
     where = where or {}
@@ -414,23 +424,29 @@ def _v_member_list(caller="", **kwargs) -> dict:
             profiles = [p.name for p in user.profiles]
         except Exception:
             profiles = []
-        members.append({
-            "principal": user.id,
-            "nickname": getattr(user, "nickname", "") or "",
-            "avatar": getattr(user, "avatar", "") or "",
-            "human_name": (getattr(human, "name", "") or "") if human else "",
-            "profiles": profiles,
-            "has_member": member is not None,
-            "identity_verification": (
-                getattr(member, "identity_verification", "") or ""
-            ) if member else "",
-            "tax_compliance": (
-                getattr(member, "tax_compliance", "") or ""
-            ) if member else "",
-            "is_active": bool(
-                member.is_active()
-            ) if member and hasattr(member, "is_active") else False,
-        })
+        members.append(
+            {
+                "principal": user.id,
+                "nickname": getattr(user, "nickname", "") or "",
+                "avatar": getattr(user, "avatar", "") or "",
+                "human_name": (getattr(human, "name", "") or "") if human else "",
+                "profiles": profiles,
+                "has_member": member is not None,
+                "identity_verification": (
+                    (getattr(member, "identity_verification", "") or "")
+                    if member
+                    else ""
+                ),
+                "tax_compliance": (
+                    (getattr(member, "tax_compliance", "") or "") if member else ""
+                ),
+                "is_active": (
+                    bool(member.is_active())
+                    if member and hasattr(member, "is_active")
+                    else False
+                ),
+            }
+        )
     return {"members": members, "total": len(members)}
 
 
@@ -461,18 +477,18 @@ def _v_member_profile(caller="", subject="", **kwargs) -> dict:
         record = getattr(member, "criminal_record", "") or ""
         member_data = {
             "id": getattr(member, "_id", None),
-            "identity_verification": getattr(
-                member, "identity_verification", "") or "",
+            "identity_verification": getattr(member, "identity_verification", "") or "",
             "tax_compliance": getattr(member, "tax_compliance", "") or "",
             "residence_permit": getattr(member, "residence_permit", "") or "",
-            "voting_eligibility": getattr(
-                member, "voting_eligibility", "") or "",
+            "voting_eligibility": getattr(member, "voting_eligibility", "") or "",
             "public_benefits_eligibility": getattr(
-                member, "public_benefits_eligibility", "") or "",
+                member, "public_benefits_eligibility", ""
+            )
+            or "",
             "has_zk_passport": record.startswith("clean|zk:") or "|zk:" in record,
-            "is_active": bool(
-                member.is_active()
-            ) if hasattr(member, "is_active") else False,
+            "is_active": (
+                bool(member.is_active()) if hasattr(member, "is_active") else False
+            ),
         }
 
     human = getattr(user, "human", None)
@@ -493,8 +509,7 @@ def _v_member_profile(caller="", subject="", **kwargs) -> dict:
             identities = []
 
     count = sum(
-        1 for n in Notification.instances()
-        if _notification_owner(n) == subject
+        1 for n in Notification.instances() if _notification_owner(n) == subject
     )
 
     return {
@@ -520,7 +535,8 @@ def _v_member_notifications(caller="", subject="", **kwargs) -> dict:
     if not subject:
         raise ValueError("subject is required")
     rows = [
-        _notification_row(n) for n in Notification.instances()
+        _notification_row(n)
+        for n in Notification.instances()
         if _notification_owner(n) == subject
     ]
     rows.sort(key=lambda r: r["timestamp_ms"], reverse=True)
@@ -556,9 +572,7 @@ def _v_system_snapshot(caller="", sections=None, **kwargs) -> dict:
     to walk the filesystem itself.
     """
     if not caller_has_operation(caller, "realm.admin"):
-        raise PermissionError(
-            "system.snapshot requires the 'realm.admin' operation"
-        )
+        raise PermissionError("system.snapshot requires the 'realm.admin' operation")
     from core import system_snapshot
 
     return system_snapshot.snapshot(sections)
@@ -588,7 +602,7 @@ def _v_realm_info(caller="", **kwargs) -> dict:
     try:
         from api.registry import get_registry_info
 
-        for entry in (get_registry_info().get("registries") or []):
+        for entry in get_registry_info().get("registries") or []:
             principal = (entry.get("principal_id") or "").strip()
             if principal:
                 registry_id = principal
@@ -622,8 +636,16 @@ def _v_schema_entities(**kwargs) -> dict:
     """
     import ggg
     from ic_python_db import (
-        Boolean, Entity, Float, Integer, ManyToMany, ManyToOne,
-        OneToMany, OneToOne, String, TimestampedMixin,
+        Boolean,
+        Entity,
+        Float,
+        Integer,
+        ManyToMany,
+        ManyToOne,
+        OneToMany,
+        OneToOne,
+        String,
+        TimestampedMixin,
     )
 
     scalars = (String, Integer, Boolean, Float)
@@ -690,8 +712,13 @@ def _v_schema_describe(capabilities=(), **kwargs) -> dict:
 # ---------------------------------------------------------------------------
 
 ZONE_TYPES = (
-    "unassigned", "residential", "commercial", "agricultural",
-    "industrial", "public", "mixed",
+    "unassigned",
+    "residential",
+    "commercial",
+    "agricultural",
+    "industrial",
+    "public",
+    "mixed",
 )
 
 # Writable through zone.create / zone.update. `user` is absent on purpose:
@@ -874,12 +901,10 @@ def register_declared_entities(ext_id: str, manifest: dict) -> List[str]:
     the same namespaced classes ``create_extension_entity_class`` produced —
     so storage layout is unchanged and existing rows keep working.
     """
+    from core.extensions import create_extension_entity_class
     from ic_python_db import Boolean, Float, Integer, String
 
-    from core.extensions import create_extension_entity_class
-
-    kinds = {"String": String, "Integer": Integer, "Float": Float,
-             "Boolean": Boolean}
+    kinds = {"String": String, "Integer": Integer, "Float": Float, "Boolean": Boolean}
     base = create_extension_entity_class(ext_id)
     registered = []
     for name, spec in declared_entities(manifest).items():
@@ -888,7 +913,8 @@ def register_declared_entities(ext_id: str, manifest: dict) -> List[str]:
             kind = kinds[fspec["type"]]
             attrs[field] = (
                 kind(max_length=fspec["max_length"])
-                if "max_length" in fspec else kind()
+                if "max_length" in fspec
+                else kind()
             )
         if spec.get("alias"):
             attrs["__alias__"] = spec["alias"]
@@ -947,9 +973,11 @@ def _project_own(row, fields: List[str]) -> dict:
     out = {"id": getattr(row, "id", None)}
     for field in fields:
         value = getattr(row, field, None)
-        out[field] = value if isinstance(
-            value, (str, int, float, bool)
-        ) or value is None else str(value)
+        out[field] = (
+            value
+            if isinstance(value, (str, int, float, bool)) or value is None
+            else str(value)
+        )
     return out
 
 
@@ -964,8 +992,7 @@ def _v_ext_entity_create(ext_id="", type="", values=None, **kwargs) -> dict:
     return _project_own(row, fields)
 
 
-def _v_ext_entity_list(ext_id="", type="", where=None, limit=1000,
-                       **kwargs) -> dict:
+def _v_ext_entity_list(ext_id="", type="", where=None, limit=1000, **kwargs) -> dict:
     cls = _own_entity_class(ext_id, type)
     fields = _own_fields(ext_id, type)
     rows = list(cls.instances())
@@ -987,8 +1014,7 @@ def _v_ext_entity_get(ext_id="", type="", id="", **kwargs):
     return _project_own(row, fields) if row is not None else None
 
 
-def _v_ext_entity_update(ext_id="", type="", id="", values=None,
-                         **kwargs) -> dict:
+def _v_ext_entity_update(ext_id="", type="", id="", values=None, **kwargs) -> dict:
     cls = _own_entity_class(ext_id, type)
     fields = _own_fields(ext_id, type)
     row = cls[id]
@@ -1048,33 +1074,41 @@ VERBS: Dict[str, Callable[..., Any]] = {
 
 # Verbs that only read. Kept explicit rather than inferred so a new write verb
 # cannot become readable by accident.
-READ_VERBS = frozenset({
-    "entity.list",
-    "entity.get",
-    "caller.get",
-    "schema.describe",
-    "schema.entities",
-    "realm.info",
-    "ext_entity.list",
-    "ext_entity.get",
-    "time.now",
-    "log.write",
-    "system.snapshot",
-    "member.list",
-    "member.profile",
-    "member.notifications",
-    "crypto.envelope",
-    "land.list",
-    "land.get",
-    "land.map",
-    "extension_access.list",
-    "notification.list",
-    "notification.departments",
-    "notification.email_settings",
-    "notification.pending_emails",
-    "console.overview",
-    "console.list_citizen_invites",
-}) | _dept_docs_bridge.READ_VERBS | _treasury_bridge.READ_VERBS | _procurement.READ_VERBS | _justice.READ_VERBS
+READ_VERBS = (
+    frozenset(
+        {
+            "entity.list",
+            "entity.get",
+            "caller.get",
+            "schema.describe",
+            "schema.entities",
+            "realm.info",
+            "ext_entity.list",
+            "ext_entity.get",
+            "time.now",
+            "log.write",
+            "system.snapshot",
+            "member.list",
+            "member.profile",
+            "member.notifications",
+            "crypto.envelope",
+            "land.list",
+            "land.get",
+            "land.map",
+            "extension_access.list",
+            "notification.list",
+            "notification.departments",
+            "notification.email_settings",
+            "notification.pending_emails",
+            "console.overview",
+            "console.list_citizen_invites",
+        }
+    )
+    | _dept_docs_bridge.READ_VERBS
+    | _treasury_bridge.READ_VERBS
+    | _procurement.READ_VERBS
+    | _justice.READ_VERBS
+)
 
 WRITE_VERBS = frozenset(VERBS) - READ_VERBS
 
@@ -1084,11 +1118,16 @@ _CAPABILITY_AWARE = frozenset({"entity.list", "entity.get", "schema.describe"})
 
 # Verbs scoped to the calling extension's own namespace. The id is supplied by
 # the host's dispatch, so these can never be aimed at another extension.
-_EXT_SCOPED = frozenset({
-    "ext_entity.create", "ext_entity.list", "ext_entity.get",
-    "ext_entity.update", "ext_entity.delete",
-    "log.write",
-})
+_EXT_SCOPED = frozenset(
+    {
+        "ext_entity.create",
+        "ext_entity.list",
+        "ext_entity.get",
+        "ext_entity.update",
+        "ext_entity.delete",
+        "log.write",
+    }
+)
 
 
 def known_verbs() -> List[str]:
@@ -1101,15 +1140,12 @@ def known_verbs() -> List[str]:
     """
     from core.async_bridge import service_capabilities
 
-    return sorted(
-        set(VERBS) | set(read_capabilities()) | set(service_capabilities())
-    )
+    return sorted(set(VERBS) | set(read_capabilities()) | set(service_capabilities()))
 
 
 def authorize(action: str, capabilities: List[str]) -> Optional[str]:
     """Return an error string if *action* is not permitted, else ``None``."""
-    return check_capability(action, capabilities, frozenset(VERBS),
-                            subject="extension")
+    return check_capability(action, capabilities, frozenset(VERBS), subject="extension")
 
 
 # ---------------------------------------------------------------------------
@@ -1138,8 +1174,13 @@ def _cedar_check(action: str, caller: str, kwargs: dict) -> None:
 
     resource_type = ""
     resource_id = ""
-    if action in ("entity.get", "entity.list", "entity.create", "entity.update",
-                  "entity.delete"):
+    if action in (
+        "entity.get",
+        "entity.list",
+        "entity.create",
+        "entity.update",
+        "entity.delete",
+    ):
         resource_type = str(kwargs.get("type") or "")
         # A listing names no row, but it must still reach Cedar as a resource of
         # that *type*, or a rule refusing to expose profiles would let

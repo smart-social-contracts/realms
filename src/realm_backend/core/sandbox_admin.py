@@ -17,7 +17,7 @@ logger = get_logger("core.sandbox_admin")
 
 
 def _root_department():
-    from ggg import Department, ROOT_ORG_NAME
+    from ggg import ROOT_ORG_NAME, Department
 
     root = Department[ROOT_ORG_NAME]
     if root:
@@ -128,10 +128,11 @@ def _validate_patch(patch: dict) -> None:
     # Instead duplicate the field checks from update_config.
     if "enabled" in patch and not isinstance(patch["enabled"], bool):
         raise ValueError("'enabled' must be a boolean")
-    if "default_mode" in patch and patch["default_mode"] not in runtime_sandbox.VALID_MODES:
-        raise ValueError(
-            f"'default_mode' must be one of {runtime_sandbox.VALID_MODES}"
-        )
+    if (
+        "default_mode" in patch
+        and patch["default_mode"] not in runtime_sandbox.VALID_MODES
+    ):
+        raise ValueError(f"'default_mode' must be one of {runtime_sandbox.VALID_MODES}")
     if "budget" in patch:
         if (
             not isinstance(patch["budget"], int)
@@ -160,7 +161,7 @@ def _validate_patch(patch: dict) -> None:
                 and runtime_sandbox.manifest_runtime_mode(ext_id) == "in_process"
             ):
                 raise ValueError(
-                    f"extension '{ext_id}' declares \"runtime\": \"in_process\" "
+                    f'extension \'{ext_id}\' declares "runtime": "in_process" '
                     f"and cannot be sandboxed — it imports host modules, so the "
                     f"spawn would fail and there is no in-process fallback"
                 )
@@ -168,7 +169,10 @@ def _validate_patch(patch: dict) -> None:
         raw = patch["codex_hooks"]
         if not isinstance(raw, dict):
             raise ValueError("'codex_hooks' must be an object")
-        if "default_mode" in raw and raw["default_mode"] not in runtime_sandbox.VALID_MODES:
+        if (
+            "default_mode" in raw
+            and raw["default_mode"] not in runtime_sandbox.VALID_MODES
+        ):
             raise ValueError(
                 f"codex_hooks.default_mode must be one of {runtime_sandbox.VALID_MODES}"
             )

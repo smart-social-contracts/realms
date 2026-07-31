@@ -3,6 +3,7 @@
 import base64
 import json
 import math
+import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -61,16 +62,21 @@ def import_data_command(
 
         console.print(f"📊 Found {len(data)} records to import")
 
-        # TODO:
-        # if dry_run:
-        #     console.print("[yellow]🔍 Dry run mode - no data will be imported[/yellow]")
-        #     display_success_panel(
-        #         "Dry Run Complete",
-        #         f"Would import {len(data)} {entity_type} records from {file_path}",
-        #     )
-        #     return
+        # Topologically sort so referents exist before referees (issue #14).
+        try:
+            backend_root = Path(__file__).resolve().parents[4] / "src" / "realm_backend"
+            if str(backend_root) not in sys.path:
+                sys.path.insert(0, str(backend_root))
+            import ggg  # noqa: F401
+            from core.entity_import import topological_sort_records
 
-        project_root = get_project_root()
+            data, sort_warnings = topological_sort_records(data)
+            for warning in sort_warnings:
+                console.print(f"[yellow]⚠ {warning}[/yellow]")
+        except Exception as sort_err:
+            console.print(
+                f"[yellow]⚠ Import order sort skipped: {sort_err}[/yellow]"
+            )
 
         # Calculate the total number of chunks using ceiling division
         total_chunks = math.ceil(len(data) / batch_size)
@@ -83,6 +89,7 @@ def import_data_command(
             args = {
                 "format": format,
                 "data": chunk,
+                "sort_records": False,
             }
 
             args_json = json.dumps(args)
@@ -95,7 +102,7 @@ def import_data_command(
                 "call",
                 canister,
                 "extension_sync_call",
-                f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "base64:{args_b64}"; }})',
+                f'(record {{ extension_name = "import_export"; function_name = "import_data"; args = "base64:{args_b64}"; }})',
                 "--network",
                 network,
                 "--output",
@@ -202,7 +209,7 @@ def import_codex_command(
             "call",
             canister,
             "extension_sync_call",
-            f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
+            f'(record {{ extension_name = "import_export"; function_name = "import_data"; args = "{escaped_args}"; }})',
             "--network",
             network,
         ]

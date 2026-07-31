@@ -6,6 +6,7 @@
     "realm_settings",
     "voting",
     "admin_dashboard",
+    "import_export",
     "vault",
     "codex_viewer",
     "task_monitor",

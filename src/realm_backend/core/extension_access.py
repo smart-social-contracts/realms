@@ -181,8 +181,8 @@ def gate_extension_call(
     from core.governed_action import (
         INITIATOR_KEY,
         build_extension_replay_code,
-        gate as governed_gate,
     )
+    from core.governed_action import gate as governed_gate
 
     confirm = False
     replay_args = args or "{}"

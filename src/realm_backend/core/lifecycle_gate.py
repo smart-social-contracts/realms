@@ -63,23 +63,26 @@ def readiness_checklist(realm) -> list:
 
     Each item: ``{id, label, done, detail}``.
     """
-    from ggg import Department, ROOT_ORG_NAME, User
+    from ggg import ROOT_ORG_NAME, Department, User
 
     config = _manifest(realm)
     items = []
 
     depts = list(Department.instances())
     non_root = [
-        d for d in depts
+        d
+        for d in depts
         if not (getattr(d, "is_root", False) or d.name == ROOT_ORG_NAME)
     ]
     expected = config.get("departments", []) or []
-    items.append({
-        "id": "departments_seeded",
-        "label": "Departments seeded",
-        "done": len(non_root) > 0 and len(non_root) >= len(expected),
-        "detail": f"{len(non_root)} departments (template lists {len(expected)})",
-    })
+    items.append(
+        {
+            "id": "departments_seeded",
+            "label": "Departments seeded",
+            "done": len(non_root) > 0 and len(non_root) >= len(expected),
+            "detail": f"{len(non_root)} departments (template lists {len(expected)})",
+        }
+    )
 
     def _member_count(dept) -> int:
         from core.membership import department_member_count
@@ -93,7 +96,8 @@ def readiness_checklist(realm) -> list:
         from ggg import Position, PositionStatus
 
         open_positions = [
-            p for p in Position.instances()
+            p
+            for p in Position.instances()
             if (p.status or PositionStatus.OPEN) == PositionStatus.OPEN
         ]
     except Exception:
@@ -101,45 +105,55 @@ def readiness_checklist(realm) -> list:
 
     if open_positions:
         staffed_positions = [p for p in open_positions if p.filled_count() > 0]
-        items.append({
-            "id": "departments_staffed",
-            "label": "Civil servants onboarded",
-            "done": len(staffed_positions) == len(open_positions),
-            "detail": f"{len(staffed_positions)} of {len(open_positions)} positions staffed",
-        })
+        items.append(
+            {
+                "id": "departments_staffed",
+                "label": "Civil servants onboarded",
+                "done": len(staffed_positions) == len(open_positions),
+                "detail": f"{len(staffed_positions)} of {len(open_positions)} positions staffed",
+            }
+        )
     else:
         staffed = [d for d in non_root if _member_count(d) > 0]
-        items.append({
-            "id": "departments_staffed",
-            "label": "Civil servants onboarded",
-            "done": len(non_root) > 0 and len(staffed) == len(non_root),
-            "detail": f"{len(staffed)} of {len(non_root)} departments have members",
-        })
+        items.append(
+            {
+                "id": "departments_staffed",
+                "label": "Civil servants onboarded",
+                "done": len(non_root) > 0 and len(staffed) == len(non_root),
+                "detail": f"{len(staffed)} of {len(non_root)} departments have members",
+            }
+        )
 
     budgets = [d for d in non_root if getattr(d, "fund", None)]
-    items.append({
-        "id": "budgets_linked",
-        "label": "Department budgets linked",
-        "done": len(non_root) > 0 and len(budgets) == len(non_root),
-        "detail": f"{len(budgets)} of {len(non_root)} departments have a fund",
-    })
+    items.append(
+        {
+            "id": "budgets_linked",
+            "label": "Department budgets linked",
+            "done": len(non_root) > 0 and len(budgets) == len(non_root),
+            "detail": f"{len(budgets)} of {len(non_root)} departments have a fund",
+        }
+    )
 
     population = User.count()
     target = int((config.get("lifecycle", {}) or {}).get("population_target", 0) or 0)
-    items.append({
-        "id": "citizens_imported",
-        "label": "Citizens imported",
-        "done": target > 0 and population >= target,
-        "detail": f"{population} members (target {target})",
-    })
+    items.append(
+        {
+            "id": "citizens_imported",
+            "label": "Citizens imported",
+            "done": target > 0 and population >= target,
+            "detail": f"{population} members (target {target})",
+        }
+    )
 
     token_id = (getattr(realm, "token_canister_id", "") or "").strip()
-    items.append({
-        "id": "treasury_configured",
-        "label": "Currency / treasury configured",
-        "done": bool(token_id),
-        "detail": f"token canister: {token_id or 'not set'}",
-    })
+    items.append(
+        {
+            "id": "treasury_configured",
+            "label": "Currency / treasury configured",
+            "done": bool(token_id),
+            "detail": f"token canister: {token_id or 'not set'}",
+        }
+    )
 
     try:
         from ggg import Zone
@@ -147,12 +161,14 @@ def readiness_checklist(realm) -> list:
         zone_count = Zone.count()
     except Exception:
         zone_count = 0
-    items.append({
-        "id": "zones_defined",
-        "label": "Geographic zones defined",
-        "done": zone_count > 0,
-        "detail": f"{zone_count} zones",
-    })
+    items.append(
+        {
+            "id": "zones_defined",
+            "label": "Geographic zones defined",
+            "done": zone_count > 0,
+            "detail": f"{zone_count} zones",
+        }
+    )
 
     # Dependencies may be a list (latest) or a {name: version_pin} dict
     # (issue #242); either way we only need the extension names here.
@@ -165,12 +181,14 @@ def readiness_checklist(realm) -> list:
     except Exception:
         installed = set()
     missing = [d for d in deps if d not in installed]
-    items.append({
-        "id": "extensions_installed",
-        "label": "Required extensions installed",
-        "done": len(deps) > 0 and not missing,
-        "detail": f"missing: {', '.join(missing) if missing else 'none'}",
-    })
+    items.append(
+        {
+            "id": "extensions_installed",
+            "label": "Required extensions installed",
+            "done": len(deps) > 0 and not missing,
+            "detail": f"missing: {', '.join(missing) if missing else 'none'}",
+        }
+    )
 
     # Root handover: the root org has members beyond the realm creator, i.e.
     # governance has been transferred to the top authority (usually congress).
@@ -179,12 +197,14 @@ def readiness_checklist(realm) -> list:
         None,
     )
     root_members = _member_count(root) if root else 0
-    items.append({
-        "id": "root_handover",
-        "label": "Root handed to governance authority",
-        "done": root_members > 1,
-        "detail": f"root department has {root_members} member(s)",
-    })
+    items.append(
+        {
+            "id": "root_handover",
+            "label": "Root handed to governance authority",
+            "done": root_members > 1,
+            "detail": f"root department has {root_members} member(s)",
+        }
+    )
 
     return items
 
@@ -293,7 +313,7 @@ def beta_to_production_ready(realm):
     proposal. This gate runs again at replay time, so the proving period
     cannot be bypassed by voting early.
     """
-    from ggg import Department, ROOT_ORG_NAME
+    from ggg import ROOT_ORG_NAME, Department
 
     missing = []
     config = _manifest(realm)
@@ -317,7 +337,8 @@ def beta_to_production_ready(realm):
 
     root = next(
         (
-            d for d in Department.instances()
+            d
+            for d in Department.instances()
             if getattr(d, "is_root", False) or d.name == ROOT_ORG_NAME
         ),
         None,

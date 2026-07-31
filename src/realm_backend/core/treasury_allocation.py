@@ -49,9 +49,7 @@ EPOCH_MONTHS = {
     "annual": 12,
 }
 
-EPOCH_LENGTHS = frozenset(
-    set(EPOCH_MONTHS) | {"weekly", "biweekly", "minutes"}
-)
+EPOCH_LENGTHS = frozenset(set(EPOCH_MONTHS) | {"weekly", "biweekly", "minutes"})
 
 # Monday 1970-01-05 — anchor for 14-day biweekly periods.
 _BIWEEKLY_ANCHOR_ORD = 4
@@ -60,6 +58,7 @@ _BIWEEKLY_ANCHOR_ORD = 4
 # ---------------------------------------------------------------------------
 # Time & config
 # ---------------------------------------------------------------------------
+
 
 def _now_ts() -> int:
     """Current unix time from IC time when available (canister-safe)."""
@@ -81,6 +80,7 @@ def _now_ts() -> int:
 # returns 1970 regardless of input, no date/timedelta), so all date math
 # below is pure integer arithmetic on (year, month, day) tuples and ISO
 # "YYYY-MM-DD" strings.
+
 
 def civil_from_ts(ts: int) -> tuple:
     """Unix timestamp → (year, month, day) in UTC — no datetime involved.
@@ -235,16 +235,12 @@ def set_epoch_config(
     if epoch_length == "bi-weekly":
         epoch_length = "biweekly"
     if epoch_length not in EPOCH_LENGTHS:
-        return {
-            "error": f"epoch_length must be one of {sorted(EPOCH_LENGTHS)}"
-        }
+        return {"error": f"epoch_length must be one of {sorted(EPOCH_LENGTHS)}"}
     if epoch_length == "minutes":
         from core.runtime_flags import is_test_mode
 
         if not is_test_mode():
-            return {
-                "error": "Minute-based epochs are only available in test mode"
-            }
+            return {"error": "Minute-based epochs are only available in test mode"}
         mins = int(epoch_minutes or 0)
         if mins < 1 or mins > 10_080:
             return {"error": "epoch_minutes must be between 1 and 10080"}
@@ -272,6 +268,7 @@ def set_epoch_config(
 # ---------------------------------------------------------------------------
 # Calendar-aligned epochs
 # ---------------------------------------------------------------------------
+
 
 def _epoch_start_for(ymd: tuple, months: int, anchor: int) -> tuple:
     """(year, month) of the first day of the epoch containing *ymd*."""
@@ -375,7 +372,9 @@ def ensure_epoch_periods() -> dict:
         if end_cmp:
             if latest_end is None or end_cmp > latest_end:
                 latest_end = end_cmp
-        if period.status == FiscalPeriodStatus.OPEN and _period_end_passed(end_incl, cfg):
+        if period.status == FiscalPeriodStatus.OPEN and _period_end_passed(
+            end_incl, cfg
+        ):
             period.close()
             closed_now.append(period.id)
 
@@ -409,6 +408,7 @@ def current_epoch_id() -> str:
 # Funds
 # ---------------------------------------------------------------------------
 
+
 def _source_fund():
     from ggg import Fund
 
@@ -425,6 +425,7 @@ def _source_fund():
 # ---------------------------------------------------------------------------
 # Stage 1 — recognition: sweep unmatched deposits
 # ---------------------------------------------------------------------------
+
 
 def _invoice_claimed_amounts() -> dict:
     """Multiset {raw_amount: count} of amounts owned by the invoice pipeline.
@@ -457,11 +458,10 @@ def sweep_deposits():
     fund, dated today (recognition date), in the current open period.
     Idempotent via the deterministic transaction id ``SWEEP-<token>-<tx id>``.
     """
-    from ic_basilisk_toolkit.entities import WalletTransfer
-    from ic_basilisk_toolkit.wallet import Wallet
-
     from _cdk import ic
     from ggg import Category, EntryType, FiscalPeriod, LedgerEntry, Token
+    from ic_basilisk_toolkit.entities import WalletTransfer
+    from ic_basilisk_toolkit.wallet import Wallet
 
     currency = treasury_currency()
     token = Token[currency]
@@ -554,6 +554,7 @@ def sweep_deposits():
 # Allocation rules
 # ---------------------------------------------------------------------------
 
+
 def _parse_rules(rules_json: str) -> list:
     try:
         rules = json.loads(rules_json or "[]")
@@ -567,7 +568,8 @@ def active_allocation_rule():
     from ggg import AllocationRule, AllocationRuleStatus
 
     adopted = [
-        r for r in AllocationRule.instances()
+        r
+        for r in AllocationRule.instances()
         if r.status == AllocationRuleStatus.ADOPTED
     ]
     if not adopted:
@@ -641,6 +643,7 @@ def set_allocation_rule(
 # Pool math (read model helpers)
 # ---------------------------------------------------------------------------
 
+
 def _entries_in_period(period, fund=None, entry_type=None) -> list:
     from ggg import LedgerEntry
 
@@ -675,14 +678,13 @@ def allocated_out(period, fund=None) -> int:
 
     fund = fund or _source_fund()
     entries = _entries_in_period(period, fund=fund, entry_type=EntryType.EQUITY)
-    return sum(
-        (e.debit or 0) for e in entries if e.category == Category.TRANSFER_OUT
-    )
+    return sum((e.debit or 0) for e in entries if e.category == Category.TRANSFER_OUT)
 
 
 # ---------------------------------------------------------------------------
 # Stage 2 — allocation engine
 # ---------------------------------------------------------------------------
+
 
 def run_allocation(period_id: str = None, triggered_by: str = "") -> dict:
     """Distribute the unallocated pool of one epoch into funds by rule.
@@ -692,7 +694,15 @@ def run_allocation(period_id: str = None, triggered_by: str = "") -> dict:
     mid-epoch runs and the automatic close run compose. Interfund movements
     are equity + cash lines; the income statement is untouched.
     """
-    from ggg import Budget, BudgetStatus, Category, EntryType, FiscalPeriod, Fund, LedgerEntry
+    from ggg import (
+        Budget,
+        BudgetStatus,
+        Category,
+        EntryType,
+        FiscalPeriod,
+        Fund,
+        LedgerEntry,
+    )
 
     ensure_epoch_periods()
     period_id = (period_id or "").strip() or epoch_id_for(_today())
@@ -830,6 +840,7 @@ def run_allocation(period_id: str = None, triggered_by: str = "") -> dict:
 # Standing schedule (daily tick)
 # ---------------------------------------------------------------------------
 
+
 def set_treasury_schedule(
     enabled: bool, auto_allocate: bool = None, triggered_by: str = ""
 ) -> dict:
@@ -925,12 +936,11 @@ def treasury_schedule_status() -> dict:
 # Read models (Budget Management extension)
 # ---------------------------------------------------------------------------
 
+
 def _list_periods() -> list:
     from ggg import FiscalPeriod
 
-    periods = sorted(
-        FiscalPeriod.instances(), key=lambda p: str(p.start_date or "")
-    )
+    periods = sorted(FiscalPeriod.instances(), key=lambda p: str(p.start_date or ""))
     return [
         {
             "id": p.id,
@@ -982,13 +992,15 @@ def treasury_overview() -> dict:
         "test_mode": is_test_mode(),
         "current_period": epoch_id_for(_today(), cfg),
         "periods": _list_periods(),
-        "rule": {
-            "id": rule.id,
-            "rules": _parse_rules(rule.rules),
-            "description": rule.description or "",
-        }
-        if rule
-        else None,
+        "rule": (
+            {
+                "id": rule.id,
+                "rules": _parse_rules(rule.rules),
+                "description": rule.description or "",
+            }
+            if rule
+            else None
+        ),
         "funds": sorted(funds, key=lambda f: f["code"] or ""),
         **treasury_schedule_status(),
     }
@@ -1066,8 +1078,12 @@ def allocation_flows(period_id: str = None) -> dict:
             continue
         node_id = f"rev:{category}"
         nodes.append(
-            {"id": node_id, "label": category.replace("_", " "), "column": 0,
-             "value": amount}
+            {
+                "id": node_id,
+                "label": category.replace("_", " "),
+                "column": 0,
+                "value": amount,
+            }
         )
         links.append({"source": node_id, "target": "pool", "value": amount})
 
@@ -1084,15 +1100,17 @@ def allocation_flows(period_id: str = None) -> dict:
         fund = Fund[code]
         label = (fund.name or code) if fund else code
         node_id = f"fund:{code}"
-        nodes.append(
-            {"id": node_id, "label": label, "column": 2, "value": amount}
-        )
+        nodes.append({"id": node_id, "label": label, "column": 2, "value": amount})
         links.append({"source": "pool", "target": node_id, "value": amount})
     reserve = int(status.get("unallocated") or 0)
     if reserve > 0:
         nodes.append(
-            {"id": "reserve", "label": "Unallocated reserve", "column": 2,
-             "value": reserve}
+            {
+                "id": "reserve",
+                "label": "Unallocated reserve",
+                "column": 2,
+                "value": reserve,
+            }
         )
         links.append({"source": "pool", "target": "reserve", "value": reserve})
 
@@ -1103,21 +1121,19 @@ def allocation_flows(period_id: str = None) -> dict:
             fund = Fund[code]
             if fund is None:
                 continue
-            for e in _entries_in_period(period, fund=fund, entry_type=EntryType.EXPENSE):
+            for e in _entries_in_period(
+                period, fund=fund, entry_type=EntryType.EXPENSE
+            ):
                 net = (e.debit or 0) - (e.credit or 0)
                 if net <= 0:
                     continue
                 category = e.category or "other"
                 key = f"exp:{category}"
                 expense_totals[key] = expense_totals.get(key, 0) + net
-                links.append(
-                    {"source": f"fund:{code}", "target": key, "value": net}
-                )
+                links.append({"source": f"fund:{code}", "target": key, "value": net})
         for key, total in sorted(expense_totals.items()):
             label = key.split(":", 1)[1].replace("_", " ")
-            nodes.append(
-                {"id": key, "label": label, "column": 3, "value": total}
-            )
+            nodes.append({"id": key, "label": label, "column": 3, "value": total})
 
     return {
         "period": status["period"],
@@ -1299,6 +1315,7 @@ def budgets_for_period(period_id: str = None) -> dict:
 # ---------------------------------------------------------------------------
 # Governance (vote-gated actions — mirrors core.payroll)
 # ---------------------------------------------------------------------------
+
 
 def describe_treasury_action(action: dict) -> str:
     """One-line human summary for proposal titles and audit logs."""

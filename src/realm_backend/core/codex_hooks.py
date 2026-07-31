@@ -52,20 +52,37 @@ SUPPORTED_GGG_API_VERSIONS = frozenset({1})
 # Manifest keys that are packaging/plumbing, not realm configuration.
 # Everything else in a codex manifest is served as config by the default
 # get_config implementation.
-_NON_CONFIG_MANIFEST_KEYS = frozenset({
-    "id", "name", "version", "kind", "codex_api_version", "description",
-    "author", "dependencies", "extension_overrides", "data_files",
-    "entity_method_overrides", "profiles", "categories", "icon",
-    "show_in_sidebar", "sidebar_label", "doc_url", "permissions", "system",
-    # Wizard-editable parameter declarations (issue #253) — metadata about
-    # the config, not config itself.
-    "parameters",
-    # GGG API contract declaration + capability grants + sandbox hook module
-    # (issue #265) — plumbing, not config.
-    "ggg_api_version",
-    "capabilities",
-    "sandbox_module",
-})
+_NON_CONFIG_MANIFEST_KEYS = frozenset(
+    {
+        "id",
+        "name",
+        "version",
+        "kind",
+        "codex_api_version",
+        "description",
+        "author",
+        "dependencies",
+        "extension_overrides",
+        "data_files",
+        "entity_method_overrides",
+        "profiles",
+        "categories",
+        "icon",
+        "show_in_sidebar",
+        "sidebar_label",
+        "doc_url",
+        "permissions",
+        "system",
+        # Wizard-editable parameter declarations (issue #253) — metadata about
+        # the config, not config itself.
+        "parameters",
+        # GGG API contract declaration + capability grants + sandbox hook module
+        # (issue #265) — plumbing, not config.
+        "ggg_api_version",
+        "capabilities",
+        "sandbox_module",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +210,9 @@ def is_bridge_codex(manifest: dict) -> bool:
     """True when a codex is fully bridge-native: it declares both a
     ``capabilities`` list and a ``sandbox_module``. Only such codices are
     routed through the sandbox (issue #265)."""
-    return declares_capabilities(manifest) and codex_sandbox_module(manifest) is not None
+    return (
+        declares_capabilities(manifest) and codex_sandbox_module(manifest) is not None
+    )
 
 
 def get_active_codex() -> Optional[str]:
@@ -315,10 +334,7 @@ def call_hook(hook_name: str, args: Optional[dict] = None, default: Any = None) 
 
 def _manifest_config_blocks(manifest: dict) -> dict:
     """Config blocks from a codex manifest (default get_config source)."""
-    return {
-        k: v for k, v in manifest.items()
-        if k not in _NON_CONFIG_MANIFEST_KEYS
-    }
+    return {k: v for k, v in manifest.items() if k not in _NON_CONFIG_MANIFEST_KEYS}
 
 
 def _deep_merge(base: dict, overrides: dict) -> dict:
@@ -740,10 +756,10 @@ def enforce_role_gate(
     reason = ""
     if isinstance(result, dict):
         reason = str(result.get("reason") or "")
-    reason = reason or (
-        f"'{profile_name}' requires an approved governance proposal"
+    reason = reason or (f"'{profile_name}' requires an approved governance proposal")
+    logger.info(
+        f"Role hook {hook_name} denied '{profile_name}' for {user_id}: {reason}"
     )
-    logger.info(f"Role hook {hook_name} denied '{profile_name}' for {user_id}: {reason}")
     raise PermissionError(reason)
 
 
@@ -863,9 +879,7 @@ def call_assign_quarter(
     return str(result) if result else None
 
 
-def call_should_deploy_quarter(
-    populations: list, network: str = ""
-) -> Optional[bool]:
+def call_should_deploy_quarter(populations: list, network: str = "") -> Optional[bool]:
     """Ask the federation codex whether to spawn another quarter.
 
     Returns ``True``/``False`` from the policy, or ``None`` when no policy is
@@ -946,7 +960,9 @@ def dispatch_federation_message(topic: str, source: str, body: dict) -> Optional
     if hook is None:
         return None
     try:
-        result = hook(json.dumps({"topic": topic, "source": source, "body": body or {}}))
+        result = hook(
+            json.dumps({"topic": topic, "source": source, "body": body or {}})
+        )
         if isinstance(result, str):
             try:
                 return json.loads(result)
@@ -1061,10 +1077,10 @@ def run_init(codex_id: str) -> Optional[str]:
 
 def _treasury_send_sandboxed(codex_id: str, params: dict) -> dict:
     """Run ``on_treasury_send`` in the sandbox; return transfer kwargs."""
-    from core import runtime_sandbox
-
-    from core.runtime_extensions import EXTENSIONS_DIR
     import os
+
+    from core import runtime_sandbox
+    from core.runtime_extensions import EXTENSIONS_DIR
 
     module_file = runtime_sandbox._codex_hook_module_file(codex_id)
     module_path = os.path.join(EXTENSIONS_DIR, codex_id, module_file)
@@ -1132,9 +1148,11 @@ def treasury_send_async(treasury_name: str, to_principal: str, amount: int):
     if extension_async_call is None:
         raise RuntimeError("extension_async_call unavailable")
 
-    vault_args = json.dumps({
-        "to_principal": transfer_kwargs.get("to_principal", to_principal),
-        "amount": transfer_kwargs.get("amount", amount),
-    })
+    vault_args = json.dumps(
+        {
+            "to_principal": transfer_kwargs.get("to_principal", to_principal),
+            "amount": transfer_kwargs.get("amount", amount),
+        }
+    )
     result = yield extension_async_call("vault", "transfer", vault_args)
     return result

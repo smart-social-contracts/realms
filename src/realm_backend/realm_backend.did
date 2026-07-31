@@ -284,6 +284,7 @@ type Duration = nat64;
 type Address = text;
 
 service : {
+  "policy_status" : () -> (text) query;
   "status" : () -> (RealmResponse) query;
   "get_runtime_flags" : () -> (text) query;
   "get_quarter_info" : () -> (RealmResponse) query;

@@ -9,8 +9,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from _cdk import ic
-from ic_python_logging import get_logger
-
 from core.access import AccessDenied, _check_access
 from ggg import Notification, User
 from ggg.governance.delegation import (
@@ -21,6 +19,7 @@ from ggg.governance.delegation import (
     Delegation,
 )
 from ggg.system.user_profile import Operations
+from ic_python_logging import get_logger
 
 logger = get_logger("core.delegation")
 
@@ -154,7 +153,9 @@ def resolve_acting_context(args: dict | None, operation: str) -> ActingContext:
 
     if not grantor or grantor == caller:
         if not _check_access(caller, operation):
-            raise AccessDenied(f"Access denied: user {caller} lacks permission '{operation}'")
+            raise AccessDenied(
+                f"Access denied: user {caller} lacks permission '{operation}'"
+            )
         user = User[caller]
         if not user:
             raise AccessDenied(f"User {caller} not registered in this realm")
@@ -168,9 +169,7 @@ def resolve_acting_context(args: dict | None, operation: str) -> ActingContext:
 
     delegation = find_active_delegation(grantor, caller)
     if not delegation:
-        raise AccessDenied(
-            f"No active delegation from {grantor} to {caller}"
-        )
+        raise AccessDenied(f"No active delegation from {grantor} to {caller}")
     scope = _parse_scope(delegation.scope_json)
     if not scope_allows(scope, operation):
         raise AccessDenied(
@@ -269,9 +268,15 @@ def accept_delegation(delegation_id: str) -> dict[str, Any]:
     if not d:
         return {"success": False, "error": "Delegation not found"}
     if d.delegate != caller:
-        return {"success": False, "error": "Only the delegate may accept this delegation"}
+        return {
+            "success": False,
+            "error": "Only the delegate may accept this delegation",
+        }
     if d.status != STATUS_PENDING:
-        return {"success": False, "error": f"Delegation is not pending (status={d.status})"}
+        return {
+            "success": False,
+            "error": f"Delegation is not pending (status={d.status})",
+        }
     d.status = STATUS_ACTIVE
     d.accepted_at = _now_ts()
     return {"success": True, "data": _delegation_to_dict(d)}
@@ -283,7 +288,11 @@ def revoke_delegation(delegation_id: str) -> dict[str, Any]:
     if not d:
         return {"success": False, "error": "Delegation not found"}
     if d.status in (STATUS_REVOKED, STATUS_EXPIRED):
-        return {"success": True, "data": _delegation_to_dict(d), "message": "Already inactive"}
+        return {
+            "success": True,
+            "data": _delegation_to_dict(d),
+            "message": "Already inactive",
+        }
 
     allowed = (
         caller == d.grantor

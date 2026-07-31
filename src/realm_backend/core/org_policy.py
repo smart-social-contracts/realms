@@ -79,7 +79,7 @@ def policy_satisfied(
 
 def ensure_root_org(head_user=None):
     """Create the quarter ``root`` org if missing. Returns the root Department."""
-    from ggg import Department, Fund, FundType, ROOT_ORG_NAME
+    from ggg import ROOT_ORG_NAME, Department, Fund, FundType
 
     existing = Department[ROOT_ORG_NAME]
     if existing:
@@ -96,9 +96,7 @@ def ensure_root_org(head_user=None):
             )
             return dept
 
-    fund = Fund[
-        "ROOT"
-    ]
+    fund = Fund["ROOT"]
     if not fund:
         fund = Fund(
             code="ROOT",
@@ -133,7 +131,7 @@ def grant_root_authority_over_local_orgs():
     """Ensure root has default manage permissions over every other local org."""
     import uuid
 
-    from ggg import Department, DepartmentAuthority, ROOT_ORG_NAME
+    from ggg import ROOT_ORG_NAME, Department, DepartmentAuthority
 
     root = Department[ROOT_ORG_NAME] or ensure_root_org()
     perms = ",".join(ROOT_DEFAULT_OVER_ORG)

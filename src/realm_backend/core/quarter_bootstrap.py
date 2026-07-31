@@ -54,6 +54,7 @@ AUTOSCALE_STEP_CODE = (
 
 # ── Pure plan construction + state machine (unit-testable, no canister) ──────
 
+
 def build_bootstrap_plan(spec):
     """Turn a bootstrap spec into an ordered install plan + cursor state.
 
@@ -163,16 +164,26 @@ def step_plan(state, ok, error=None):
 # deliberately excluded — a quarter must not spin up its own synthetic personas
 # (that would defeat the load distribution the quarter exists to provide).
 _QUARTER_CONFIG_STR_FIELDS = (
-    "name", "manifesto", "welcome_message", "logo_url", "background_image_url",
-    "network", "accounting_currency",
-    "file_registry_canister_id", "marketplace_canister_id",
-    "token_canister_id", "nft_canister_id",
+    "name",
+    "manifesto",
+    "welcome_message",
+    "logo_url",
+    "background_image_url",
+    "network",
+    "accounting_currency",
+    "file_registry_canister_id",
+    "marketplace_canister_id",
+    "token_canister_id",
+    "nft_canister_id",
 )
 _QUARTER_CONFIG_BOOL_FIELDS = ("open_registration", "ai_assistant_enabled")
 _QUARTER_CONFIG_INT_FIELDS = ("accounting_currency_decimals",)
 _QUARTER_TEST_FLAG_FIELDS = (
-    "test_mode", "test_mode_ii_bypass", "test_mode_user_self_registration",
-    "test_mode_skip_terms", "test_mode_skip_passport_zkproof",
+    "test_mode",
+    "test_mode_ii_bypass",
+    "test_mode_user_self_registration",
+    "test_mode_skip_terms",
+    "test_mode_skip_passport_zkproof",
     "test_mode_skip_authentication",
 )
 
@@ -216,6 +227,7 @@ def apply_quarter_config(realm, config):
 
 # ── Live install-set derivation (capital → quarter parity) ──────────────────
 
+
 def derive_capital_install_set(default_registry=""):
     """Build the codex + extension install set from the capital's *own live
     state*, so a freshly minted quarter mirrors whatever the capital currently
@@ -246,8 +258,8 @@ def derive_capital_install_set(default_registry=""):
     try:
         from core.runtime_extensions import (
             get_extension_source,
-            list_installed as _list_installed_exts,
         )
+        from core.runtime_extensions import list_installed as _list_installed_exts
 
         for ext_id in _list_installed_exts():
             src = get_extension_source(ext_id) or {}
@@ -261,8 +273,8 @@ def derive_capital_install_set(default_registry=""):
     try:
         from core.runtime_codex import (
             get_all_codex_manifests,
-            list_installed as _list_installed_codices,
         )
+        from core.runtime_codex import list_installed as _list_installed_codices
 
         manifests = get_all_codex_manifests()
         for codex_id in _list_installed_codices():
@@ -285,6 +297,7 @@ def derive_capital_install_set(default_registry=""):
 
 # ── Realm-persisted state helpers ───────────────────────────────────────────
 
+
 def load_state(realm):
     """Read the JSON bootstrap plan persisted on ``realm`` (or None)."""
     raw = getattr(realm, "bootstrap_state", "") or ""
@@ -302,6 +315,7 @@ def save_state(realm, state):
 
 
 # ── Canister runtime: install one item per tick ─────────────────────────────
+
 
 def _install_item(state, item):
     """Generator: install a single plan item locally via the file registry.
@@ -323,7 +337,10 @@ def _install_item(state, item):
     from api.file_registry import install_extension_from_registry as _install_ext
 
     res = yield from _install_ext(
-        registry, item.get("id"), item.get("version"), frontend_canister_id=frontend or None
+        registry,
+        item.get("id"),
+        item.get("version"),
+        frontend_canister_id=frontend or None,
     )
     parsed = json.loads(res) if isinstance(res, str) else res
     if isinstance(parsed, dict) and parsed.get("success"):
@@ -360,7 +377,11 @@ def advance_bootstrap():
         from realm_backend.ggg import Realm  # test/module layout
 
     if _bootstrap_tick_in_flight:
-        return {"success": True, "status": "busy", "message": "previous tick still installing"}
+        return {
+            "success": True,
+            "status": "busy",
+            "message": "previous tick still installing",
+        }
 
     realm = Realm.load("1")
     if not realm:
@@ -413,9 +434,18 @@ def advance_bootstrap():
             f"advance_bootstrap: plan moved under us (installed {item.get('id')!r}, "
             f"cursor now at {fresh_item.get('id') if fresh_item else 'end'!r}); not stepping"
         )
-        return {"success": ok, "status": state.get("status"),
-                "cursor": fresh_cursor, "item": item.get("id"), "result": result}
-    error = None if ok else (result.get("error") if isinstance(result, dict) else str(result))
+        return {
+            "success": ok,
+            "status": state.get("status"),
+            "cursor": fresh_cursor,
+            "item": item.get("id"),
+            "result": result,
+        }
+    error = (
+        None
+        if ok
+        else (result.get("error") if isinstance(result, dict) else str(result))
+    )
     step_plan(state, ok, error=error)
     save_state(realm, state)
 
@@ -435,6 +465,7 @@ def advance_bootstrap():
 
 
 # ── Capital-side quarter directory merge (capital ← quarters) ───────────────
+
 
 def sync_one_peer(peer_canister_id):
     """Generator: pull one peer quarter's coarse directory and merge it into
@@ -459,12 +490,14 @@ def sync_one_peer(peer_canister_id):
 
         local = []
         for q in Quarter.instances():
-            local.append({
-                "name": q.name or "",
-                "canister_id": q.canister_id or "",
-                "population": int(q.population or 0),
-                "status": q.status or "active",
-            })
+            local.append(
+                {
+                    "name": q.name or "",
+                    "canister_id": q.canister_id or "",
+                    "population": int(q.population or 0),
+                    "status": q.status or "active",
+                }
+            )
 
         merged, changed = merge_quarter_directory(local, peer_quarters)
 
@@ -508,6 +541,7 @@ def sync_one_peer(peer_canister_id):
 
 # ── TaskManager seeding / teardown (canister only) ──────────────────────────
 
+
 def seed_recurring_codex_task(name, code, interval_s):
     """Create (or re-enable) a recurring single-step TaskManager task.
 
@@ -537,7 +571,9 @@ def seed_recurring_codex_task(name, code, interval_s):
                 if step.call is not None and step.call.codex is not None:
                     step.call.codex.code = code
         except Exception as e:
-            logger.error(f"seed_recurring_codex_task: codex refresh failed for {name}: {e}")
+            logger.error(
+                f"seed_recurring_codex_task: codex refresh failed for {name}: {e}"
+            )
 
         # A task left in a terminal state ("failed"/"completed") is never
         # rescheduled by TaskManager._update_timers (which only acts on
@@ -609,4 +645,6 @@ def disable_population_sync_task():
 
 def seed_bootstrap_task(interval_s=BOOTSTRAP_INTERVAL_S):
     """Seed the recurring quarter self-bootstrap task."""
-    return seed_recurring_codex_task(BOOTSTRAP_TASK_NAME, BOOTSTRAP_STEP_CODE, interval_s)
+    return seed_recurring_codex_task(
+        BOOTSTRAP_TASK_NAME, BOOTSTRAP_STEP_CODE, interval_s
+    )

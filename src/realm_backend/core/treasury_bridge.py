@@ -53,7 +53,7 @@ DEFAULT_VOTING_WINDOW_SECONDS = 604_800
 
 def governing_department():
     """Org whose policy gates treasury actions: the source fund's org, else root."""
-    from ggg import Department, ROOT_ORG_NAME
+    from ggg import ROOT_ORG_NAME, Department
 
     try:
         from core.treasury_allocation import _source_fund
@@ -77,7 +77,7 @@ def _caller_user(caller: str):
 def _has_operation(user, operation: str) -> bool:
     from ggg.system.user_profile import OPERATIONS_SEPARATOR, Operations
 
-    for profile in (user.profiles or []):
+    for profile in user.profiles or []:
         allowed = str(profile.allowed_to or "").split(OPERATIONS_SEPARATOR)
         if Operations.ALL in allowed or operation in allowed:
             return True
@@ -91,7 +91,7 @@ def _has_operation(user, operation: str) -> bool:
 
 
 def _in_root(user) -> bool:
-    from ggg import Department, ROOT_ORG_NAME
+    from ggg import ROOT_ORG_NAME, Department
 
     root = Department[ROOT_ORG_NAME]
     if not root:
@@ -165,7 +165,9 @@ def _unwrap(result: dict) -> dict:
     return result
 
 
-def v_allocation_status(caller: str = "", period: Optional[str] = None, **kwargs) -> dict:
+def v_allocation_status(
+    caller: str = "", period: Optional[str] = None, **kwargs
+) -> dict:
     from core.treasury_allocation import allocation_status
 
     _require_member(caller)
@@ -354,9 +356,7 @@ def v_action(
     user = _caller_user(caller)
     department = governing_department()
     if not can_manage(user, department):
-        raise PermissionError(
-            "treasury actions require admin/head rights"
-        )
+        raise PermissionError("treasury actions require admin/head rights")
 
     action = _build_action(kind, dict(fields or {}), user.id)
 
@@ -401,10 +401,12 @@ VERBS = {
     "treasury.disable_schedule": v_disable_schedule,
 }
 
-READ_VERBS = frozenset({
-    "treasury.overview",
-    "treasury.allocation_status",
-    "treasury.flows",
-    "treasury.budgets",
-    "treasury.timeline",
-})
+READ_VERBS = frozenset(
+    {
+        "treasury.overview",
+        "treasury.allocation_status",
+        "treasury.flows",
+        "treasury.budgets",
+        "treasury.timeline",
+    }
+)

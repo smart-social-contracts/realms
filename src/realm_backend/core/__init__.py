@@ -1,5 +1,4 @@
-from . import extensions
-from . import runtime_flags
+from . import extensions, runtime_flags
 
 __all__ = [
     "extensions",

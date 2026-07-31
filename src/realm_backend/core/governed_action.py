@@ -79,7 +79,7 @@ def policy_is_direct(dept) -> bool:
 
 def governing_org(org_name: Optional[str] = None):
     """Resolve the governing Department: *org_name* if given, else root."""
-    from ggg import Department, ROOT_ORG_NAME
+    from ggg import ROOT_ORG_NAME, Department
 
     if org_name:
         dept = Department[org_name]
@@ -231,7 +231,9 @@ def build_extension_replay_code(ext_id: str, function_name: str, args_json: str)
     )
 
 
-def build_backend_replay_code(module_path: str, function_name: str, payload_json: str) -> str:
+def build_backend_replay_code(
+    module_path: str, function_name: str, payload_json: str
+) -> str:
     """Inline proposal code that re-runs a backend core function with realm authority."""
     return (
         "from core.governed_action import execute_backend_replay\n"
@@ -275,7 +277,9 @@ def execute_replay(ext_id: str, function_name: str, args_json: str) -> Any:
         _replay_depth -= 1
 
 
-def execute_backend_replay(module_path: str, function_name: str, payload_json: str) -> Any:
+def execute_backend_replay(
+    module_path: str, function_name: str, payload_json: str
+) -> Any:
     """Replay a backend core function with realm authority (proposal execution only)."""
     global _replay_depth
     import importlib

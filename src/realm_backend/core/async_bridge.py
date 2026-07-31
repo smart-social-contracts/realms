@@ -50,7 +50,7 @@ logger = get_logger("core.async_bridge")
 MAX_ROUNDS = 4
 
 ASYNC_WRITE_RULE = (
-    "a function declared in \"async_functions\" runs more than once (its body "
+    'a function declared in "async_functions" runs more than once (its body '
     "replays after each outcall), so it may not use write verbs"
 )
 
@@ -107,7 +107,7 @@ def _registry_principal() -> str:
     """The registry this realm is registered with, from the local DB."""
     from api.registry import get_registry_info
 
-    for entry in (get_registry_info().get("registries") or []):
+    for entry in get_registry_info().get("registries") or []:
         principal = (entry.get("principal_id") or "").strip()
         if principal:
             return principal
@@ -139,8 +139,15 @@ def _registry_transaction_service(target: str):
     """Built lazily: ``_cdk`` service classes cannot be defined at import time
     in CPython template mode, where ``Record``/``Variant`` are plain dicts."""
     from _cdk import (
-        Principal, Record, Service, Variant, Vec, float64, nat64,
-        service_query, text,
+        Principal,
+        Record,
+        Service,
+        Variant,
+        Vec,
+        float64,
+        nat64,
+        service_query,
+        text,
     )
 
     class CreditTransactionRecord(Record):
@@ -160,8 +167,7 @@ def _registry_transaction_service(target: str):
         @service_query
         def get_transactions(
             self, principal_id: text, limit: nat64
-        ) -> TransactionHistoryResult:
-            ...
+        ) -> TransactionHistoryResult: ...
 
     return RegistryTransactionService(Principal.from_str(target))
 
@@ -197,7 +203,9 @@ def _perform_registry_transactions(target: str, params: Dict[str, Any]):
     try:
         limit = int(limit)
     except (TypeError, ValueError):
-        raise PermissionError("service 'registry.get_transactions': limit must be an integer")
+        raise PermissionError(
+            "service 'registry.get_transactions': limit must be an integer"
+        )
     limit = max(1, min(limit, 200))
 
     service = _registry_transaction_service(target)
@@ -314,8 +322,7 @@ def run_with_effects(
             return outcome.get("value")
         if status != "effect":
             raise RuntimeError(
-                f"{ext_id}.{function_name}: unknown dispatcher status "
-                f"{status!r}"
+                f"{ext_id}.{function_name}: unknown dispatcher status " f"{status!r}"
             )
 
         if round_index >= MAX_ROUNDS:
@@ -340,9 +347,7 @@ def run_with_effects(
                 f"already resolved — the extension is not reading its result"
             )
 
-        logger.debug(
-            f"async_bridge[{ext_id}]: round {round_index} -> {name} {checked}"
-        )
+        logger.debug(f"async_bridge[{ext_id}]: round {round_index} -> {name} {checked}")
         try:
             value = yield from spec.perform(spec.target(), checked)
             resolved[key] = {"value": value}
