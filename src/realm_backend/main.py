@@ -682,6 +682,12 @@ def join_realm(
         # Citizen-import binding (issue #241): attach the imported census
         # record (nickname, private data) to the redeeming principal. A
         # pre-assigned quarter from the import wins over no preference.
+        # Snapshot the caller-supplied quarter preference: invite-bound
+        # imports may substitute their own (possibly stale) pre-assignment
+        # below, which keeps the lenient fallback — strict validation applies
+        # only to what the client explicitly asked for.
+        explicit_preferred_quarter = (preferred_quarter or "").strip()
+
         if invite_consume_data:
             try:
                 from core.citizen_import import bind_citizen
@@ -744,6 +750,25 @@ def join_realm(
         assigned_quarter_canister_id = ""
         quarters = list(Quarter.instances()) if realm else []
         if realm and quarters:
+            requested_quarter = (preferred_quarter or "").strip()
+            if requested_quarter and requested_quarter == explicit_preferred_quarter:
+                known_quarters = {
+                    str(q.canister_id) for q in quarters if q.status == "active"
+                }
+                if requested_quarter not in known_quarters:
+                    # An explicit but unknown/inactive quarter is a client
+                    # contract violation — silently joining the capital (the
+                    # previous behavior) misleads clients expecting quarter
+                    # assignment (CHAOS-3 finding).
+                    return RealmResponse(
+                        success=False,
+                        data=RealmResponseData(
+                            error=(
+                                f"Unknown or inactive quarter '{requested_quarter}'; "
+                                f"omit preferred_quarter for automatic assignment"
+                            )
+                        ),
+                    )
             assigned_quarter_canister_id = _assign_quarter(
                 caller, realm, quarters, preferred_quarter
             )
@@ -2187,6 +2212,7 @@ def get_scale_status() -> text:
 
         from core.autoscale import (
             default_threshold_n,
+            quarter_capacity_override,
             quarter_populations,
             resolve_should_scale,
             scale_at,
@@ -2199,7 +2225,10 @@ def get_scale_status() -> text:
 
         network = getattr(realm, "network", "") or ""
         pops = quarter_populations(realm)
-        n = default_threshold_n(network)
+        # Report the effective N: the manifest override the registration path
+        # actually uses, not just the env default (observability must match
+        # behavior or operators misread stuck scales).
+        n = quarter_capacity_override(realm) or default_threshold_n(network)
         codex_fn = _codex_should_deploy_fn(realm)
         return json.dumps({
             "success": True,
@@ -2210,81 +2239,14 @@ def get_scale_status() -> text:
             "n": n,
             "threshold": scale_at(n),
             "populations": pops,
-            "should_scale": resolve_should_scale(pops, network, codex_fn=codex_fn, realm=realm),
+            "should_scale": resolve_should_scale(
+                pops, network, codex_fn=codex_fn, n_override=quarter_capacity_override(realm),
+                realm=realm,
+            ),
         })
     except Exception as e:
         logger.error(f"Error in get_scale_status: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
-
-
-def _quarter_casals_args(realm):
-    """Build the provisioning spec for a new quarter from realm config.
-
-    Reads the optional ``casals`` block persisted in ``manifest_data``::
-
-        {
-          "stand": "agora",                        # required
-          "backend_wasm_key": "realm-backend@...", # required
-          "casals_canister_id": "jj2e5-...",       # enables the direct path
-          "registry_canister_id": "iebdk-...",     # for codex/extension pull
-          "codex": {"codex_id": "...", "version": null},
-          "extensions": [{"ext_id": "...", "version": null}, ...],
-          "frontend_canister_id": ""               # quarters are backend-only
-        }
-
-    Returns None when the required ``stand``/``backend_wasm_key`` are missing.
-    """
-    # Name the new quarter after its prospective catalog index.
-    next_index = 1
-    try:
-        from ggg import Quarter
-
-        for q in Quarter.instances():
-            next_index = max(next_index, int(q.index or 0) + 1)
-    except Exception:
-        pass
-    return _parse_casals_spec(getattr(realm, "manifest_data", "") or "{}", next_index)
-
-
-def _capital_runtime_config(realm) -> dict:
-    """Snapshot the capital's runtime config + branding for a new quarter to
-    mirror (issue #156), consumed by ``bootstrap_as_quarter`` via
-    ``core.quarter_bootstrap.apply_quarter_config``.
-
-    Copies identity (name/manifesto/welcome/branding), registration policy,
-    accounting currency, shared infra canister ids, and the test-mode flags
-    *verbatim* — so the quarter matches the capital's environment (a production
-    capital has the flags off, so the quarter inherits them off). ``demo_data``
-    is intentionally not propagated. ``frontend_canister_id`` is omitted: quarters
-    are backend-only and keep their own empty value.
-    """
-    def g(attr, default=""):
-        return getattr(realm, attr, default)
-
-    return {
-        "name": g("name"),
-        "manifesto": g("manifesto"),
-        "welcome_message": g("welcome_message"),
-        "logo_url": g("logo_url"),
-        "background_image_url": g("background_image_url"),
-        "network": g("network"),
-        "accounting_currency": g("accounting_currency"),
-        "accounting_currency_decimals": int(g("accounting_currency_decimals", 0) or 0),
-        "open_registration": bool(g("open_registration", False)),
-        "ai_assistant_enabled": bool(g("ai_assistant_enabled", True)),
-        "file_registry_canister_id": g("file_registry_canister_id"),
-        "marketplace_canister_id": g("marketplace_canister_id"),
-        "token_canister_id": g("token_canister_id"),
-        "nft_canister_id": g("nft_canister_id"),
-        "test_flags": {
-            "test_mode": bool(g("test_mode", False)),
-            "test_mode_ii_bypass": bool(g("test_mode_ii_bypass", False)),
-            "test_mode_user_self_registration": bool(g("test_mode_user_self_registration", False)),
-            "test_mode_skip_terms": bool(g("test_mode_skip_terms", False)),
-            "test_mode_skip_passport_zkproof": bool(g("test_mode_skip_passport_zkproof", False)),
-            "test_mode_skip_authentication": bool(g("test_mode_skip_authentication", False)),
-        },
-    }
 
 
 @update
@@ -2461,232 +2423,40 @@ def process_quarter_scaling() -> Async[text]:
     actual provisioning out of band so joins never wait on a deploy.
     Idempotent: a no-op when no scale is in flight.
     """
-    res = yield from _run_quarter_scaling()
+    from core.quarter_scaling import run_quarter_scaling
+
+    res = yield from run_quarter_scaling()
     return res
 
 
-def _run_quarter_scaling() -> Async[text]:
-    """Core auto-scale provisioning driver (un-gated).
-
-    Creates a quarter via Casals (direct) or the installer (broker), seeds the
-    new quarter's local self-bootstrap, registers it locally, then clears the
-    in-flight guard. Shared by the ``process_quarter_scaling`` endpoint and the
-    recurring autoscale task (``run_autoscale_tick``).
-    """
-    try:
-        from ggg import Realm
-
-        realm = Realm.load("1")
-        if not realm:
-            return json.dumps({"success": False, "error": "Realm not found"})
-        if not bool(getattr(realm, "scale_in_flight", False)):
-            return json.dumps({"success": True, "status": "idle", "message": "no scale in flight"})
-
-        # Quarters must never provision siblings — only the capital has the
-        # Casals stand / casals block. Clear a stuck flag left by older builds
-        # that set scale_in_flight on the join target (the fullest quarter).
-        if bool(getattr(realm, "is_quarter", False)):
-            realm.scale_in_flight = False
-            return json.dumps({
-                "success": True,
-                "status": "idle",
-                "message": "quarter cannot provision; capital re-evaluates after population sync",
-            })
-
-        spec = _quarter_casals_args(realm)
-        if not spec:
-            return json.dumps({
-                "success": False,
-                "status": "blocked",
-                "error": "manifest_data.casals {stand, backend_wasm_key} required to provision",
-            })
-
-        casals_id = (spec.get("casals_canister_id") or "").strip()
-        installer_id = (getattr(realm, "installer_canister_id", "") or "").strip()
-        bootstrap_result = None
-
-        # Auto-derive the install set from the capital's *own live state* so the
-        # new quarter mirrors whatever the capital currently has installed — no
-        # admin-curated codex/extension list to maintain (issue #156). The
-        # configured casals-block lists are only a fallback for a capital that
-        # has nothing runtime-installed (e.g. fully baked-in extensions).
-        from core.quarter_bootstrap import derive_capital_install_set
-
-        derived = derive_capital_install_set(spec.get("registry_canister_id", ""))
-        registry_id = (derived.get("registry_canister_id") or spec.get("registry_canister_id", "")).strip()
-        codices = derived.get("codices") or (
-            [spec["codex"]] if spec.get("codex") else []
-        )
-        extensions = derived.get("extensions") or spec.get("extensions", [])
-        # Snapshot the capital's runtime config + branding so the quarter comes
-        # up branded and registration-ready (issue #156), not as a bare
-        # "Default Realm" that rejects new users.
-        capital_config = _capital_runtime_config(realm)
-        logger.info(
-            f"Auto-scale install set (mirroring capital): "
-            f"{len(codices)} codices, {len(extensions)} extensions, registry={registry_id or 'none'}; "
-            f"config name={capital_config.get('name')!r} open_reg={capital_config.get('open_registration')}"
-        )
-
-        if casals_id:
-            # ── Direct path: the capital commands its own Casals stand. ──
-            create_res = yield from _request_casals_create_canister(casals_id, {
-                "stand": spec["stand"],
-                "name": spec["name"],
-                "kind": "backend",
-                "wasm_key": spec["backend_wasm_key"],
-            })
-            if not create_res.get("ok"):
-                realm.scale_in_flight = False
-                return json.dumps({"success": False, "status": "failed",
-                                   "error": f"Casals create_canister failed: {create_res.get('error')}"})
-            new_canister_id = (create_res.get("canister_id") or "").strip()
-            if not new_canister_id:
-                realm.scale_in_flight = False
-                return json.dumps({"success": False, "status": "failed",
-                                   "error": "Casals create_canister returned no canister_id"})
-
-            # Seed the new quarter's local self-bootstrap (config + codex +
-            # extensions, installed one item per tick by its own TaskManager).
-            bootstrap_result = yield from _bootstrap_quarter(new_canister_id, {
-                "parent_realm_canister_id": ic.id().to_str(),
-                "registry_canister_id": registry_id,
-                "codices": codices,
-                "extensions": extensions,
-                "frontend_canister_id": spec.get("frontend_canister_id", ""),
-                "config": capital_config,
-            })
-        elif installer_id:
-            # ── Broker path: ask the installer to provision on our behalf. ──
-            result = yield from _request_provision_quarter(installer_id, {
-                "stand": spec["stand"],
-                "backend_wasm_key": spec["backend_wasm_key"],
-                "name": spec["name"],
-            })
-            if not result.get("ok"):
-                realm.scale_in_flight = False
-                return json.dumps({"success": False, "status": "failed",
-                                   "error": result.get("error", "provision failed")})
-            new_canister_id = (result.get("canister_id") or "").strip()
-        else:
-            # Intent recorded but no transport wired; keep the flag set so an
-            # operator can finish wiring and retry.
-            return json.dumps({
-                "success": False,
-                "status": "blocked",
-                "error": "no provisioning transport: set manifest_data.casals.casals_canister_id "
-                         "(direct) or installer_canister_id (broker)",
-            })
-
-        from ggg import Quarter
-
-        # Register the freshly minted backend as a quarter (assign next index).
-        already = any(q.canister_id == new_canister_id for q in Quarter.instances())
-        new_index = 1
-        if not already:
-            for q in Quarter.instances():
-                new_index = max(new_index, int(q.index or 0) + 1)
-            q = Quarter(name=spec.get("name") or new_canister_id[:8], canister_id=new_canister_id, index=new_index)
-            q.federation = realm
-
-        # Start refreshing this quarter's population into the capital's view so
-        # join-page counts don't go stale (issue #156). Best-effort.
-        try:
-            ensure_population_sync_task()
-        except Exception as e:
-            logger.error(f"ensure_population_sync_task (auto-scale) failed: {e}")
-
-        # Provisioning complete; allow the next threshold crossing to re-trigger.
-        realm.scale_in_flight = False
-        logger.info(f"Auto-scale provisioned + registered quarter {new_canister_id} (index {new_index})")
-        return json.dumps({
-            "success": True,
-            "status": "provisioned",
-            "canister_id": new_canister_id,
-            "index": new_index,
-            "bootstrap": bootstrap_result,
-        })
-    except Exception as e:
-        logger.error(f"Error in process_quarter_scaling: {e}\n{traceback.format_exc()}")
-        return json.dumps({"success": False, "error": str(e)})
-
-
 def run_autoscale_tick() -> Async[text]:
-    """Recurring autoscale driver step (issue #156).
-
-    Provisions a quarter when a scale is in flight, otherwise disables the
-    trigger schedule so the task stops firing until the next registration
-    re-seeds it (see ``ensure_autoscale_task``). Also stops ticking on a
-    ``blocked`` result (misconfiguration needing operator intervention) so a
-    mis-wired realm never busy-loops. Invoked by the ``AUTOSCALE_TASK_NAME``
-    TaskManager task via a tiny codex shim (``from main import run_autoscale_tick``).
+    """Compat shim: the driver lives in ``core.quarter_scaling`` so the
+    TaskManager sandbox (which cannot import ``main``) can reach it. Tasks
+    seeded by older builds still call ``from main import run_autoscale_tick``.
     """
-    try:
-        from ggg import Realm
-        from core.quarter_bootstrap import AUTOSCALE_TASK_NAME, disable_recurring_task
+    from core.quarter_scaling import run_autoscale_tick as _tick
 
-        realm = Realm.load("1")
-        if not realm or not bool(getattr(realm, "scale_in_flight", False)):
-            disable_recurring_task(AUTOSCALE_TASK_NAME)
-            return json.dumps({"success": True, "status": "idle"})
-
-        res = yield from _run_quarter_scaling()
-
-        # Stop ticking once the flag is cleared (done/failed) or we're blocked.
-        stop = False
-        try:
-            parsed = json.loads(res) if isinstance(res, str) else res
-            if isinstance(parsed, dict) and parsed.get("status") == "blocked":
-                stop = True
-        except Exception:
-            pass
-        realm = Realm.load("1")
-        if realm and not bool(getattr(realm, "scale_in_flight", False)):
-            stop = True
-        if stop:
-            disable_recurring_task(AUTOSCALE_TASK_NAME)
-        return res
-    except Exception as e:
-        logger.error(f"run_autoscale_tick failed: {e}\n{traceback.format_exc()}")
-        return json.dumps({"success": False, "error": str(e)})
+    res = yield from _tick()
+    return res
 
 
 def ensure_autoscale_task() -> bool:
-    """Seed (or re-enable) the recurring TaskManager task that drives auto-scale
-    provisioning while ``scale_in_flight`` is set. Idempotent; safe to call from
-    the registration path each time a scale is newly requested."""
-    try:
-        from core.quarter_bootstrap import (
-            AUTOSCALE_INTERVAL_S,
-            AUTOSCALE_STEP_CODE,
-            AUTOSCALE_TASK_NAME,
-            seed_recurring_codex_task,
-        )
+    """Compat shim: the implementation lives in ``core.quarter_bootstrap`` so
+    sandboxed contexts (join path, __shell__) that cannot import ``main`` can
+    still seed the provisioning driver. Kept for older callers/post_upgrade."""
+    from core.quarter_bootstrap import ensure_autoscale_task as _ensure
 
-        seed_recurring_codex_task(AUTOSCALE_TASK_NAME, AUTOSCALE_STEP_CODE, AUTOSCALE_INTERVAL_S)
-        return True
-    except Exception as e:
-        logger.error(f"ensure_autoscale_task failed: {e}\n{traceback.format_exc()}")
-        return False
+    return _ensure()
 
 
 def ensure_population_sync_task() -> bool:
-    """Seed (or re-enable) the recurring population-sync task that keeps the
-    capital's quarter populations fresh. Idempotent; safe to call every time a
-    quarter is registered or auto-provisioned."""
-    try:
-        from core.quarter_bootstrap import (
-            POP_SYNC_INTERVAL_S,
-            POP_SYNC_STEP_CODE,
-            POP_SYNC_TASK_NAME,
-            seed_recurring_codex_task,
-        )
-
-        seed_recurring_codex_task(POP_SYNC_TASK_NAME, POP_SYNC_STEP_CODE, POP_SYNC_INTERVAL_S)
-        return True
-    except Exception as e:
-        logger.error(f"ensure_population_sync_task failed: {e}\n{traceback.format_exc()}")
-        return False
+    """Retired no-op: capital-side population refresh is push-based (issue
+    #156) — each quarter calls ``report_quarter_population`` on join, so the
+    old recurring pull task (``quarter_population_sync``) is retired and there
+    is nothing to seed. Kept so legacy call sites stay valid; the previous
+    implementation imported ``POP_SYNC_*`` names that no longer exist and
+    silently failed every call."""
+    return True
 
 
 @query
@@ -4346,31 +4116,16 @@ def initialize() -> void:
             f"❌ Error starting TaskManager: {str(e)}\n{traceback.format_exc()}"
         )
 
-    # Seed the recurring population-sync task for federations that already have
-    # sub-quarters (issue #156). New quarters seed it via register_quarter /
-    # auto-scale, but a capital that gained its quarters before this code existed
-    # (e.g. staging Agora) would otherwise never refresh their counts.
-    #
-    # Only seed when the task is ABSENT: the TaskManager().run() above already
-    # recovers an *existing* recurring task (RUNNING->PENDING + reschedule), so
-    # re-seeding it here would call run() a second time and leave the schedule
-    # un-armed (the just-set last_run_at makes the interval check fail). Gated on
-    # a sub-quarter existing so a lone capital doesn't schedule a no-op task.
+    # Population refresh is push-based (issue #156): quarters call
+    # ``report_quarter_population`` on join, so the retired
+    # quarter_population_sync pull task must NOT be re-seeded. Disable any
+    # stale copy left by pre-retirement builds instead.
     try:
-        from ggg import Quarter, Task
-        from core.quarter_bootstrap import POP_SYNC_TASK_NAME
+        from core.quarter_bootstrap import disable_population_sync_task
 
-        self_id = ic.id().to_str()
-        has_quarters = any(
-            (q.canister_id or "") and q.canister_id != self_id
-            for q in Quarter.instances()
-        )
-        has_task = any(t.name == POP_SYNC_TASK_NAME for t in Task.instances())
-        if has_quarters and not has_task:
-            ensure_population_sync_task()
-            logger.info("✅ Population-sync task seeded (sub-quarters present)")
+        disable_population_sync_task()
     except Exception as e:
-        logger.error(f"❌ Error ensuring population-sync task: {str(e)}")
+        logger.error(f"❌ Error disabling retired population-sync task: {str(e)}")
 
     # Backfill Proposal field indexes (status, org_scope — ic-python-db#11).
     # Runs as a self-re-arming timer chain so each batch stays far below the

@@ -62,7 +62,6 @@ extended spawn signature run unmetered — see ``supports_capabilities()``.
 
 import json
 import os
-import re
 from typing import Any, Dict, List, Optional
 
 from ic_python_logging import get_logger
@@ -734,22 +733,38 @@ def _extension_source(ext_id: str) -> str:
 # module name.
 SANDBOX_PACKAGE = "_ext"
 
-_RELATIVE_IMPORT = re.compile(
-    r"^\s*from\s+\.(?P<module>\w+)?\s+import\s+(?P<names>.+)$", re.MULTILINE
-)
-
 
 def _module_dependencies(source: str) -> List[str]:
     """Sibling modules a module imports, from ``from . import x`` and
-    ``from .x import y``."""
+    ``from .x import y``.
+
+    Scanned by hand rather than with a module-level ``re.compile``: some
+    execution contexts on this platform ship a gutted ``re`` module with no
+    ``compile``, and a pattern compiled at module scope would take the whole
+    (lazy-loaded) module down with it.
+    """
     deps = []
-    for match in _RELATIVE_IMPORT.finditer(source):
-        module = match.group("module")
+    for line in source.splitlines():
+        text = line.strip()
+        if not text.startswith("from"):
+            continue
+        rest = text[4:].lstrip()
+        if not rest.startswith("."):
+            continue
+        rest = rest[1:].lstrip()
+        i = 0
+        while i < len(rest) and (rest[i].isalnum() or rest[i] == "_"):
+            i += 1
+        module = rest[:i]
+        tail = rest[i:].strip()
+        if not tail.startswith("import "):
+            continue
+        names = tail[len("import "):]
         if module:
             deps.append(module)
         else:
             # ``from . import a, b as c`` — the names are modules.
-            for part in match.group("names").split(","):
+            for part in names.split(","):
                 name = part.strip().split(" as ")[0].strip()
                 if name and name.isidentifier():
                     deps.append(name)

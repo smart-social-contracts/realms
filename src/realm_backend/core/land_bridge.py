@@ -84,6 +84,77 @@ def project(land) -> dict:
     }
 
 
+def _resolve_land(land_id: str):
+    """Parcel lookup accepting every id shape this API itself hands out.
+
+    Listings project ``land_N`` while the store keys numerically, and some
+    callers pass the raw key — without normalization every id the read path
+    emits is refused by the write path.
+    """
+    from ggg import Land
+
+    key = str(land_id or "").strip()
+    if not key:
+        return None
+    candidates = [key]
+    if key.lower().startswith("land_"):
+        candidates.append(key.split("_", 1)[1])
+    for cand in candidates:
+        land = None
+        try:
+            land = Land.load(cand)
+        except Exception:
+            land = None
+        if land is None:
+            try:
+                land = Land[cand]
+            except Exception:
+                land = None
+        if land is not None:
+            return land
+    return None
+
+
+def _resolve_user(user_id: str):
+    """User lookup accepting a principal (the ``id`` field) or a numeric ``_id``."""
+    from ggg import User
+
+    key = str(user_id or "").strip()
+    if not key:
+        return None
+    user = None
+    try:
+        user = User[key]
+    except Exception:
+        user = None
+    if user is None:
+        try:
+            user = User.load(key)
+        except Exception:
+            user = None
+    return user
+
+
+def _resolve_organization(org_id: str):
+    """Organization lookup by ``id`` or numeric ``_id``."""
+    from ggg import Organization
+
+    key = str(org_id or "").strip()
+    if not key:
+        return None
+    org = None
+    try:
+        org = Organization[key]
+    except Exception:
+        org = None
+    if org is None:
+        try:
+            org = Organization.load(key)
+        except Exception:
+            org = None
+    return org
+
+
 def _page(from_id: int, page_size: int):
     """One page of parcels, plus the cursor for the next.
 
@@ -162,11 +233,9 @@ def v_list(caller="", from_id=1, page_size=DEFAULT_PAGE_SIZE, all=False,
 
 
 def v_get(caller="", land_id="", **kwargs) -> dict:
-    from ggg import Land
-
     if not land_id:
         raise ValueError("land_id is required")
-    land = Land[land_id]
+    land = _resolve_land(land_id)
     if not land:
         raise ValueError("Land not found")
     return project(land)
@@ -302,11 +371,10 @@ def v_create(caller="", land_type=None, name="", id="", h3_index=None,
 def v_update(caller="", land_id="", **fields) -> dict:
     """Update a parcel's own attributes. Ownership is not among them."""
     _require_admin(caller, "land.update")
-    from ggg import Land
 
     if not land_id:
         raise ValueError("land_id is required")
-    land = Land[land_id]
+    land = _resolve_land(land_id)
     if not land:
         raise ValueError("Land not found")
 
@@ -337,11 +405,11 @@ def v_set_owner(caller="", land_id="", owner_user_id=None,
     belongs to organizations.
     """
     _require_admin(caller, "land.set_owner")
-    from ggg import Land, LandType, Organization, User
+    from ggg import LandType
 
     if not land_id:
         raise ValueError("land_id is required")
-    land = Land.load(land_id)
+    land = _resolve_land(land_id)
     if not land:
         raise ValueError("Land not found")
 
@@ -351,7 +419,7 @@ def v_set_owner(caller="", land_id="", owner_user_id=None,
     if owner_user_id:
         if land.land_type != LandType.RESIDENTIAL:
             raise ValueError("Members can only own residential land")
-        user = User.load(owner_user_id)
+        user = _resolve_user(owner_user_id)
         if not user:
             raise ValueError("User not found")
         land.owner_user = user
@@ -359,7 +427,7 @@ def v_set_owner(caller="", land_id="", owner_user_id=None,
     elif owner_organization_id:
         if land.land_type == LandType.RESIDENTIAL:
             raise ValueError("Organizations cannot own residential land")
-        org = Organization.load(owner_organization_id)
+        org = _resolve_organization(owner_organization_id)
         if not org:
             raise ValueError("Organization not found")
         land.owner_organization = org
@@ -374,14 +442,14 @@ def v_set_owner(caller="", land_id="", owner_user_id=None,
 def v_prepare_nft(caller="", land_id="", owner_principal="", **kwargs) -> dict:
     """Mark a parcel active and ready to mint, refusing a second mint."""
     _require_admin(caller, "land.prepare_nft")
-    from ggg import Land, LandStatus
+    from ggg import LandStatus
 
     if not land_id:
         raise ValueError("land_id is required")
     if not owner_principal:
         raise ValueError("owner_principal is required")
 
-    land = Land[land_id]
+    land = _resolve_land(land_id)
     if not land:
         raise ValueError("Land not found")
     if land.nft_token_id:
@@ -403,14 +471,13 @@ def v_prepare_nft(caller="", land_id="", owner_principal="", **kwargs) -> dict:
 def v_set_nft_token(caller="", land_id="", nft_token_id="", **kwargs) -> dict:
     """Record the token id after a successful mint. Write-once."""
     _require_admin(caller, "land.set_nft_token")
-    from ggg import Land
 
     if not land_id:
         raise ValueError("land_id is required")
     if not nft_token_id:
         raise ValueError("nft_token_id is required")
 
-    land = Land[land_id]
+    land = _resolve_land(land_id)
     if not land:
         raise ValueError("Land not found")
     if land.nft_token_id and str(land.nft_token_id) != str(nft_token_id):

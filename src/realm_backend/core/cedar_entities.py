@@ -72,6 +72,59 @@ def declared_types() -> frozenset:
     return resolved
 
 
+def declared_attrs(entity_type: str) -> Optional[frozenset]:
+    """Attribute names the schema declares for *entity_type*.
+
+    ``None`` when the type itself is undeclared. Cedar parses the store
+    schema-aware: an entity whose type declares attributes is validated
+    against exactly that set, so projecting mixin bookkeeping fields the
+    schema never declared (``creator``, ``owner``, ``timestamp_created``, …)
+    makes the whole store fail deserialization — and this module turns a
+    store error into a denial. Found at the 10k rung: every member write
+    denied once policy loading started enforcing (P12).
+
+    Hand-rolled parsing: the WASI runtime's ``re`` has no ``compile``.
+    """
+    cache_key = "attrs:" + entity_type
+    cached = _CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    result: Optional[frozenset] = None
+    marker = "entity " + entity_type
+    idx = 0
+    while True:
+        idx = SCHEMA.find(marker, idx)
+        if idx == -1:
+            break
+        end = idx + len(marker)
+        # Word boundary: "entity User" must not match "entity UserProfile".
+        if end < len(SCHEMA) and (SCHEMA[end].isalnum() or SCHEMA[end] == "_"):
+            idx = end
+            continue
+        brace = SCHEMA.find("{", end)
+        semi = SCHEMA.find(";", end)
+        if semi != -1 and (brace == -1 or semi < brace):
+            result = frozenset()  # declared without attributes
+            break
+        if brace == -1:
+            break
+        close = SCHEMA.find("}", brace)
+        if close == -1:
+            break
+        names = set()
+        for piece in SCHEMA[brace + 1 : close].split(","):
+            piece = piece.strip()
+            if not piece:
+                continue
+            name = piece.split("?:")[0].split(":")[0].strip()
+            if name:
+                names.add(name)
+        result = frozenset(names)
+        break
+    _CACHE[cache_key] = result
+    return result
+
+
 def _reference(value: Any) -> Optional[Dict[str, Any]]:
     """A related row as a Cedar entity reference, or None if it is not one.
 
@@ -169,7 +222,8 @@ def principal_entity(principal_id: str) -> List[Dict[str, Any]]:
             parents.append(uid_json("UserProfile", profile_id))
             entities.append(_entity("UserProfile", profile_id, {}))
 
-    attrs = _attrs(user) if user is not None else {}
+    declared = declared_attrs("User")
+    attrs = _attrs(user, declared) if user is not None and declared is not None else {}
     # The principal's own id must be readable by policies comparing ownership,
     # and it is the caller's principal, never the ORM's internal `_id`.
     attrs["id"] = principal_id
@@ -208,7 +262,12 @@ def resource_entity(
     """
     if not entity_type or not entity_id:
         return []
-    return [_entity(entity_type, entity_id, _attrs(row) if row is not None else {})]
+    declared = declared_attrs(entity_type)
+    if declared is None:
+        # An entity of a type the schema never declared makes Cedar reject the
+        # whole store; drop it, same as _reference does for unknown relations.
+        return []
+    return [_entity(entity_type, entity_id, _attrs(row, declared) if row is not None else {})]
 
 
 def slice_for(

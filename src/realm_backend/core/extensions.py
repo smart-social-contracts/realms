@@ -118,6 +118,26 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
         logger.debug(f"Got function from registry: {func}")
 
         result = func(args)
+        if hasattr(result, "__next__"):
+            # Kybra ``Async`` extension functions are generators: calling one
+            # here returns the undriven generator, which json.dumps cannot
+            # serialize. A sync caller still deserves an answer when the
+            # function never actually suspends, so drive pure-compute
+            # generators to completion; a real yield is an inter-canister
+            # round that only extension_async_call may finish.
+            gen = result
+            result = None
+            while True:
+                try:
+                    suspended = next(gen)
+                except StopIteration as done:
+                    result = done.value
+                    break
+                if suspended is not None:
+                    raise RuntimeError(
+                        f"Extension function '{function_name}' suspended "
+                        f"mid-call; invoke it via extension_async_call"
+                    )
         logger.debug(f"Got result from function: {result}")
 
     except AttributeError as e:

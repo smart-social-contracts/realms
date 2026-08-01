@@ -205,15 +205,17 @@ class TestEntitySlice:
     def test_a_relation_to_an_undeclared_type_is_dropped(self):
         # A reference to a type Cedar never heard of makes it reject the entire
         # store, which would deny the call for a reason no policy expressed.
+        # The attribute itself is declared (Appeal.original_case) so the
+        # declared-attribute filter is not what drops it.
         class Gadget:
             id = "g1"
 
         class Row:
             id = "r1"
-            gadget = Gadget()
+            original_case = Gadget()
 
-        attrs = cedar_entities.resource_entity("Mandate", "m1", Row())[0]["attrs"]
-        assert "gadget" not in attrs
+        attrs = cedar_entities.resource_entity("Appeal", "a1", Row())[0]["attrs"]
+        assert "original_case" not in attrs
 
     def test_no_resource_yields_only_the_principal_side(self):
         assert cedar_entities.slice_for("alice") == cedar_entities.principal_entity(
@@ -225,13 +227,39 @@ class TestEntitySlice:
             id = "r1"
             password = "hunter2"
             ciphertext = "AAAA"
-            title = "visible"
+            name = "visible"
 
         entities = cedar_entities.resource_entity("Mandate", "m1", Row())
         attrs = entities[0]["attrs"]
-        assert attrs["title"] == "visible"
+        assert attrs["name"] == "visible"
         assert "password" not in attrs
         assert "ciphertext" not in attrs
+
+    def test_undeclared_attributes_are_dropped(self):
+        # The schema declares a closed attribute set per type, and Cedar
+        # rejects a store carrying attributes it never declared — which this
+        # module turns into a denial. Mixin bookkeeping fields (creator,
+        # owner, timestamps) must therefore never be projected, or every
+        # decision fails closed (found at the 10k E2E rung).
+        class Row:
+            id = "r1"
+            creator = "system"
+            timestamp_created = "None"
+            name = "declared"
+
+        attrs = cedar_entities.resource_entity("Mandate", "m1", Row())[0]["attrs"]
+        assert attrs["name"] == "declared"
+        assert "creator" not in attrs
+        assert "timestamp_created" not in attrs
+
+    def test_a_resource_of_an_undeclared_type_is_dropped(self):
+        # A resource entity whose type the schema never declared makes Cedar
+        # reject the whole store; dropping it fails the decision closed
+        # without poisoning every other decision.
+        class Row:
+            id = "r1"
+
+        assert cedar_entities.resource_entity("Gadget", "g1", Row()) == []
 
     def test_relations_are_not_dragged_in(self):
         # A relation would pull its target into the store, and the target's
@@ -249,13 +277,14 @@ class TestEntitySlice:
         assert "owner" not in attrs
 
     def test_floats_are_dropped_because_cedar_has_none(self):
+        # Balance declares `amount?: Long`; Bid declares no attributes at all.
         class Row:
             id = "r1"
             score = 1.5
-            count = 2
+            amount = 2
 
-        attrs = cedar_entities.resource_entity("Bid", "b1", Row())[0]["attrs"]
-        assert attrs["count"] == 2
+        attrs = cedar_entities.resource_entity("Balance", "b1", Row())[0]["attrs"]
+        assert attrs["amount"] == 2
         assert "score" not in attrs
 
     def test_the_slice_stays_small(self):

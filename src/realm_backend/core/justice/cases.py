@@ -568,8 +568,12 @@ def file_appeal(
     if not appellant:
         raise ValueError(f"{caller} is not a registered user")
 
-    verdicts = list(getattr(case, "verdicts", None) or [])
-    if not verdicts:
+    # Verdict.case is OneToOne("Case", "verdict") — the reverse accessor is
+    # the singular ``case.verdict``. Reading a plural ``verdicts`` here made
+    # every appeal fail with "no verdict" even right after a verdict was
+    # issued (found by the 10k E2E, phase 6).
+    verdict = getattr(case, "verdict", None)
+    if verdict is None:
         raise ValueError("Cannot appeal a case without a verdict")
 
     appellate_court = (
@@ -580,7 +584,6 @@ def file_appeal(
 
     appeal = appeal_file(
         case=case,
-        verdict=verdicts[-1],
         appellant=appellant,
         grounds=str(grounds),
         appellate_court=appellate_court,

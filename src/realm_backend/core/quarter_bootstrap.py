@@ -47,7 +47,7 @@ AUTOSCALE_TASK_NAME = "quarter_autoscale_trigger"
 AUTOSCALE_INTERVAL_S = 15
 AUTOSCALE_STEP_CODE = (
     "def async_task():\n"
-    "    from main import run_autoscale_tick\n"
+    "    from core.quarter_scaling import run_autoscale_tick\n"
     "    res = yield from run_autoscale_tick()\n"
     "    return res\n"
 )
@@ -587,6 +587,33 @@ def seed_recurring_codex_task(name, code, interval_s):
             for s in existing.schedules:
                 s.last_run_at = 0  # fire promptly on the next _update_timers pass
 
+        # A re-seed is an explicit recovery action: also reset the persisted
+        # plan state. advance_bootstrap short-circuits on status=="complete"
+        # and never retries items recorded in ``failed`` — without this reset
+        # a re-seed instantly replays the stale failure list (e.g. failures
+        # caused by since-fixed registry/platform issues) instead of working.
+        if name == BOOTSTRAP_TASK_NAME:
+            try:
+                from ggg import Realm
+            except ImportError:
+                try:
+                    from realm_backend.ggg import Realm
+                except Exception:
+                    Realm = None
+            if Realm is not None:
+                try:
+                    realm = Realm.load("1")
+                    state = load_state(realm) if realm else None
+                    if state:
+                        state["status"] = "in_progress"
+                        state["cursor"] = 0
+                        state["attempts"] = 0
+                        state["done"] = []
+                        state["failed"] = []
+                        save_state(realm, state)
+                except Exception as e:
+                    logger.warning(f"re-seed: could not reset bootstrap plan state: {e}")
+
         for s in existing.schedules:
             s.disabled = False
             s.repeat_every = interval_s
@@ -648,3 +675,19 @@ def seed_bootstrap_task(interval_s=BOOTSTRAP_INTERVAL_S):
     return seed_recurring_codex_task(
         BOOTSTRAP_TASK_NAME, BOOTSTRAP_STEP_CODE, interval_s
     )
+
+
+def ensure_autoscale_task() -> bool:
+    """Seed (or re-enable) the recurring task that drives auto-scale
+    provisioning while ``scale_in_flight`` is set. Idempotent.
+
+    Lives in core: the registration path (``core.autoscale``) runs in contexts
+    where ``from main import ...`` resolves nothing (WASI sandbox), so the
+    seeding primitive must be importable without the entry module.
+    """
+    try:
+        seed_recurring_codex_task(AUTOSCALE_TASK_NAME, AUTOSCALE_STEP_CODE, AUTOSCALE_INTERVAL_S)
+        return True
+    except Exception as e:
+        logger.error(f"ensure_autoscale_task failed: {e}")
+        return False

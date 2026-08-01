@@ -1161,32 +1161,40 @@ def _cedar_check(action: str, caller: str, kwargs: dict) -> None:
     this answers "may this caller do it to this row, given what the realm
     forbids". An extension can hold a capability it may not exercise.
 
-    Only the generic entity verbs name a resource. That is enough for the
-    guardrails, which turn on the resource *type* — reading a UserProfile is
-    refused whichever verb asks. Verbs that reach core state by another route are
-    still covered, because they map to ``write`` and G1 forbids extension writes
-    outright rather than enumerating what is protected.
+    Only the generic entity verbs are gated here. They name a core resource
+    directly, which is what the guardrails turn on: G1 refuses extension
+    writes to core state and G2 refuses reads of authorization data, both
+    keying on the resource *type* the verb carries.
+
+    Named RPC verbs (``justice.file_case``, ``procurement.award``, …) and the
+    extension-namespaced ``ext_entity.*`` verbs are NOT gated here: they are
+    capability-checked above and run their authorization host-side in Python,
+    which is where G1's own commentary says those writes live. Collapsing
+    them to ``write`` made G1 forbid every extension write — including the
+    first-party extensions the realm ships — the moment enforcement became
+    active (found at the 10k E2E rung: ``sue_user`` denied before ever
+    reaching the host verb).
     """
     from core import cedar_authz
 
     if not cedar_authz.enabled():
         return
 
-    resource_type = ""
-    resource_id = ""
-    if action in (
+    if action not in (
         "entity.get",
         "entity.list",
         "entity.create",
         "entity.update",
         "entity.delete",
     ):
-        resource_type = str(kwargs.get("type") or "")
-        # A listing names no row, but it must still reach Cedar as a resource of
-        # that *type*, or a rule refusing to expose profiles would let
-        # `entity.list(type="UserProfile")` past — the case it most needs to
-        # catch. The placeholder id stands for "any row of this type".
-        resource_id = str(kwargs.get("id") or "") or ("*" if resource_type else "")
+        return
+
+    resource_type = str(kwargs.get("type") or "")
+    # A listing names no row, but it must still reach Cedar as a resource of
+    # that *type*, or a rule refusing to expose profiles would let
+    # `entity.list(type="UserProfile")` past — the case it most needs to
+    # catch. The placeholder id stands for "any row of this type".
+    resource_id = str(kwargs.get("id") or "") or ("*" if resource_type else "")
 
     cedar_authz.check(
         caller,

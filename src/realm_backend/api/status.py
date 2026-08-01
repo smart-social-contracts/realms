@@ -32,6 +32,11 @@ from ic_python_logging import get_logger
 # Initialize logger
 logger = get_logger("api.status")
 
+# Above this many users the per-quarter home_quarter scan is unaffordable in
+# a query call (5B instruction limit); larger realms report counter-based
+# populations (join-time push) instead.
+_POP_SCAN_LIMIT = 2000
+
 
 def get_status() -> "dict[str, Any]":
     """
@@ -248,12 +253,29 @@ def get_status() -> "dict[str, Any]":
             quarter_entities = list(Quarter.instances())
 
             if quarter_entities:
-                # Multiple quarters: scan users to compute per-quarter populations
-                all_users = list(User.instances())
-                capital_pop = sum(
-                    1 for u in all_users
-                    if (getattr(u, "home_quarter", "") or "") in ("", own_id)
-                )
+                # Population accounting without a full User scan: direct
+                # quarter joins live in the quarter's own table and are pushed
+                # to q.population via report_quarter_population, so the
+                # capital's table holds capital residents. The legacy
+                # home_quarter scan is only affordable for small realms — at
+                # 10k users it exceeds the 5B query instruction limit (found
+                # at the 10k calibration rung).
+                if users_count <= _POP_SCAN_LIMIT:
+                    all_users = list(User.instances())
+                    capital_pop = sum(
+                        1 for u in all_users
+                        if (getattr(u, "home_quarter", "") or "") in ("", own_id)
+                    )
+                    per_quarter_scan = {
+                        q.canister_id or "": sum(
+                            1 for u in all_users
+                            if (getattr(u, "home_quarter", "") or "") == (q.canister_id or "")
+                        )
+                        for q in quarter_entities
+                    }
+                else:
+                    capital_pop = users_count
+                    per_quarter_scan = {}
                 quarters.append(
                     {
                         "name": "Capital",
@@ -270,11 +292,7 @@ def get_status() -> "dict[str, Any]":
                     # own table, not the capital's — the local home_quarter scan
                     # misses them. Join-time population push writes the quarter's
                     # true count into q.population; trust whichever is larger.
-                    local_scan = sum(
-                        1 for u in all_users
-                        if (getattr(u, "home_quarter", "") or "") == qcid
-                    )
-                    q_pop = max(local_scan, int(q.population or 0))
+                    q_pop = max(per_quarter_scan.get(qcid, 0), int(q.population or 0))
                     quarters.append(
                         {
                             "name": q.name or "",

@@ -813,7 +813,24 @@ def install_extension_from_registry(
 
     frontend_copied = 0
     if frontend_files:
-        if not fe_canister:
+        # Quarters are backend-only by design: they never serve UI, the
+        # shared frontend already carries the bundle from the capital's
+        # install, and the quarter holds no Commit permission on that
+        # frontend (a copy attempt fails with "Caller does not have Commit
+        # permission"). Skip unconditionally on quarters — even when a
+        # frontend_canister_id is handed down via bootstrap args.
+        from ggg import Realm as _Realm
+
+        _realm = _Realm.load("1")
+        if bool(getattr(_realm, "is_quarter", False)):
+            logger.warning(
+                f"Extension '{ext_id}': skipping frontend bundle copy — "
+                f"quarter is backend-only (UI served by the shared frontend)"
+            )
+            frontend_files = []
+        elif not fe_canister:
+            # On a capital, UI-carrying extensions without a configured
+            # frontend are a real misconfiguration worth failing.
             return json.dumps(
                 {
                     "success": False,
@@ -823,16 +840,17 @@ def install_extension_from_registry(
                     ),
                 }
             )
-        copy_err = yield from _copy_frontend_to_asset_canister(
-            registry_canister_id,
-            ext_id,
-            resolved_version,
-            fe_canister,
-            files=frontend_files,
-        )
-        if copy_err:
-            return json.dumps({"success": False, "error": copy_err})
-        frontend_copied = len(frontend_files)
+        if frontend_files:
+            copy_err = yield from _copy_frontend_to_asset_canister(
+                registry_canister_id,
+                ext_id,
+                resolved_version,
+                fe_canister,
+                files=frontend_files,
+            )
+            if copy_err:
+                return json.dumps({"success": False, "error": copy_err})
+            frontend_copied = len(frontend_files)
 
     from core.runtime_extensions import install_extension as _install
 

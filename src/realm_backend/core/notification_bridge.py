@@ -21,11 +21,25 @@ fixed.
 """
 
 import json
-import re
 
 from core.time_utils import parse_timestamp_ms
 
-EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+def _valid_email(address: str) -> bool:
+    """Rough ``local@domain.tld`` check.
+
+    Deliberately not a module-level ``re.compile``: some platform contexts
+    ship a gutted ``re`` without ``compile``, which would break lazy module
+    loading for the entire bridge.
+    """
+    try:
+        import re
+
+        return bool(re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", address))
+    except Exception:
+        local, _, domain = (address or "").partition("@")
+        return bool(local) and "." in domain and " " not in address
+
 
 AUDIENCES = ("user", "department", "realm")
 VISIBILITIES = ("private", "public")
@@ -455,7 +469,7 @@ def v_email_settings(caller="", **kwargs) -> dict:
 def v_set_email(caller="", email="", **kwargs) -> dict:
     """Set the caller's own email address. Only ever their own."""
     address = str(email or "").strip().lower()
-    if address and not EMAIL_PATTERN.match(address):
+    if address and not _valid_email(address):
         raise ValueError("Invalid email address")
 
     user = _caller_user(caller)
@@ -557,7 +571,7 @@ def v_send_test_email(caller="", to="", subject="Realms email test",
     address = str(to or "").strip().lower()
     if not address:
         raise ValueError("to address is required")
-    if not EMAIL_PATTERN.match(address):
+    if not _valid_email(address):
         raise ValueError("Invalid to address")
 
     user = _caller_user(caller)

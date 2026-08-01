@@ -76,7 +76,7 @@ class Appeal(Entity, TimestampedMixin):
 
 def appeal_file(
     case: "Case",
-    appellate_court: "Court",
+    appellate_court: Optional["Court"],
     appellant: "User",
     grounds: str,
     appeal_id: Optional[str] = None,
@@ -84,28 +84,31 @@ def appeal_file(
 ) -> "Appeal":
     """
     File an Appeal to a higher Court.
-    
+
     Args:
         case: The original Case being appealed
-        appellate_court: The Court to hear the appeal
+        appellate_court: The Court to hear the appeal, or None for a
+            courtless appeal (small realms may have no appellate court;
+            the core API treats the court as optional)
         appellant: The User filing the appeal (plaintiff or defendant)
         grounds: Legal grounds for the appeal
         appeal_id: Optional custom appeal ID
         metadata: Optional JSON metadata
-        
+
     Returns:
         The created Appeal
     """
     from .case import CaseStatus
-    
+
     if not case.can_appeal():
         raise ValueError(f"Case {case.case_number} cannot be appealed (status: {case.status})")
-    
-    if not appellate_court.can_hear_appeal():
-        raise ValueError(f"Court {appellate_court.name} cannot hear appeals (level: {appellate_court.level})")
-    
-    if not appellate_court.is_active():
-        raise ValueError(f"Court {appellate_court.name} is not active")
+
+    if appellate_court is not None:
+        if not appellate_court.can_hear_appeal():
+            raise ValueError(f"Court {appellate_court.name} cannot hear appeals (level: {appellate_court.level})")
+
+        if not appellate_court.is_active():
+            raise ValueError(f"Court {appellate_court.name} is not active")
     
     if not appeal_id:
         import uuid

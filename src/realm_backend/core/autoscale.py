@@ -23,7 +23,12 @@ Design (see issue #156):
 Pure stdlib only (no ``_cdk``) so it imports under plain CPython in tests.
 """
 
+import json
 import math
+
+from ic_python_logging import get_logger
+
+logger = get_logger("core.autoscale")
 
 # Capacity per quarter before we consider it "full".
 DEFAULT_N = 2000
@@ -180,6 +185,25 @@ def quarter_populations(realm):
     return pops
 
 
+def quarter_capacity_override(realm):
+    """Per-realm quarter capacity N from ``manifest_data`` (0/absent = env default).
+
+    Realms tune sharding via the optional manifest block::
+
+        {"scaling": {"quarter_capacity": 2000}}
+
+    Staging's env default (10) exists so CI exercises sharding cheaply, but it
+    would mint thousands of canisters on a busy realm — a real realm always
+    sets its own capacity here.
+    """
+    try:
+        md = json.loads(getattr(realm, "manifest_data", "") or "{}")
+        cap = int((md.get("scaling") or {}).get("quarter_capacity") or 0)
+        return cap if cap > 0 else None
+    except Exception:
+        return None
+
+
 def maybe_request_quarter_scale():
     """Evaluate the scaling policy and set an idempotent "scale in flight" flag.
 
@@ -220,7 +244,13 @@ def maybe_request_quarter_scale():
     populations = quarter_populations(realm)
     network = getattr(realm, "network", "") or ""
     codex_fn = _codex_should_deploy_fn(realm)
-    if not resolve_should_scale(populations, network, codex_fn=codex_fn, realm=realm):
+    if not resolve_should_scale(
+        populations,
+        network,
+        codex_fn=codex_fn,
+        n_override=quarter_capacity_override(realm),
+        realm=realm,
+    ):
         return False
 
     realm.scale_in_flight = True
@@ -230,13 +260,16 @@ def maybe_request_quarter_scale():
         realm.scale_requested_at = str(int(ic.time()))
     except Exception:
         pass
-    # Spin up the on-chain provisioning loop. Lazy/guarded import so the pure
-    # policy path (and unit tests under plain CPython) never depend on the
-    # canister ``main`` module or the TaskManager.
+    # Spin up the on-chain provisioning loop. Seeding lives in core: this
+    # function runs in contexts where ``from main import ...`` resolves
+    # nothing (WASI sandbox / __shell__), and a swallowed failure here leaves
+    # scale_in_flight set with no driver task — the exact stuck-scale bug
+    # found at the 10k rung. Log, never silence.
     try:
-        from main import ensure_autoscale_task
+        from core.quarter_bootstrap import ensure_autoscale_task
 
-        ensure_autoscale_task()
-    except Exception:
-        pass
+        if not ensure_autoscale_task():
+            logger.error("scale requested but autoscale task seeding failed")
+    except Exception as e:
+        logger.error(f"autoscale task seeding raised: {e}")
     return True

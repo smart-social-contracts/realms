@@ -154,7 +154,9 @@ def appeal(a) -> Dict[str, Any]:
         "grounds": a.grounds or "",
         "status": a.status or "",
         "filed_date": a.filed_date or "",
-        "decision_date": a.decision_date or "",
+        # The entity field is ``decided_date``; reading ``decision_date``
+        # raised AttributeError on every appeal projection (10k E2E, P16).
+        "decision_date": a.decided_date or "",
         "decision": a.decision or "",
         "original_case_id": _rel_id(a, "original_case"),
         "original_case_number": _rel_attr(a, "original_case", "case_number"),
@@ -168,7 +170,11 @@ def appeal(a) -> Dict[str, Any]:
 def case_detail(c) -> Dict[str, Any]:
     """A case with its verdicts and appeals inlined, for the detail view."""
     data = case(c)
-    data["verdicts"] = [verdict(v) for v in _related_list(c, "verdicts")]
+    # Verdict.case is OneToOne("Case", "verdict") — the reverse accessor is
+    # the singular ``c.verdict``. Reading a plural ``verdicts`` silently
+    # yielded [] forever (same wrong-name family as the P11 appeal bug).
+    single = getattr(c, "verdict", None)
+    data["verdicts"] = [verdict(single)] if single is not None else []
     data["appeals"] = [appeal(a) for a in _related_list(c, "appeals")]
     return data
 
