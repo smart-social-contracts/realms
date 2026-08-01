@@ -1424,6 +1424,20 @@ def _start_extensions_for_job(job, manifest: dict) -> Async[None]:
             codex_list.append({"id": pkg, "version": codex.get("version"), "run_init": True})
         elif isinstance(pkg, dict):
             codex_list.append({"id": pkg.get("name", ""), "version": pkg.get("version"), "run_init": True})
+        else:
+            # A codex dict without a usable "package" means the caller used a
+            # different shape (e.g. {"codex_id": ...}). Silently skipping it
+            # deploys a codex-less realm with zero dependency extensions —
+            # found when a custom deploy client did exactly that (R7).
+            jlog(job.name).error(
+                f"realm.codex has no 'package' field (keys: {sorted(codex.keys())}) — "
+                "the realm will deploy WITHOUT a codex or its dependency extensions"
+            )
+    elif codex:
+        jlog(job.name).error(
+            f"realm.codex is a {type(codex).__name__}, expected dict with 'package' — "
+            "the realm will deploy WITHOUT a codex or its dependency extensions"
+        )
     if codex_list:
         ext_manifest["codices"] = codex_list
 

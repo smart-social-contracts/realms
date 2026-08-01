@@ -86,12 +86,20 @@ def main():
         "--via-marketplace",
         default="",
         help=(
-            "Marketplace canister id to route approvals through. Strongly "
-            "recommended: realms trust their configured marketplace by default, "
-            "so an approval written directly by an operator key is one they will "
-            "refuse. Requires the marketplace to hold approver rights on the "
+            "Marketplace canister id to route approvals through. Defaults to "
+            "the known marketplace for --network (test/staging/demo). Realms "
+            "trust their configured marketplace by default, so an approval "
+            "written directly by an operator key is one they will refuse "
+            "(found the hard way: P18, 10k E2E). Pass --direct to override. "
+            "Requires the marketplace to hold approver rights on the "
             "registry (grant_publish on the '_approvers' namespace)."
         ),
+    )
+    parser.add_argument(
+        "--direct",
+        action="store_true",
+        help="Approve directly with the operator identity instead of routing "
+        "through the marketplace (NOT recommended — realms will refuse).",
     )
     parser.add_argument("--network", default="ic")
     parser.add_argument("--notes", default=DEFAULT_NOTES)
@@ -106,6 +114,25 @@ def main():
         help="Comma-separated substring filter, e.g. 'ext/voting,codex/syntropia'",
     )
     args = parser.parse_args()
+
+    # Default to the network's marketplace so approvals are attributed to the
+    # principal realms actually trust. --direct opts out (operator-attributed
+    # approvals — realms refuse them).
+    MARKETPLACE_BY_NETWORK = {
+        "test": "2wldc-niaaa-aaaad-qlxga-cai",
+        "staging": "jji3o-uyaaa-aaaah-qreja-cai",
+        "demo": "ehyfg-wyaaa-aaaae-qg3qq-cai",
+    }
+    if args.direct:
+        args.via_marketplace = ""
+    elif not args.via_marketplace:
+        args.via_marketplace = MARKETPLACE_BY_NETWORK.get(args.network, "")
+        if not args.via_marketplace and args.execute:
+            parser.error(
+                f"no known marketplace for --network {args.network}; "
+                "pass --via-marketplace explicitly or --direct to approve "
+                "with the operator identity (realms will refuse those)"
+            )
 
     print(f"Reading namespaces from {args.registry} on {args.network} ...")
     namespaces = json.loads(call(args.registry, "list_namespaces", "", args.network, query=True))

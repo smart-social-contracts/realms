@@ -25,7 +25,17 @@ _MANIFEST_DATA_KEYS = (
     "membership",
 )
 
-_PRESERVE_MANIFEST_KEYS = ("config_overrides", "lifecycle_overrides", "casals")
+# Realm-specific blocks that a codex (re-)init must never clobber. ``casals``
+# is the realm's provisioning wiring; ``scaling`` holds operator-set capacity
+# overrides — both are written after deploy and are lost when a codex upgrade
+# re-runs init (the unified install path always does). A codex upgrade on a
+# 2000-capacity realm silently reset it to the env default (P21, E2E 003).
+_PRESERVE_MANIFEST_KEYS = (
+    "config_overrides",
+    "lifecycle_overrides",
+    "casals",
+    "scaling",
+)
 
 
 def _extensions_dir() -> str:
@@ -46,21 +56,40 @@ def _load_manifest(codex_id: str) -> dict:
     return manifest if isinstance(manifest, dict) else {}
 
 
+def _package_file(codex_id: str, rel_path: str) -> Optional[str]:
+    """Resolve a file inside an installed codex package.
+
+    Registry-installed packages flatten ``backend/*`` to the package root,
+    while source installs keep the ``backend/`` prefix — accept both so codex
+    init works regardless of how the package arrived (P21: a registry
+    install's init could not find ``data/departments.json`` under ``backend/``
+    and silently skipped all template seeding).
+    """
+    base = os.path.join(_extensions_dir(), codex_id)
+    for candidate in (
+        os.path.join(base, rel_path),
+        os.path.join(base, "backend", rel_path),
+    ):
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
 def _load_data_file(codex_id: str, rel_path: str) -> Optional[dict]:
     if not rel_path:
         return None
-    path = os.path.join(_extensions_dir(), codex_id, "backend", rel_path)
-    if not os.path.isfile(path):
-        logger.warning(f"codex_init_host: missing data file {path}")
+    path = _package_file(codex_id, rel_path)
+    if path is None:
+        logger.warning(f"codex_init_host: missing data file {rel_path} for {codex_id}")
         return None
     with open(path, "r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
 def _load_backend_module(codex_id: str, module_name: str):
-    path = os.path.join(_extensions_dir(), codex_id, "backend", module_name + ".py")
-    if not os.path.isfile(path):
-        raise FileNotFoundError(f"codex '{codex_id}' has no backend/{module_name}.py")
+    path = _package_file(codex_id, module_name + ".py")
+    if path is None:
+        raise FileNotFoundError(f"codex '{codex_id}' has no {module_name}.py")
     spec = importlib.util.spec_from_file_location(
         f"{codex_id}.{module_name}", path
     )
