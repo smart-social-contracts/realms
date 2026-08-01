@@ -5,9 +5,9 @@ Sandboxed ``init`` hooks emit effects such as ``realm.apply_init_policy`` and
 entity mutations the host owns.
 """
 
-import importlib.util
 import json
 import os
+import sys
 from typing import Any, Dict, Optional
 
 from ic_python_logging import get_logger
@@ -52,7 +52,8 @@ def _load_manifest(codex_id: str) -> dict:
         path = os.path.join(_extensions_dir(), codex_id, "manifest.json")
         if os.path.isfile(path):
             with open(path, "r", encoding="utf-8") as handle:
-                manifest = json.load(handle)
+                # WASI CPython's frozen json has no load() — loads() only.
+                manifest = json.loads(handle.read())
     return manifest if isinstance(manifest, dict) else {}
 
 
@@ -83,20 +84,25 @@ def _load_data_file(codex_id: str, rel_path: str) -> Optional[dict]:
         logger.warning(f"codex_init_host: missing data file {rel_path} for {codex_id}")
         return None
     with open(path, "r", encoding="utf-8") as handle:
-        return json.load(handle)
+        # WASI CPython's frozen json has no load() — loads() only.
+        return json.loads(handle.read())
 
 
 def _load_backend_module(codex_id: str, module_name: str):
     path = _package_file(codex_id, module_name + ".py")
     if path is None:
         raise FileNotFoundError(f"codex '{codex_id}' has no {module_name}.py")
-    spec = importlib.util.spec_from_file_location(
-        f"{codex_id}.{module_name}", path
-    )
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # exec/compile instead of importlib.util — the WASI CPython build ships
+    # importlib as an empty stub (same pattern as runtime_extensions._load_module).
+    full_name = f"_codex_host_{codex_id}.{module_name}"
+    with open(path, "r", encoding="utf-8") as handle:
+        source = handle.read()
+    module = type(sys)(full_name)
+    module.__file__ = path
+    module.__name__ = full_name
+    module.__package__ = f"_codex_host_{codex_id}"
+    exec(compile(source, path, "exec"), module.__dict__)
+    sys.modules[full_name] = module
     return module
 
 
