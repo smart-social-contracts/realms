@@ -642,6 +642,7 @@ def should_deploy_quarter_hook(args):
                 args.get("populations") or [],
                 args.get("network") or "",
                 None,
+                quarter_capacity=args.get("quarter_capacity") or 0,
             )
         )
     }
@@ -879,12 +880,20 @@ def call_assign_quarter(
     return str(result) if result else None
 
 
-def call_should_deploy_quarter(populations: list, network: str = "") -> Optional[bool]:
+def call_should_deploy_quarter(
+    populations: list, network: str = "", quarter_capacity: int = 0
+) -> Optional[bool]:
     """Ask the federation codex whether to spawn another quarter.
 
     Returns ``True``/``False`` from the policy, or ``None`` when no policy is
     installed or it cannot be evaluated — callers then apply the built-in
     default. Scaling must not stall because a codex is broken.
+
+    ``quarter_capacity`` carries the realm's manifest_data override as plain
+    data (sandboxed hooks receive no realm entity by design, issue #265).
+    Codices predating the kwarg raise TypeError, which degrades to None →
+    the override-aware platform default — so old policies can't silently
+    scale at the env default (P22).
     """
     name, source = _federation_codex()
     if not source or "def should_deploy_quarter" not in source:
@@ -900,6 +909,7 @@ def call_should_deploy_quarter(populations: list, network: str = "") -> Optional
             {
                 "populations": [int(p or 0) for p in (populations or [])],
                 "network": network or "",
+                "quarter_capacity": int(quarter_capacity or 0),
             },
             [],
         )

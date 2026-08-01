@@ -135,7 +135,13 @@ def _codex_should_deploy_fn(realm):
         return None
 
     def _fn(populations, network, realm=None):
-        verdict = codex_hooks.call_should_deploy_quarter(populations, network)
+        # Hand the realm's capacity override to the hook as plain data —
+        # sandboxed hooks receive no realm entity (issue #265), so without
+        # this the codex policy silently scaled at the env default (P22).
+        cap = (quarter_capacity_override(realm) or 0) if realm is not None else 0
+        verdict = codex_hooks.call_should_deploy_quarter(
+            populations, network, quarter_capacity=cap
+        )
         if verdict is None:
             # Signal resolve_should_scale to fall through to the default.
             raise RuntimeError("federation should_deploy_quarter unavailable")
