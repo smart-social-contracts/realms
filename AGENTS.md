@@ -1,5 +1,20 @@
 # Agents Guide — Realms
 
+## Model Selection
+
+Preferred models for agents working in this repo:
+
+| Model | Role |
+|---|---|
+| **Composer 2.5** | Default worker — medium-to-low complexity tasks, implementation, exploration, routine changes |
+| **Kimi K3** | Orchestrator — high-level planning, complex reasoning, critical tasks, and verification. **Must spin up Composer 2.5 workers** for delegated implementation, exploration, and routine work. |
+
+**Strategy:** Maximize use of **Composer 2.5** — it is cheap but smart enough for most day-to-day work. Reserve **Kimi K3** for complex tasks and for verifying the most critical work delegated to Composer 2.5.
+
+When running as **Kimi K3**, spin up **Composer 2.5** subagents (Task tool / workers) for anything that does not require Kimi K3's reasoning — implementation, file search, bulk exploration, test runs, and medium-to-low complexity edits. Do not do that work inline in Kimi K3 when a Composer 2.5 worker can handle it.
+
+---
+
 ## Project Structure
 
 ```
