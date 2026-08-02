@@ -1,0 +1,29 @@
+# One-off backend redeploy for TestSyntropia003 (wizard-created realm).
+# Deploys the Cedar-gated sandboxed REPL backend (realms#282, toolkit 0.5.3)
+# built from the local checkout. Mode upgrade preserves all realm state.
+#
+# Requires BASILISK_TEMPLATE_WASM pointing at the Cedar-enabled basilisk
+# template, otherwise the sandboxed __shell__ is unavailable in this build.
+version: 2
+network: staging
+
+infra:
+  file_registry_canister_id: iebdk-kqaaa-aaaau-agoxq-cai
+  marketplace_canister_id: jji3o-uyaaa-aaaah-qreja-cai
+  ii_derivation_origin: https://staging.realmsgos.org
+
+mundus:
+  - name: testsyntropia003
+    type: realm
+    display_name: TestSyntropia003
+    canister_id: 2kb2z-wqaaa-aaaac-bfswa-cai
+    frontend_canister_id: 2na4n-3iaaa-aaaac-bfswq-cai
+    manifest: examples/demo/realm3/manifest.json
+
+parameters:
+  TEST_MODE: true
+  TEST_MODE_II_BYPASS: true
+  TEST_MODE_USER_SELF_REGISTRATION: true
+  TEST_MODE_DEMO_DATA: false
+  TEST_MODE_SKIP_TERMS: false
+  TEST_MODE_SKIP_PASSPORT_ZKPROOF: false
