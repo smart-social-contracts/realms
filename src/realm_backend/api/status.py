@@ -320,6 +320,12 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not load quarter info: {e}")
 
+    # Federation-wide headcount: the capital's User.count() covers capital residents
+    # only — sub-quarters store their own user tables and push counts into
+    # Quarter.population. Sum the quarter directory for total realm population.
+    if not is_quarter and quarters:
+        users_count = sum(int(q.get("population", 0) or 0) for q in quarters)
+
     # Dependency versions injected at build time (runtime detection doesn't work in WASM)
     dependencies = [
         "ic-basilisk==BASILISK_VERSION_PLACEHOLDER",

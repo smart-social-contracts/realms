@@ -20,6 +20,14 @@ export async function fetchRealmDetails(realms) {
   const { IDL } = await import('@dfinity/candid');
 
   const statusIdlFactory = ({ IDL: Idl }) => {
+    const QuarterInfo = Idl.Record({
+      name: Idl.Text,
+      canister_id: Idl.Text,
+      population: Idl.Nat,
+      status: Idl.Text,
+      index: Idl.Nat,
+      is_capital: Idl.Bool,
+    });
     const StatusData = Idl.Record({
       status: Idl.Text,
       test_mode: Idl.Bool,
@@ -44,6 +52,8 @@ export async function fetchRealmDetails(realms) {
       realm_welcome_message: Idl.Text,
       realm_stage: Idl.Opt(Idl.Text),
       user_profiles_count: Idl.Nat,
+      quarters: Idl.Vec(QuarterInfo),
+      is_quarter: Idl.Bool,
     });
     const ApiResponse = Idl.Record({
       data: Idl.Variant({ status: StatusData }),
@@ -72,9 +82,22 @@ export async function fetchRealmDetails(realms) {
         const response = await actor.status();
         if (response.success && response.data.status) {
           const statusData = response.data.status;
+          let usersCount = Number(statusData.users_count);
+          // Capital User.count() is capital-residents only; sum quarter directory
+          // for federation-wide population (mirrors realm_backend status API).
+          if (
+            !statusData.is_quarter &&
+            Array.isArray(statusData.quarters) &&
+            statusData.quarters.length > 0
+          ) {
+            usersCount = statusData.quarters.reduce(
+              (sum, q) => sum + Number(q.population ?? 0),
+              0
+            );
+          }
           return {
             id: realm.id,
-            users_count: Number(statusData.users_count),
+            users_count: usersCount,
             manifesto: statusData.realm_manifesto || '',
             realm_name: statusData.realm_name || '',
             realm_stage:

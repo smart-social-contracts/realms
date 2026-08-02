@@ -222,9 +222,16 @@
 			console.debug(`[extension] Mounted ${id}@${version}`);
 			status = 'ready';
 		} catch (e: any) {
-			if (e instanceof AccessDeniedError) {
+			// Extensions that call ctx.backend.extension_sync_call directly surface
+			// denials as plain Errors carrying the backend's JSON — route those
+			// through the same friendly access-denied screen.
+			const denied =
+				e instanceof AccessDeniedError
+					? { operation: e.operation }
+					: parseAccessError(e);
+			if (denied) {
 				status = 'access_denied';
-				accessDeniedOperation = e.operation;
+				accessDeniedOperation = denied.operation;
 			} else {
 				console.error('Extension load failed:', e);
 				status = 'error';
@@ -275,7 +282,7 @@
 			<span class="text-sm">{loadingMessage}</span>
 		</div>
 	{:else if status === 'access_denied'}
-		<AccessDenied operation={accessDeniedOperation} />
+		<AccessDenied operation={accessDeniedOperation} onRetry={() => loadRuntimeExtension(id)} />
 	{:else if status === 'error'}
 		<Alert color="red" class="mb-4">
 			<div class="font-semibold">Failed to load extension '{id}'</div>

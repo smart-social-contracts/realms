@@ -365,6 +365,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
+    'policy_status' : IDL.Func([], [IDL.Text], ['query']),
     'process_quarter_scaling' : IDL.Func([], [IDL.Text], []),
     'receive_realm_message' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],

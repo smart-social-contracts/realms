@@ -913,6 +913,7 @@ export interface RealmTargetService {
   'install_codex_from_registry' : ActorMethod<[string], string>,
   'install_extension_from_registry' : ActorMethod<[string], string>,
 }
+export type RecordKey = [string, string];
 export type RejectionCode = { 'NoError' : null } |
   { 'CanisterError' : null } |
   { 'SysTransient' : null } |
@@ -1357,6 +1358,7 @@ export interface _SERVICE {
   'list_runtime_extensions' : ActorMethod<[], string>,
   'list_share_audiences' : ActorMethod<[], RealmResponse>,
   'mint_land_nft_for_parcel' : ActorMethod<[string, string, string], string>,
+  'policy_status' : ActorMethod<[], string>,
   'process_quarter_scaling' : ActorMethod<[], string>,
   'receive_realm_message' : ActorMethod<
     [string, string, string, string],
