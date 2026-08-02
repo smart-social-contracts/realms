@@ -13,6 +13,31 @@ import sys
 
 import pytest
 
+# test_access_control.py (alphabetically earlier) replaces ic_basilisk_toolkit
+# and its dependency modules with MagicMocks at import time and never restores
+# them. The Cedar modules now delegate to the toolkit's CedarEngine/Slicer, so
+# any mocked module in that import chain — and any core Cedar module already
+# imported under one — must be evicted before the real import below happens.
+_MOCKED_PREFIXES = (
+    "ic_basilisk_toolkit",
+    "ic_python_db",
+    "ic_python_logging",
+    "basilisk",
+    "_cdk",
+)
+for _name in list(sys.modules):
+    if any(
+        _name == prefix or _name.startswith(prefix + ".")
+        for prefix in _MOCKED_PREFIXES
+    ):
+        if type(sys.modules[_name]).__name__ == "MagicMock":
+            del sys.modules[_name]
+for _name in ("core.cedar_authz", "core.cedar_entities", "core.cedar_schema_runtime"):
+    sys.modules.pop(_name, None)
+for _name in list(sys.modules):
+    if _name == "ggg" or _name.startswith("ggg."):
+        del sys.modules[_name]
+
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), "..", "..", "src", "realm_backend")
 )
@@ -60,8 +85,11 @@ def clean_state():
 def loaded(monkeypatch):
     def install(**kwargs):
         fake = FakeCedar(**kwargs)
-        monkeypatch.setattr(cedar_authz, "_cedar", fake)
-        monkeypatch.setattr(cedar_authz, "available", lambda: True)
+        # The decision machinery now lives in the toolkit's CedarEngine, so the
+        # fake is injected there; everything asserted through cedar_authz's
+        # public API is unchanged.
+        monkeypatch.setattr("ic_basilisk_toolkit.cedar_engine._cedar", fake)
+        monkeypatch.setitem(sys.modules, "_basilisk_cedar", object())
         cedar_authz.load()
         return fake
 
@@ -82,8 +110,10 @@ class TestFailsClosed:
         assert cedar_authz.is_authorized("alice", "write") is False
 
     def test_failure_to_load_leaves_enforcement_off(self, monkeypatch):
-        monkeypatch.setattr(cedar_authz, "_cedar", FakeCedar(raises="bad policy"))
-        monkeypatch.setattr(cedar_authz, "available", lambda: True)
+        monkeypatch.setattr(
+            "ic_basilisk_toolkit.cedar_engine._cedar", FakeCedar(raises="bad policy")
+        )
+        monkeypatch.setitem(sys.modules, "_basilisk_cedar", object())
         assert cedar_authz.load() is False
         assert cedar_authz.enabled() is False
 

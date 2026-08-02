@@ -5,6 +5,7 @@ logger = get_logger("entity.vote")
 
 
 class Vote(Entity, TimestampedMixin):
+    __owner_field__ = "voter"  # realms#282 — SecureORM ownership stamp/protect
     """Individual vote entity for tracking votes on proposals"""
 
     proposal = ManyToOne("Proposal", "votes")

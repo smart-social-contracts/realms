@@ -14,6 +14,7 @@ AUDIENCE_REALM = "realm"  # every registered user of the realm
 
 
 class Notification(Entity, TimestampedMixin):
+    __owner_field__ = "recipient"  # realms#282 — SecureORM ownership stamp/protect
     """Notification (a.k.a. message) with visibility + audience semantics.
 
     Two orthogonal dimensions decide delivery:

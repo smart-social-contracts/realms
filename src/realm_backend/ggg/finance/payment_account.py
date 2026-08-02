@@ -11,6 +11,7 @@ logger = get_logger("entity.payment_account")
 
 
 class PaymentAccount(Entity, TimestampedMixin):
+    __owner_field__ = "user"  # realms#282 — SecureORM ownership stamp/protect
     """
     Represents a payment account that can receive transfers.
     Users can have multiple payment accounts for different networks and currencies.

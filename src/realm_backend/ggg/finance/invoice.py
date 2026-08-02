@@ -168,6 +168,7 @@ class _ICRC1IndexerService(Service):
 # ---------------------------------------------------------------------------
 
 class Invoice(Entity, TimestampedMixin):
+    __owner_field__ = "user"  # realms#282 — SecureORM ownership stamp/protect
     """
     Represents an invoice denominated in the realm's currency.
 

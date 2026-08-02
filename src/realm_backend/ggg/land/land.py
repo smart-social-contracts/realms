@@ -20,6 +20,7 @@ class LandStatus:
 
 
 class Land(Entity, TimestampedMixin):
+    __owner_field__ = "owner_user"  # realms#282 — SecureORM ownership stamp/protect
     __alias__ = "id"
     id = String()
     x_coordinate = Integer()

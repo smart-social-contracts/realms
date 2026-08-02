@@ -281,6 +281,51 @@ def _get_frontend_canister_id() -> str:
 
 logger = get_logger("main")
 
+
+def _init_secure_orm():
+    """Build the Cedar-gated ORM singleton for the sandboxed REPL (realms#282)."""
+    from ic_python_db import Entity
+    from ic_python_db.schema import build_schema
+    from ic_basilisk_toolkit.secure_orm import SecureORM
+
+    import ggg
+    from core import cedar_authz
+
+    candidates = [
+        getattr(ggg, name)
+        for name in ggg.__all__
+        if isinstance(getattr(ggg, name), type)
+        and issubclass(getattr(ggg, name), Entity)
+    ]
+    included = []
+    for cls in candidates:
+        try:
+            build_schema({cls.__name__: cls})
+        except Exception as exc:
+            logger.warning(
+                f"secure_orm: excluding {cls.__name__} from REPL stubs: {exc}"
+            )
+            continue
+        included.append(cls)
+
+    schema = build_schema({cls.__name__: cls for cls in included})
+    return SecureORM(
+        engine=cedar_authz._get_engine(),
+        namespace="Realm",
+        entities=included,
+        schema=schema,
+        principal_type="User",
+        principal_entity=ggg.User,
+        shell_context={"repl": True},
+    )
+
+
+try:
+    secure_orm = _init_secure_orm()
+except Exception as exc:
+    logger.warning(f"secure_orm unavailable: {exc}")
+    secure_orm = None
+
 # HTTP types used by http_transform endpoint
 from _cdk import (
     HttpResponse,
@@ -4468,59 +4513,17 @@ def http_transform(args: HttpTransformArgs) -> HttpResponse:
     return http_response
 
 
-_shell_ns_by_principal = {}
-
-
 @update
 @require(Operations.SHELL_EXECUTE)
 def __shell__(code: str) -> str:
-    """Executes Python code in a persistent namespace and returns the output.
+    """Run code in a sandboxed subinterpreter REPL with ORM-like stubs.
 
-    This is the core function needed for the Basilisk Simple Shell to work.
-    It captures stdout and stderr from the executed code.  The namespace
-    persists across calls per caller principal, so variables defined in one
-    command are available in subsequent commands (like a normal interactive
-    Python session).  Each principal gets its own isolated session.
+    Mutations cross the trust boundary only through typed RPC actions, each
+    checked by Cedar with ``context.repl`` before touching entity storage.
     """
-    import io
-    import sys
-    import traceback
-
-    from core.execution import _ensure_codex_lazy_loading
-
-    _ensure_codex_lazy_loading()
-
-    global _shell_ns_by_principal
-    caller = str(ic.caller())
-    if caller not in _shell_ns_by_principal:
-        import _cdk as basilisk
-        import ggg
-
-        _shell_ns_by_principal[caller] = {"__builtins__": __builtins__}
-        _shell_ns_by_principal[caller].update(
-            {
-                "ggg": ggg,
-                "basilisk": basilisk,
-                "ic": ic,
-            }
-        )
-        for _name in ggg.__all__:
-            _shell_ns_by_principal[caller][_name] = getattr(ggg, _name)
-    ns = _shell_ns_by_principal[caller]
-
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-    sys.stdout = stdout
-    sys.stderr = stderr
-
-    try:
-        exec(code, ns, ns)
-    except Exception:
-        traceback.print_exc()
-
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
-    return stdout.getvalue() + stderr.getvalue()
+    if secure_orm is None:
+        raise RuntimeError("secure_orm is not available in this build")
+    return secure_orm.shell(code)
 
 
 # Removed endpoints (use __shell__ + basilisk shell commands instead):

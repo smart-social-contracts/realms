@@ -5,6 +5,7 @@ logger = get_logger("entity.human")
 
 
 class Human(Entity, TimestampedMixin):
+    __owner_field__ = "user"  # realms#282 — SecureORM ownership stamp/protect
     __alias__ = "name"
     name = String(max_length=256)
     date_of_birth = String(max_length=256)

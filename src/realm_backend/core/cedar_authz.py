@@ -5,6 +5,14 @@ Authorization rules the realm cannot afford to get wrong live in
 verbs. This module is what makes them bite: it loads them at startup and asks
 Cedar before a call proceeds.
 
+Since ic-basilisk-toolkit 0.5.1 the machinery lives in the toolkit
+(``CedarEngine`` — extracted from this module — and ``Slicer``); what remains
+here is the realm's *configuration* of that machinery: the ``Realm`` namespace,
+the embedded guardrails and policies, the ambient call origin as request
+context, and the realm's verb-to-action collapsing rule. The module-level
+function API is unchanged, so call sites in ``main.py`` and
+``core/extension_bridge.py`` are unaffected.
+
 Two properties matter more than anything else here.
 
 **It fails closed.** If policies did not load, if the entity slice is malformed,
@@ -24,28 +32,55 @@ why :func:`require_enforcement` exists for a realm that wants that guarantee.
 from typing import Any, List, Optional
 
 from core.call_origin import current as current_origin
-from core.cedar_policies import GUARDRAILS, POLICIES, SCHEMA
+from core.cedar_policies import GUARDRAILS, POLICIES
 
 try:  # pragma: no cover - exercised by which artifact the canister is built on
     from ic_basilisk_toolkit import cedar as _cedar
     from ic_basilisk_toolkit.cedar import CedarError
+    from ic_basilisk_toolkit.cedar_engine import CedarEngine
+    from ic_basilisk_toolkit.cedar_slicing import Slicer
 except ImportError:  # pragma: no cover
     _cedar = None
+    CedarEngine = None
+    Slicer = None
 
     class CedarError(Exception):
         """Placeholder so callers can catch one exception type either way."""
 
 
-_state = {"loaded": False, "attempted": False, "warnings": [], "error": ""}
+_engine: Optional["CedarEngine"] = None
 
 
-def _log(message: str) -> None:
-    try:
-        from core.logging import logger
+def schema() -> str:
+    """The effective Cedar schema text, generated from ggg entity definitions."""
+    from core.cedar_schema_runtime import generate_realm_cedar_schema
 
-        logger.warning(message)
-    except Exception:
-        print(message)
+    return generate_realm_cedar_schema()
+
+
+def _get_engine() -> "CedarEngine":
+    """The realm's configured engine, created on first use.
+
+    ``fail_open_when_unavailable`` matches this realm's longstanding contract:
+    on a stock build ``check`` is a no-op and the Python checks remain the only
+    gate, while ``is_authorized`` still denies. The engine's own ``check`` is
+    not used here because the realm's denial message predates it.
+    """
+    global _engine
+    if _engine is None:
+        if CedarEngine is None or Slicer is None:
+            raise RuntimeError("ic-basilisk-toolkit Cedar modules unavailable")
+        schema_text = schema()
+        _engine = CedarEngine(
+            namespace="Realm",
+            principal_type="User",
+            schema=schema_text,
+            policies=f"{GUARDRAILS}\n\n{POLICIES}",
+            slicer=Slicer("Realm", schema_text, "User"),
+            context_provider=current_origin,
+            fail_open_when_unavailable=True,
+        )
+    return _engine
 
 
 def available() -> bool:
@@ -61,7 +96,7 @@ def available() -> bool:
 
 def enabled() -> bool:
     """Whether Cedar is actually deciding calls in this deployment."""
-    return bool(_state["loaded"])
+    return _engine is not None and _engine.enabled()
 
 
 def status() -> dict:
@@ -70,13 +105,17 @@ def status() -> dict:
     A realm running without enforcement should be able to say so out loud rather
     than leaving it to be inferred from behaviour.
     """
-    return {
-        "available": available(),
-        "enforcing": enabled(),
-        "attempted": _state["attempted"],
-        "error": _state["error"],
-        "warnings": list(_state["warnings"]),
-    }
+    if _engine is None:
+        return {
+            "available": available(),
+            "enforcing": False,
+            "attempted": False,
+            "error": "",
+            "warnings": [],
+        }
+    out = _engine.status()
+    out.pop("has_extra_policies", None)
+    return out
 
 
 def load(extra_policies: str = "") -> bool:
@@ -87,33 +126,9 @@ def load(extra_policies: str = "") -> bool:
     finds nothing (smart-social-contracts/realms#281). Call it from the deferred
     timer that already performs extension discovery.
     """
-    _state["attempted"] = True
-    if not available():
-        _state["error"] = "no native Cedar module in this build"
+    if CedarEngine is None or Slicer is None:
         return False
-
-    # Policy text comes from the embedded constants in core.cedar_policies, not
-    # the filesystem: bundled canister modules have no `__file__`, and a WASI
-    # `open()` finds nothing. The .cedar files remain the source of truth and CI
-    # keeps this copy current, so a stale embed cannot silently change behaviour.
-    schema = SCHEMA
-    policies = f"{GUARDRAILS}\n\n{POLICIES}"
-    if extra_policies:
-        policies = f"{policies}\n\n{extra_policies}"
-
-    try:
-        warnings = _cedar.load(schema, policies)
-    except CedarError as exc:
-        _state["error"] = str(exc)
-        _log(f"cedar_authz: policies rejected: {exc}")
-        return False
-
-    _state["loaded"] = True
-    _state["error"] = ""
-    _state["warnings"] = list(warnings or ())
-    for warning in _state["warnings"]:
-        _log(f"cedar_authz: {warning}")
-    return True
+    return _get_engine().load(extra_policies)
 
 
 def declared_actions() -> frozenset:
@@ -124,19 +139,7 @@ def declared_actions() -> frozenset:
     and look like a policy decision. Deriving the set from the schema means
     adding an action in one place cannot silently break the other.
     """
-    cached = _state.get("actions")
-    if cached is not None:
-        return cached
-    actions = set()
-    for line in SCHEMA.splitlines():
-        line = line.strip()
-        if not line.startswith("action "):
-            continue
-        name = line[len("action ") :].split(" in ")[0].split(";")[0].strip()
-        actions.add(name.strip('"'))
-    resolved = frozenset(actions)
-    _state["actions"] = resolved
-    return resolved
+    return _get_engine().declared_actions()
 
 
 def action_for(verb: str, is_read: bool) -> str:
@@ -172,39 +175,12 @@ def is_authorized(
     call site could get it wrong; taking it from the ambient origin means only
     the bridge can.
     """
-    if not enabled():
+    if _engine is None:
         return False
-
-    from core import cedar_entities
-
-    if entities is None:
-        entities = cedar_entities.slice_for(
-            principal_id, resource_type, resource_id, resource_row
-        )
-
-    resource = (
-        cedar_entities.uid(resource_type, resource_id)
-        if resource_type and resource_id
-        # Cedar needs *a* resource. A synthetic one keeps type-only rules
-        # meaningful for verbs that do not name a row, and matches nothing that
-        # a policy could grant by accident.
-        else 'Realm::Realm::"realm"'
+    return _engine.is_authorized(
+        principal_id, action, resource_type, resource_id, resource_row,
+        entities=entities,
     )
-
-    try:
-        return _cedar.is_authorized(
-            cedar_entities.uid("User", principal_id),
-            f'Realm::Action::"{action}"',
-            resource,
-            entities,
-            current_origin(),
-        )
-    except CedarError as exc:
-        # A failure is not a denial, but it must behave like one. Logged loudly
-        # because a realm denying everything for a mechanical reason looks
-        # identical to a strict one from the outside.
-        _log(f"cedar_authz: decision failed for {action}: {exc}")
-        return False
 
 
 def check(
@@ -234,13 +210,19 @@ def require_enforcement() -> None:
     The failure this guards against is a realm built on the wrong artifact:
     everything works, nothing is enforced, and no request looks different.
     """
-    if not enabled():
+    if _engine is None:
         raise RuntimeError(
             "Cedar enforcement required but unavailable: "
-            f"{_state['error'] or 'load() was never called'}. Build the canister "
-            "on the Cedar template artifact."
+            "load() was never called. Build the canister on the Cedar "
+            "template artifact."
         )
+    _engine.require_enforcement()
 
 
 def reset_for_tests() -> None:
-    _state.update({"loaded": False, "attempted": False, "warnings": [], "error": ""})
+    global _engine
+    _engine = None
+    from core import cedar_entities, cedar_schema_runtime
+
+    cedar_schema_runtime.reset_for_tests()
+    cedar_entities.reset_for_tests()

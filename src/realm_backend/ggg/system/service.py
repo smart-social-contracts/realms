@@ -5,6 +5,7 @@ logger = get_logger("entity.service")
 
 
 class Service(Entity, TimestampedMixin):
+    __owner_field__ = "user"  # realms#282 — SecureORM ownership stamp/protect
     """Public service entity for citizen services"""
 
     __alias__ = "service_id"

@@ -2,8 +2,11 @@
 
 Bundled canister modules have no ``__file__``, so the authorizer cannot read
 policy text from the filesystem at runtime. String constants survive freezing,
-so this script generates ``core/cedar_policies.py`` holding the schema and the
+so this script generates ``core/cedar_policies.py`` holding the guardrails and
 policies verbatim, and the authorizer imports that instead.
+
+The Cedar schema is generated at runtime from ggg entity definitions (see
+``core/cedar_schema_runtime.py``), not embedded here.
 
 The hazard is the two drifting apart: someone edits ``guardrails.cedar`` and the
 embedded copy silently keeps the old rules. ``--check`` exists to catch that in
@@ -22,7 +25,6 @@ _CEDAR_DIR = os.path.join(_HERE, "..", "src", "realm_backend", "core", "cedar")
 _OUT = os.path.join(_HERE, "..", "src", "realm_backend", "core", "cedar_policies.py")
 
 _SOURCES = [
-    ("SCHEMA", "realm.cedarschema"),
     ("GUARDRAILS", "guardrails.cedar"),
     ("POLICIES", "policies.cedar"),
 ]
@@ -36,6 +38,9 @@ GENERATED FILE — do not edit. Regenerate with
 Bundled canister modules have no ``__file__`` and no readable filesystem copy of
 these files, so the policy text is carried as data rather than read at runtime.
 The ``.cedar`` files remain the source of truth; this module only mirrors them.
+
+The Cedar schema is generated at runtime from ggg entity definitions (see
+``core/cedar_schema_runtime.py``), not embedded here.
 """
 
 '''

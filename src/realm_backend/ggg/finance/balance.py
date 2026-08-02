@@ -14,6 +14,7 @@ logger = get_logger("entity.balance")
 
 
 class Balance(Entity, TimestampedMixin):
+    __owner_field__ = "user"  # realms#282 — SecureORM ownership stamp/protect
     """
     Per-user, per-instrument balance in the realm's accounting layer.
 

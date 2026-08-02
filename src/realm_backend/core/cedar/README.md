@@ -15,11 +15,11 @@ costs ~10.1M instructions for 12 records, which is not a real option.
 
 | File | |
 |---|---|
-| `realm.cedarschema` | Generated from the live entity definitions. Do not hand-edit. |
 | `guardrails.cedar` | The three rules no installed policy can weaken. |
+| `policies.cedar` | The realm's ordinary policy set (host, extension, REPL). |
 
-Regenerate the schema with `scripts/generate_cedar_schema.py --write`; the
-`--check` mode fails when it drifts from the entity definitions.
+The Cedar schema is generated at runtime from ggg entity definitions by
+``core/cedar_schema_runtime.py`` — it is not committed as a hand-written file.
 
 ## Writing policies: guard every attribute access
 

@@ -5,6 +5,7 @@ logger = get_logger("entity.zone")
 
 
 class Zone(Entity, TimestampedMixin):
+    __owner_field__ = "user"  # realms#282 — SecureORM ownership stamp/protect
     """
     Geographic zone of influence, stored as an H3 cell index.
 

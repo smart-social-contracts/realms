@@ -7,6 +7,7 @@ logger = get_logger("entity.proposal")
 
 
 class Proposal(Entity, TimestampedMixin):
+    __owner_field__ = "proposer"  # realms#282 — SecureORM ownership stamp/protect
     """Governance proposal entity for voting system.
 
     v2: ``org_scope`` promoted from the metadata JSON blob to an indexed

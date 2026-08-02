@@ -17,6 +17,7 @@ logger = get_logger("entity.user")
 
 
 class User(Entity, TimestampedMixin):
+    __owner_field__ = "id"  # realms#282 — SecureORM ownership stamp/protect
     __alias__ = "id"
     id = String()
     # Public data (visible to community)
