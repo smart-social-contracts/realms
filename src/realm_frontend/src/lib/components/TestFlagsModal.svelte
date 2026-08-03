@@ -58,6 +58,10 @@
 			This realm runs in test mode. Anyone can view and change these runtime flags while
 			test mode is enabled.
 		</p>
+		<Alert color="red" class="border border-red-300">
+			<span class="font-semibold">WARNING:</span> turning off "Test mode" hides this editor and
+			locks further flag changes to canister admins.
+		</Alert>
 		<div class="space-y-4">
 			{#each FLAGS as flag}
 				<div class="flex items-start justify-between gap-4">

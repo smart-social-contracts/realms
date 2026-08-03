@@ -177,6 +177,10 @@
         This registry runs in test mode. Anyone can view and change these runtime flags while
         test mode is enabled.
       </p>
+      <p class="warning">
+        WARNING: turning off &quot;Test mode&quot; hides this editor and locks further flag
+        changes to canister controllers.
+      </p>
 
       <div class="flags">
         {#each FLAGS as flag}
@@ -346,6 +350,18 @@
     font-size: 0.8125rem;
     line-height: 1.45;
     color: #737373;
+  }
+
+  .warning {
+    margin: 0 0 1rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
   }
 
   .flags {

@@ -195,7 +195,8 @@
   }
 
   async function handleLogin() {
-    const result = await syncAuthSession();
+    const { login } = await import('$lib/auth.js');
+    const result = await login();
     if (result?.principal) {
       isLoggedIn = true;
       userPrincipal = result.principal;
