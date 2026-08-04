@@ -77,7 +77,9 @@ def _authenticated_caller() -> str:
         return ""
 
 
-def call_extension_function(extension_name: str, function_name: str, args: str):
+def call_extension_function(
+    extension_name: str, function_name: str, args: str, *, allow_suspend: bool = False
+):
     logger.debug(f"Calling extension '{extension_name}' function '{function_name}'")
 
     try:
@@ -119,6 +121,10 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
 
         result = func(args)
         if hasattr(result, "__next__"):
+            if allow_suspend:
+                # ``extension_async_call`` will ``yield`` this generator so the
+                # IC runtime can finish inter-canister / HTTP rounds.
+                return result
             # Kybra ``Async`` extension functions are generators: calling one
             # here returns the undriven generator, which json.dumps cannot
             # serialize. A sync caller still deserves an answer when the
@@ -156,7 +162,9 @@ def extension_async_call(
 ) -> Async[Any]:
     logger.debug(f"Async calling extension {extension_name}...")
 
-    result_coroutine = call_extension_function(extension_name, function_name, args)
+    result_coroutine = call_extension_function(
+        extension_name, function_name, args, allow_suspend=True
+    )
     logger.debug(
         f"Got coroutine from extension {extension_name} function {function_name}: {result_coroutine}"
     )
