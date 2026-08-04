@@ -4,21 +4,16 @@ network: staging
 infra:
   file_registry_canister_id: iebdk-kqaaa-aaaau-agoxq-cai
   marketplace_canister_id: jji3o-uyaaa-aaaah-qreja-cai
-  # Canonical Internet Identity derivationOrigin for the federation. Pinned into
-  # each realm's canister_ids.js so every realm + the registry resolve to ONE
-  # principal per human. Must list each realm frontend in its
-  # /.well-known/ii-alternative-origins (served by the registry). See issue #233.
-  ii_derivation_origin: https://staging.realmsgos.org
+  # No ii_derivation_origin: the federation portal is the ONLY II login origin
+  # (FEDERATION_PORTAL.md) — pinning one would require every realm frontend in the
+  # registry's 10-entry-capped /.well-known/ii-alternative-origins (legacy #233).
   # Staging test identity roster (principals + optional PEMs at deploy) for II-bypass picker.
   test_identities_config: config/staging-test-identities.json
 
 mundus:
-  - name: dominion
-    type: realm
-    display_name: Dominion
-    canister_id: ijdaw-dyaaa-aaaac-beh2a-cai
-    frontend_canister_id: iocgc-oaaaa-aaaac-beh2q-cai
-    manifest: examples/demo/realm1/manifest.json
+  # Demo realms (dominion/agora/syntropia) were decommissioned on staging; their
+  # canisters no longer exist. Staging realms are provisioned ad hoc via Casals
+  # stands (e.g. testsyntropia1). Token/NFT infra below remains managed infra.
 
   - name: dominion-token
     type: token
@@ -32,13 +27,6 @@ mundus:
     wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm
     init_arg: '(record { name = "Dominion Land"; symbol = "DLAND"; description = opt "Land ownership NFT for Dominion realm"; supply_cap = opt 10000 : opt nat; test = opt true })'
 
-  - name: agora
-    type: realm
-    display_name: Agora
-    canister_id: ihbn6-yiaaa-aaaac-beh3a-cai
-    frontend_canister_id: iaalk-vqaaa-aaaac-beh3q-cai
-    manifest: examples/demo/realm2/manifest.json
-
   - name: agora-token
     type: token
     display_name: Agora Token
@@ -50,13 +38,6 @@ mundus:
     display_name: Agora Land NFT
     wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm
     init_arg: '(record { name = "Agora Land"; symbol = "ALAND"; description = opt "Land ownership NFT for Agora realm"; supply_cap = opt 10000 : opt nat; test = opt true })'
-
-  - name: syntropia
-    type: realm
-    display_name: Syntropia
-    canister_id: jnope-2yaaa-aaaac-beh4a-cai
-    frontend_canister_id: jkpjq-xaaaa-aaaac-beh4q-cai
-    manifest: examples/demo/realm3/manifest.json
 
   - name: syntropia-token
     type: token

@@ -10,7 +10,8 @@ network: staging
 infra:
   file_registry_canister_id: iebdk-kqaaa-aaaau-agoxq-cai
   marketplace_canister_id: jji3o-uyaaa-aaaah-qreja-cai
-  ii_derivation_origin: https://staging.realmsgos.org
+  # No ii_derivation_origin — federation portal is the only II login origin
+  # (FEDERATION_PORTAL.md); the realm logs in via portal bridge/redirect.
 
 mundus:
   - name: testsyntropia003

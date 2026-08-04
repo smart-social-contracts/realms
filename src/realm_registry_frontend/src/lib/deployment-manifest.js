@@ -16,9 +16,9 @@ export function slugify(name) {
 /** Canonical federation portal URL for a realm slug. */
 export function portalUrlForSlug(slug, network) {
   const hosts = {
-    staging: 'https://staging.realmsgos.org',
-    demo: 'https://demo.realmsgos.org',
-    test: 'https://test.realmsgos.org',
+    staging: 'https://staging.gos.earth',
+    demo: 'https://demo.gos.earth',
+    test: 'https://test.gos.earth',
     ic: 'https://registry.realmsgos.org',
     production: 'https://registry.realmsgos.org',
   };
@@ -82,16 +82,11 @@ function networkInfra(network) {
       test: '2wldc-niaaa-aaaad-qlxga-cai',
     }[net] ||
       '');
-  // Canonical II derivation origin (the registry) so the deployed realm's
-  // frontend logs in against the same origin and yields one principal per human.
-  const ii_derivation_origin =
-    CONFIG.ii_derivation_origin ||
-    ({
-      staging: 'https://staging.realmsgos.org',
-      demo: 'https://demo.realmsgos.org',
-      test: 'https://test.realmsgos.org',
-    }[net] ||
-      '');
+  // Federation portal: the portal origin is the ONLY II login surface, so realms
+  // must NOT pin a derivationOrigin (FEDERATION_PORTAL.md — the ii-alternative-
+  // origins 10-origin cap cannot scale with unbounded wizard realms). Escape
+  // hatch only: explicit CONFIG.ii_derivation_origin (VITE_II_DERIVATION_ORIGIN).
+  const ii_derivation_origin = CONFIG.ii_derivation_origin || '';
   if (!file_registry_canister_id && !marketplace_canister_id && !ii_derivation_origin)
     return null;
   return { file_registry_canister_id, marketplace_canister_id, ii_derivation_origin };
