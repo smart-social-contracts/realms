@@ -129,7 +129,7 @@ export interface RealmExtensionContext {
 	/** The i18n translate function as a reactive store. Usage: $t('key', { values }). */
 	t: Readable<(key: string, vars?: Record<string, unknown>) => string>;
 	/** The current locale code (e.g. "en", "de"). */
-	locale: Readable<string>;
+	locale: Readable<string | null | undefined>;
 
 	/** Notification subsystem. */
 	notifications: {

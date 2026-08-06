@@ -93,3 +93,18 @@ server.destroy();
 ```
 
 See `docs/reference/EXTENSION_SANDBOXING.md` for the full protocol contract.
+
+## Rate limiting
+
+Fire-and-forget operations are silently dropped when they exceed a per-bridge
+sliding-window limit (consistent with denied fire-and-forget semantics):
+
+| Operation | Limit |
+|-----------|-------|
+| `notify` | 10 per 10s |
+| `navigate` | 10 per 10s |
+| `resize` | 30 per 10s |
+
+Request/response operations (`call_extension`, `open_modal`) are not
+rate-limited; they are gated by capability checks and (for `call_extension`)
+the `entry_access.functions` allowlist.

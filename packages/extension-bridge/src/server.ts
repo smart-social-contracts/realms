@@ -44,6 +44,20 @@ function failed(message: string): BridgeErrorPayload {
 	return { code: 'failed', message };
 }
 
+/** Per-key sliding-window rate limiter for fire-and-forget bridge ops. */
+function createRateLimiter(maxEvents: number, windowMs: number) {
+	const timestamps: number[] = [];
+	return (): boolean => {
+		const now = Date.now();
+		while (timestamps.length > 0 && timestamps[0] <= now - windowMs) {
+			timestamps.shift();
+		}
+		if (timestamps.length >= maxEvents) return false;
+		timestamps.push(now);
+		return true;
+	};
+}
+
 export function createBridgeServer(
 	iframe: HTMLIFrameElement,
 	options: BridgeServerOptions,
@@ -53,6 +67,11 @@ export function createBridgeServer(
 	let handshakeDone = false;
 	let destroyed = false;
 
+	const RATE_WINDOW_MS = 10_000;
+	const allowNotify = createRateLimiter(10, RATE_WINDOW_MS);
+	const allowNavigate = createRateLimiter(10, RATE_WINDOW_MS);
+	const allowResize = createRateLimiter(30, RATE_WINDOW_MS);
+
 	function targetWindow(): Window | null {
 		return iframe.contentWindow;
 	}
@@ -61,6 +80,10 @@ export function createBridgeServer(
 		if (destroyed) return;
 		const win = targetWindow();
 		if (!win) return;
+		// Sandboxed extension iframes have opaque origin `'null'`; there is no
+		// concrete targetOrigin to pass. Safe here: iframe HTML is host-served,
+		// the extension only sees data the host already injected, and identity
+		// never enters the sandbox.
 		win.postMessage(msg, '*');
 	}
 
@@ -135,6 +158,7 @@ export function createBridgeServer(
 			case 'navigate': {
 				if (!handshakeDone) return;
 				if (!hasCapability('navigate')) return;
+				if (!allowNavigate()) return;
 				await options.onNavigate?.(msg.path);
 				return;
 			}
@@ -142,6 +166,7 @@ export function createBridgeServer(
 			case 'notify': {
 				if (!handshakeDone) return;
 				if (!hasCapability('notify')) return;
+				if (!allowNotify()) return;
 				options.onNotify?.(msg.level, msg.message);
 				return;
 			}
@@ -171,6 +196,7 @@ export function createBridgeServer(
 
 			case 'resize': {
 				if (!handshakeDone) return;
+				if (!allowResize()) return;
 				options.onResize?.(msg.height);
 				return;
 			}

@@ -89,7 +89,13 @@ export class SandboxBridgeService {
 					),
 				}),
 			onResize: (height) => {
-				if (Number.isFinite(height) && height > 0) {
+				const MIN_HEIGHT = 100;
+				const MAX_HEIGHT = 4000;
+				if (
+					Number.isFinite(height) &&
+					height >= MIN_HEIGHT &&
+					height <= MAX_HEIGHT
+				) {
 					iframe.style.height = `${Math.ceil(height)}px`;
 					iframe.style.width = '100%';
 					iframe.style.border = 'none';

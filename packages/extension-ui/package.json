@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "svelte-package",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "prepublishOnly": "npm run build"
   },
   "svelte": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,8 +17,18 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smart-social-contracts/realms.git",
+    "directory": "packages/extension-ui"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "peerDependencies": {
     "svelte": "^5.0.0"
   },

@@ -11,7 +11,7 @@
 	import { realmInfo } from '$lib/stores/realmInfo';
 	import { notifications, unreadCount, loadNotifications, markAsRead } from '$lib/stores/notifications';
 	import { _, locale } from 'svelte-i18n';
-	import { get, type Readable } from 'svelte/store';
+	import { get } from 'svelte/store';
 	import { CONFIG } from '$lib/config.js';
 	import { cn } from '$lib/theme/utilities';
 	import { mountExtension, mountSandboxedExtension, resolveExtensionVersion, type MountResult, type SandboxMountResult } from '$lib/extension-loader';
@@ -65,7 +65,7 @@
 	function buildSandboxHostState(): HostState {
 		return {
 			principal: get(principal) as string,
-			locale: get(locale as unknown as Readable<string>) || 'en',
+			locale: get(locale) || 'en',
 			theme: readHostTheme(),
 			realmInfo: realmInfoSnapshot(),
 		};
@@ -75,7 +75,7 @@
 		const unsubs = [
 			principal.subscribe(() => onChange(buildSandboxHostState())),
 			realmInfo.subscribe(() => onChange(buildSandboxHostState())),
-			(locale as unknown as Readable<string>).subscribe(() => onChange(buildSandboxHostState())),
+			locale.subscribe(() => onChange(buildSandboxHostState())),
 		];
 
 		if (browser) {
