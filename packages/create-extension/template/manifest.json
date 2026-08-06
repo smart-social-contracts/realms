@@ -1,0 +1,30 @@
+{
+  "name": "__EXTENSION_ID__",
+  "version": "1.0.0",
+  "description": "__EXTENSION_DESCRIPTION__",
+  "author": "",
+  "runtime": "sandboxed",
+  "sdk_version": "1",
+  "capabilities": [
+    "call_extension",
+    "notify"
+  ],
+  "permissions": [],
+  "profiles": [
+    "member",
+    "admin"
+  ],
+  "categories": [
+    "other"
+  ],
+  "icon": "wand",
+  "show_in_sidebar": true,
+  "sidebar_label": {
+    "en": "__EXTENSION_NAME__"
+  },
+  "entry_access": {
+    "functions": {
+      "greet": "member"
+    }
+  }
+}

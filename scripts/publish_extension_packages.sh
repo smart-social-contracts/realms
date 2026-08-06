@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Publish the extension packages (packages/extension-bridge, packages/extension-ui)
+# Publish the extension packages (packages/extension-bridge, packages/extension-ui,
+# packages/create-extension)
 # to npm. Package names/versions are read from each package.json.
 #
 # Usage:
@@ -20,7 +21,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PACKAGES=("extension-bridge" "extension-ui")
+PACKAGES=("extension-bridge" "extension-ui" "create-extension")
 REQUIRED_SCOPE="${REQUIRED_SCOPE:-@realmsgos}"
 TAG="${NPM_TAG:-latest}"
 
@@ -67,6 +68,9 @@ for pkg in "${PACKAGES[@]}"; do
 			npm install --no-audit --no-fund
 			npm run build -w "$name"
 		)
+	elif [[ "$pkg" == "create-extension" ]]; then
+		# Scaffolding CLI — no compile step; files ship as-is from bin/ and template/.
+		:
 	else
 		(
 			cd "$dir"

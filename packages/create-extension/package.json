@@ -1,0 +1,29 @@
+{
+  "name": "@realmsgos/create-extension",
+  "version": "0.1.0",
+  "description": "Scaffold a sandboxed Realms extension project (npm create @realmsgos/extension)",
+  "type": "module",
+  "bin": {
+    "create-realms-extension": "./bin/create-realms-extension.mjs"
+  },
+  "files": [
+    "bin",
+    "template",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node -e \"process.exit(0)\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smart-social-contracts/realms.git",
+    "directory": "packages/create-extension"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
