@@ -67,6 +67,16 @@ Built-in Realms pages place breadcrumbs in the host shell with a fixed gap to th
 | `Card` | Bordered content container with optional `title` or `header` snippet |
 | `Button` | Primary / secondary / danger actions (`tone`, `size`, `onclick`) |
 | `EmptyState` | Centered placeholder with optional `message` and `actions` |
+| `Badge` | Status pill with tone-colored background (`tone`, children snippet for label) |
+| `Alert` | Inline banner with left border accent (`tone`, optional `title`, children for body) |
+| `Spinner` | Loading indicator SVG (`size`, optional `label` for screen readers) |
+| `AccessDenied` | Permission-denied state with lock icon, operation chip, and optional `children` |
+| `FormField` | Label + control wrapper with optional `hint` and `error` text |
+| `Input` | Styled text input with bindable `value`, optional `error` ring |
+| `Select` | Native `<select>` styled to match `Input` (`options`, bindable `value`) |
+| `DataTable` | Props-based table with optional `cell` snippet for custom cell rendering |
+| `CodeBlock` | Monospace `<pre>` block with copy-to-clipboard button |
+| `cn()` | Utility joining truthy class-name strings with spaces |
 
 ## Design tokens
 
