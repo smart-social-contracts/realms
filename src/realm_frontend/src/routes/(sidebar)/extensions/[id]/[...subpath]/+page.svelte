@@ -284,10 +284,11 @@
 						sdk_version: manifest?.sdk_version as string | undefined,
 						capabilities: manifest?.capabilities as string[] | undefined,
 						entry_access: manifest?.entry_access as { functions?: Record<string, string> } | undefined,
-					},
-					callSync: ctx.callSync,
-					navigate: ctx.navigate,
-					getHostState: buildSandboxHostState,
+				},
+				callSync: ctx.callSync,
+				callAsync: ctx.callAsync,
+				navigate: ctx.navigate,
+				getHostState: buildSandboxHostState,
 					subscribeHostState: subscribeSandboxHostState,
 					onHandshakeFailed: (reason) => {
 						cleanupMounted();
