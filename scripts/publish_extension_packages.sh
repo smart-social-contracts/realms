@@ -70,7 +70,19 @@ for pkg in "${PACKAGES[@]}"; do
 		cd "$dir"
 		npm publish --access public --tag "$TAG"
 	)
-	echo "    published: $(npm view "$name@$version" version)"
+	# npm's read CDN lags writes by a few seconds; retry the verification.
+	verified=""
+	for _ in $(seq 1 10); do
+		if verified="$(npm view "$name@$version" version 2>/dev/null)"; then
+			break
+		fi
+		sleep 3
+	done
+	if [[ -z "$verified" ]]; then
+		echo "error: $name@$version not visible on the registry 30s after publish" >&2
+		exit 1
+	fi
+	echo "    published: $verified — https://www.npmjs.com/package/$name/v/$version"
 done
 
 echo "All done."
