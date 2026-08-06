@@ -119,6 +119,7 @@ Re-handshake failure applies the same teardown path.
 | kind | payload | reply kind | capability gate |
 |---|---|---|---|
 | `call_extension` | `{ fn, args }` | `call_result` / `error` | `call_extension` + `entry_access.functions` |
+| `call_extension_async` | `{ fn, args }` | `call_result { taskId }` then `task_result` / `error` | same as `call_extension` |
 | `navigate` | `{ path }` | none (fire-and-forget) | `navigate` + host path validation |
 | `notify` | `{ level: "info"\|"success"\|"error", message }` | none | `notify` |
 | `open_modal` | `{ title, body, actions: [{id, label, tone?}] }` | `modal_result { actionId }` / `error` | `modal` |
@@ -137,12 +138,29 @@ of `decodeURIComponent`. Invalid paths are silently dropped with `console.warn`.
   whenever any field changes. Extensions must treat this as the only source of
   truth and must not cache across sessions.
 - `modal_result` — resolves a pending `open_modal` request.
+- `task_result` — one-shot completion for `call_extension_async`:
+  `{ taskId, status: "completed"|"failed", result?, error? }`.
+
+#### Async extension call flow
+
+```
+ext ──call_extension_async { fn, args }──► host
+ext ◄──call_result { taskId }───────────── host   (immediate ack)
+     … host awaits backend extension_async_call …
+ext ◄──task_result { taskId, status, … }── host   (one-shot push)
+```
+
+The bridge decouples the long-running IC async call from the postMessage
+request/response slot: the host assigns a `taskId`, returns it promptly, then
+pushes the outcome when `extension_async_call` settles (same path as in-process
+`ctx.callAsync`). Default client timeout waiting for `task_result`: **60 s**
+(configurable via `callExtensionAsync` options).
 
 ### 3.5 Canister call checkpoint
 
 `call_extension` maps to the host's existing extension RPC
-(`backend.extension_sync_call` / async equivalent) for **that extension's own
-canister only**. The host:
+(`backend.extension_sync_call` / `extension_async_call` for async) for **that
+extension's own canister only**. The host:
 
 1. verifies the iframe identity (`event.source` match),
 2. verifies `call_extension` capability,
@@ -158,13 +176,14 @@ The bridge enforces sliding-window rate limits (10 s window) and payload bounds:
 
 | operation | limit | notes |
 |---|---|---|
-| `call_extension` | 30 / 10 s | request/response |
+| `call_extension` | 30 / 10 s | request/response; shared window with async |
+| `call_extension_async` | (shared) | shares `call_extension` sliding window + concurrent cap |
 | `open_modal` | 5 / 10 s | request/response |
 | `get_state` | 30 / 10 s | request/response |
 | `navigate` | 10 / 10 s | fire-and-forget |
 | `notify` | 10 / 10 s | fire-and-forget |
 | `resize` | 30 / 10 s | fire-and-forget |
-| in-flight `call_extension` | 10 concurrent | excess → `rate_limited` |
+| in-flight `call_extension` | 10 concurrent | applies to sync + async submit; excess → `rate_limited` |
 | inbound message size | 256 KiB | serialized JSON; oversize dropped |
 
 Request/response ops reply with `{ code: "rate_limited", message }`. Fire-and-forget
@@ -178,9 +197,10 @@ import { createExtensionClient } from "@realmsgos/extension-bridge";
 const ctx = await createExtensionClient();   // performs handshake
 ctx.extensionId: string;
 ctx.capabilities: string[];
-await ctx.callExtension<T>("greet", { name: "Ada" });
-ctx.navigate("/extensions/other");
-ctx.notify("success", "Saved");
+await ctx.callExtension('greet', { name: 'Ada' });
+await ctx.callExtensionAsync('check_invoice_payment', { invoice_id: '…' });
+ctx.navigate('/extensions/other');
+ctx.notify('success', 'Saved');
 const { actionId } = await ctx.openModal({ title, body, actions });
 ctx.onStateChange((s) => { /* principal, locale, theme, realmInfo */ });
 ctx.reportHeight(document.body.scrollHeight); // host resizes iframe

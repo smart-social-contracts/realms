@@ -9,6 +9,7 @@ import {
 	BRIDGE_PROTOCOL_VERSION,
 	type BridgeServer,
 	type HostState,
+	type TaskResultPayload,
 } from '@realmsgos/extension-bridge';
 import { showBridgeToast } from '$lib/stores/bridge-toast';
 import { requestBridgeModal, type BridgeModalAction } from '$lib/stores/bridge-modal';
@@ -46,6 +47,8 @@ export interface SandboxBridgeDeps {
 	extensionId: string;
 	manifest: SandboxManifest;
 	callSync: (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
+	/** Same backend path as in-process `ctx.callAsync` (extension_async_call). */
+	callAsync?: (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 	navigate: (path: string) => Promise<void>;
 	getHostState: () => HostState;
 	subscribeHostState: (onChange: (state: HostState) => void) => () => void;
@@ -53,9 +56,24 @@ export interface SandboxBridgeDeps {
 	onHandshakeComplete?: () => void;
 }
 
+let nextBridgeTaskSeq = 0;
+
+function formatCallExtensionError(e: unknown): Error {
+	if (e instanceof AccessDeniedError) return e;
+	const denied = parseAccessError(e);
+	if (denied) {
+		const err = new Error(denied.operation);
+		(err as Error & { code: string }).code = 'denied';
+		return err;
+	}
+	return e instanceof Error ? e : new Error(String(e));
+}
+
 export class SandboxBridgeService {
 	private server: BridgeServer;
 	private unsubState: () => void;
+	private destroyed = false;
+	private inFlightAsyncTasks = new Set<string>();
 	readonly ready: Promise<void>;
 
 	constructor(iframe: HTMLIFrameElement, deps: SandboxBridgeDeps) {
@@ -67,6 +85,25 @@ export class SandboxBridgeService {
 		});
 
 		const capabilities = deps.manifest.capabilities ?? [];
+		const serverRef: { current?: BridgeServer } = {};
+
+		const runAsyncExtensionCall = (taskId: string, fn: string, args: Record<string, unknown>) => {
+			if (!deps.callAsync) return;
+			this.inFlightAsyncTasks.add(taskId);
+			void (async () => {
+				let payload: TaskResultPayload;
+				try {
+					const result = await deps.callAsync!(fn, args);
+					payload = { status: 'completed', result };
+				} catch (e) {
+					const err = formatCallExtensionError(e);
+					payload = { status: 'failed', error: err.message };
+				}
+				this.inFlightAsyncTasks.delete(taskId);
+				if (this.destroyed) return;
+				serverRef.current?.pushTaskResult(taskId, payload);
+			})();
+		};
 
 		this.server = createBridgeServer(iframe, {
 			extensionId: deps.extensionId,
@@ -86,16 +123,16 @@ export class SandboxBridgeService {
 				try {
 					return await deps.callSync(fn, args);
 				} catch (e) {
-					if (e instanceof AccessDeniedError) throw e;
-					const denied = parseAccessError(e);
-					if (denied) {
-						const err = new Error(denied.operation);
-						(err as Error & { code: string }).code = 'denied';
-						throw err;
-					}
-					throw e;
+					throw formatCallExtensionError(e);
 				}
 			},
+			onCallExtensionAsync: deps.callAsync
+				? async (fn, args) => {
+						const taskId = `${deps.extensionId}-${++nextBridgeTaskSeq}-${Date.now()}`;
+						runAsyncExtensionCall(taskId, fn, args ?? {});
+						return { taskId };
+					}
+				: undefined,
 			onNavigate: (path) => {
 				if (!isValidNavigatePath(path)) {
 					console.warn('[extension-bridge-host] Invalid navigate path dropped:', path);
@@ -131,6 +168,7 @@ export class SandboxBridgeService {
 				}
 			},
 		});
+		serverRef.current = this.server;
 
 		this.unsubState = deps.subscribeHostState((state) => {
 			this.server.pushState(state);
@@ -138,6 +176,8 @@ export class SandboxBridgeService {
 	}
 
 	destroy(): void {
+		this.destroyed = true;
+		this.inFlightAsyncTasks.clear();
 		this.unsubState();
 		this.server.destroy();
 	}
