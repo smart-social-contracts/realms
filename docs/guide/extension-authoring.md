@@ -5,6 +5,7 @@ Audience: external developers building Realms extensions that run in the sandbox
 Related specs:
 
 - [Extension Sandboxing (bridge protocol)](/reference/EXTENSION_SANDBOXING)
+- Start a new extension: `npm create @realmsgos/extension my-extension` (scaffolder package `@realmsgos/create-extension`)
 - Reference implementation: `extensions/extensions/hello_sandboxed/` in the Realms monorepo
 
 ---
@@ -114,7 +115,7 @@ node bin/dev.js hello_sandboxed
 | **5555** | Mock realm host page — bridge server, toast area, confirm modal, bridge log |
 | **5556** | Extension Vite dev server — loaded inside a sandboxed iframe on port 5555 |
 
-Open http://localhost:5555. The mock host enforces manifest `capabilities` and `entry_access.functions`, returns mock results for declared functions (e.g. `greet`), and logs all bridge traffic.
+Open http://localhost:5555. The mock host enforces manifest `capabilities` and `entry_access.functions`, returns mock results for declared functions (e.g. `greet`), and logs all bridge traffic. In a real realm install, those calls instead reach your extension's `backend/entry.py` on the canister.
 
 Alternative entry point (same script):
 
@@ -483,7 +484,7 @@ export default defineConfig({
 
 ### Release channels
 
-`@realmsgos/extension-bridge` and `@realmsgos/extension-ui` are published to npm on two dist-tags:
+`@realmsgos/extension-bridge`, `@realmsgos/extension-ui`, and `@realmsgos/create-extension` are published to npm on two dist-tags:
 
 | Dist-tag | Channel | Source | Install |
 |----------|---------|--------|---------|
