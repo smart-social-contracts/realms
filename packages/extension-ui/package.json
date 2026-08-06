@@ -4,6 +4,7 @@
   "description": "Shared Svelte 5 UI components for sandboxed Realms extensions",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/ensure-packaging-svelte.mjs",
     "build": "svelte-package",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "prepublishOnly": "npm run build"

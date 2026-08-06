@@ -59,11 +59,21 @@ for pkg in "${PACKAGES[@]}"; do
 	fi
 
 	echo "==> building $name@$version"
-	(
-		cd "$dir"
-		npm install --no-audit --no-fund
-		npm run build
-	)
+	if [[ "$pkg" == "extension-ui" ]]; then
+		# Svelte 5 components: build via workspace so svelte2tsx resolves Svelte 5
+		# (isolated install in packages/extension-ui hoists Svelte 4 from other workspaces).
+		(
+			cd "$REPO_ROOT"
+			npm install --no-audit --no-fund
+			npm run build -w "$name"
+		)
+	else
+		(
+			cd "$dir"
+			npm install --no-audit --no-fund
+			npm run build
+		)
+	fi
 
 	echo "==> publishing $name@$version (tag: $TAG)"
 	(
