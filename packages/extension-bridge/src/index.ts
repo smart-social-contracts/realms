@@ -27,3 +27,17 @@ export {
 	type BridgeServer,
 	type BridgeServerOptions,
 } from './server.js';
+
+export {
+	validateExtToHostMessage,
+	validateHello,
+	validateCallExtension,
+	validateNavigate,
+	validateNotify,
+	validateOpenModal,
+	validateResize,
+	validateGetState,
+	validateGoodbye,
+	type ExtMessageValidationFailure,
+	type ExtMessageValidationResult,
+} from './validators.js';

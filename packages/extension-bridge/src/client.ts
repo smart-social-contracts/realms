@@ -115,8 +115,14 @@ export async function createExtensionClient(
 	}
 
 	const messageHandler = (event: MessageEvent) => {
+		// Ignore messages not from the embedding host (bundle reuse outside intended host).
+		if (event.source !== window.parent) return;
 		if (!isBridgeMessage(event.data)) return;
 		const msg = event.data as HostToExtMessage;
+
+		if (!handshakeComplete && msg.kind !== 'hello_ack' && msg.kind !== 'hello_nack') {
+			return;
+		}
 
 		if (msg.kind === 'hello_ack') {
 			extensionId = msg.extensionId;

@@ -4,7 +4,12 @@ export const BRIDGE_PROTOCOL_VERSION = '1';
 /** Discriminant on every bridge message. */
 export const BRIDGE_SOURCE = 'realm-bridge' as const;
 
-export type BridgeErrorCode = 'denied' | 'unsupported' | 'failed';
+export type BridgeErrorCode =
+	| 'denied'
+	| 'unsupported'
+	| 'failed'
+	| 'bad_request'
+	| 'rate_limited';
 
 export interface BridgeErrorPayload {
 	code: BridgeErrorCode;
@@ -87,6 +92,11 @@ export interface GetStateMessage extends BridgeEnvelope {
 	id: number;
 }
 
+export interface GoodbyeMessage extends BridgeEnvelope {
+	kind: 'goodbye';
+	id?: number;
+}
+
 export type ExtToHostMessage =
 	| HelloMessage
 	| CallExtensionMessage
@@ -94,7 +104,8 @@ export type ExtToHostMessage =
 	| NotifyMessage
 	| OpenModalMessage
 	| ResizeMessage
-	| GetStateMessage;
+	| GetStateMessage
+	| GoodbyeMessage;
 
 // ── Host → extension ────────────────────────────────────────────────────
 

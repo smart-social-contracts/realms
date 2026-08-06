@@ -8,6 +8,7 @@ import {
 	isBridgeMessage,
 	bridgeVersionsCompatible,
 } from './protocol.js';
+import { validateExtToHostMessage } from './validators.js';
 
 export interface BridgeServerOptions {
 	extensionId: string;
@@ -36,12 +37,24 @@ export interface BridgeServer {
 	destroy(): void;
 }
 
+/** Max serialized inbound message size (JSON.stringify). */
+const MAX_INBOUND_MESSAGE_BYTES = 256 * 1024;
+const MAX_CONCURRENT_CALL_EXTENSION = 10;
+
 function deny(message: string): BridgeErrorPayload {
 	return { code: 'denied', message };
 }
 
 function failed(message: string): BridgeErrorPayload {
 	return { code: 'failed', message };
+}
+
+function badRequest(message: string): BridgeErrorPayload {
+	return { code: 'bad_request', message };
+}
+
+function rateLimited(message: string): BridgeErrorPayload {
+	return { code: 'rate_limited', message };
 }
 
 /** Per-key sliding-window rate limiter for fire-and-forget bridge ops. */
@@ -66,11 +79,15 @@ export function createBridgeServer(
 		options.requiredSdkVersion ?? BRIDGE_PROTOCOL_VERSION;
 	let handshakeDone = false;
 	let destroyed = false;
+	let inFlightCallExtension = 0;
 
 	const RATE_WINDOW_MS = 10_000;
 	const allowNotify = createRateLimiter(10, RATE_WINDOW_MS);
 	const allowNavigate = createRateLimiter(10, RATE_WINDOW_MS);
 	const allowResize = createRateLimiter(30, RATE_WINDOW_MS);
+	const allowCallExtension = createRateLimiter(30, RATE_WINDOW_MS);
+	const allowOpenModal = createRateLimiter(5, RATE_WINDOW_MS);
+	const allowGetState = createRateLimiter(30, RATE_WINDOW_MS);
 
 	function targetWindow(): Window | null {
 		return iframe.contentWindow;
@@ -97,7 +114,14 @@ export function createBridgeServer(
 
 	function isFunctionAllowed(fn: string): boolean {
 		const allowlist = options.entryAccessFunctions;
-		if (!allowlist) return true;
+		if (!allowlist) {
+			if (hasCapability('call_extension')) {
+				console.warn(
+					'[extension-bridge] call_extension capability granted but entry_access.functions is missing; denying all functions (fail-closed). Declare entry_access.functions in the extension manifest.',
+				);
+			}
+			return false;
+		}
 		return Object.prototype.hasOwnProperty.call(allowlist, fn);
 	}
 
@@ -130,6 +154,14 @@ export function createBridgeServer(
 					replyError(msg.id, deny('Handshake not complete'));
 					return;
 				}
+				if (!allowCallExtension()) {
+					replyError(msg.id, rateLimited('call_extension rate limit exceeded'));
+					return;
+				}
+				if (inFlightCallExtension >= MAX_CONCURRENT_CALL_EXTENSION) {
+					replyError(msg.id, rateLimited('Too many concurrent call_extension requests'));
+					return;
+				}
 				if (!hasCapability('call_extension')) {
 					replyError(msg.id, deny("Capability 'call_extension' not declared"));
 					return;
@@ -145,12 +177,15 @@ export function createBridgeServer(
 					replyError(msg.id, { code: 'unsupported', message: 'call_extension handler not configured' });
 					return;
 				}
+				inFlightCallExtension++;
 				try {
 					const result = await options.onCallExtension(msg.fn, msg.args ?? {});
 					post({ source: BRIDGE_SOURCE, kind: 'call_result', id: msg.id, result });
 				} catch (e) {
 					const message = e instanceof Error ? e.message : String(e);
 					replyError(msg.id, failed(message));
+				} finally {
+					inFlightCallExtension--;
 				}
 				return;
 			}
@@ -174,6 +209,14 @@ export function createBridgeServer(
 			case 'open_modal': {
 				if (!handshakeDone) {
 					replyError(msg.id, deny('Handshake not complete'));
+					return;
+				}
+				if (!allowOpenModal()) {
+					replyError(msg.id, rateLimited('open_modal rate limit exceeded'));
+					return;
+				}
+				if (!hasCapability('modal')) {
+					replyError(msg.id, deny("Capability 'modal' not declared"));
 					return;
 				}
 				if (!options.onOpenModal) {
@@ -206,6 +249,7 @@ export function createBridgeServer(
 					replyError(msg.id, deny('Handshake not complete'));
 					return;
 				}
+				if (!allowGetState()) return;
 				post({
 					source: BRIDGE_SOURCE,
 					kind: 'state',
@@ -213,14 +257,35 @@ export function createBridgeServer(
 				});
 				return;
 			}
+
+			case 'goodbye':
+				return;
 		}
 	}
 
 	const messageHandler = (event: MessageEvent) => {
 		if (destroyed) return;
 		if (event.source !== iframe.contentWindow) return;
+
+		let serialized: string;
+		try {
+			serialized = JSON.stringify(event.data);
+		} catch {
+			return;
+		}
+		if (serialized.length > MAX_INBOUND_MESSAGE_BYTES) return;
+
 		if (!isBridgeMessage(event.data)) return;
-		void handleRequest(event.data as ExtToHostMessage);
+
+		const validated = validateExtToHostMessage(event.data);
+		if (!validated.ok) {
+			if (validated.responseId !== undefined) {
+				replyError(validated.responseId, badRequest(validated.reason));
+			}
+			return;
+		}
+
+		void handleRequest(validated.message);
 	};
 
 	window.addEventListener('message', messageHandler);
