@@ -237,7 +237,8 @@ function createExtensionClient(
 | `callExtension` | `<T>(fn: string, args?: Record<string, unknown>) => Promise<T>` | `call_extension` + `entry_access.functions` | Call the extension's own backend canister via host RPC. JSON-serializable args and results only. |
 | `navigate` | `(path: string) => void` | `navigate` | Request in-app navigation (fire-and-forget). |
 | `notify` | `(level: NotifyLevel, message: string) => void` | `notify` | Show a host toast. `NotifyLevel`: `'info' \| 'success' \| 'error'`. |
-| `openModal` | `(options: OpenModalOptions) => Promise<{ actionId: string }>` | none (host UI) | Declarative confirm dialog rendered by the host. |
+| `openModal` | `(options: OpenModalOptions) => Promise<{ actionId: string }>` | `modal` | Declarative confirm dialog rendered by the host. |
+| `callExtensionAsync` | `<T>(fn: string, args?: Record<string, unknown>, opts?: { timeoutMs?: number }) => Promise<T>` | `call_extension` + `entry_access.functions` | Async backend functions (generators with `yield`). Host acknowledges with a task id and pushes the settled result. Bridge ≥ 0.2.0. |
 | `onStateChange` | `(listener: (state: HostState) => void) => () => void` | none | Subscribe to host state pushes. Returns unsubscribe function. |
 | `reportHeight` | `(height: number) => void` | none | Tell the host to resize the iframe. |
 | `destroy` | `() => void` | — | Remove listeners and cancel pending work. Call on unmount. |
@@ -631,8 +632,8 @@ Checkpoint enforcement does not prevent a sandboxed extension from drawing misle
 | JSON-serializable payloads only (no streaming/binary) | v1 |
 | No extension-to-extension messaging | v1 |
 | No shared workers or storage (opaque origin) | By design |
-| First-party extensions still on in-process path | Migration tracked separately |
-| `open_modal` has no capability gate (host renders declarative UI only) | v1 |
+| First-party extensions still on in-process path | [Migration in progress](/guide/extension-migration) — pilots done |
+| `open_modal` gated behind the `modal` capability (bridge ≥ 0.1.1) | Done |
 
 Spec and protocol details: [Extension Sandboxing](/reference/EXTENSION_SANDBOXING).
 

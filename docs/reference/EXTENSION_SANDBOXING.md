@@ -248,7 +248,8 @@ padding stacking).
 - No streaming/binary payloads (JSON-serializable values only).
 - No extension-to-extension messaging.
 - No shared workers, no storage access (opaque origin has none — by design).
-- First-party migration (tracked separately).
+
+First-party migration is underway (pilots: `hello_world`, `system_info`, `member_dashboard`) — see `docs/guide/extension-migration.md`.
 
 ## 9. Threat model notes
 
