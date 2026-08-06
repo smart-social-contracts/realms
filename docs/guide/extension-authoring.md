@@ -21,7 +21,7 @@ Realms supports two extension frontends:
 
 Third-party extensions must use the sandboxed runtime. The extension never touches the host DOM, the user's identity/session, or canister agents directly. All host interaction crosses a **postMessage bridge** mediated by the host permission checkpoint. See [Extension Sandboxing](/reference/EXTENSION_SANDBOXING) for the full protocol contract and threat model: a malicious extension cannot read host memory, sign canister calls outside declared capabilities, or persist data across sessions, but it can still render deceptive UI inside its iframe — marketplace listing and review remain necessary.
 
-First-party extensions continue to use the legacy in-process path unchanged.
+First-party extensions are being migrated to the sandboxed runtime; see [Migrating a first-party extension to the sandboxed runtime](/guide/extension-migration).
 
 ---
 
