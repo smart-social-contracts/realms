@@ -84,16 +84,18 @@ for pkg in "${PACKAGES[@]}"; do
 		cd "$dir"
 		npm publish --access public --tag "$TAG"
 	)
-	# npm's read CDN lags writes by a few seconds; retry the verification.
+	# npm's read CDN lags writes — for a brand-new package name the 404 can be
+	# negatively cached for a minute or more; retry the verification.
 	verified=""
-	for _ in $(seq 1 10); do
+	for _ in $(seq 1 40); do
 		if verified="$(npm view "$name@$version" version 2>/dev/null)"; then
 			break
 		fi
 		sleep 3
 	done
 	if [[ -z "$verified" ]]; then
-		echo "error: $name@$version not visible on the registry 30s after publish" >&2
+		echo "error: $name@$version not visible on the registry 120s after publish" >&2
+		echo "       (the publish itself succeeded if npm printed '+ $name@$version' — re-run this script to re-verify)" >&2
 		exit 1
 	fi
 	echo "    published: $verified — https://www.npmjs.com/package/$name/v/$version"
