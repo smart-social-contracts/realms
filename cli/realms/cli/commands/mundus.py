@@ -690,9 +690,9 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
         deriv = (infra or {}).get("ii_derivation_origin")
         if deriv is None:
             deriv = {
-                "staging": "https://staging.realmsgos.org",
-                "demo": "https://demo.realmsgos.org",
-                "test": "https://test.realmsgos.org",
+                "staging": "https://staging.gos.earth",
+                "demo": "https://demo.gos.earth",
+                "test": "https://test.gos.earth",
             }.get(network, "")
         portal_url = _resolve_portal_url(realm, network, deriv)
         _store_canister_ids(frontend_id, backend_id, network,

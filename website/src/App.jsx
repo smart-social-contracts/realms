@@ -147,7 +147,7 @@ function App() {
             
             <div className="flex flex-col items-center gap-3">
               <div className="flex flex-col sm:flex-row justify-center gap-3">
-                <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
+                <a href="https://demo.gos.earth" target="_blank" rel="noopener noreferrer"
                    className="inline-flex items-center justify-center px-8 py-4 bg-primary-900 text-white rounded-xl font-semibold text-lg hover:bg-primary-800 transition-colors">
                   {t('hero.tryDemo')}
                 </a>
@@ -417,7 +417,7 @@ function App() {
               <h3 className="text-xl font-semibold text-slate-800 mb-3">{t('getStarted.demo.title')}</h3>
               <p className="text-base text-slate-600 mb-6 flex-grow">{t('getStarted.demo.description')}</p>
               <a 
-                href="https://demo.realmsgos.org" 
+                href="https://demo.gos.earth" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center px-6 py-3 bg-primary-900 text-white rounded-xl font-semibold hover:bg-primary-800 transition-colors"

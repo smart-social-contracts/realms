@@ -19,7 +19,7 @@ if (DERIVATION_ORIGIN) {
   console.log(`Using II derivationOrigin: ${DERIVATION_ORIGIN}`);
 }
 
-// Canonical portal page for this realm (e.g. https://staging.realmsgos.org/r/<slug>).
+// Canonical portal page for this realm (e.g. https://staging.gos.earth/r/<slug>).
 // Injected at deploy time via canister_ids.js. When a visitor lands on the raw
 // icp0.io origin and tries to sign in, we redirect them here: the realm origin
 // is not in the registry's /.well-known/ii-alternative-origins (II caps that

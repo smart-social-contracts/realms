@@ -489,7 +489,7 @@ def _build_canister_ids_js(
     registry). Empty string preserves legacy per-origin principals. See #233.
 
     ``portal_url`` is the realm's canonical federation portal page
-    (e.g. ``https://staging.realmsgos.org/r/<slug>``). When set, the frontend
+    (e.g. ``https://staging.gos.earth/r/<slug>``). When set, the frontend
     redirects direct-visit sign-ins to the portal, where the single II login is
     bridged into the embedded realm (the raw icp0.io origin cannot II-login —
     it is not in the registry's capped ii-alternative-origins list).

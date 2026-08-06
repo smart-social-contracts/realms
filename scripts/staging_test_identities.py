@@ -156,7 +156,7 @@ def patch_staging_realm(
     network: str = "staging",
     identity: str = "deployer",
     file_registry_id: str = "iebdk-kqaaa-aaaau-agoxq-cai",
-    derivation_origin: str = "https://staging.realmsgos.org",
+    derivation_origin: str = "https://staging.gos.earth",
     portal_url: str = "",
 ) -> None:
     js = build_canister_ids_js(

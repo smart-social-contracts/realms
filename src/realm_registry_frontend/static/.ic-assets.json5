@@ -51,7 +51,7 @@
         // Disabled: dfx "standard" certifies a large Permissions-Policy /
         // X-XSS-Protection / X-Frame-Options set that custom-domain gateways
         // intermittently fail to verify (HTTP 503 Response Verification Error
-        // on staging.realmsgos.org). Explicit headers below are certified instead.
+        // on staging.gos.earth). Explicit headers below are certified instead.
         "security_policy": "disabled",
 
         "headers": {

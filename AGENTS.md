@@ -77,7 +77,7 @@ per realm.
 ### Registry / wizard UI (staging)
 
 The **create-realm wizard** and **deployment status page** live in
-`src/realm_registry_frontend/` (`staging.realmsgos.org` / `staging.gos.earth`). They are
+`src/realm_registry_frontend/` (`staging.gos.earth`). They are
 **not** realm apps and **not** upgraded by `mundus deploy` or `ci-main` (which only
 publishes/rolls out `family=realm`).
 
@@ -302,7 +302,7 @@ the realm apps.
 |---|---|---|
 | Realm backends + frontends (Dominion, Agora, Syntropia) | Yes | Yes |
 | Extensions/codices on realms | Yes (manifest + `file_registry`) | Yes (arrangement) |
-| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.realmsgos.org) | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) | Yes (`family=registry`, target `realm-registry`) |
+| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.gos.earth) | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) | Yes (`family=registry`, target `realm-registry`) |
 | Installer, `file_registry`, marketplace, dashboard | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) | Yes (`all-infra` or per-family) |
 
 Notes:
