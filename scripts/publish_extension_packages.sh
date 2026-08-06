@@ -6,16 +6,23 @@
 #   NPM_TOKEN=npm_xxx ./scripts/publish_extension_packages.sh
 #   # or, if already logged in via `npm login`:
 #   ./scripts/publish_extension_packages.sh
+#   # experimental channel (install via `npm i @realmsgos/extension-bridge@next`):
+#   NPM_TAG=next NPM_TOKEN=npm_xxx ./scripts/publish_extension_packages.sh
 #
 # Notes:
 # - NPM_TOKEN is passed to npm through a temporary, isolated npmrc that is
 #   deleted on exit; your ~/.npmrc is never touched.
 # - Scoped packages are published with --access public.
 # - Idempotent: a name@version that already exists on the registry is skipped.
+# - Safety: only packages named ${REQUIRED_SCOPE}/* with a valid non-empty
+#   semver version are ever published; npm is always run from inside the
+#   package directory so a stray cwd can never publish the monorepo root.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGES=("extension-bridge" "extension-ui")
+REQUIRED_SCOPE="${REQUIRED_SCOPE:-@realmsgos}"
+TAG="${NPM_TAG:-latest}"
 
 NPMRC_TMP=""
 if [[ -n "${NPM_TOKEN:-}" ]]; then
@@ -30,12 +37,21 @@ if ! npm whoami >/dev/null 2>&1; then
 	echo "  Export NPM_TOKEN (automation token) or run 'npm login' first." >&2
 	exit 1
 fi
-echo "Publishing to npm as: $(npm whoami)"
+echo "Publishing to npm as: $(npm whoami) (dist-tag: $TAG)"
 
 for pkg in "${PACKAGES[@]}"; do
 	dir="$REPO_ROOT/packages/$pkg"
 	name="$(node -p "require('$dir/package.json').name")"
 	version="$(node -p "require('$dir/package.json').version")"
+
+	if [[ "$name" != "$REQUIRED_SCOPE"/* ]]; then
+		echo "error: refusing to publish '$name' — must be scoped under $REQUIRED_SCOPE/" >&2
+		exit 1
+	fi
+	if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+		echo "error: '$name' has invalid or empty version '$version' in $dir/package.json" >&2
+		exit 1
+	fi
 
 	if npm view "$name@$version" version >/dev/null 2>&1; then
 		echo "skip: $name@$version is already published"
@@ -43,11 +59,17 @@ for pkg in "${PACKAGES[@]}"; do
 	fi
 
 	echo "==> building $name@$version"
-	npm --prefix "$dir" install --no-audit --no-fund
-	npm --prefix "$dir" run build
+	(
+		cd "$dir"
+		npm install --no-audit --no-fund
+		npm run build
+	)
 
-	echo "==> publishing $name@$version"
-	npm --prefix "$dir" publish --access public
+	echo "==> publishing $name@$version (tag: $TAG)"
+	(
+		cd "$dir"
+		npm publish --access public --tag "$TAG"
+	)
 	echo "    published: $(npm view "$name@$version" version)"
 done
 

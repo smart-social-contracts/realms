@@ -4,6 +4,7 @@
     "npm": ">=7.0.0"
   },
   "name": "realms",
+  "private": true,
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "prebuild": "npm run prebuild --workspaces --if-present",
@@ -14,6 +15,7 @@
   "type": "module",
   "workspaces": [
     "packages/extension-bridge",
+    "packages/extension-ui",
     "src/realm_frontend",
     "src/realm_registry_frontend",
     "src/file_registry_frontend",
