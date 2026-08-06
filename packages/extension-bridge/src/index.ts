@@ -10,6 +10,8 @@ export {
 	type BridgeMessage,
 	type ExtToHostMessage,
 	type HostToExtMessage,
+	type TaskResultStatus,
+	type TaskResultPayload,
 	isBridgeMessage,
 	bridgeProtocolMajor,
 	bridgeVersionsCompatible,
@@ -20,6 +22,7 @@ export {
 	type ExtensionClient,
 	type ExtensionClientOptions,
 	type OpenModalOptions,
+	type CallExtensionAsyncOptions,
 } from './client.js';
 
 export {
@@ -32,6 +35,7 @@ export {
 	validateExtToHostMessage,
 	validateHello,
 	validateCallExtension,
+	validateCallExtensionAsync,
 	validateNavigate,
 	validateNotify,
 	validateOpenModal,

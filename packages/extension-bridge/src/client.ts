@@ -15,10 +15,20 @@ export interface OpenModalOptions {
 	actions: ModalAction[];
 }
 
+export interface CallExtensionAsyncOptions {
+	/** Max wait for task_result after taskId is assigned. Default 60_000 ms. */
+	timeoutMs?: number;
+}
+
 export interface ExtensionClient {
 	extensionId: string;
 	capabilities: string[];
 	callExtension<T = unknown>(fn: string, args?: Record<string, unknown>): Promise<T>;
+	callExtensionAsync<T = unknown>(
+		fn: string,
+		args?: Record<string, unknown>,
+		options?: CallExtensionAsyncOptions,
+	): Promise<T>;
 	navigate(path: string): void;
 	notify(level: NotifyLevel, message: string): void;
 	openModal(options: OpenModalOptions): Promise<{ actionId: string }>;
@@ -39,7 +49,14 @@ type PendingRequest = {
 	reject: (error: Error) => void;
 };
 
+type PendingTask = {
+	resolve: (value: unknown) => void;
+	reject: (error: Error) => void;
+	timer: ReturnType<typeof setTimeout>;
+};
+
 const HANDSHAKE_TIMEOUT_MS = 30_000;
+const DEFAULT_CALL_EXTENSION_ASYNC_TIMEOUT_MS = 60_000;
 
 function bridgeError(err: BridgeErrorPayload): Error {
 	const e = new Error(err.message);
@@ -64,6 +81,7 @@ export async function createExtensionClient(
 	let handshakeComplete = false;
 	let destroyed = false;
 	const pending = new Map<number, PendingRequest>();
+	const pendingTasks = new Map<string, PendingTask>();
 	const queuedOutgoing: Record<string, unknown>[] = [];
 	const stateListeners = new Set<(state: HostState) => void>();
 	const cleanupFns: Array<() => void> = [];
@@ -176,6 +194,21 @@ export async function createExtensionClient(
 				pending.delete(msg.id);
 				req.resolve({ actionId: msg.actionId });
 			}
+			return;
+		}
+
+		if (msg.kind === 'task_result') {
+			const req = pendingTasks.get(msg.taskId);
+			if (!req) return;
+			pendingTasks.delete(msg.taskId);
+			clearTimeout(req.timer);
+			if (msg.status === 'completed') {
+				req.resolve(msg.result);
+			} else {
+				const err = new Error(msg.error ?? 'call_extension_async failed');
+				(err as Error & { code: string }).code = 'failed';
+				req.reject(err);
+			}
 		}
 	};
 
@@ -194,6 +227,33 @@ export async function createExtensionClient(
 		},
 		callExtension<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
 			return sendRequest<T>({ kind: 'call_extension', fn, args });
+		},
+		async callExtensionAsync<T>(
+			fn: string,
+			args: Record<string, unknown> = {},
+			options: CallExtensionAsyncOptions = {},
+		): Promise<T> {
+			const timeoutMs = options.timeoutMs ?? DEFAULT_CALL_EXTENSION_ASYNC_TIMEOUT_MS;
+			const ack = await sendRequest<{ taskId: string }>({
+				kind: 'call_extension_async',
+				fn,
+				args,
+			});
+			const taskId = ack?.taskId;
+			if (typeof taskId !== 'string' || !taskId) {
+				throw new Error('call_extension_async: host did not return taskId');
+			}
+			return new Promise<T>((resolve, reject) => {
+				const timer = setTimeout(() => {
+					pendingTasks.delete(taskId);
+					reject(new Error(`call_extension_async timed out after ${timeoutMs}ms`));
+				}, timeoutMs);
+				pendingTasks.set(taskId, {
+					resolve: (v) => resolve(v as T),
+					reject,
+					timer,
+				});
+			});
 		},
 		navigate(path: string): void {
 			sendOrQueue({ kind: 'navigate', id: nextId++, path });
@@ -223,6 +283,11 @@ export async function createExtensionClient(
 			destroyed = true;
 			for (const fn of cleanupFns) fn();
 			pending.clear();
+			for (const [taskId, task] of pendingTasks) {
+				clearTimeout(task.timer);
+				task.reject(new Error('Bridge client destroyed'));
+				pendingTasks.delete(taskId);
+			}
 			stateListeners.clear();
 		},
 	};

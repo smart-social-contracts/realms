@@ -1,5 +1,6 @@
 import {
 	BRIDGE_SOURCE,
+	type CallExtensionAsyncMessage,
 	type CallExtensionMessage,
 	type ExtToHostMessage,
 	type GetStateMessage,
@@ -108,6 +109,37 @@ export function validateCallExtension(data: Record<string, unknown>): ExtMessage
 	const message: CallExtensionMessage = {
 		source: BRIDGE_SOURCE,
 		kind: 'call_extension',
+		id: data.id,
+		fn: data.fn,
+		args: (data.args as Record<string, unknown> | undefined) ?? {},
+	};
+	return { ok: true, message };
+}
+
+export function validateCallExtensionAsync(data: Record<string, unknown>): ExtMessageValidationResult {
+	if (!envelope(data) || data.kind !== 'call_extension_async') {
+		return { ok: false, reason: 'invalid call_extension_async envelope' };
+	}
+	if (!isRequestId(data.id)) {
+		return {
+			ok: false,
+			reason: 'call_extension_async.id must be a positive integer',
+			responseId: typeof data.id === 'number' ? data.id : undefined,
+		};
+	}
+	if (!isString(data.fn)) {
+		return { ok: false, reason: 'call_extension_async.fn must be a string', responseId: data.id };
+	}
+	if (data.args !== undefined && !isPlainObject(data.args)) {
+		return {
+			ok: false,
+			reason: 'call_extension_async.args must be an object when present',
+			responseId: data.id,
+		};
+	}
+	const message: CallExtensionAsyncMessage = {
+		source: BRIDGE_SOURCE,
+		kind: 'call_extension_async',
 		id: data.id,
 		fn: data.fn,
 		args: (data.args as Record<string, unknown> | undefined) ?? {},
@@ -235,6 +267,8 @@ export function validateExtToHostMessage(data: unknown): ExtMessageValidationRes
 			return validateHello(data);
 		case 'call_extension':
 			return validateCallExtension(data);
+		case 'call_extension_async':
+			return validateCallExtensionAsync(data);
 		case 'navigate':
 			return validateNavigate(data);
 		case 'notify':

@@ -27,6 +27,7 @@ ctx.onStateChange((state) => {
 });
 
 await ctx.callExtension('greet', { name: 'Ada' });
+await ctx.callExtensionAsync('check_invoice_payment', { invoice_id: '…' });
 ctx.navigate('/extensions/other');
 ctx.notify('success', 'Saved');
 
@@ -67,8 +68,17 @@ const server = createBridgeServer(iframe, {
     },
   }),
   onCallExtension: async (fn, args) => {
-    /* host RPC */
+    /* host sync RPC (extension_sync_call) */
     return { ok: true };
+  },
+  onCallExtensionAsync: async (fn, args) => {
+    /* submit async RPC; return taskId, then pushTaskResult when done */
+    const taskId = '…';
+    void backendCall(fn, args).then(
+      (result) => server.pushTaskResult(taskId, { status: 'completed', result }),
+      (e) => server.pushTaskResult(taskId, { status: 'failed', error: String(e) }),
+    );
+    return { taskId };
   },
   onNavigate: (path) => {
     /* SvelteKit goto */
@@ -102,6 +112,7 @@ capabilities are denied):
 | Capability | Operations |
 |------------|------------|
 | `call_extension` | `call_extension` |
+| `call_extension` | `call_extension_async` (same capability + allowlist) |
 | `navigate` | `navigate` |
 | `notify` | `notify` |
 | `modal` | `open_modal` |
@@ -142,12 +153,32 @@ Operations exceeding per-bridge sliding-window limits are handled as follows:
 | `notify` | 10 per 10s | silently dropped |
 | `navigate` | 10 per 10s | silently dropped |
 | `resize` | 30 per 10s | silently dropped |
-| `call_extension` | 30 per 10s | `{ code: 'rate_limited' }` |
+| `call_extension` | 30 per 10s | `{ code: 'rate_limited' }`; shared with `call_extension_async` |
+| `call_extension_async` | (shared) | shares `call_extension` window and 10 concurrent cap |
 | `open_modal` | 5 per 10s | `{ code: 'rate_limited' }` |
 | `get_state` | 30 per 10s | silently dropped |
 
-Additionally, at most **10** concurrent in-flight `call_extension` requests are
-allowed per bridge; excess requests receive `{ code: 'rate_limited' }`.
+Additionally, at most **10** concurrent in-flight `call_extension` and
+`call_extension_async` submit requests are allowed per bridge; excess requests
+receive `{ code: 'rate_limited' }`.
+
+## Async extension calls (`callExtensionAsync`)
+
+Long-running backend functions (async generators / inter-canister yields) use a
+two-phase flow over the bridge:
+
+1. Extension sends `call_extension_async { fn, args }`.
+2. Host replies immediately with `call_result { taskId }`.
+3. Host runs the backend async call (e.g. `extension_async_call`) and pushes
+   `task_result { taskId, status, result?, error? }` when it settles.
+
+The extension client registers a one-shot listener for the matching `taskId`.
+Default timeout waiting for `task_result`: **60 s** (override via
+`callExtensionAsync(fn, args, { timeoutMs })`). Sync `callExtension` keeps the
+**30 s** handshake-aligned request timeout via the pending request map.
+
+The server is transport-only: polling/awaiting the backend belongs in the host
+(`onCallExtensionAsync` + `pushTaskResult`).
 
 ## Client source verification
 

@@ -60,6 +60,13 @@ export interface CallExtensionMessage extends BridgeEnvelope {
 	args: Record<string, unknown>;
 }
 
+export interface CallExtensionAsyncMessage extends BridgeEnvelope {
+	kind: 'call_extension_async';
+	id: number;
+	fn: string;
+	args: Record<string, unknown>;
+}
+
 export interface NavigateMessage extends BridgeEnvelope {
 	kind: 'navigate';
 	id: number;
@@ -97,9 +104,18 @@ export interface GoodbyeMessage extends BridgeEnvelope {
 	id?: number;
 }
 
+export type TaskResultStatus = 'completed' | 'failed';
+
+export interface TaskResultPayload {
+	status: TaskResultStatus;
+	result?: unknown;
+	error?: string;
+}
+
 export type ExtToHostMessage =
 	| HelloMessage
 	| CallExtensionMessage
+	| CallExtensionAsyncMessage
 	| NavigateMessage
 	| NotifyMessage
 	| OpenModalMessage
@@ -145,13 +161,23 @@ export interface ModalResultMessage extends BridgeEnvelope {
 	actionId: string;
 }
 
+/** One-shot host push when an async extension call completes. */
+export interface TaskResultMessage extends BridgeEnvelope {
+	kind: 'task_result';
+	taskId: string;
+	status: TaskResultStatus;
+	result?: unknown;
+	error?: string;
+}
+
 export type HostToExtMessage =
 	| HelloAckMessage
 	| HelloNackMessage
 	| CallResultMessage
 	| ErrorMessage
 	| StatePushMessage
-	| ModalResultMessage;
+	| ModalResultMessage
+	| TaskResultMessage;
 
 export type BridgeMessage = ExtToHostMessage | HostToExtMessage;
 

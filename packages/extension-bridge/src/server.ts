@@ -5,6 +5,7 @@ import {
 	type HostState,
 	type ExtToHostMessage,
 	type HostToExtMessage,
+	type TaskResultPayload,
 	isBridgeMessage,
 	bridgeVersionsCompatible,
 } from './protocol.js';
@@ -20,6 +21,8 @@ export interface BridgeServerOptions {
 	entryAccessFunctions?: Record<string, string>;
 	getState: () => HostState;
 	onCallExtension?: (fn: string, args: Record<string, unknown>) => Promise<unknown>;
+	/** Submit an async backend call; must return a task id promptly. Completion is pushed via {@link BridgeServer.pushTaskResult}. */
+	onCallExtensionAsync?: (fn: string, args: Record<string, unknown>) => Promise<{ taskId: string }>;
 	onNavigate?: (path: string) => void | Promise<void>;
 	onNotify?: (level: 'info' | 'success' | 'error', message: string) => void;
 	onOpenModal?: (payload: {
@@ -34,6 +37,8 @@ export interface BridgeServerOptions {
 
 export interface BridgeServer {
 	pushState(state: HostState): void;
+	/** Push completion of an async extension call to the sandbox (one-shot). */
+	pushTaskResult(taskId: string, payload: TaskResultPayload): void;
 	destroy(): void;
 }
 
@@ -125,6 +130,28 @@ export function createBridgeServer(
 		return Object.prototype.hasOwnProperty.call(allowlist, fn);
 	}
 
+	function gateCallExtension(
+		_requestId: number,
+		fn: string,
+	): BridgeErrorPayload | null {
+		if (!handshakeDone) {
+			return deny('Handshake not complete');
+		}
+		if (!allowCallExtension()) {
+			return rateLimited('call_extension rate limit exceeded');
+		}
+		if (inFlightCallExtension >= MAX_CONCURRENT_CALL_EXTENSION) {
+			return rateLimited('Too many concurrent call_extension requests');
+		}
+		if (!hasCapability('call_extension')) {
+			return deny("Capability 'call_extension' not declared");
+		}
+		if (!isFunctionAllowed(fn)) {
+			return deny(`Function '${fn}' not in entry_access.functions allowlist`);
+		}
+		return null;
+	}
+
 	async function handleRequest(msg: ExtToHostMessage): Promise<void> {
 		switch (msg.kind) {
 			case 'hello': {
@@ -150,27 +177,9 @@ export function createBridgeServer(
 			}
 
 			case 'call_extension': {
-				if (!handshakeDone) {
-					replyError(msg.id, deny('Handshake not complete'));
-					return;
-				}
-				if (!allowCallExtension()) {
-					replyError(msg.id, rateLimited('call_extension rate limit exceeded'));
-					return;
-				}
-				if (inFlightCallExtension >= MAX_CONCURRENT_CALL_EXTENSION) {
-					replyError(msg.id, rateLimited('Too many concurrent call_extension requests'));
-					return;
-				}
-				if (!hasCapability('call_extension')) {
-					replyError(msg.id, deny("Capability 'call_extension' not declared"));
-					return;
-				}
-				if (!isFunctionAllowed(msg.fn)) {
-					replyError(
-						msg.id,
-						deny(`Function '${msg.fn}' not in entry_access.functions allowlist`),
-					);
+				const gateErr = gateCallExtension(msg.id, msg.fn);
+				if (gateErr) {
+					replyError(msg.id, gateErr);
 					return;
 				}
 				if (!options.onCallExtension) {
@@ -181,6 +190,32 @@ export function createBridgeServer(
 				try {
 					const result = await options.onCallExtension(msg.fn, msg.args ?? {});
 					post({ source: BRIDGE_SOURCE, kind: 'call_result', id: msg.id, result });
+				} catch (e) {
+					const message = e instanceof Error ? e.message : String(e);
+					replyError(msg.id, failed(message));
+				} finally {
+					inFlightCallExtension--;
+				}
+				return;
+			}
+
+			case 'call_extension_async': {
+				const gateErr = gateCallExtension(msg.id, msg.fn);
+				if (gateErr) {
+					replyError(msg.id, gateErr);
+					return;
+				}
+				if (!options.onCallExtensionAsync) {
+					replyError(msg.id, {
+						code: 'unsupported',
+						message: 'call_extension_async handler not configured',
+					});
+					return;
+				}
+				inFlightCallExtension++;
+				try {
+					const { taskId } = await options.onCallExtensionAsync(msg.fn, msg.args ?? {});
+					post({ source: BRIDGE_SOURCE, kind: 'call_result', id: msg.id, result: { taskId } });
 				} catch (e) {
 					const message = e instanceof Error ? e.message : String(e);
 					replyError(msg.id, failed(message));
@@ -294,6 +329,18 @@ export function createBridgeServer(
 		pushState(state: HostState): void {
 			if (!handshakeDone || destroyed) return;
 			post({ source: BRIDGE_SOURCE, kind: 'state', state });
+		},
+		pushTaskResult(taskId: string, payload: TaskResultPayload): void {
+			if (destroyed || !handshakeDone) return;
+			if (typeof taskId !== 'string' || !taskId) return;
+			post({
+				source: BRIDGE_SOURCE,
+				kind: 'task_result',
+				taskId,
+				status: payload.status,
+				result: payload.result,
+				error: payload.error,
+			});
 		},
 		destroy(): void {
 			destroyed = true;
