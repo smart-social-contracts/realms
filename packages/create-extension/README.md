@@ -10,7 +10,15 @@ npm create @realmsgos/extension my-extension
 
 This downloads `@realmsgos/create-extension` and runs `create-realms-extension`.
 
-### Non-interactive flags
+### Non-interactive usage
+
+When you pass a target directory, `--id` and `--name` are derived from its basename if omitted (e.g. `demo-greeter` → id `demo_greeter`, name `"Demo Greeter"`):
+
+```bash
+npm create @realmsgos/extension demo-greeter
+```
+
+Override defaults explicitly:
 
 ```bash
 npm create @realmsgos/extension my-extension -- \
@@ -21,8 +29,8 @@ npm create @realmsgos/extension my-extension -- \
 
 | Flag | Description |
 |------|-------------|
-| `--id` | Extension identifier (`snake_case`, 3–32 chars, `^[a-z][a-z0-9_]{2,31}$`) |
-| `--name` | Display name (sidebar label, page title) |
+| `--id` | Extension identifier (`snake_case`, 3–32 chars; default: derived from target-dir basename) |
+| `--name` | Display name (sidebar label, page title; default: derived from target-dir basename) |
 | `--description` | Manifest description (defaults to `"<name> — a sandboxed Realms extension"`) |
 
 The target directory must not exist or must be empty.

@@ -1,6 +1,6 @@
 {
   "name": "@realmsgos/create-extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scaffold a sandboxed Realms extension project (npm create @realmsgos/extension)",
   "type": "module",
   "bin": {

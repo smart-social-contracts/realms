@@ -34,12 +34,32 @@ const TEXT_EXTENSIONS = new Set([
 	'.ts',
 ]);
 
+function splitBasename(name) {
+	const withSpaces = name.replace(/([a-z])([A-Z])/g, '$1 $2');
+	return withSpaces.split(/[^a-zA-Z0-9]+/).filter(Boolean);
+}
+
+function basenameToId(name) {
+	return splitBasename(name)
+		.map((part) => part.toLowerCase())
+		.join('_');
+}
+
+function basenameToName(name) {
+	return splitBasename(name)
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+		.join(' ');
+}
+
 function usage() {
 	console.log(`Usage: create-realms-extension [target-dir] [options]
 
+When target-dir is given, --id and --name default from its basename
+(e.g. demo-greeter → id demo_greeter, name "Demo Greeter").
+
 Options:
-  --id <snake_case_id>       Extension identifier (manifest name field)
-  --name "<Display Name>"    Sidebar / page title
+  --id <snake_case_id>       Extension identifier (default: derived from target-dir)
+  --name "<Display Name>"    Sidebar / page title (default: derived from target-dir)
   --description "..."        Short description for manifest.json
   -h, --help                 Show this help
 `);
@@ -164,26 +184,21 @@ async function main() {
 
 	targetDir = resolve(process.cwd(), targetDir);
 
+	const dirBasename = basename(targetDir);
+
 	let id = flags.id;
 	if (!id && interactive) {
-		const suggested = basename(targetDir).replace(/-/g, '_').toLowerCase();
-		id = await ask(rl, 'Extension id (snake_case)', suggested);
+		id = await ask(rl, 'Extension id (snake_case)', basenameToId(dirBasename));
 	} else if (!id) {
-		console.error('Error: --id is required in non-interactive mode.');
-		process.exit(1);
+		id = basenameToId(dirBasename);
 	}
 	validateId(id);
 
 	let name = flags.name;
 	if (!name && interactive) {
-		const suggested = id
-			.split('_')
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
-		name = await ask(rl, 'Display name', suggested);
+		name = await ask(rl, 'Display name', basenameToName(dirBasename));
 	} else if (!name) {
-		console.error('Error: --name is required in non-interactive mode.');
-		process.exit(1);
+		name = basenameToName(dirBasename);
 	}
 
 	let description = flags.description;
