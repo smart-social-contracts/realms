@@ -15,6 +15,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@realms/extension-bridge": "file:../../packages/extension-bridge",
     "@dfinity/agent": "^3.4.3",
     "@dfinity/auth-client": "^3.4.3",
     "@dfinity/candid": "^3.4.3",

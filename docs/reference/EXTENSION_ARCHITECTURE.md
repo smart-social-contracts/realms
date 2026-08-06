@@ -1,5 +1,7 @@
 # Extension Architecture
 
+> **Frontend (outdated for third-party extensions).** The frontend sections below describe the legacy **in-process** model (`frontend-rt/`, dynamic `mount()` bundles). Third-party extensions use the **sandboxed iframe** runtime instead. For the current model, see [Extension Sandboxing](./EXTENSION_SANDBOXING.md) and the [Third-Party Extension Authoring Guide](../guide/extension-authoring.md).
+
 ## System Overview
 
 ```mermaid

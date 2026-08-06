@@ -20,8 +20,19 @@ import type {
   MountResult,
   ExtensionMountFn,
 } from './realm-extension-sdk';
+import { SandboxBridgeService, type SandboxBridgeDeps } from './extension-bridge-host';
 
 export type { MountResult, ExtensionMountFn as MountFn };
+
+export interface SandboxMountResult {
+  unmount: () => void;
+  /** Resolves when the iframe bridge handshake completes. */
+  ready: Promise<void>;
+}
+
+export type SandboxExtensionDeps = Omit<SandboxBridgeDeps, 'extensionId'> & {
+  manifest: SandboxBridgeDeps['manifest'];
+};
 
 export interface ExtensionManifest {
   id?: string;
@@ -103,4 +114,52 @@ export async function mountExtension(
   }
 
   return await mount(target, ctx);
+}
+
+/**
+ * Mount a sandboxed extension inside an iframe and bind the postMessage bridge.
+ *
+ * The iframe loads `/ext/{id}/{version}/frontend/dist/index.html` with
+ * `sandbox="allow-scripts"` (opaque origin). Returns `{ unmount, ready }` where
+ * `ready` resolves after hello_ack or rejects on hello_nack (e.g. sdk_version mismatch).
+ */
+export async function mountSandboxedExtension(
+  extId: string,
+  version: string,
+  container: HTMLElement,
+  deps: SandboxExtensionDeps,
+): Promise<SandboxMountResult> {
+	const ver = version;
+
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('sandbox', 'allow-scripts');
+  iframe.setAttribute('title', `Extension ${extId}`);
+  iframe.src = `/ext/${extId}/${ver}/frontend/dist/index.html`;
+  iframe.style.width = '100%';
+  iframe.style.border = 'none';
+  iframe.style.display = 'block';
+  iframe.style.minHeight = '200px';
+
+  container.innerHTML = '';
+  container.appendChild(iframe);
+
+  const bridge = new SandboxBridgeService(iframe, {
+    extensionId: extId,
+    manifest: deps.manifest,
+    callSync: deps.callSync,
+    navigate: deps.navigate,
+    getHostState: deps.getHostState,
+    subscribeHostState: deps.subscribeHostState,
+    onHandshakeFailed: deps.onHandshakeFailed,
+    onHandshakeComplete: deps.onHandshakeComplete,
+  });
+
+  return {
+    unmount: () => {
+      bridge.destroy();
+      iframe.remove();
+      container.innerHTML = '';
+    },
+    ready: bridge.ready,
+  };
 }

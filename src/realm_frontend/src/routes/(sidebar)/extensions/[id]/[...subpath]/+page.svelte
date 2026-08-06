@@ -11,13 +11,17 @@
 	import { realmInfo } from '$lib/stores/realmInfo';
 	import { notifications, unreadCount, loadNotifications, markAsRead } from '$lib/stores/notifications';
 	import { _, locale } from 'svelte-i18n';
-	import { get } from 'svelte/store';
+	import { get, type Readable } from 'svelte/store';
 	import { CONFIG } from '$lib/config.js';
 	import { cn } from '$lib/theme/utilities';
-	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
+	import { mountExtension, mountSandboxedExtension, resolveExtensionVersion, type MountResult, type SandboxMountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import { createMarketplaceExtensionBackend } from '$lib/marketplace-extension-backend';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
+	import { getExtensionManifest } from '$lib/utils/extension-manifest';
+	import BridgeModalHost from '$lib/components/BridgeModalHost.svelte';
+	import type { HostRealmInfo, HostState } from '@realms/extension-bridge';
+	import BridgeToastHost from '$lib/components/BridgeToastHost.svelte';
 	import {
 		deriveMySharingVetKey,
 		unwrapDek,
@@ -35,10 +39,61 @@
 	import { createHostContext } from '$lib/host-bridge';
 
 	let mountPoint: HTMLDivElement | undefined;
-	let status: 'loading' | 'ready' | 'error' | 'access_denied' = 'loading';
+	let status: 'loading' | 'ready' | 'error' | 'access_denied' | 'sdk_mismatch' = 'loading';
 	let errorMsg = '';
 	let accessDeniedOperation = '';
-	let mounted: MountResult | void;
+	let mounted: MountResult | SandboxMountResult | void;
+	let sandboxed = false;
+
+	function readHostTheme(): 'light' | 'dark' {
+		if (!browser) return 'light';
+		return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+	}
+
+	function realmInfoSnapshot(): HostRealmInfo {
+		const info = get(realmInfo);
+		return {
+			name: info.name,
+			welcomeMessage: info.welcomeMessage,
+			manifesto: info.manifesto,
+			isQuarter: info.isQuarter,
+			parentRealmCanisterId: info.parentRealmCanisterId,
+			logoUrl: info.logoUrl || undefined,
+		};
+	}
+
+	function buildSandboxHostState(): HostState {
+		return {
+			principal: get(principal) as string,
+			locale: get(locale as unknown as Readable<string>) || 'en',
+			theme: readHostTheme(),
+			realmInfo: realmInfoSnapshot(),
+		};
+	}
+
+	function subscribeSandboxHostState(onChange: (state: HostState) => void): () => void {
+		const unsubs = [
+			principal.subscribe(() => onChange(buildSandboxHostState())),
+			realmInfo.subscribe(() => onChange(buildSandboxHostState())),
+			(locale as unknown as Readable<string>).subscribe(() => onChange(buildSandboxHostState())),
+		];
+
+		if (browser) {
+			const onDark = (event: Event) => {
+				const detail = (event as CustomEvent<boolean>).detail;
+				onChange({ ...buildSandboxHostState(), theme: detail ? 'dark' : 'light' });
+			};
+			document.addEventListener('dark', onDark);
+			unsubs.push(() => document.removeEventListener('dark', onDark));
+
+			const observer = new MutationObserver(() => onChange(buildSandboxHostState()));
+			observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+			unsubs.push(() => observer.disconnect());
+		}
+
+		onChange(buildSandboxHostState());
+		return () => unsubs.forEach((u) => u());
+	}
 
 	let infraConfig: { fileRegistryCanisterId?: string; marketplaceCanisterId?: string } = {};
 
@@ -188,6 +243,7 @@
 			}
 		}
 		mounted = undefined;
+		sandboxed = false;
 		if (mountPoint) {
 			mountPoint.innerHTML = '';
 		}
@@ -199,8 +255,9 @@
 		errorMsg = '';
 
 		try {
-			const [version] = await Promise.all([
+			const [version, manifest] = await Promise.all([
 				resolveExtensionVersion(backend as any, id),
+				getExtensionManifest(id),
 				resolveInfraConfig(),
 			]);
 			if (!version) {
@@ -217,9 +274,28 @@
 
 			await loadExtensionTranslation(id, version, get(locale) || 'en');
 
-			const ctx = await buildContext(id, version);
-			mounted = await mountExtension(id, version, mountPoint, ctx);
-			console.debug(`[extension] Mounted ${id}@${version}`);
+			const runtime = manifest?.runtime;
+			if (runtime === 'sandboxed') {
+				sandboxed = true;
+				const ctx = await buildContext(id, version);
+				mounted = await mountSandboxedExtension(id, version, mountPoint, {
+					manifest: {
+						sdk_version: manifest?.sdk_version as string | undefined,
+						capabilities: manifest?.capabilities as string[] | undefined,
+						entry_access: manifest?.entry_access as { functions?: Record<string, string> } | undefined,
+					},
+					callSync: ctx.callSync,
+					navigate: ctx.navigate,
+					getHostState: buildSandboxHostState,
+					subscribeHostState: subscribeSandboxHostState,
+				});
+				await (mounted as SandboxMountResult).ready;
+				console.debug(`[extension] Sandboxed bridge ready ${id}@${version}`);
+			} else {
+				const ctx = await buildContext(id, version);
+				mounted = await mountExtension(id, version, mountPoint, ctx);
+				console.debug(`[extension] Mounted ${id}@${version}`);
+			}
 			status = 'ready';
 		} catch (e: any) {
 			// Extensions that call ctx.backend.extension_sync_call directly surface
@@ -232,6 +308,9 @@
 			if (denied) {
 				status = 'access_denied';
 				accessDeniedOperation = denied.operation;
+			} else if (String(e?.message ?? e).includes('SDK version mismatch')) {
+				status = 'sdk_mismatch';
+				errorMsg = String(e?.message ?? e);
 			} else {
 				console.error('Extension load failed:', e);
 				status = 'error';
@@ -283,6 +362,15 @@
 		</div>
 	{:else if status === 'access_denied'}
 		<AccessDenied operation={accessDeniedOperation} onRetry={() => loadRuntimeExtension(id)} />
+	{:else if status === 'sdk_mismatch'}
+		<Alert color="red" class="mb-4">
+			<div class="font-semibold">Extension SDK version mismatch</div>
+			<div class="text-sm mt-1">{errorMsg}</div>
+			<div class="text-sm mt-2 text-gray-600 dark:text-gray-400">
+				This sandboxed extension requires a bridge protocol version incompatible with the host.
+				Update the extension or contact the publisher.
+			</div>
+		</Alert>
 	{:else if status === 'error'}
 		<Alert color="red" class="mb-4">
 			<div class="font-semibold">Failed to load extension '{id}'</div>
@@ -292,6 +380,11 @@
 
 	<div bind:this={mountPoint} data-extension-id={id} class="extension-mount-point"></div>
 </div>
+
+{#if sandboxed && status === 'ready'}
+	<BridgeModalHost />
+	<BridgeToastHost />
+{/if}
 
 <style>
 	.extension-host-fullbleed {
