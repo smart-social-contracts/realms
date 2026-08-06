@@ -15,6 +15,7 @@
 	import { CONFIG } from '$lib/config.js';
 	import { cn } from '$lib/theme/utilities';
 	import { mountExtension, mountSandboxedExtension, resolveExtensionVersion, type MountResult, type SandboxMountResult } from '$lib/extension-loader';
+	import { isPrivilegedExtension } from '$lib/extension-privileged';
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import { createMarketplaceExtensionBackend } from '$lib/marketplace-extension-backend';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
@@ -288,16 +289,32 @@
 					navigate: ctx.navigate,
 					getHostState: buildSandboxHostState,
 					subscribeHostState: subscribeSandboxHostState,
+					onHandshakeFailed: (reason) => {
+						cleanupMounted();
+						if (String(reason).includes('SDK version mismatch')) {
+							status = 'sdk_mismatch';
+							errorMsg = reason;
+						} else {
+							status = 'error';
+							errorMsg = reason;
+						}
+					},
 				});
 				await (mounted as SandboxMountResult).ready;
 				console.debug(`[extension] Sandboxed bridge ready ${id}@${version}`);
 			} else {
+				if (!isPrivilegedExtension(id)) {
+					status = 'error';
+					errorMsg = `Extension '${id}' is not on the privileged allowlist and must declare runtime:"sandboxed".`;
+					return;
+				}
 				const ctx = await buildContext(id, version);
 				mounted = await mountExtension(id, version, mountPoint, ctx);
 				console.debug(`[extension] Mounted ${id}@${version}`);
 			}
 			status = 'ready';
 		} catch (e: any) {
+			cleanupMounted();
 			// Extensions that call ctx.backend.extension_sync_call directly surface
 			// denials as plain Errors carrying the backend's JSON — route those
 			// through the same friendly access-denied screen.

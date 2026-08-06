@@ -14,6 +14,19 @@ First-party (in-process) extensions are unaffected and keep loading through the
 existing dynamic-import path. The sandboxed path is selected per extension via
 its manifest (`runtime: "sandboxed"`).
 
+**Decoupled axes:** frontend `runtime: "sandboxed"` (iframe + bridge) and backend
+runtime sandbox modes (`"sandbox"` / `"in_process"`) are independent. Backend
+isolation follows the realm's `default_mode` today; the iframe boundary is
+enforced entirely in the host frontend regardless of backend mode.
+
+**Privileged tier (in-process):** extensions whose manifest lacks
+`runtime: "sandboxed"` mount in-process with full host privileges. The host
+consult `isPrivilegedExtension(id)` against `VITE_PRIVILEGED_EXTENSIONS`
+(comma-separated allowlist). When the env var is absent the guard is open
+(status quo); when set, only listed ids may mount in-process. When the
+marketplace lands, install-time enforcement (server-side) plus this list form
+the boundary for third-party installs.
+
 ```
 ┌─ Host (SvelteKit app) ─────────────────────────────┐
 │  SandboxBridgeService                              │
@@ -25,6 +38,7 @@ its manifest (`runtime: "sandboxed"`).
          │
 ┌────────┼───────────────────────────────────────────┐
 │  iframe sandbox (opaque origin)                    │
+│   referrerpolicy="no-referrer"                     │
 │   Extension UI + @realmsgos/extension-bridge client   │
 │   + @realmsgos/extension-ui components                │
 └────────────────────────────────────────────────────┘
@@ -41,9 +55,10 @@ its manifest (`runtime: "sandboxed"`).
   "capabilities": [                  // host enforces at the checkpoint
     "call_extension",                // may call its own backend canister
     "navigate",                      // may request in-app navigation
-    "notify"                         // may show host toast notifications
+    "notify",                        // may show host toast notifications
+    "modal"                          // may open host modal dialogs (typed denial if absent)
   ],
-  "entry_access": {                   // optional fine-grained function allowlist
+  "entry_access": {                   // required when call_extension is granted
     "functions": { "greet": "member" }
   },
   "...": "all existing fields (sidebar_label, icon, categories, ...) unchanged"
@@ -53,10 +68,14 @@ its manifest (`runtime: "sandboxed"`).
 Rules:
 - `runtime: "sandboxed"` selects the iframe loader.
 - `sdk_version` must equal `BRIDGE_PROTOCOL_VERSION` major; mismatch → the host
-  shows an error card instead of mounting.
-- `capabilities` is closed-world: anything not declared is denied.
-- If `entry_access.functions` is present, only listed function names may be
-  invoked through `callExtension`.
+  replies with `hello_nack`, tears down the iframe (no dangling bridge or
+  listeners), and shows an error card instead of leaving a running iframe.
+- `capabilities` is closed-world: anything not declared is denied with a typed
+  `{ code: "denied", message }` error (request/response ops) or silently dropped
+  (fire-and-forget ops).
+- If `call_extension` is declared, `entry_access.functions` **must** be present.
+  When the capability is granted but no allowlist is declared, all function calls
+  are denied (fail-closed).
 
 ## 3. Wire protocol
 
@@ -74,7 +93,7 @@ type BridgeMessage =
 ```
 
 Every request carries a monotonically increasing `id`; responses echo it.
-Errors are typed: `{ code: "denied" | "unsupported" | "failed", message }`.
+Errors are typed: `{ code: "denied" | "unsupported" | "failed" | "rate_limited" | "bad_request", message }`.
 
 ### 3.2 Handshake
 
@@ -85,19 +104,32 @@ host → ext  { source, kind: "hello_ack", sdkVersion: "1", extensionId,
 ```
 
 Until `hello_ack` arrives the extension client queues outgoing requests.
-On major-version mismatch the host replies with `hello_nack { reason }` and
-does not mount.
+On major-version mismatch the host replies with `hello_nack { reason }`, tears
+down the iframe, and does not leave a running sandbox. Handshake timeout (30 s)
+on either side has the same teardown semantics on the host.
+
+**Iframe reload / self-navigation:** the host attaches a `load` listener on the
+sandbox iframe. The first `load` is expected (extension bundle). Any subsequent
+`load` means the document inside navigated — the host destroys the current
+bridge, treats the new `contentWindow` as untrusted, and re-runs the handshake.
+Re-handshake failure applies the same teardown path.
 
 ### 3.3 Requests (extension → host)
 
 | kind | payload | reply kind | capability gate |
 |---|---|---|---|
 | `call_extension` | `{ fn, args }` | `call_result` / `error` | `call_extension` + `entry_access.functions` |
-| `navigate` | `{ path }` | none (fire-and-forget) | `navigate` |
+| `navigate` | `{ path }` | none (fire-and-forget) | `navigate` + host path validation |
 | `notify` | `{ level: "info"\|"success"\|"error", message }` | none | `notify` |
-| `open_modal` | `{ title, body, actions: [{id, label, tone?}] }` | `modal_result { actionId }` | none (host UI, declarative only) |
+| `open_modal` | `{ title, body, actions: [{id, label, tone?}] }` | `modal_result { actionId }` / `error` | `modal` |
 | `resize` | `{ height }` | none | none |
 | `get_state` | — | `state` snapshot | none |
+
+**Navigate path validation (host belt):** in addition to SvelteKit `goto` blocking
+external origins, the host validates `path` before navigation: must start with
+exactly one `/`, must not start with `//`, must not contain `\`, must not contain
+a URL scheme (`/^[a-zA-Z][a-zA-Z0-9+.-]*:/`), and must still pass after one round
+of `decodeURIComponent`. Invalid paths are silently dropped with `console.warn`.
 
 ### 3.4 Pushes (host → extension, unsolicited)
 
@@ -114,11 +146,29 @@ canister only**. The host:
 
 1. verifies the iframe identity (`event.source` match),
 2. verifies `call_extension` capability,
-3. verifies `fn` against `entry_access.functions` if present,
+3. verifies `fn` against `entry_access.functions` (fail-closed if allowlist missing),
 4. performs the call with the host-held identity,
 5. returns the JSON-serializable result or a typed error.
 
 Raw actor/agent access is never exposed. This is the security boundary.
+
+### 3.6 Rate limiting (contract)
+
+The bridge enforces sliding-window rate limits (10 s window) and payload bounds:
+
+| operation | limit | notes |
+|---|---|---|
+| `call_extension` | 30 / 10 s | request/response |
+| `open_modal` | 5 / 10 s | request/response |
+| `get_state` | 30 / 10 s | request/response |
+| `navigate` | 10 / 10 s | fire-and-forget |
+| `notify` | 10 / 10 s | fire-and-forget |
+| `resize` | 30 / 10 s | fire-and-forget |
+| in-flight `call_extension` | 10 concurrent | excess → `rate_limited` |
+| inbound message size | 256 KiB | serialized JSON; oversize dropped |
+
+Request/response ops reply with `{ code: "rate_limited", message }`. Fire-and-forget
+ops are silently dropped when limited.
 
 ## 4. Extension-side client API (`@realmsgos/extension-bridge`)
 
@@ -142,8 +192,14 @@ host state.
 ## 5. Host integration
 
 - `extension-loader.ts` gains `mountSandboxedExtension(id, version, container, deps)`:
-  builds `/ext/{id}/{version}/frontend/dist/index.html` iframe, creates a
-  `SandboxBridgeService` bound to that iframe, returns `{ unmount }`.
+  builds `/ext/{id}/{version}/frontend/dist/index.html` iframe with
+  `referrerpolicy="no-referrer"`, creates a `SandboxBridgeService` bound to that
+  iframe, returns `{ unmount, ready }`. Handshake failure or timeout tears down
+  the iframe before `ready` rejects.
+- `extension-bridge-host.ts` wraps `createBridgeServer`, validates navigate paths,
+  and wires callbacks to real host capabilities.
+- `extension-privileged.ts` exports `isPrivilegedExtension(id)` for the in-process
+  allowlist guard.
 - The extensions route (`(sidebar)/extensions/[id]/[...subpath]/+page.svelte`)
   branches on the installed manifest's `runtime` field; sandboxed extensions get
   the same breadcrumb/page-shell treatment as in-process ones.
@@ -181,3 +237,5 @@ padding stacking).
 - It cannot read host memory/DOM, sign canister calls outside its declared
   capabilities, or persist data. Resize/navigate/notify are the only ambient
   authorities and all are rate-limitable at the host.
+- Iframe self-navigation resets trust: a navigated document must re-handshake
+  before any bridge authority is granted again.

@@ -42,6 +42,8 @@ export interface ExtensionManifest {
   [key: string]: unknown;
 }
 
+const HANDSHAKE_TIMEOUT_MS = 30_000;
+
 async function resolveInstalledVersion(
   backend: { get_extension_frontend_info?: (args: string) => Promise<string> },
   extId: string,
@@ -122,6 +124,7 @@ export async function mountExtension(
  * The iframe loads `/ext/{id}/{version}/frontend/dist/index.html` with
  * `sandbox="allow-scripts"` (opaque origin). Returns `{ unmount, ready }` where
  * `ready` resolves after hello_ack or rejects on hello_nack (e.g. sdk_version mismatch).
+ * On handshake failure the iframe is torn down before `ready` rejects.
  */
 export async function mountSandboxedExtension(
   extId: string,
@@ -129,10 +132,11 @@ export async function mountSandboxedExtension(
   container: HTMLElement,
   deps: SandboxExtensionDeps,
 ): Promise<SandboxMountResult> {
-	const ver = version;
+  const ver = version;
 
   const iframe = document.createElement('iframe');
   iframe.setAttribute('sandbox', 'allow-scripts');
+  iframe.setAttribute('referrerpolicy', 'no-referrer');
   iframe.setAttribute('title', `Extension ${extId}`);
   iframe.src = `/ext/${extId}/${ver}/frontend/dist/index.html`;
   iframe.style.width = '100%';
@@ -143,23 +147,100 @@ export async function mountSandboxedExtension(
   container.innerHTML = '';
   container.appendChild(iframe);
 
-  const bridge = new SandboxBridgeService(iframe, {
-    extensionId: extId,
-    manifest: deps.manifest,
-    callSync: deps.callSync,
-    navigate: deps.navigate,
-    getHostState: deps.getHostState,
-    subscribeHostState: deps.subscribeHostState,
-    onHandshakeFailed: deps.onHandshakeFailed,
-    onHandshakeComplete: deps.onHandshakeComplete,
+  let bridge: SandboxBridgeService | null = null;
+  let tornDown = false;
+  let initialHandshakeDone = false;
+  let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
+  let iframeLoadCount = 0;
+
+  let resolveReady!: () => void;
+  let rejectReady!: (err: Error) => void;
+  const ready = new Promise<void>((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
   });
+
+  function clearHandshakeTimer(): void {
+    if (handshakeTimer !== undefined) {
+      clearTimeout(handshakeTimer);
+      handshakeTimer = undefined;
+    }
+  }
+
+  function teardown(reason?: string): void {
+    if (tornDown) return;
+    tornDown = true;
+    clearHandshakeTimer();
+    iframe.removeEventListener('load', onIframeLoad);
+    bridge?.destroy();
+    bridge = null;
+    iframe.remove();
+    container.innerHTML = '';
+    if (reason) {
+      console.warn('[extension-loader] sandbox teardown:', reason);
+    }
+  }
+
+  function handleHandshakeFailure(reason: string, isRehandshake: boolean): void {
+    clearHandshakeTimer();
+    teardown(reason);
+    deps.onHandshakeFailed?.(reason);
+    if (!isRehandshake) {
+      rejectReady(new Error(reason));
+    }
+  }
+
+  function startHandshakeTimer(isRehandshake: boolean): void {
+    clearHandshakeTimer();
+    handshakeTimer = setTimeout(() => {
+      handleHandshakeFailure('Handshake timeout', isRehandshake);
+    }, HANDSHAKE_TIMEOUT_MS);
+  }
+
+  function bindBridge(isRehandshake: boolean): SandboxBridgeService {
+    startHandshakeTimer(isRehandshake);
+    return new SandboxBridgeService(iframe, {
+      extensionId: extId,
+      manifest: deps.manifest,
+      callSync: deps.callSync,
+      navigate: deps.navigate,
+      getHostState: deps.getHostState,
+      subscribeHostState: deps.subscribeHostState,
+      onHandshakeComplete: () => {
+        clearHandshakeTimer();
+        if (!initialHandshakeDone) {
+          initialHandshakeDone = true;
+          deps.onHandshakeComplete?.();
+          resolveReady();
+        } else {
+          deps.onHandshakeComplete?.();
+        }
+      },
+      onHandshakeFailed: (reason) => {
+        handleHandshakeFailure(reason, isRehandshake);
+      },
+    });
+  }
+
+  function onIframeLoad(): void {
+    iframeLoadCount += 1;
+    // First load is the expected extension bundle; bridge is already bound.
+    if (iframeLoadCount === 1) return;
+
+    // Subsequent load = document navigated — treat as new untrusted context.
+    bridge?.destroy();
+    bridge = null;
+    if (tornDown) return;
+    bridge = bindBridge(true);
+  }
+
+  iframe.addEventListener('load', onIframeLoad);
+  bridge = bindBridge(false);
 
   return {
     unmount: () => {
-      bridge.destroy();
-      iframe.remove();
-      container.innerHTML = '';
+      teardown();
     },
-    ready: bridge.ready,
+    ready,
   };
 }

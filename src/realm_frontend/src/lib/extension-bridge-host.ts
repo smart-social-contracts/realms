@@ -14,6 +14,28 @@ import { showBridgeToast } from '$lib/stores/bridge-toast';
 import { requestBridgeModal, type BridgeModalAction } from '$lib/stores/bridge-modal';
 import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
 
+const NAVIGATE_SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
+
+function checkNavigatePathSegment(path: string): boolean {
+	if (!path.startsWith('/')) return false;
+	if (path.startsWith('//')) return false;
+	if (path.includes('\\')) return false;
+	if (NAVIGATE_SCHEME_RE.test(path)) return false;
+	return true;
+}
+
+/** Host-side belt for in-app navigate requests from sandboxed extensions. */
+export function isValidNavigatePath(path: string): boolean {
+	if (!checkNavigatePathSegment(path)) return false;
+	try {
+		const decoded = decodeURIComponent(path);
+		if (decoded !== path && !checkNavigatePathSegment(decoded)) return false;
+	} catch {
+		return false;
+	}
+	return true;
+}
+
 export interface SandboxManifest {
 	sdk_version?: string;
 	capabilities?: string[];
@@ -74,7 +96,13 @@ export class SandboxBridgeService {
 					throw e;
 				}
 			},
-			onNavigate: (path) => deps.navigate(path),
+			onNavigate: (path) => {
+				if (!isValidNavigatePath(path)) {
+					console.warn('[extension-bridge-host] Invalid navigate path dropped:', path);
+					return;
+				}
+				return deps.navigate(path);
+			},
 			onNotify: (level, message) => showBridgeToast(level, message),
 			onOpenModal: (payload) =>
 				requestBridgeModal({
