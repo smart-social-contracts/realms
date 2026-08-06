@@ -1,5 +1,5 @@
 {
-  "name": "@realms/extension-bridge",
+  "name": "@realmsgos/extension-bridge",
   "version": "0.1.0",
   "description": "Isomorphic postMessage bridge for sandboxed Realm extensions",
   "type": "module",

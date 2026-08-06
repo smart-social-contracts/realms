@@ -20,7 +20,7 @@
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
 	import { getExtensionManifest } from '$lib/utils/extension-manifest';
 	import BridgeModalHost from '$lib/components/BridgeModalHost.svelte';
-	import type { HostRealmInfo, HostState } from '@realms/extension-bridge';
+	import type { HostRealmInfo, HostState } from '@realmsgos/extension-bridge';
 	import BridgeToastHost from '$lib/components/BridgeToastHost.svelte';
 	import {
 		deriveMySharingVetKey,

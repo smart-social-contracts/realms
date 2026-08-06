@@ -25,8 +25,8 @@ its manifest (`runtime: "sandboxed"`).
          │
 ┌────────┼───────────────────────────────────────────┐
 │  iframe sandbox (opaque origin)                    │
-│   Extension UI + @realms/extension-bridge client   │
-│   + @realms/extension-ui components                │
+│   Extension UI + @realmsgos/extension-bridge client   │
+│   + @realmsgos/extension-ui components                │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -120,10 +120,10 @@ canister only**. The host:
 
 Raw actor/agent access is never exposed. This is the security boundary.
 
-## 4. Extension-side client API (`@realms/extension-bridge`)
+## 4. Extension-side client API (`@realmsgos/extension-bridge`)
 
 ```ts
-import { createExtensionClient } from "@realms/extension-bridge";
+import { createExtensionClient } from "@realmsgos/extension-bridge";
 
 const ctx = await createExtensionClient();   // performs handshake
 ctx.extensionId: string;
@@ -149,7 +149,7 @@ host state.
   the same breadcrumb/page-shell treatment as in-process ones.
 - Loading, error, and access-denied states mirror the in-process path.
 
-## 6. Component package (`@realms/extension-ui`)
+## 6. Component package (`@realmsgos/extension-ui`)
 
 Svelte 5 library bundled by each extension (components cannot cross the iframe).
 Styled with Tailwind against host design tokens (CSS custom properties), so

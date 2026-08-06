@@ -1,5 +1,5 @@
 {
-  "name": "@realms/extension-ui",
+  "name": "@realmsgos/extension-ui",
   "version": "0.1.0",
   "description": "Shared Svelte 5 UI components for sandboxed Realms extensions",
   "type": "module",

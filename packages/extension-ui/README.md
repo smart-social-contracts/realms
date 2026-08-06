@@ -1,13 +1,13 @@
-# @realms/extension-ui
+# @realmsgos/extension-ui
 
 Shared Svelte 5 UI components for **sandboxed Realms extensions**. Host-provided Svelte components cannot cross an iframe boundary, so each extension bundles this package into its own frontend build.
 
-The host never injects these components or styles. Extensions compile Tailwind locally and inherit host theming through CSS custom properties pushed via the bridge (`theme` in `@realms/extension-bridge` state).
+The host never injects these components or styles. Extensions compile Tailwind locally and inherit host theming through CSS custom properties pushed via the bridge (`theme` in `@realmsgos/extension-bridge` state).
 
 ## Install
 
 ```bash
-npm install @realms/extension-ui
+npm install @realmsgos/extension-ui
 ```
 
 In a monorepo checkout, depend on the workspace package path or link it while developing.
@@ -16,7 +16,7 @@ In a monorepo checkout, depend on the workspace package path or link it while de
 
 ```svelte
 <script lang="ts">
-  import { PageHeader, Card, Button, EmptyState } from '@realms/extension-ui';
+  import { PageHeader, Card, Button, EmptyState } from '@realmsgos/extension-ui';
 </script>
 
 <PageHeader title="Members" subtitle="Manage realm membership.">
@@ -48,7 +48,7 @@ export default {
   darkMode: 'selector',
   content: [
     './src/**/*.{html,js,svelte,ts}',
-    './node_modules/@realms/extension-ui/dist/**/*.{html,js,svelte,ts}'
+    './node_modules/@realmsgos/extension-ui/dist/**/*.{html,js,svelte,ts}'
   ]
 };
 ```
@@ -106,4 +106,4 @@ npm run check   # svelte-check
 
 ## Bundling note
 
-Extensions must list `@realms/extension-ui` as a dependency and bundle it into `dist/index.html`. The Realms host does not provide or inject this package at runtime.
+Extensions must list `@realmsgos/extension-ui` as a dependency and bundle it into `dist/index.html`. The Realms host does not provide or inject this package at runtime.

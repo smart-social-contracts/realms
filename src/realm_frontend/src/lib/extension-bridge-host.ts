@@ -9,7 +9,7 @@ import {
 	BRIDGE_PROTOCOL_VERSION,
 	type BridgeServer,
 	type HostState,
-} from '@realms/extension-bridge';
+} from '@realmsgos/extension-bridge';
 import { showBridgeToast } from '$lib/stores/bridge-toast';
 import { requestBridgeModal, type BridgeModalAction } from '$lib/stores/bridge-modal';
 import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';

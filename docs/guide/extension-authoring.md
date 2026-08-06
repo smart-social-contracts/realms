@@ -59,8 +59,8 @@ In a monorepo checkout, `package.json` depends on the packages via `file:` paths
 ```json
 {
   "dependencies": {
-    "@realms/extension-bridge": "file:../../../../packages/extension-bridge",
-    "@realms/extension-ui": "file:../../../../packages/extension-ui"
+    "@realmsgos/extension-bridge": "file:../../../../packages/extension-bridge",
+    "@realmsgos/extension-ui": "file:../../../../packages/extension-ui"
   }
 }
 ```
@@ -119,7 +119,7 @@ The host iframe loader (`mountSandboxedExtension`) sets `iframe.src` to the `ind
 | Field | Required | Description |
 |-------|----------|-------------|
 | `runtime` | Yes (sandboxed) | Must be `"sandboxed"` to select the iframe loader. Absent or `"in_process"` uses the legacy in-process path. |
-| `sdk_version` | Yes (sandboxed) | Bridge protocol major version the extension was built for (currently `"1"`). Must match `BRIDGE_PROTOCOL_VERSION` from `@realms/extension-bridge`. Mismatch → host sends `hello_nack` and shows an error card instead of mounting. |
+| `sdk_version` | Yes (sandboxed) | Bridge protocol major version the extension was built for (currently `"1"`). Must match `BRIDGE_PROTOCOL_VERSION` from `@realmsgos/extension-bridge`. Mismatch → host sends `hello_nack` and shows an error card instead of mounting. |
 | `capabilities` | Yes (sandboxed) | Bridge capability allowlist. **Closed-world rule:** anything not listed is denied at the host checkpoint. Valid v1 values: `call_extension`, `navigate`, `notify`. |
 | `entry_access` | Recommended | Fine-grained backend function allowlist. When `entry_access.functions` is present, only listed function names may be invoked through `callExtension`. Values are role/permission strings (e.g. `"member"`, `"proposal.create"`). |
 
@@ -172,13 +172,13 @@ These fields apply to all extensions (in-process and sandboxed):
 Install:
 
 ```bash
-npm install @realms/extension-bridge
+npm install @realmsgos/extension-bridge
 ```
 
 Import and create the client at app startup:
 
 ```ts
-import { createExtensionClient, BRIDGE_PROTOCOL_VERSION } from '@realms/extension-bridge';
+import { createExtensionClient, BRIDGE_PROTOCOL_VERSION } from '@realmsgos/extension-bridge';
 
 const ctx = await createExtensionClient();
 ```
@@ -255,7 +255,7 @@ interface HostRealmInfo {
 **Initialize, theme sync, and backend call:**
 
 ```ts
-import { createExtensionClient, type HostState } from '@realms/extension-bridge';
+import { createExtensionClient, type HostState } from '@realmsgos/extension-bridge';
 
 const ctx = await createExtensionClient();
 
@@ -323,7 +323,7 @@ try {
 Protocol constant:
 
 ```ts
-import { BRIDGE_PROTOCOL_VERSION } from '@realms/extension-bridge';
+import { BRIDGE_PROTOCOL_VERSION } from '@realmsgos/extension-bridge';
 // '1' — must match manifest sdk_version major
 ```
 
@@ -331,21 +331,21 @@ See [Extension Sandboxing](/reference/EXTENSION_SANDBOXING) for wire-level messa
 
 ---
 
-## 5. UI components (`@realms/extension-ui`)
+## 5. UI components (`@realmsgos/extension-ui`)
 
 Sandboxed extensions bundle their own copy of shared Svelte 5 components. The host does not inject components or styles across the iframe boundary.
 
 Install:
 
 ```bash
-npm install @realms/extension-ui
+npm install @realmsgos/extension-ui
 ```
 
 v1 exports: `PageHeader`, `Card`, `Button`, `EmptyState`.
 
 ```svelte
 <script lang="ts">
-  import { PageHeader, Card, Button, EmptyState } from '@realms/extension-ui';
+  import { PageHeader, Card, Button, EmptyState } from '@realmsgos/extension-ui';
 </script>
 
 <PageHeader title="Members" subtitle="Manage realm membership.">
@@ -375,7 +375,7 @@ Horizontal padding on the content wrapper (e.g. `px-4`) is fine; see `hello_sand
 
 ### Tailwind content scan (required)
 
-`@realms/extension-ui` ships Tailwind utility class names only. Your build must scan the package so those classes are emitted.
+`@realmsgos/extension-ui` ships Tailwind utility class names only. Your build must scan the package so those classes are emitted.
 
 **Tailwind v4** (as used in `hello_sandboxed`):
 
@@ -384,7 +384,7 @@ Horizontal padding on the content wrapper (e.g. `px-4`) is fine; see `hello_sand
 @import "tailwindcss";
 
 @source "./**/*.{html,js,svelte,ts}";
-@source "../node_modules/@realms/extension-ui/dist/**/*.{html,js,svelte,ts}";
+@source "../node_modules/@realmsgos/extension-ui/dist/**/*.{html,js,svelte,ts}";
 ```
 
 **Tailwind v3** (`tailwind.config.js`):
@@ -394,7 +394,7 @@ export default {
   darkMode: 'selector',
   content: [
     './src/**/*.{html,js,svelte,ts}',
-    './node_modules/@realms/extension-ui/dist/**/*.{html,js,svelte,ts}',
+    './node_modules/@realmsgos/extension-ui/dist/**/*.{html,js,svelte,ts}',
   ],
 };
 ```
@@ -568,7 +568,7 @@ Checkpoint enforcement does not prevent a sandboxed extension from drawing misle
 
 **Symptom:** Unstyled `PageHeader` / `Button` / `Card`.
 
-**Fix:** Add `@realms/extension-ui/dist/**` to Tailwind content/`@source` scan paths (see section 5).
+**Fix:** Add `@realmsgos/extension-ui/dist/**` to Tailwind content/`@source` scan paths (see section 5).
 
 ### iframe height too small or clipped
 
@@ -588,7 +588,7 @@ Checkpoint enforcement does not prevent a sandboxed extension from drawing misle
 
 | Limitation | Status |
 |------------|--------|
-| `@realms/extension-bridge` and `@realms/extension-ui` consumed via `file:` paths inside the monorepo | Today; npm publishing planned |
+| `@realmsgos/extension-bridge` and `@realmsgos/extension-ui` consumed via `file:` paths inside the monorepo | Today; npm publishing planned |
 | JSON-serializable payloads only (no streaming/binary) | v1 |
 | No extension-to-extension messaging | v1 |
 | No shared workers or storage (opaque origin) | By design |

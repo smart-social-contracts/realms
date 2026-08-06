@@ -1,4 +1,4 @@
-# @realms/extension-bridge
+# @realmsgos/extension-bridge
 
 Isomorphic TypeScript bridge for sandboxed Realm extensions. Both the SvelteKit
 host and the extension iframe bundle import this package to exchange messages
@@ -7,7 +7,7 @@ over `postMessage`.
 ## Install
 
 ```bash
-npm install @realms/extension-bridge
+npm install @realmsgos/extension-bridge
 ```
 
 In the Realms monorepo the host frontend depends on the local package via
@@ -16,7 +16,7 @@ In the Realms monorepo the host frontend depends on the local package via
 ## Extension side (inside the sandbox iframe)
 
 ```ts
-import { createExtensionClient } from '@realms/extension-bridge';
+import { createExtensionClient } from '@realmsgos/extension-bridge';
 
 const ctx = await createExtensionClient();
 
@@ -45,7 +45,7 @@ ctx.reportHeight(document.body.scrollHeight);
 ## Host side
 
 ```ts
-import { createBridgeServer, type HostState } from '@realms/extension-bridge';
+import { createBridgeServer, type HostState } from '@realmsgos/extension-bridge';
 
 const iframe = document.querySelector('iframe')!;
 

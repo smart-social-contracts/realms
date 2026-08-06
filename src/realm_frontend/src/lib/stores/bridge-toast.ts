@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { NotifyLevel } from '@realms/extension-bridge';
+import type { NotifyLevel } from '@realmsgos/extension-bridge';
 
 export interface BridgeToast {
 	id: number;
