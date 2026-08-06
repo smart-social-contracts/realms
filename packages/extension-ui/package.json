@@ -30,6 +30,9 @@
   "engines": {
     "node": ">=18"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "svelte": "^5.0.0"
   },

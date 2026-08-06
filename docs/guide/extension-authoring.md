@@ -26,9 +26,34 @@ First-party extensions continue to use the legacy in-process path unchanged.
 
 ## 2. Quick start
 
-### Scaffold from the reference extension
+### Scaffold a new extension
 
-Copy `hello_sandboxed` as a starting point:
+```bash
+npm create @realmsgos/extension my-ext
+```
+
+This downloads `@realmsgos/create-extension` (published on npm at **0.1.0**, alongside `@realmsgos/extension-bridge` and `@realmsgos/extension-ui` at the same version) and generates a sandboxed project with `manifest.json`, `frontend/`, and `backend/entry.py`.
+
+Non-interactive flags:
+
+```bash
+npm create @realmsgos/extension my-ext -- \
+  --id my_extension \
+  --name "My Extension" \
+  --description "Does something useful"
+```
+
+```bash
+cd my-ext/frontend
+npm install
+npm run build   # emits dist/index.html with relative ./assets/ paths
+```
+
+The scaffold template declares a minimal capability set (`call_extension` + `notify`); the monorepo reference extension `hello_sandboxed` adds `navigate` and demonstrates host modal UI via `openModal`.
+
+### Alternative: copy the reference extension
+
+In a monorepo checkout, copy `hello_sandboxed` instead:
 
 ```bash
 cp -r extensions/extensions/hello_sandboxed extensions/extensions/my_extension
@@ -39,7 +64,9 @@ Edit `../manifest.json` (`name`, `version`, labels, capabilities, `entry_access`
 
 ### Install dependencies
 
-Build the bridge and UI packages first (monorepo checkout):
+**Scaffolded projects (npm):** dependencies on `@realmsgos/extension-bridge` and `@realmsgos/extension-ui` are resolved from npm when you run `npm install` in `frontend/`.
+
+**Monorepo checkout:** build the bridge and UI packages locally first:
 
 ```bash
 cd packages/extension-bridge && npm install && npm run build
@@ -599,7 +626,7 @@ Checkpoint enforcement does not prevent a sandboxed extension from drawing misle
 
 | Limitation | Status |
 |------------|--------|
-| `@realmsgos/extension-bridge` and `@realmsgos/extension-ui` consumed via `file:` paths inside the monorepo | Today; npm publishing planned |
+| `@realmsgos/extension-bridge`, `@realmsgos/extension-ui`, and `@realmsgos/create-extension` on npm | Published at **0.1.0** (0.x semver); monorepo checkouts still use `file:` paths |
 | JSON-serializable payloads only (no streaming/binary) | v1 |
 | No extension-to-extension messaging | v1 |
 | No shared workers or storage (opaque origin) | By design |
