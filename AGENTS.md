@@ -681,12 +681,12 @@ for fast test iteration) and per-realm steps.
 | Canister | Test | Demo | Staging |
 |---|---|---|---|
 | file_registry | `uq2mu-kaaaa-aaaah-avqcq-cai` | `vi64l-3aaaa-aaaae-qj4va-cai` | `iebdk-kqaaa-aaaau-agoxq-cai` |
-| Agora backend | `rnghe-haaaa-aaaak-qyxyq-cai` | `3bohd-2yaaa-aaaac-qcyla-cai` | `ihbn6-yiaaa-aaaac-beh3a-cai` |
-| Agora frontend | `pqwsi-vyaaa-aaaau-agrbq-cai` | `3gpbx-xaaaa-aaaac-qcylq-cai` | `iaalk-vqaaa-aaaac-beh3q-cai` |
-| Dominion backend | `ku6cv-2iaaa-aaaab-agrpa-cai` | `h5vpp-qyaaa-aaaac-qai3a-cai` | `ijdaw-dyaaa-aaaac-beh2a-cai` |
-| Dominion frontend | `2enu3-byaaa-aaaad-qlxfa-cai` | `gzya5-jyaaa-aaaac-qai5a-cai` | `iocgc-oaaaa-aaaac-beh2q-cai` |
-| Syntropia backend | `m2wv3-uaaaa-aaaah-quoiq-cai` | `2lbfz-yiaaa-aaaac-qcyma-cai` | `jnope-2yaaa-aaaac-beh4a-cai` |
-| Syntropia frontend | `2dmsp-maaaa-aaaad-qlxfq-cai` | `2madn-vqaaa-aaaac-qcymq-cai` | `jkpjq-xaaaa-aaaac-beh4q-cai` |
+| Agora backend | `rnghe-haaaa-aaaak-qyxyq-cai` | `3bohd-2yaaa-aaaac-qcyla-cai` | `—` |
+| Agora frontend | `pqwsi-vyaaa-aaaau-agrbq-cai` | `3gpbx-xaaaa-aaaac-qcylq-cai` | `—` |
+| Dominion backend | `ku6cv-2iaaa-aaaab-agrpa-cai` | `h5vpp-qyaaa-aaaac-qai3a-cai` | `—` |
+| Dominion frontend | `2enu3-byaaa-aaaad-qlxfa-cai` | `gzya5-jyaaa-aaaac-qai5a-cai` | `—` |
+| Syntropia backend | `m2wv3-uaaaa-aaaah-quoiq-cai` | `2lbfz-yiaaa-aaaac-qcyma-cai` | `4ilhs-2iaaa-aaaac-bfsaq-cai` |
+| Syntropia frontend | `2dmsp-maaaa-aaaad-qlxfq-cai` | `2madn-vqaaa-aaaac-qcymq-cai` | `4bimo-maaaa-aaaac-bfsba-cai` |
 
 ---
 
@@ -840,12 +840,16 @@ dfx identity use deployer   # or my_dev_identity_1 on test
 
 **Staging canister IDs:**
 
-| Realm | Backend | Frontend |
-|---|---|---|
-| Syntropia | `jnope-2yaaa-aaaac-beh4a-cai` | `jkpjq-xaaaa-aaaac-beh4q-cai` |
-| Agora | `ihbn6-yiaaa-aaaac-beh3a-cai` | `iaalk-vqaaa-aaaac-beh3q-cai` |
+> Capital Agora/Dominion/Syntropia staging realms were decommissioned (IC0301); the
+> Casals-managed stands below are the current staging targets (not in `realms-staging.json`).
 
-**Full example — justice courts on staging Syntropia (verified Jul 2026):**
+| Stand | Backend | Frontend |
+|---|---|---|
+| TestSyntropia001 | `4ilhs-2iaaa-aaaac-bfsaq-cai` | `4bimo-maaaa-aaaac-bfsba-cai` |
+| TestSyntropia1 | `icuo5-5aaaa-aaaac-bfrxa-cai` | `ifvij-qyaaa-aaaac-bfrxq-cai` |
+| DemoSyntropia1 | `ritsw-2yaaa-aaaac-bftlq-cai` | `qf5wy-vqaaa-aaaac-bftma-cai` |
+
+**Full example — justice courts on staging TestSyntropia001 (verified Aug 2026):**
 
 ```bash
 cd /path/to/realms
@@ -853,26 +857,26 @@ cd /path/to/realms
 # 1. Backend WASM — build locally, upgrade directly (~25s)
 python -m basilisk realm_backend src/realm_backend/main.py
 gzip -c .basilisk/realm_backend/realm_backend.wasm > /tmp/realm_backend.wasm.gz
-dfx canister install jnope-2yaaa-aaaac-beh4a-cai \
+dfx canister install 4ilhs-2iaaa-aaaac-bfsaq-cai \
   --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network staging
 
 # 2. Codex (seeds court hierarchy via init → seed_justice)
 realms codex runtime-install \
-  --canister jnope-2yaaa-aaaac-beh4a-cai \
+  --canister 4ilhs-2iaaa-aaaac-bfsaq-cai \
   --source-dir codices/codices/syntropia \
   --network staging --run-init
 
 # 3. Extension (backend + frontend bundle + initialize hook)
 realms files build --extensions justice_litigation   # build frontend-rt/dist first
 realms extension runtime-install \
-  --canister jnope-2yaaa-aaaac-beh4a-cai \
+  --canister 4ilhs-2iaaa-aaaac-bfsaq-cai \
   --source-dir extensions/extensions/justice_litigation \
-  --frontend-canister jkpjq-xaaaa-aaaac-beh4q-cai \
+  --frontend-canister 4bimo-maaaa-aaaac-bfsba-cai \
   --network staging
 ```
 
-Repeat steps 2–3 for Agora (`ihbn6-yiaaa-aaaac-beh3a-cai` / `iaalk-vqaaa-aaaac-beh3q-cai`)
-with `--source-dir codices/codices/agora`.
+Repeat steps 2–3 on TestSyntropia1 or DemoSyntropia1 using the backend/frontend IDs
+from the table above (same `--source-dir codices/codices/syntropia`).
 
 **What the pure `dfx` backend upgrade skips (usually fine on staging):**
 
@@ -896,8 +900,8 @@ quarter bootstrap can pull the new packages.
 
 **Gotchas (learned staging Jul 2026):**
 
-1. **Deploy to the realm you're actually viewing.** Capital Syntropia/Agora
-   canister IDs (table above) are *not* manual-test or quarter realms created
+1. **Deploy to the realm you're actually viewing.** The Casals-managed staging stands
+   (table above) are *not* manual-test or quarter realms created
    via the registry wizard. If the UI shows e.g. `ManualTest410Syntropia`, look
    up its backend/frontend IDs first:
 
