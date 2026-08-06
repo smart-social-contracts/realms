@@ -454,6 +454,17 @@ export default defineConfig({
 
 ## 7. Packaging and publishing
 
+### Release channels
+
+`@realmsgos/extension-bridge` and `@realmsgos/extension-ui` are published to npm on two dist-tags:
+
+| Dist-tag | Channel | Source | Install |
+|----------|---------|--------|---------|
+| **`latest`** | Official | Manual release by a maintainer via `scripts/publish_extension_packages.sh` (npm token stays off CI) | `npm install @realmsgos/extension-bridge` |
+| **`next`** | Experimental | CI on every push to `main` that touches `packages/extension-*` | `npm install @realmsgos/extension-bridge@next` |
+
+Experimental builds use semver pre-release versions derived from the `package.json` base version plus the GitHub Actions run number, e.g. `0.1.0-next.42`. Pin `@next` only for early testing against main; use `@latest` (or an explicit semver) for production extension work.
+
 ### Build output layout
 
 ```bash

@@ -1,0 +1,106 @@
+# publish-extension-packages.yml — publish @realmsgos/extension-* to npm @next (experimental).
+#
+# Auth (pick one; Trusted Publishing preferred):
+# 1. npm Trusted Publishing (OIDC, keyless — no stored token):
+#    - On npmjs.com, for each package (@realmsgos/extension-bridge, @realmsgos/extension-ui),
+#      add Trusted Publisher: GitHub Actions, repo smart-social-contracts/realms,
+#      workflow filename publish-extension-packages.yml.
+#    - This workflow requests id-token: write; npm publish --provenance uses OIDC automatically.
+# 2. Fallback — repository secret NPM_TOKEN:
+#    - Long-lived automation token written via npm config set (never echoed).
+#    - Used when Trusted Publishing is not configured; OIDC is still attempted first.
+#
+# Publishing is OFF until the repository variable NPM_PUBLISH_ENABLED is set to "true".
+# Until then, matching pushes still build packages but skip publish so CI stays green.
+
+name: Publish extension packages (@next)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/extension-bridge/**'
+      - 'packages/extension-ui/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: publish-extension-packages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package_dir:
+          - extension-bridge
+          - extension-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install and build
+        working-directory: packages/${{ matrix.package_dir }}
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Resolve package name and experimental version
+        id: meta
+        run: |
+          PKG_DIR="packages/${{ matrix.package_dir }}"
+          BASE=$(node -p "require('./${PKG_DIR}/package.json').version")
+          EXP="${BASE}-next.${{ github.run_number }}"
+          NAME=$(node -p "require('./${PKG_DIR}/package.json').name")
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${EXP}" >> "$GITHUB_OUTPUT"
+          echo "Package: ${NAME}@${EXP}"
+
+      - name: Skip if version already published (idempotent)
+        id: skip
+        run: |
+          if npm view "${{ steps.meta.outputs.name }}@${{ steps.meta.outputs.version }}" version >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "skip: ${{ steps.meta.outputs.name }}@${{ steps.meta.outputs.version }} is already published"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish disabled — setup instructions
+        if: ${{ vars.NPM_PUBLISH_ENABLED != 'true' && steps.skip.outputs.skip != 'true' }}
+        run: |
+          echo "npm publish skipped: repository variable NPM_PUBLISH_ENABLED is not 'true'."
+          echo ""
+          echo "To enable experimental (@next) publishes from main:"
+          echo "  1. Repository Settings → Secrets and variables → Actions → Variables:"
+          echo "     set NPM_PUBLISH_ENABLED=true"
+          echo "  2. Configure npm Trusted Publishing (preferred) on npmjs.com for each package:"
+          echo "     @realmsgos/extension-bridge, @realmsgos/extension-ui"
+          echo "     Publisher: GitHub Actions"
+          echo "     Repository: smart-social-contracts/realms"
+          echo "     Workflow: publish-extension-packages.yml"
+          echo "  3. Or add repository secret NPM_TOKEN (automation token) as fallback."
+
+      - name: Configure npm auth (NPM_TOKEN fallback)
+        if: ${{ vars.NPM_PUBLISH_ENABLED == 'true' && steps.skip.outputs.skip != 'true' }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+          fi
+
+      - name: Publish to npm (@next)
+        if: ${{ vars.NPM_PUBLISH_ENABLED == 'true' && steps.skip.outputs.skip != 'true' }}
+        working-directory: packages/${{ matrix.package_dir }}
+        run: |
+          npm version "${{ steps.meta.outputs.version }}" --no-git-tag-version
+          npm publish --access public --tag next --provenance
