@@ -77,6 +77,15 @@ function initializeBackendStore() {
 	_initBackendPromise = (async () => {
 		await initializeImports();
 
+		// Provisional anonymous actor so realmInfo.fetch() can call the backend
+		// before auth init (fetch requires backendStore to be set).
+		let agent = new HttpAgent({ verifyQuerySignatures: false });
+		if (isLocalDevelopment()) {
+			await agent.fetchRootKey().catch(() => {});
+		}
+		let actor = createActor(canisterId, { agent });
+		backendStore.set(actor);
+
 		// Runtime flags (incl. test_mode_ii_bypass) come from backend status(), not
 		// canister_ids.js. Fetch before auth init so test-mode auto-login is not
 		// skipped while status is still loading (which leaves an anonymous actor).
@@ -96,25 +105,20 @@ function initializeBackendStore() {
 
 			if (await client.isAuthenticated()) {
 				const identity = client.getIdentity();
-			const agent = new HttpAgent({ identity, verifyQuerySignatures: false });
-			if (isLocalDevelopment()) {
-				await agent.fetchRootKey().catch(() => {});
-			}
-			const actor = createActor(canisterId, { agent });
-			backendStore.set(actor);
-			console.log('Backend store initialized with authenticated identity');
-			return;
+				agent = new HttpAgent({ identity, verifyQuerySignatures: false });
+				if (isLocalDevelopment()) {
+					await agent.fetchRootKey().catch(() => {});
+				}
+				actor = createActor(canisterId, { agent });
+				backendStore.set(actor);
+				console.log('Backend store initialized with authenticated identity');
+				return;
 			}
 		} catch (e) {
 			console.warn('Could not check auth during init, falling back to anonymous:', e);
 		}
 
-		const agent = new HttpAgent({ verifyQuerySignatures: false });
-		if (isLocalDevelopment()) {
-			await agent.fetchRootKey().catch(() => {});
-		}
-		const actor = createActor(canisterId, { agent });
-		backendStore.set(actor);
+		// Keep provisional anonymous actor for login page / unauthenticated users.
 	})();
 
 	return _initBackendPromise;
