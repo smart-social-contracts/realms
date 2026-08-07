@@ -76,11 +76,15 @@ per realm.
 
 ### Registry / wizard UI (staging)
 
-The **create-realm wizard**, **deployment status page**, and **realm registry backend**
-(registry/installer stack — *not* the on-chain `file_registry`) live in
-[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service)
-(first release **v0.1.0**). Realms **no longer builds** `realm_registry_*` or
-`realm_installer` from source — those directories were removed from this repo.
+The **create-realm wizard**, **deployment status page**, **realm registry backend**,
+**realm installer**, and the **file_registry backend** (the platform artifact store —
+GOS wasms, frontends, branding) all live in
+[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
+Realms **no longer builds** `realm_registry_*`, `realm_installer`, or `file_registry`
+from source — those directories were removed from this repo; the prebuilt wasms are
+fetched from gos-as-a-service releases (vendored candid under `src/gos-vendor/`).
+Realms still *uses* the file_registry canister (publishing realm artifacts, branding)
+and still builds/deploys the `file_registry_frontend` management UI from this repo.
 
 **Develop registry/wizard changes in gos-as-a-service**, cut a release there, then bump
 Realms' pin in `scripts/fetch_gos_artifacts.py` (`GOS_RELEASE`).

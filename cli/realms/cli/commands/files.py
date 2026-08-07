@@ -68,19 +68,17 @@ def files_reset_command(
     if result.returncode != 0:
         raise RuntimeError(f"uninstall-code failed: {result.stderr}")
 
-    console.print("  Building file_registry WASM...")
-    build_env = {
-        **env,
-        "CANISTER_CANDID_PATH": str(root / "src" / "file_registry" / "file_registry.did"),
-    }
+    console.print("  Fetching file_registry WASM (gos-as-a-service release)...")
     result = subprocess.run(
-        ["python3", "-m", "basilisk", "file_registry", "src/file_registry/main.py"],
-        capture_output=True, text=True, cwd=root, env=build_env,
+        ["python3", "scripts/fetch_gos_artifacts.py", "--what", "wasms"],
+        capture_output=True, text=True, cwd=root, env=env,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"WASM build failed: {result.stderr}")
+        raise RuntimeError(f"WASM fetch failed: {result.stderr or result.stdout}")
 
-    wasm_path = root / ".basilisk" / "file_registry" / "file_registry.wasm"
+    wasm_path = root / ".external-wasms" / "file_registry.wasm.gz"
+    if not wasm_path.exists():
+        raise RuntimeError(f"fetched wasm not found at {wasm_path}")
     console.print("  Installing fresh canister...")
     cmd = [
         "dfx", "canister", "install", reg,

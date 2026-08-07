@@ -319,7 +319,10 @@ if [[ "$COMPONENT" == "backend" || "$COMPONENT" == "both" ]]; then
             fetch_gos_artifacts wasms
             deploy_backend_remote "realm_installer"
             ;;
-        file-registry) deploy_backend "file_registry" "file_registry" ;;
+        file-registry)
+            fetch_gos_artifacts wasms
+            deploy_backend_remote "file_registry"
+            ;;
         marketplace) deploy_backend "marketplace_backend" "marketplace_backend" ;;
     esac
 fi

@@ -24,6 +24,7 @@ FRONTEND_DIST = REPO_ROOT / ".external-assets" / "realm_registry_frontend" / "di
 WASM_ARTIFACTS = (
     "realm_registry_backend.wasm.gz",
     "realm_installer.wasm.gz",
+    "file_registry.wasm.gz",
 )
 FRONTEND_TARBALL = "realm_registry_frontend.tar.gz"
 
