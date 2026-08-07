@@ -43,21 +43,13 @@
         {
           "name": "candid:service"
         }
-      ],
-      "remote": {
-        "id": {
-          "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
-          "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
-          "test": "yhw3g-fyaaa-aaaas-qgorq-cai"
-        }
-      }
+      ]
     },
     "realm_registry_frontend": {
       "source": [
         ".external-assets/realm_registry_frontend/dist"
       ],
-      "type": "assets",
-      "workspace": "realm_registry_frontend"
+      "type": "assets"
     },
     "internet_identity": {
       "candid": "https://github.com/dfinity/internet-identity/releases/download/release-2026-03-09/internet_identity.did",
@@ -165,10 +157,12 @@
       ],
       "type": "assets",
       "workspace": "marketplace_frontend",
-      "dependencies": ["marketplace_backend"]
+      "dependencies": [
+        "marketplace_backend"
+      ]
     }
   },
-  "defaults": { 
+  "defaults": {
     "build": {
       "args": "",
       "packtool": ""
@@ -180,26 +174,34 @@
       "type": "ephemeral"
     },
     "staging": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     },
     "demo": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     },
     "test": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     },
     "ic": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     }
   },
   "metadata": [
-   {
-     "name": "candid:service"
-   }
+    {
+      "name": "candid:service"
+    }
   ],
   "output_env_file": ".env",
   "version": 1
