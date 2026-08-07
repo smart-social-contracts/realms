@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-GOS_RELEASE = "v0.2.1"
+GOS_RELEASE = "v0.3.0"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXTERNAL_WASMS = REPO_ROOT / ".external-wasms"
