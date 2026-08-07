@@ -83,8 +83,9 @@ GOS wasms, frontends, branding) all live in
 Realms **no longer builds** `realm_registry_*`, `realm_installer`, or `file_registry`
 from source — those directories were removed from this repo; the prebuilt wasms are
 fetched from gos-as-a-service releases (vendored candid under `src/gos-vendor/`).
-Realms still *uses* the file_registry canister (publishing realm artifacts, branding)
-and still builds/deploys the `file_registry_frontend` management UI from this repo.
+Realms still *uses* the file_registry canister (publishing realm artifacts, branding).
+The `file_registry_frontend` admin UI is built and released from gos-as-a-service;
+realms fetches `file_registry_frontend.tar.gz` via `scripts/fetch_gos_artifacts.py`.
 
 **Develop registry/wizard changes in gos-as-a-service**, cut a release there, then bump
 Realms' pin in `scripts/fetch_gos_artifacts.py` (`GOS_RELEASE`).

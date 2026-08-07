@@ -590,7 +590,7 @@ The plumbing lives in `src/realm_frontend/src/lib/extension-loader.ts`, `src/rea
 
 ### `file_registry_frontend` admin UI
 
-A standalone asset canister (`src/file_registry_frontend/`) ships a vanilla-JS dashboard for the registry: namespace browser, file list, drag-and-drop upload with auto-chunking above 400 KB, delete (controller-only), and Internet Identity login. The `@dfinity/*` client SDK is pre-bundled into `dist/dfinity.js` via `src/file_registry_frontend/scripts/build-dfinity-bundle.sh` (`esbuild`) so there's no CDN dependency.
+A standalone asset canister ships a vanilla-JS dashboard for the registry: namespace browser, file list, drag-and-drop upload with auto-chunking above 400 KB, delete (controller-only), and Internet Identity login. Source and releases live in [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service) (`file_registry_frontend.tar.gz`); realms deploys the fetched dist from `.external-assets/file_registry_frontend/dist`.
 
 ### CI / GitHub Actions
 

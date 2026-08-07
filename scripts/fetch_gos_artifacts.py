@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Download prebuilt GaaS (gos-as-a-service) release artifacts.
 
-WASMs land in .external-wasms/; the registry frontend tarball is extracted to
-.external-assets/realm_registry_frontend/dist/.
+WASMs land in .external-wasms/; frontend tarballs are extracted to
+.external-assets/<name>/dist/.
 """
 
 from __future__ import annotations
@@ -19,14 +19,16 @@ GOS_RELEASE = "v0.2.1"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXTERNAL_WASMS = REPO_ROOT / ".external-wasms"
-FRONTEND_DIST = REPO_ROOT / ".external-assets" / "realm_registry_frontend" / "dist"
 
 WASM_ARTIFACTS = (
     "realm_registry_backend.wasm.gz",
     "realm_installer.wasm.gz",
     "file_registry.wasm.gz",
 )
-FRONTEND_TARBALL = "realm_registry_frontend.tar.gz"
+FRONTEND_TARBALLS = {
+    "realm_registry_frontend": "realm_registry_frontend.tar.gz",
+    "file_registry_frontend": "file_registry_frontend.tar.gz",
+}
 
 
 def _download(url: str, dest: Path) -> None:
@@ -50,6 +52,39 @@ def _download(url: str, dest: Path) -> None:
         ) from exc
     dest.write_bytes(data)
     print(f"    fetched {dest.stat().st_size:,} bytes")
+
+
+def _extract_frontend_tarball(tarball_name: str, dist_dir: Path, base_url: str) -> None:
+    tarball_path = REPO_ROOT / ".external-assets" / tarball_name
+    _download(f"{base_url}/{tarball_name}", tarball_path)
+
+    if dist_dir.exists():
+        shutil.rmtree(dist_dir)
+    dist_dir.mkdir(parents=True, exist_ok=True)
+
+    with tarfile.open(tarball_path, "r:gz") as tar:
+        tar.extractall(path=dist_dir.parent / "_extract")
+        extract_root = dist_dir.parent / "_extract"
+        inner_dist = extract_root / "dist"
+        if inner_dist.is_dir():
+            shutil.move(str(inner_dist), str(dist_dir))
+        else:
+            for entry in extract_root.iterdir():
+                dest = dist_dir / entry.name
+                if dest.exists():
+                    if dest.is_dir():
+                        shutil.rmtree(dest)
+                    else:
+                        dest.unlink()
+                shutil.move(str(entry), str(dest))
+        shutil.rmtree(extract_root, ignore_errors=True)
+
+    tarball_path.unlink(missing_ok=True)
+    if not dist_dir.is_dir() or not any(dist_dir.iterdir()):
+        raise SystemExit(
+            f"ERROR: {tarball_name} did not produce a non-empty {dist_dir}"
+        )
+    print(f"  ✓ {dist_dir.relative_to(REPO_ROOT)}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -80,37 +115,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  ✓ {dest.relative_to(REPO_ROOT)}")
 
     if args.what in ("all", "frontend"):
-        print("\nFrontend:")
-        tarball_path = REPO_ROOT / ".external-assets" / FRONTEND_TARBALL
-        _download(f"{base_url}/{FRONTEND_TARBALL}", tarball_path)
-
-        if FRONTEND_DIST.exists():
-            shutil.rmtree(FRONTEND_DIST)
-        FRONTEND_DIST.mkdir(parents=True, exist_ok=True)
-
-        with tarfile.open(tarball_path, "r:gz") as tar:
-            tar.extractall(path=FRONTEND_DIST.parent / "_extract")
-            extract_root = FRONTEND_DIST.parent / "_extract"
-            inner_dist = extract_root / "dist"
-            if inner_dist.is_dir():
-                shutil.move(str(inner_dist), str(FRONTEND_DIST))
-            else:
-                for entry in extract_root.iterdir():
-                    dest = FRONTEND_DIST / entry.name
-                    if dest.exists():
-                        if dest.is_dir():
-                            shutil.rmtree(dest)
-                        else:
-                            dest.unlink()
-                    shutil.move(str(entry), str(dest))
-            shutil.rmtree(extract_root, ignore_errors=True)
-
-        tarball_path.unlink(missing_ok=True)
-        if not FRONTEND_DIST.is_dir() or not any(FRONTEND_DIST.iterdir()):
-            raise SystemExit(
-                f"ERROR: {FRONTEND_TARBALL} did not produce a non-empty {FRONTEND_DIST}"
-            )
-        print(f"  ✓ {FRONTEND_DIST.relative_to(REPO_ROOT)}")
+        print("\nFrontends:")
+        for frontend_name, tarball_name in FRONTEND_TARBALLS.items():
+            dist_dir = REPO_ROOT / ".external-assets" / frontend_name / "dist"
+            _extract_frontend_tarball(tarball_name, dist_dir, base_url)
 
     print("\nDone.")
     return 0

@@ -18,7 +18,6 @@
     "packages/extension-bridge",
     "packages/extension-ui",
     "src/realm_frontend",
-    "src/file_registry_frontend",
     "src/marketplace_frontend",
     "src/platform_dashboard_frontend"
   ],

@@ -96,7 +96,7 @@ case "$FAMILY" in
     file-registry)
         BACKEND_CANISTER="file_registry"
         FRONTEND_CANISTER="file_registry_frontend"
-        FRONTEND_WORKSPACE="file_registry_frontend"
+        FRONTEND_DIST="$REPO_ROOT/.external-assets/file_registry_frontend/dist"
         ;;
     marketplace)
         BACKEND_CANISTER="marketplace_backend"
@@ -194,8 +194,9 @@ deploy_backend() {
     dfx canister install "$cid" --network "$NETWORK" --mode upgrade --wasm "$wasm"
 }
 
-deploy_registry_frontend() {
+deploy_external_frontend() {
     local canister_key="$1"
+    local dist_dir="$2"
     local cid
     cid=$(python3 -c "import json; print(json.load(open('$REPO_ROOT/canister_ids.json')).get('$canister_key', {}).get('$NETWORK', ''))")
     if [[ -z "$cid" ]]; then
@@ -204,21 +205,21 @@ deploy_registry_frontend() {
     fi
 
     if [[ "$CLEAN_BUILD" == true ]]; then
-        echo -e "${YELLOW}🧹 Cleaning fetched registry frontend dist${NC}"
-        rm -rf "$FRONTEND_DIST"
+        echo -e "${YELLOW}🧹 Cleaning fetched frontend dist${NC}"
+        rm -rf "$dist_dir"
     fi
 
     fetch_gos_artifacts frontend
 
-    if [[ ! -d "$FRONTEND_DIST" ]]; then
-        echo -e "${RED}Fetched frontend dist not found: $FRONTEND_DIST${NC}"
+    if [[ ! -d "$dist_dir" ]]; then
+        echo -e "${RED}Fetched frontend dist not found: $dist_dir${NC}"
         exit 1
     fi
 
     local tmpdir
     tmpdir=$(mktemp -d)
     trap 'rm -rf "$tmpdir"' EXIT
-    cp -a "$FRONTEND_DIST" "$tmpdir/dist"
+    cp -a "$dist_dir" "$tmpdir/dist"
     cat > "$tmpdir/dfx.json" <<EOF
 {
   "version": 1,
@@ -232,7 +233,7 @@ deploy_registry_frontend() {
 EOF
     echo "{\"frontend\": {\"$NETWORK\": \"$cid\"}}" > "$tmpdir/canister_ids.json"
 
-    echo -e "${GREEN}🚀 Uploading registry frontend assets ($cid) → $NETWORK${NC}"
+    echo -e "${GREEN}🚀 Uploading frontend assets ($cid) → $NETWORK${NC}"
     local deployer_principal
     deployer_principal=$(dfx identity get-principal)
     for perm in Prepare Commit; do
@@ -329,8 +330,8 @@ fi
 
 if [[ "$COMPONENT" == "frontend" || "$COMPONENT" == "both" ]]; then
     case "$FAMILY" in
-        registry) deploy_registry_frontend "realm_registry_frontend" ;;
-        file-registry) deploy_frontend "file_registry_frontend" "file_registry_frontend" "file_registry_frontend" ;;
+        registry) deploy_external_frontend "realm_registry_frontend" "$FRONTEND_DIST" ;;
+        file-registry) deploy_external_frontend "file_registry_frontend" "$FRONTEND_DIST" ;;
         marketplace) deploy_frontend "marketplace_frontend" "marketplace_frontend" "marketplace_frontend" ;;
         dashboard) deploy_frontend "platform_dashboard_frontend" "platform_dashboard_frontend" "platform_dashboard_frontend" ;;
     esac

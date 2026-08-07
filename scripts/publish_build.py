@@ -49,11 +49,10 @@ FAMILIES = {
         "backend": ("realm_backend", "src/realm_backend/main.py"),
         "frontend": "src/realm_frontend",
     },
-    # file_registry backend moved to gos-as-a-service (platform infra) — realms
-    # consumes the prebuilt wasm and only publishes the management frontend.
+    # file_registry backend and management frontend moved to gos-as-a-service.
     "file-registry": {
         "backend": None,
-        "frontend": "src/file_registry_frontend",
+        "frontend": None,
     },
     "dashboard": {
         "backend": None,
