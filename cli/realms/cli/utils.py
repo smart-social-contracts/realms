@@ -1385,7 +1385,7 @@ def get_canister_urls(
                             canister_info["url"] = f"https://{canister_id}.icp0.io/"
                         else:
                             # For backends on IC, use Candid UI
-                            canister_info["url"] = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+                            canister_info["url"] = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={canister_id}"
                     
                     canisters[canister_name] = canister_info
                     
@@ -1471,7 +1471,7 @@ def display_canister_urls_json(
             if network == "local" and candid_ui_id:
                 url = f"http://127.0.0.1:{port}/?canisterId={candid_ui_id}&id={canister_id}"
             elif network in ["staging", "ic", "mainnet"]:
-                url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+                url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={canister_id}"
             else:
                 url = info.get("url", "")
         

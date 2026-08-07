@@ -200,6 +200,18 @@ def _run_basilisk(repo_root: Path, *, dry_run: bool) -> Path:
     wasm_path = repo_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
     if not wasm_path.is_file():
         raise SystemExit(f"basilisk did not produce {wasm_path}")
+
+    did_path = Path(env.get("CANISTER_CANDID_PATH") or wasm_path.with_suffix(".did"))
+    if not did_path.is_file():
+        did_path = wasm_path.with_suffix(".did")
+    if not did_path.is_file():
+        raise SystemExit(f"basilisk did not produce candid file at {did_path}")
+
+    # Candid UI reads candid:service WASM metadata (not __get_candid_interface_tmp_hack).
+    sys.path.insert(0, str(repo_root / "scripts"))
+    from embed_candid_metadata import embed_candid_service_metadata
+
+    embed_candid_service_metadata(wasm_path, did_path)
     return wasm_path
 
 

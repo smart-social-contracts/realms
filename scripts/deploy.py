@@ -434,6 +434,14 @@ def deploy_backend(
         print(f"❌ WASM not found at {wasm_in_cwd}")
         sys.exit(1)
 
+    did_in_cwd = wasm_in_cwd.with_suffix(".did")
+    if not did_in_cwd.is_file():
+        did_in_cwd = src_backend / "realm_backend.did"
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from embed_candid_metadata import embed_candid_service_metadata
+
+    embed_candid_service_metadata(wasm_in_cwd, did_in_cwd)
+
     # Install the freshly-built WASM to the target canister.
     print(f"   📦 Installing WASM to {backend_id} (mode={mode})...")
     result = subprocess.run(

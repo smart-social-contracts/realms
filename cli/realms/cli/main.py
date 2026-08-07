@@ -2043,11 +2043,11 @@ def realm_status(
                 if is_backend:
                     # Backend canisters use Candid UI
                     if effective_network == "ic":
-                        candid_ui = "a4gq6-oaaaa-aaaab-qaa4q-cai"
-                        url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/?id={canister_id}"
+                        candid_ui = "rxs6w-5qaaa-aaaah-avp2a-cai"
+                        url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.ic0.app/?id={canister_id}"
                     elif effective_network in ("staging", "demo", "test"):
-                        candid_ui = "a4gq6-oaaaa-aaaab-qaa4q-cai"
-                        url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+                        candid_ui = "rxs6w-5qaaa-aaaah-avp2a-cai"
+                        url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={canister_id}"
                     elif effective_network == "local":
                         # For local, use dynamically fetched Candid UI and port
                         if candid_ui_id:
@@ -2057,7 +2057,7 @@ def realm_status(
                             url = f"http://127.0.0.1:{local_port}/?canisterId=<candid-ui>&id={canister_id}"
                     else:
                         # Other networks, use staging format
-                        url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+                        url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={canister_id}"
                 else:
                     # Frontend canisters use direct URLs
                     if effective_network == "ic":
@@ -2094,10 +2094,10 @@ def _show_remote_realm_status(backend_canister_id: str, realm_name: str, network
     # Construct URLs based on network
     if network == "ic":
         frontend_url = f"https://{backend_canister_id}.ic0.app"  # Actually need frontend ID
-        backend_url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/?id={backend_canister_id}"
+        backend_url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.ic0.app/?id={backend_canister_id}"
     elif network in ("staging", "demo", "test"):
         frontend_url = f"https://{backend_canister_id}.icp0.io"  # Actually need frontend ID
-        backend_url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={backend_canister_id}"
+        backend_url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={backend_canister_id}"
     else:
         frontend_url = f"http://{backend_canister_id}.localhost:8000/"
         backend_url = f"http://127.0.0.1:8000/?canisterId=<candid-ui>&id={backend_canister_id}"

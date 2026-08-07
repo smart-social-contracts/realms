@@ -10,7 +10,7 @@ describe('frontendUrl', () => {
 describe('candidUiUrl', () => {
   it('returns Candid UI URL with the canister ID as query param', () => {
     const url = candidUiUrl('xyz-123');
-    expect(url).toContain('a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io');
+    expect(url).toContain('rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io');
     expect(url).toContain('id=xyz-123');
   });
 });

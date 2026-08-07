@@ -131,6 +131,12 @@ def _build_backend(root: Path, canister: str, main_py: str) -> Path:
     wasm = root / ".basilisk" / canister / f"{canister}.wasm"
     if not wasm.exists():
         sys.exit(f"basilisk did not produce {wasm}")
+    if not did.is_file():
+        did = wasm.with_suffix(".did")
+    sys.path.insert(0, str(root / "scripts"))
+    from embed_candid_metadata import embed_candid_service_metadata
+
+    embed_candid_service_metadata(wasm, did)
     gz = root / f"{canister}.wasm.gz"
     with open(wasm, "rb") as fi:
         import gzip as _gz

@@ -60,7 +60,7 @@ export function frontendUrl(canisterId: string): string {
 }
 
 export function candidUiUrl(canisterId: string): string {
-  return `https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=${canisterId}`;
+  return `https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id=${canisterId}`;
 }
 
 export function icDashboardUrl(canisterId: string): string {
