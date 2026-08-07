@@ -34,7 +34,7 @@ realms/
 │   ├── deploy-mundus.yml             # Off-chain realm deploy (fast path; test/demo/staging)
 │   ├── casals-upgrade.yml            # Upgrade the Casals orchestrator itself
 │   └── deploy-files.yml              # Publish extensions/codices into file_registry
-├── casals/                           # Casals provisioner (submodule → smart-social-contracts/casals; platform layer of gos-as-a-service)
+├── (casals is NOT a submodule — clone smart-social-contracts/casals separately if you need its source/CLI; platform provisioner of gos-as-a-service)
 ├── casals-config/                    # Realms fleet config for Casals conductors (arrangements, sheet)
 ├── scripts/
 │   └── publish_build.py              # Build+publish engine used by publish-build.yml
