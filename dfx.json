@@ -77,7 +77,7 @@
     "realm_installer": {
       "type": "custom",
       "candid": "src/gos-vendor/realm_installer/realm_installer.did",
-      "wasm": "https://github.com/smart-social-contracts/gos-as-a-service/releases/download/v0.1.0/realm_installer.wasm.gz",
+      "wasm": ".external-wasms/realm_installer.wasm.gz",
       "declarations": {
         "node_compatibility": true
       },
@@ -91,7 +91,7 @@
     "realm_registry_backend": {
       "type": "custom",
       "candid": "src/gos-vendor/realm_registry_backend/realm_registry_backend.did",
-      "wasm": "https://github.com/smart-social-contracts/gos-as-a-service/releases/download/v0.1.0/realm_registry_backend.wasm.gz",
+      "wasm": ".external-wasms/realm_registry_backend.wasm.gz",
       "declarations": {
         "node_compatibility": true
       },
