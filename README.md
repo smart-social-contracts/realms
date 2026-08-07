@@ -2,9 +2,11 @@
 
 Realms GOS (Governance Operating System) is a platform for building and deploying governance systems on the [Internet Computer](https://internetcomputer.org).
 
-The **registry / wizard / installer** stack (GaaS platform layer) lives in the sibling repo [smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service). Realms consumes prebuilt artifacts from pinned GOS releases; it does not build `realm_registry_*` or `realm_installer` from source.
+The **registry / wizard / installer** stack (GaaS platform layer) lives in [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service). Realms consumes prebuilt artifacts from pinned GOS releases; it does not build `realm_registry_*` or `realm_installer` from source.
 
-**Related repos:** basilisk · ic-basilisk-toolkit · ic-python-db · ic-python-logging · **realms** (this repo) · **gos-as-a-service** · extensions · codices · casals
+**Canister provisioning** is handled by [Casals](https://github.com/smart-social-contracts/casals), the platform's on-chain lifecycle provisioner (external repo, serving the gos-as-a-service platform). Realms is the fleet **operator**: it runs Casals conductor instances per network and keeps fleet config in `casals-config/`.
+
+**Related repos:** basilisk · ic-basilisk-toolkit · ic-python-db · ic-python-logging · **realms** (this repo) · [**gos-as-a-service**](https://github.com/smart-social-contracts/gos-as-a-service) (GaaS platform — registry, wizard, installer) · extensions · codices · [**casals**](https://github.com/smart-social-contracts/casals) (platform provisioner — Realms operates conductors)
 
 ## Table of Contents
 

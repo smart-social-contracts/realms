@@ -34,8 +34,8 @@ realms/
 │   ├── deploy-mundus.yml             # Off-chain realm deploy (fast path; test/demo/staging)
 │   ├── casals-upgrade.yml            # Upgrade the Casals orchestrator itself
 │   └── deploy-files.yml              # Publish extensions/codices into file_registry
-├── casals/                           # Casals orchestrator engine (git submodule)
-├── casals-config/                    # Realms-owned Casals objects (arrangements, sheet)
+├── casals/                           # Casals provisioner (submodule → smart-social-contracts/casals; platform layer of gos-as-a-service)
+├── casals-config/                    # Realms fleet config for Casals conductors (arrangements, sheet)
 ├── scripts/
 │   └── publish_build.py              # Build+publish engine used by publish-build.yml
 ├── deployment-descriptors/           # Network topology (YAML)
@@ -265,7 +265,12 @@ Takes ~5 minutes. The version file determines the current version; the workflow 
 > `rollout.yml`) and fast off-chain (`deploy-mundus.yml` or `realms mundus deploy`).
 > `deploy-files.yml` publishes extension/codex bundles into `file_registry` for either path.
 
-Casals is an **on-chain orchestrator** that owns the realm canisters and upgrades
+[Casals](https://github.com/smart-social-contracts/casals) is the **GaaS platform
+provisioner** — an on-chain canister lifecycle orchestrator from its own repo,
+serving the [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service) platform.
+**Realms operates** one conductor instance per network (`test`, `demo`, `staging`)
+and keeps fleet config in `casals-config/`; rollouts are driven via `realms rollout`.
+On each environment, Casals owns the orchestra canisters it manages and upgrades
 them for us. Instead of an off-chain CI job installing WASMs, Casals pulls the
 artifacts from `file_registry` and installs them itself, with **automatic
 snapshot → install → verify-hash → rollback-on-failure** built in.
@@ -277,8 +282,8 @@ There are exactly **two steps**:
 2. **Rollout** — tell Casals to upgrade (or reinstall) the chosen canisters to a
    published version.
 
-**Casals is deployed and wired on all three environments** (`test`, `demo`, `staging`):
-each one's realm and infra canisters are registered in Casals. Orchestra canisters are
+**Realms runs Casals conductor instances on all three environments** (`test`, `demo`, `staging`; conductor IDs in `canister_ids.json`):
+each one's realm and infra canisters are registered in its Casals instance. Orchestra canisters are
 controlled by **Casals + CycleOps**; on **test/staging**, the **`deployer`** identity
 remains a co-controller so you can use the [fast infra deploy](#fast-infra-deploy-dev-only)
 path during development. Publishing builds and authoritative rollouts still go through
@@ -525,11 +530,14 @@ gh workflow run rollout.yml \
 
 ### Upgrading Casals itself (the orchestrator canisters)
 
+Realms upgrades its per-network **conductor canisters** from the upstream
+[Casals](https://github.com/smart-social-contracts/casals) repo (platform provisioner).
+
 > **Different from rollout.** `rollout.yml` upgrades the realm/infra canisters
 > Casals *manages*. `casals-upgrade.yml` upgrades the **Casals orchestrator
 > canisters themselves** (`casals_backend` / `casals_frontend`) — i.e. when a new
-> version of the [Casals](https://github.com/smart-social-contracts/Casals)
-> project ships and we want this environment's Casals brought up to it.
+> version of the Casals project ships and Realms should bring that environment's
+> conductor up to it.
 
 `casals-upgrade.yml` checks out the Casals repo at a chosen ref, builds it from
 source (`make build`), points the deploy at this environment's Casals canister IDs
@@ -624,7 +632,7 @@ authorization model, cycle budget).
 ## Realm config via Casals arrangements (branding, registration, runtime flags)
 
 A sheet rollout stands up the canisters (code); a Casals **arrangement** configures
-them afterwards (state). Realms-owned arrangements live in
+them afterwards (state). As fleet operator, Realms keeps generated arrangements in
 `casals-config/arrangements/` and are **generated** — edit deployment-descriptors
 `parameters` and realm manifests, then re-run `python3 casals-config/_gen_arrangements.py`
 (never hand-edit the JSON). One arrangement per environment (`test`, `staging`, `demo`);
