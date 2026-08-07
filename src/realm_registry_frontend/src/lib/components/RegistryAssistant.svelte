@@ -187,7 +187,12 @@
     loadingStatus = '';
   }
 
-  $: viewingPending = conversationId ? isPending(conversationId) : isPending('__anonymous__');
+  // Reference pendingSendIds directly so Svelte tracks pending state reliably.
+  $: viewingPending = conversationId
+    ? !!pendingSendIds[conversationId]
+    : !!pendingSendIds['__anonymous__'];
+  $: awaitingReply =
+    viewingPending && messages.length > 0 && messages[messages.length - 1]?.isUser;
 
   function mergeConversationLists(serverList, previousList) {
     /** @type {Map<string, import('$lib/geister/conversations.js').Conversation>} */
@@ -751,8 +756,8 @@
     const viewing = () =>
       sendConversationId ? isViewingConversation(sendConversationId) : !conversationId;
 
-    if (viewing()) {
-      loadingStatus = $_('assistant.thinking', { default: 'Thinking…' });
+    if (viewing() && !loadingStatus) {
+      loadingStatus = get(_)('assistant.thinking', { default: 'Thinking…' });
     }
 
     /** @type {ReturnType<typeof setTimeout> | null} */
@@ -889,9 +894,13 @@
     messages = [...messages, { text: question, isUser: true }];
     newMessage = '';
     suggestions = [];
-    void scrollToBottom();
 
     const sendConversationId = conversationId;
+    const pendingKey = sendConversationId || '__anonymous__';
+    markPending(pendingKey);
+    loadingStatus = get(_)('assistant.thinking', { default: 'Thinking…' });
+    void scrollToBottom();
+
     const principal = userPrincipal;
     const persona = selectedAssistant?.id || 'ashoka';
     const ctxRealm = contextRealmId || '';
@@ -1213,8 +1222,17 @@
           {/if}
         </div>
       {/each}
-      {#if viewingPending && loadingStatus}
-        <div class="assistant-status">{loadingStatus}</div>
+      {#if awaitingReply}
+        <div class="assistant-msg">
+          <div class="msg-wrap assistant-wrap">
+            <div class="assistant-bubble typing-indicator" aria-live="polite" aria-busy="true">
+              <span class="typing-label">
+                {loadingStatus || $_('assistant.thinking', { default: 'Thinking…' })}
+              </span>
+              <span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+            </div>
+          </div>
+        </div>
       {/if}
       {#if error}
         <div class="assistant-error">
@@ -1709,10 +1727,46 @@
     align-self: flex-start;
   }
 
-  .assistant-status {
-    color: #888;
-    font-size: 0.82rem;
+  .typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 1.25rem;
+    color: #666;
+  }
+  .typing-label {
+    font-size: 0.85rem;
     font-style: italic;
+  }
+  .typing-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .typing-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #999;
+    animation: typing-bounce 1.2s ease-in-out infinite;
+  }
+  .typing-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .typing-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  @keyframes typing-bounce {
+    0%,
+    80%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.45;
+    }
+    40% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
   }
   .assistant-error {
     display: flex;
