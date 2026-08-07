@@ -1,7 +1,8 @@
 """Core extensions — built-in Realms capabilities installed on every standard realm.
 
 Authoritative list lives in /core-extensions.json and
-src/realm_registry_frontend/src/lib/extensions-config.json (tier: "core").
+src/realm_backend/core/core_extensions.py (tier: "core") and
+smart-social-contracts/gos-as-a-service (registry wizard UI).
 Extension manifests must NOT self-declare core membership.
 """
 

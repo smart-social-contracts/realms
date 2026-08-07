@@ -2,6 +2,10 @@
 
 Realms GOS (Governance Operating System) is a platform for building and deploying governance systems on the [Internet Computer](https://internetcomputer.org).
 
+The **registry / wizard / installer** stack (GaaS platform layer) lives in the sibling repo [smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service). Realms consumes prebuilt artifacts from pinned GOS releases; it does not build `realm_registry_*` or `realm_installer` from source.
+
+**Related repos:** basilisk · ic-basilisk-toolkit · ic-python-db · ic-python-logging · **realms** (this repo) · **gos-as-a-service** · extensions · codices · casals
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
@@ -463,7 +467,7 @@ Both modes coexist. The runtime loader inside `realm_backend` falls back to bund
 | `realm_backend` | The realm itself. In layered mode this is just the base WASM; everything else is loaded from registry into stable storage. |
 | `file_registry` | Versioned artifact store. HTTP gateway for read, inter-canister calls for write. Holds WASM, ESM bundles, Python modules, manifests, i18n JSON, codices. |
 | `file_registry_frontend` | Static asset canister. Admin UI for browsing, uploading (with auto-chunking), and deleting registry contents. Authenticates via Internet Identity for write calls. |
-| `realm_installer` | Small Basilisk bootstrapper canister. Reads chunked WASM out of `file_registry` and calls `ic.management_canister.install_chunked_code` on the target realm. Must be a controller of the target realm. |
+| `realm_installer` | Small Basilisk bootstrapper canister (released from **gos-as-a-service**). Reads chunked WASM out of `file_registry` and calls `ic.management_canister.install_chunked_code` on the target realm. Must be a controller of the target realm. |
 | `realm_frontend` | SvelteKit app. In layered mode it dynamically `import()`s extension bundles from `file_registry` over the HTTP gateway, fetches per-extension i18n on demand, and renders the sidebar from `get_sidebar_manifests`. |
 | `marketplace_backend` + `marketplace_frontend` | Standalone marketplace canisters (Basilisk + SvelteKit) at `src/marketplace_*`. Hold listings (extensions and codices), likes, ranking, purchases, audit/verification status, and developer licenses. The actual artifact files live in a connected `file_registry` canister; the marketplace stores only metadata + a pointer. Deploy via `realms marketplace deploy`. See [marketplace/MARKETPLACE.md](docs/reference/MARKETPLACE.md). |
 

@@ -62,7 +62,7 @@ per realm.
 |---|---|---|
 | **Realm UI or backend change** (Agora, Dominion, Syntropia) | `realms mundus deploy` with `--version build` | ~90s |
 | **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install, **or** [direct runtime install](#direct-runtime-install-no-file-registry) | ~26s via registry; direct path skips registry |
-| **Registry / installer / other infra** during dev | `scripts/infra_dev_deploy.sh` or direct `dfx deploy` | ~2–5 min |
+| **Registry / installer / other infra** during dev | fetch GOS artifacts + `dfx deploy` (registry/installer) or `scripts/infra_dev_deploy.sh` (file_registry, …) | ~2–5 min |
 | **Pre-merge / make Casals authoritative** | `publish-build` → `rollout` | several min |
 
 ### What changed?
@@ -72,47 +72,56 @@ per realm.
 | **Frontend** (`src/realm_frontend/`) | `mundus deploy --canister frontend --version build` | `publish-build` (`component=frontend`) → `rollout` (`scope=frontend`) |
 | **Backend** (`src/realm_backend/`) | `mundus deploy --canister backend --version build` | `publish-build` (`component=both`) → `rollout` (`scope=backend`) |
 | **Extension** (`extensions/`) | `deploy-files` → re-install the extension | `deploy-files` → rollout (or re-install) |
-| **Registry / wizard UI** (`src/realm_registry_frontend/`) | [`scripts/infra_dev_deploy.sh`](#registry--wizard-ui-staging) | `publish-build` (`family=registry`) → `rollout` (`realm-registry`) — **see staging caveat below** |
+| **Registry / wizard UI** (GOS platform — live at `staging.gos.earth`) | develop in [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service); Realms pins prebuilt artifacts | fetch → upload → authorize + `realms rollout -t realm-registry` |
 
 ### Registry / wizard UI (staging)
 
-The **create-realm wizard** and **deployment status page** live in
-`src/realm_registry_frontend/` (`staging.gos.earth`). They are
-**not** realm apps and **not** upgraded by `mundus deploy` or `ci-main` (which only
-publishes/rolls out `family=realm`).
+The **create-realm wizard**, **deployment status page**, and **realm registry backend**
+(registry/installer stack — *not* the on-chain `file_registry`) live in
+[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service)
+(first release **v0.1.0**). Realms **no longer builds** `realm_registry_*` or
+`realm_installer` from source — those directories were removed from this repo.
 
-**After changing wizard or deployment-progress UI, you must deploy the registry frontend
-separately** or users will see stale behaviour (e.g. deployment stuck at “Queued” while
-the job is actually installing extensions on-chain).
+**Develop registry/wizard changes in gos-as-a-service**, cut a release there, then bump
+Realms' pin in `scripts/fetch_gos_artifacts.py` (`GOS_RELEASE`).
 
-**Staging — use this today:**
+**What Realms agents still do here:**
+
+- Interact with the **live staging registry** (list realms, credits, enqueue deploys).
+- Top up registry credits via [`deploy-mundus`](#fast-realm-deploy-mundus--default) /
+  `realms mundus deploy` when testing realm provisioning.
+- **Publish + roll out** prebuilt GOS artifacts into test/demo/staging Casals (see
+  [Fast infra deploy](#fast-infra-deploy-dev-only) and
+  [`realms rollout -t realm-registry`](#step-2--rollout)).
+
+The wizard at `staging.gos.earth` is **not** a realm app and **not** upgraded by
+`mundus deploy` or `ci-main` (which only publish/roll out `family=realm`).
+
+**Publish + roll out a new GOS release on staging (Realms side):**
 
 ```bash
 export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
 dfx identity use deployer
 
-# 1. Publish artifacts + authorize in Casals catalog (optional but good before merge)
-python3 scripts/publish_build.py --environment staging --family registry \
-  --component both --from-main --identity deployer
+# 1. Fetch prebuilt WASM + frontend from the pinned GOS release
+python3 scripts/fetch_gos_artifacts.py --what all
+# optional: python3 scripts/fetch_gos_artifacts.py --release v0.1.0 --what wasms|frontend|all
 
-# 2. Update the LIVE wizard website (required for users to see UI changes)
-scripts/infra_dev_deploy.sh -e staging -f registry -c frontend
-# or both backend + frontend if registry backend changed too:
-# scripts/infra_dev_deploy.sh -e staging -f registry -c both
+# 2. Upload into file_registry and authorize in Casals (registry family)
+realms files publish-release --network staging --family registry --version 0.1.0 \
+  --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
+  --frontend-dist .external-assets/realm_registry_frontend/dist \
+  --assets-wasm /tmp/realms-assetstorage.wasm.gz \
+  --identity deployer
+
+# 3. Upgrade the live wizard (Casals path — publish step above fetches from GOS, never builds)
+realms rollout -e staging -t realm-registry -s both -m upgrade -v 0.1.0 \
+  --identity deployer --execute --yes
 ```
 
-**Note:** `infra_dev_deploy.sh` backend build may need an explicit basilisk step first if
-`dfx build realm_registry_backend` produces no WASM — run
-`python -m basilisk realm_registry_backend src/realm_registry_backend/main.py`, then
-`gzip -kf .basilisk/realm_registry_backend/realm_registry_backend.wasm` before
-`dfx canister install …`.
-
-**Casals rollout (`realm-registry`) — blocked until Casals is upgraded on staging:**
-`realms rollout -e staging -t realm-registry -s frontend -v main` currently fails on
-`upgrade_to` (orchestration governance gate when the stand’s section is unset). The fix
-is in the `casals` submodule (`governance_requests.py`); deploy **Casals** to staging
-before relying on rollout for registry. Until then, step 2 above (`infra_dev_deploy.sh`)
-is the supported way to put registry UI changes live.
+`realms rollout -t realm-registry` **never builds from source** — when authorized WASM
+is missing it runs the fetch → upload → authorize flow via
+`scripts/fetch_gos_artifacts.py` automatically (with `--execute`).
 
 **Hard-refresh** the browser (Ctrl+Shift+R) after deploy — asset canisters cache aggressively.
 
@@ -140,8 +149,8 @@ realms mundus deploy deployment-descriptors/test-mundus-layered.yml \
 
 | Flag | Notes |
 |---|---|
-| `--version build` | **Required for local/un-pushed changes** — compiles from the repo checkout |
-| `--version latest` | Pulls artifacts from the latest GitHub release — **will not include your local edits** |
+| `--version build` | **Required for local/un-pushed realm changes** — compiles from the repo checkout |
+| `--version latest` | Pulls **realm** artifacts from the latest **Realms** GitHub release — **will not include your local edits** and **does not** update registry/installer (those use `GOS_RELEASE` in `scripts/fetch_gos_artifacts.py`) |
 | `--canister frontend` / `backend` | Scope to what changed; omit both flags to redeploy both |
 | `--skip-extensions` | Skip extension/codex install when you only changed realm frontend/backend |
 | `--realm agora` | One realm instead of all three in the descriptor |
@@ -295,52 +304,73 @@ Casals but not built here.)
 
 After an off-chain redeploy, demo/staging can still show an old **Realm Registry**
 footer (e.g. `0.3.7`) while test shows `0.4.0` — even though the three realms were
-upgraded. That is expected: the footer is **`realm_registry_frontend`** (infra), not
-the realm apps.
+upgraded. That is expected: the footer is the **GOS registry frontend** (released from
+[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service)),
+not the realm apps. Bump Realms' `GOS_RELEASE` pin when a new gos-as-a-service release
+lands; realm semver releases and GOS releases are versioned independently.
 
 | Component | Off-chain (`deploy-mundus` / `realms mundus deploy`) | Casals (`publish-build` → `rollout`) |
 |---|---|---|
 | Realm backends + frontends (Dominion, Agora, Syntropia) | Yes | Yes |
 | Extensions/codices on realms | Yes (manifest + `file_registry`) | Yes (arrangement) |
-| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.gos.earth) | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) | Yes (`family=registry`, target `realm-registry`) |
-| Installer, `file_registry`, marketplace, dashboard | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) | Yes (`all-infra` or per-family) |
+| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.gos.earth) | **No** (mundus) — **Yes** via [fetch GOS artifacts + `dfx deploy`](#fast-infra-deploy-dev-only) | Yes (`realms rollout -t realm-registry`; publish fetches from gos-as-a-service) |
+| Installer, `file_registry`, marketplace, dashboard | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) for file_registry et al.; installer via GOS fetch + publish | Yes (`all-infra` or per-family; installer uses GOS fetch) |
 
 Notes:
 
 - Mundus descriptors only list `type: realm` entries. The registry backend is used
   to *enqueue* deploy jobs; it is **not** upgraded by mundus deploy.
+- **`latest` is overloaded — never mix:** `realms mundus deploy --version latest` and
+  mundus `artifact_version=latest` mean the latest **Realms** release (realm WASM/assets).
+  Registry and installer artifacts are pinned separately to `GOS_RELEASE` in
+  `scripts/fetch_gos_artifacts.py` (currently `v0.1.0`). Do not assume one `latest`
+  updates both stacks.
 - `artifact_version=latest` in mundus deploy refers to **realm** GitHub-release
   artifacts, not registry/infra.
 - The registry footer version ≠ individual realm WASM version. Realm cards’
   “updated X ago” is catalog metadata, not proof of realm code version.
-- To align demo/staging registry UI with test after a mundus realm deploy, publish
-  and roll out the **`registry`** family (Casals path, `mode=upgrade`) — or use
-  [`infra_dev_deploy.sh`](#registry--wizard-ui-staging) on staging while Casals rollout
-  for `realm-registry` is blocked (see above).
+- To align demo/staging registry UI with test after a mundus realm deploy, fetch the
+  pinned GOS release, publish + authorize (`realms files publish-release` or
+  `realms rollout --execute`, which auto-fetches), then roll out **`realm-registry`**
+  with `-v 0.1.0` (GOS semver, not `-v main`).
 
 ```bash
-# Per environment (example: staging)
-gh workflow run publish-build.yml \
-  -f environment=staging -f family=registry -f component=both -f version=0.4.0
+# Per environment (example: staging) — registry/installer: fetch GOS, then publish + rollout
+python3 scripts/fetch_gos_artifacts.py --what all
+realms files publish-release --network staging --family registry --version 0.1.0 \
+  --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
+  --frontend-dist .external-assets/realm_registry_frontend/dist \
+  --assets-wasm /tmp/realms-assetstorage.wasm.gz --identity deployer
 
-gh workflow run rollout.yml \
-  -f environments=staging -f targets=realm-registry -f scope=both \
-  -f mode=upgrade -f version=0.4.0
+realms rollout -e staging -t realm-registry -s both -m upgrade -v 0.1.0 \
+  --identity deployer --execute --yes
 ```
 
-Repeat for `demo`. Or locally after publish:
+Repeat for `demo`. `realms rollout -t realm-registry` runs the fetch step automatically
+when `--execute` and authorized WASM is missing.
+
+For **realm** artifacts (built in this repo), use `publish_build.py` / `publish-build.yml`
+with `family=realm` as before:
 
 ```bash
-realms rollout -e staging,demo -t realm-registry -s both -m upgrade -v 0.4.0 \
-  --identity deployer --execute --yes
+gh workflow run publish-build.yml \
+  -f environment=staging -f family=realm -f component=both -f from_main=true
+realms rollout -e staging -t all-realms -s both -v main --identity deployer --execute --yes
 ```
 
 ### Fast infra deploy (dev only)
 
-While developing registry / installer / other infra, skip Casals publish + rollout and
-**deploy directly with `dfx`** from the repo root (~2–5 min per component). This updates
-the live canister code immediately but does **not** update the Casals authorized-WASM
-catalog — run the full Casals path before merge.
+While developing **file_registry**, marketplace, dashboard, or other Realms-owned infra,
+skip Casals publish + rollout and **deploy directly with `dfx`** from the repo root
+(~2–5 min per component). This updates the live canister code immediately but does
+**not** update the Casals authorized-WASM catalog — run the full Casals path before merge.
+
+**Registry and installer** no longer have source in this repo. For those stands, the dev
+path is: **fetch prebuilt WASM from the pinned gos-as-a-service release** via
+`scripts/fetch_gos_artifacts.py`, then either `dfx deploy` (direct canister upgrade) or
+`realms files publish-release` + `realms rollout` (Casals-authoritative). Develop
+registry/wizard/installer code in
+[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
 
 **Setup (once per shell):**
 
@@ -350,34 +380,39 @@ export DFX_WARNING=-mainnet_plaintext_identity
 dfx identity use deployer
 ```
 
-**Deploy:**
+**Registry / installer (prebuilt GOS artifacts):**
 
 ```bash
-# Registry backend only (~2–3 min) — e.g. draft APIs, provision_via_casals
-scripts/infra_dev_deploy.sh -e staging -f registry -c backend
+# Fetch realm_registry_backend.wasm.gz, realm_installer.wasm.gz, registry frontend dist
+python3 scripts/fetch_gos_artifacts.py --what all
 
-# Registry frontend only (~3–5 min) — e.g. wizard UI, version picker
-scripts/infra_dev_deploy.sh -e staging -f registry -c frontend
+# Direct dfx upgrade — registry backend on staging (canister id still valid)
+export DFX_NETWORK=staging
+dfx canister install 7wzxh-wyaaa-aaaau-aggyq-cai --network staging --mode upgrade \
+  --wasm .external-wasms/realm_registry_backend.wasm.gz
 
-# Both
-scripts/infra_dev_deploy.sh -e staging -f registry -c both
+# Registry frontend (asset canister)
+dfx deploy realm_registry_frontend --network staging --yes
+# (dfx.json points source at .external-assets/realm_registry_frontend/dist)
 
-# Other infra families: installer | file-registry | marketplace | dashboard
-scripts/infra_dev_deploy.sh -e test -f installer -c backend
+# Installer backend only
+dfx canister install lusjm-wqaaa-aaaau-ago7q-cai --network staging --mode upgrade \
+  --wasm .external-wasms/realm_installer.wasm.gz
+
+# Casals-authoritative (upload + authorize + rollout)
+realms rollout -e staging -t realm-registry -s both -v 0.1.0 --execute --yes
+realms rollout -e staging -t installer -s backend -v 0.1.0 --execute --yes
 ```
 
-Equivalent raw commands (registry backend example):
+> **Canister IDs:** staging registry backend `7wzxh-wyaaa-aaaau-aggyq-cai` and installer
+> `lusjm-wqaaa-aaaau-ago7q-cai` remain valid here. The authoritative ID table for the
+> GOS stack is owned by gos-as-a-service (`AGENTS.md` / `canister_ids.json` there).
+
+**Other infra families (still built from Realms source):**
 
 ```bash
-export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
-export PATH="$PWD/.venv-basilisk/bin:$PATH"
-export CANISTER_CANDID_PATH=src/realm_registry_backend/realm_registry_backend.did
-export DFX_NETWORK=staging
-dfx build realm_registry_backend --network staging
-dfx canister install 7wzxh-wyaaa-aaaau-aggyq-cai --network staging --mode upgrade \
-  --wasm .basilisk/realm_registry_backend/realm_registry_backend.wasm.gz
-npm run build --workspace=realm_registry_frontend
-dfx deploy realm_registry_frontend --network staging --yes
+scripts/infra_dev_deploy.sh -e test -f file-registry -c backend
+scripts/infra_dev_deploy.sh -e test -f marketplace -c both
 ```
 
 **When to use which path** (see also [Choose your path first](#choose-your-path-first) at the top):
@@ -385,8 +420,9 @@ dfx deploy realm_registry_frontend --network staging --yes
 | Situation | Path |
 |---|---|
 | Realm UI/backend change (Agora, Dominion, …) | `realms mundus deploy` with `--version build` |
-| Iterating on registry/wizard during development | `scripts/infra_dev_deploy.sh` |
-| Pre-merge / making Casals authoritative | `publish_build.py` → `realms rollout` |
+| Registry/wizard/installer change | Develop in **gos-as-a-service** → release → bump `GOS_RELEASE` → fetch + publish + rollout |
+| Iterating on file_registry / marketplace / dashboard | `scripts/infra_dev_deploy.sh` or `publish_build.py` |
+| Pre-merge / making Casals authoritative | `publish_build.py` (realm) or GOS fetch + `realms rollout` (registry/installer) |
 
 **Before merge**, align Casals with what you deployed off-chain (realm code):
 
@@ -400,15 +436,13 @@ realms rollout -e staging -t agora -s frontend -v main \
 To sync **registry** UI after a mundus deploy (footer version, wizard, deployment status):
 
 ```bash
-python3 scripts/publish_build.py --environment staging --family registry \
-  --component both --from-main --identity deployer
-realms rollout -e staging -t realm-registry -s both -m upgrade -v main \
+python3 scripts/fetch_gos_artifacts.py --what all
+realms rollout -e staging -t realm-registry -s both -m upgrade -v 0.1.0 \
   --identity deployer --execute --yes
 ```
 
-On **staging**, if rollout fails (known Casals `upgrade_to` issue), use
-[`infra_dev_deploy.sh -e staging -f registry -c frontend`](#registry--wizard-ui-staging)
-instead — see [Registry / wizard UI (staging)](#registry--wizard-ui-staging).
+(`realms rollout` fetches from the GOS release when authorized WASM is missing — it
+never builds registry from Realms source.)
 
 ### Step 1 — Publish Build
 
@@ -428,7 +462,7 @@ python3 scripts/publish_build.py \
 | `publish-build.yml` param | Options | Default | Notes |
 |---|---|---|---|
 | `environment` | `test`, `staging`, `demo` | `test` | |
-| `family` | `realm`, `installer`, `registry`, `file-registry`, `dashboard`, `marketplace` | `realm` | |
+| `family` | `realm`, `file-registry`, `dashboard`, `marketplace` | `realm` | `installer` / `registry` removed — use GOS fetch + `realms files publish-release` |
 | `component` | `both`, `backend`, `frontend` | `both` | |
 | `version` | semver, e.g. `0.4.0` | — | required unless `from_main` |
 | `from_main` | `true`/`false` | `false` | Publish as `main.<ts>.<sha>` instead of semver |
@@ -540,7 +574,7 @@ These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
 - **Orchestra canisters** (every realm + infra canister Casals manages): controlled
   by **Casals** plus **CycleOps** (`cpbhu-5iaaa-aaaad-aalta-cai`, for cycle top-ups).
   On **test/staging**, **`deployer`** (`ah6ac-cc73l-...`) is also a co-controller so
-  [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) can upgrade infra directly
+  direct `dfx canister install` with fetched GOS WASM can upgrade registry/installer
   during development. Casals remains the authoritative upgrade path before merge.
 - **Casals canisters**: controlled by `ah6ac-cc73l-...` (the `my_dev_identity_1` /
   `deployer` key), the dedicated CI key, and a conductor Internet Identity.
@@ -568,10 +602,10 @@ These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
    the ~5 min ingress window. Expect several minutes per realm; this is normal.
 3. **`reinstall` wipes canister state** on success (the protective snapshot is
    dropped after a verified reinstall). Use `upgrade` unless you mean it.
-4. **Frontend builds need candid declarations.** `publish_build.py` copies the
-   committed `src/declarations/*` into each frontend's `src/lib/declarations/`
-   before `vite build` (the realm frontend imports `$lib/declarations/realm_backend`).
-   Don't remove that step or the main-snapshot build fails to resolve the import.
+4. **Frontend builds need candid declarations** (realm/marketplace/dashboard frontends
+   built in this repo). `publish_build.py` copies the committed `src/declarations/*`
+   into each frontend's `src/lib/declarations/` before `vite build`. The GOS registry
+   frontend is prebuilt in gos-as-a-service — Realms only fetches its `dist/`.
 5. **Large files use incremental finalize.** Uploads over ~200 KB are chunked, and
    the CLI finalizes them with `finalize_chunked_file_step` (batched, on-chain
    hashing skipped, local sha256 passed in). The one-shot `finalize_chunked_file`
@@ -606,7 +640,8 @@ JSON. Variants:
 Each realm gets an ordered set of steps (all `(text)->(text)` calls on the realm
 backend): `set_canister_config_json` (runtime flags + file-registry / frontend /
 marketplace ids) → `update_realm_config` (name / manifesto / welcome message) →
-`register_realm_from_registry` (registry) → `install_branding_from_registry` →
+`register_realm_from_registry` (registry canister — **external** service contract;
+registry backend is owned and released from gos-as-a-service) → `install_branding_from_registry` →
 `install_codex_from_registry` → `install_extension_from_registry` (per extension).
 Seed/activate an arrangement via `casals-upgrade.yml -f seed_arrangement=<name>`; only
 one is active at a time (seeding deactivates the others).
@@ -638,9 +673,13 @@ under the file_registry per-file instruction limit.
 
 ### Registration in the realm registry
 
-Realms must register with the `realm-registry` to appear on its frontend (otherwise
-"No Realms"). The registry keys each realm on `ic.caller()` (the realm backend's id),
-so registration is idempotent.
+Realms must register with the **GOS realm-registry** stand to appear on its frontend
+(otherwise “No Realms”). The registry canister is owned by
+[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service);
+Realms arrangements call into it via an **external service contract**
+(`register_realm_from_registry` on each realm backend → inter-canister call to
+`realm_registry_backend`). The registry keys each realm on `ic.caller()` (the realm
+backend's id), so registration is idempotent.
 
 - **User / wizard realms** register automatically — the `realm_installer` calls
   `registry.register_realm(...)` at finalization.
@@ -654,9 +693,15 @@ so registration is idempotent.
 Reinstalling the whole orchestra is three stages. Each stage completes before the next.
 
 ```bash
-# Stage 1: Publish all artifacts (realm + infra) from main into the env's registry+catalog
+# Stage 1: Publish realm artifacts from main; registry/installer from GOS release
 gh workflow run publish-build.yml -f environment=test -f family=realm -f component=both -f from_main=true -f update_catalog=true
-# repeat per family as needed: installer, registry, dashboard, marketplace, file-registry
+python3 scripts/fetch_gos_artifacts.py --what all
+realms files publish-release --network test --family registry --version 0.1.0 \
+  --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
+  --frontend-dist .external-assets/realm_registry_frontend/dist --identity deployer
+realms files publish-release --network test --family installer --version 0.1.0 \
+  --backend-wasm .external-wasms/realm_installer.wasm.gz --identity deployer
+# repeat per Realms-built family: dashboard, marketplace, file-registry
 
 # Stage 2: Publish extension/codex bundles into file_registry
 gh workflow run deploy-files.yml -f environment=test -f scope=all
@@ -906,6 +951,7 @@ quarter bootstrap can pull the new packages.
    up its backend/frontend IDs first:
 
    ```bash
+   # Staging realm_registry_backend canister (authoritative ID table: gos-as-a-service)
    dfx canister call 7wzxh-wyaaa-aaaau-aggyq-cai list_realms '()' \
      --network staging --query | grep -i manualtest
    ```
@@ -1081,8 +1127,10 @@ until updated manually or re-provisioned.
 - **Default deploy path for realm changes:** `realms mundus deploy` with
   `--version build` (~90s). Casals (`publish-build.yml` + `rollout.yml`) is for
   **pre-merge / authoritative** rollouts only — frontend rollout there is slow
-  (several minutes per realm). **Fast infra:** `scripts/infra_dev_deploy.sh` or direct
-  `dfx deploy` for registry/installer during development. **Extensions:**
+  (several minutes per realm). **Registry/installer:** fetch prebuilt artifacts from
+  gos-as-a-service (`scripts/fetch_gos_artifacts.py`) — **building registry from
+  source in this repo is no longer possible**. **Other infra:** `scripts/infra_dev_deploy.sh`
+  or `publish_build.py` for file_registry, marketplace, dashboard. **Extensions:**
   `deploy-files.yml` to publish bundles into the file registry.
 - **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
 - Do not commit unless explicitly told to do so.

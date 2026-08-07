@@ -222,7 +222,8 @@ class TestInstallerManifestParsing:
         assert "gzip_path" not in entry
 
     def test_installer_did_is_queue_only(self):
-        did_path = REPO_ROOT / "src" / "realm_installer" / "realm_installer.did"
+        did_path = REPO_ROOT / "src" / "gos-vendor" / "realm_installer" / "realm_installer.did"
+        assert did_path.is_file(), "vendored realm_installer.did missing"
         did_text = did_path.read_text()
         assert "enqueue_deployment" in did_text
         assert "get_deployment_job_status" in did_text
@@ -233,31 +234,18 @@ class TestInstallerManifestParsing:
         assert "install_realm_backend" not in did_text
         assert "fetch_module_hash" not in did_text
 
-    def test_installer_main_uses_worker_callbacks(self):
-        main_path = REPO_ROOT / "src" / "realm_installer" / "main.py"
-        main_text = main_path.read_text()
-        assert "report_frontend_verified" in main_text
-        assert "_schedule_registry_settlement" in main_text
-        assert "register_founder" in main_text
-        assert "get_deployment_manifest" in main_text
-        assert "_deploy_frontend_core" not in main_text
-        assert "AssetCanisterService" not in main_text
-        assert "def deploy_frontend(" not in main_text
-
-    def test_installer_main_has_no_frontend_deploy_internals(self):
-        main_path = REPO_ROOT / "src" / "realm_installer" / "main.py"
-        main_text = main_path.read_text()
-        assert "gzip_path" not in main_text
-        assert "gzip_sha256" not in main_text
-        assert "content_encoding" not in main_text
-
-    def test_installer_configures_frontend_before_extension_install(self):
-        main_path = REPO_ROOT / "src" / "realm_installer" / "main.py"
-        main_text = main_path.read_text()
-        assert 'kind="configure_canister_ids"' in main_text
-        assert '"frontend_canister_id": frontend_id' in main_text
-        assert "_install_step_failed" in main_text
-        assert main_text.index("configure_canister_ids") < main_text.index("grant_frontend_access")
+    def test_vendored_gos_declarations_present(self):
+        for canister in ("realm_installer", "realm_registry_backend"):
+            decl_dir = REPO_ROOT / "src" / "declarations" / canister
+            vendor_did = (
+                REPO_ROOT / "src" / "gos-vendor" / canister / f"{canister}.did"
+            )
+            did = decl_dir / f"{canister}.did"
+            assert vendor_did.is_file(), f"missing gos-vendor {vendor_did}"
+            assert did.is_file(), f"missing vendored {did}"
+            assert (decl_dir / "index.js").is_file(), (
+                f"missing generated bindings for {canister}"
+            )
 
     def test_codex_install_fails_when_dependencies_fail(self):
         fr_path = REPO_ROOT / "src" / "realm_backend" / "api" / "file_registry.py"
@@ -305,6 +293,17 @@ class TestWasmSpecResolution:
         assert spec["url"] == "https://example.com/token_backend.wasm"
         assert "token-backend-1.0.0" in spec["path"]
 
+    def test_realm_registry_external_wasm(self):
+        ci = self._import_ci()
+        member = {
+            "type": "realm_registry",
+            "wasm_url": "https://example.com/realm_registry_backend.wasm.gz",
+        }
+        spec = ci._wasm_spec_for_member(member, "1.0.0")
+        assert spec is not None
+        assert spec.get("external") is True
+        assert "realm-registry-1.0.0" in spec["path"]
+
     def test_nft_frontend_external_wasm(self):
         ci = self._import_ci()
         member = {
@@ -322,10 +321,15 @@ class TestWasmSpecResolution:
 
     def test_external_wasm_types_defined(self):
         ci = self._import_ci()
+        assert "realm_registry" in ci._EXTERNAL_WASM_TYPES
         assert "token" in ci._EXTERNAL_WASM_TYPES
         assert "nft" in ci._EXTERNAL_WASM_TYPES
         assert "token_frontend" in ci._EXTERNAL_WASM_TYPES
         assert "nft_frontend" in ci._EXTERNAL_WASM_TYPES
+
+    def test_type_to_wasm_has_no_realm_registry(self):
+        ci = self._import_ci()
+        assert "realm_registry" not in ci._TYPE_TO_WASM
 
     def test_frontend_only_types_defined(self):
         ci = self._import_ci()
@@ -349,7 +353,7 @@ class TestCIInstallerPipeline:
         text = ci_path.read_text()
         assert "_publish_frontend_dist" in text
         assert "_build_realm_frontend" in text
-        assert "_build_registry_frontend" in text
+        assert "_fetch_registry_frontend" in text
         assert "_build_dashboard_frontend" in text
         assert "_build_marketplace_frontend" in text
 

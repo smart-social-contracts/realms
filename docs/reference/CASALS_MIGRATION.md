@@ -2,6 +2,12 @@
 
 Status: proposed (planning). Owner: TBD. Last updated: 2026-06-06.
 
+> **2026 note:** `realm_installer`, `realm_registry_backend`, and `realm_registry_frontend`
+> source now live in
+> [smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
+> Realms consumes prebuilt releases via `scripts/fetch_gos_artifacts.py`. Paths below that
+> reference `src/realm_installer/` or `src/realm_registry_*` are historical.
+
 ## Summary
 
 Replace the Realms deployment stack — the on-chain `realm_installer` mechanics plus

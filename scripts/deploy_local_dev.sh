@@ -172,6 +172,8 @@ deploy_repo_root() {
     fi
     
     if [ "$DEPLOY_REGISTRY_BACKEND" = true ]; then
+        echo -e "${GREEN}📥 Fetching GOS artifacts...${NC}"
+        python3 "$REPO_ROOT/scripts/fetch_gos_artifacts.py" --what wasms
         echo -e "${GREEN}🚀 Deploying registry backend...${NC}"
         (cd "$REPO_ROOT" && dfx deploy realm_registry_backend)
     fi
@@ -227,41 +229,19 @@ deploy_single_realm() {
     fi
 }
 
-# Function to copy and deploy registry (mundus mode)
+# Function to fetch and deploy registry (mundus mode)
 deploy_registry() {
-    local registry_dir=$(ls -d "$MUNDUS_PATH"/registry_* 2>/dev/null | head -1)
-    if [ -z "$registry_dir" ]; then
-        echo -e "${RED}Registry directory not found${NC}"
-        return 1
-    fi
-    
-    if [ "$DEPLOY_FRONTEND" = true ]; then
-        echo -e "${GREEN}📦 Copying registry frontend...${NC}"
-        cp -r "$REPO_ROOT/src/realm_registry_frontend/"* "$registry_dir/src/realm_registry_frontend/"
-    fi
-    
-    if [ "$DEPLOY_BACKEND" = true ]; then
-        echo -e "${GREEN}📦 Copying registry backend...${NC}"
-        cp -r "$REPO_ROOT/src/realm_registry_backend/"* "$registry_dir/src/realm_registry_backend/"
-    fi
-    
-    if [ "$CLEAN_BUILD" = true ] && [ "$DEPLOY_FRONTEND" = true ]; then
-        echo -e "${YELLOW}🧹 Cleaning build cache...${NC}"
-        rm -rf "$registry_dir/src/realm_registry_frontend/.svelte-kit"
-        rm -rf "$registry_dir/src/realm_registry_frontend/node_modules/.vite"
-        rm -rf "$registry_dir/src/realm_registry_frontend/dist"
-        echo -e "${GREEN}🔨 Building registry frontend...${NC}"
-        (cd "$registry_dir/src/realm_registry_frontend" && npm run build)
-    fi
-    
-    if [ "$DEPLOY_FRONTEND" = true ]; then
-        echo -e "${GREEN}🚀 Deploying registry frontend...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_frontend)
-    fi
-    
+    echo -e "${GREEN}📥 Fetching GOS registry artifacts...${NC}"
+    python3 "$REPO_ROOT/scripts/fetch_gos_artifacts.py" --what all
+
     if [ "$DEPLOY_BACKEND" = true ]; then
         echo -e "${GREEN}🚀 Deploying registry backend...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_backend)
+        (cd "$REPO_ROOT" && dfx deploy realm_registry_backend)
+    fi
+
+    if [ "$DEPLOY_FRONTEND" = true ]; then
+        echo -e "${GREEN}🚀 Deploying registry frontend...${NC}"
+        (cd "$REPO_ROOT" && dfx deploy realm_registry_frontend)
     fi
 }
 

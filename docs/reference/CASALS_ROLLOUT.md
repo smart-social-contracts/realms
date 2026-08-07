@@ -327,8 +327,11 @@ python3 scripts/publish_build.py \
   --version 0.0.2 --identity <realms-controller-identity>
 ```
 
-Buildable families: `realm`, `installer`, `registry`, `file-registry`,
-`dashboard` (frontend only), `marketplace`. `token`/`nft` are external
+Buildable families in Realms: `realm`, `file-registry`, `dashboard` (frontend only),
+`marketplace`. **`installer` and `registry` are released from
+[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service)** —
+fetch via `scripts/fetch_gos_artifacts.py`, then upload + authorize with
+`realms files publish-release` (see `AGENTS.md`). `token`/`nft` are external
 ledger-style canisters and are not built by this pipeline (they are still
 managed in Casals for visibility / lifecycle).
 

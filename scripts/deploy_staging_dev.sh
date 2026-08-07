@@ -139,70 +139,21 @@ IDENTITY=$(dfx identity whoami 2>/dev/null || echo "unknown")
 echo -e "${BLUE}Identity: $IDENTITY${NC}"
 echo ""
 
-# Function to copy and deploy registry
+# Function to fetch and deploy registry
 deploy_registry() {
-    local registry_dir=$(ls -d "$MUNDUS_DIR"/registry_* 2>/dev/null | head -1)
-    if [ -z "$registry_dir" ] || [ ! -d "$registry_dir" ]; then
-        echo -e "${RED}Error: Registry directory not found in $MUNDUS_DIR${NC}"
-        return 1
-    fi
-    
-    echo -e "${BLUE}━━━ Registry ━━━${NC}"
-    echo -e "${BLUE}Directory: $(basename "$registry_dir")${NC}"
-    
-    if [ "$DEPLOY_FRONTEND" = true ]; then
-        echo -e "${GREEN}📦 Copying registry frontend source...${NC}"
-        cp -r "$REPO_ROOT/src/realm_registry_frontend/"* "$registry_dir/src/realm_registry_frontend/"
-        
-        if [ "$CLEAN_BUILD" = true ]; then
-            echo -e "${YELLOW}🧹 Cleaning frontend build cache...${NC}"
-            rm -rf "$registry_dir/src/realm_registry_frontend/.svelte-kit"
-            rm -rf "$registry_dir/src/realm_registry_frontend/node_modules/.vite"
-            rm -rf "$registry_dir/src/realm_registry_frontend/dist"
-        fi
-        
-        # Source .env so canister IDs are available to the vite build
-        echo -e "${GREEN}🔐 Loading canister environment...${NC}"
-        set -a
-        source "$registry_dir/.env"
+    echo -e "${BLUE}━━━ Registry (gos-as-a-service artifacts) ━━━${NC}"
 
-        # Propagate test-mode VITE_ params from the matching deployment descriptor
-        DESCRIPTOR=""
-        if [ -f "$REPO_ROOT/deployment-descriptors/${NETWORK}-mundus-layered.yml" ]; then
-            DESCRIPTOR="$REPO_ROOT/deployment-descriptors/${NETWORK}-mundus-layered.yml"
-        fi
-        if [ -n "$DESCRIPTOR" ]; then
-            _extract_flag() { grep "^  $1:" "$DESCRIPTOR" 2>/dev/null | awk '{print tolower($2)}'; }
-            for param in TEST_MODE TEST_MODE_II_BYPASS TEST_MODE_USER_SELF_REGISTRATION \
-                         TEST_MODE_DEMO_DATA \
-                         TEST_MODE_SKIP_TERMS TEST_MODE_SKIP_PASSPORT_ZKPROOF; do
-                val=$(_extract_flag "$param")
-                if [ -n "$val" ]; then
-                    export "VITE_${param}=${val}"
-                fi
-            done
-            echo -e "${GREEN}   Test mode params loaded from descriptor${NC}"
-        fi
-        set +a
-        
-        echo -e "${GREEN}� Building registry frontend...${NC}"
-        (cd "$registry_dir/src/realm_registry_frontend" && npm run build)
-        
-        echo -e "${GREEN}🚀 Deploying registry frontend to $NETWORK...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_frontend --network "$NETWORK" --yes)
-    fi
-    
+    echo -e "${GREEN}📥 Fetching GOS registry artifacts...${NC}"
+    python3 "$REPO_ROOT/scripts/fetch_gos_artifacts.py" --what all
+
     if [ "$DEPLOY_BACKEND" = true ]; then
-        echo -e "${GREEN}📦 Copying registry backend source...${NC}"
-        cp -r "$REPO_ROOT/src/realm_registry_backend/"* "$registry_dir/src/realm_registry_backend/"
-        
-        if [ "$CLEAN_BUILD" = true ]; then
-            echo -e "${YELLOW}🧹 Cleaning backend build cache...${NC}"
-            rm -rf "$registry_dir/.basilisk"
-        fi
-        
         echo -e "${GREEN}🚀 Deploying registry backend to $NETWORK...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_backend --network "$NETWORK" --mode upgrade --yes)
+        (cd "$REPO_ROOT" && dfx deploy realm_registry_backend --network "$NETWORK" --mode upgrade --yes)
+    fi
+
+    if [ "$DEPLOY_FRONTEND" = true ]; then
+        echo -e "${GREEN}🚀 Deploying registry frontend to $NETWORK...${NC}"
+        (cd "$REPO_ROOT" && dfx deploy realm_registry_frontend --network "$NETWORK" --yes)
     fi
 }
 

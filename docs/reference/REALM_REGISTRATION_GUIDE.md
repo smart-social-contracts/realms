@@ -252,10 +252,16 @@ realms self-register deregister --realm-id <id> --network <network> --yes
 ```
 
 ### Issue: "Registry canister not found"
-**Solution**: Deploy the registry canisters first:
+**Solution:** Use the shared registry on test/demo/staging, or create a local registry
+instance with prebuilt GOS artifacts (no source build in Realms):
+
 ```bash
-dfx deploy realm_registry_backend realm_registry_frontend
+python3 scripts/fetch_gos_artifacts.py --what all
+realms registry create --deploy --network local
 ```
+
+To develop the registry itself, work in
+[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
 
 ### Issue: "Command timed out"
 **Solution**: Check that dfx replica is running:

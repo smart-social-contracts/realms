@@ -23,6 +23,7 @@ Usage:
         --file deployments/local-mundus.yml \
         --stages 0,1,2,3
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,7 +34,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -104,13 +104,23 @@ def load_descriptor(path: Path) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _run(cmd: List[str], *, env: Optional[Dict[str, str]] = None,
-         check: bool = True, cwd: Optional[Path] = None,
-         capture_output: bool = False) -> subprocess.CompletedProcess:
+def _run(
+    cmd: List[str],
+    *,
+    env: Optional[Dict[str, str]] = None,
+    check: bool = True,
+    cwd: Optional[Path] = None,
+    capture_output: bool = False,
+) -> subprocess.CompletedProcess:
     print("$", " ".join(cmd), flush=True)
-    return subprocess.run(cmd, env=env or os.environ.copy(),
-                          check=check, cwd=str(cwd) if cwd else None,
-                          capture_output=capture_output, text=capture_output)
+    return subprocess.run(
+        cmd,
+        env=env or os.environ.copy(),
+        check=check,
+        cwd=str(cwd) if cwd else None,
+        capture_output=capture_output,
+        text=capture_output,
+    )
 
 
 def _dfx(*args: str, network: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -120,26 +130,28 @@ def _dfx(*args: str, network: str, check: bool = True) -> subprocess.CompletedPr
 def _strip_dfx_warnings(text: str) -> str:
     """Strip deprecation/warning lines that newer dfx versions print to stdout."""
     return "\n".join(
-        line for line in text.splitlines()
-        if not line.startswith("WARNING:")
+        line for line in text.splitlines() if not line.startswith("WARNING:")
     ).strip()
 
 
 def _canister_id(name: str, network: str) -> Optional[str]:
     try:
-        out = _strip_dfx_warnings(subprocess.check_output(
-            ["dfx", "canister", "id", name, "--network", network],
-            text=True, stderr=subprocess.STDOUT,
-        ))
+        out = _strip_dfx_warnings(
+            subprocess.check_output(
+                ["dfx", "canister", "id", name, "--network", network],
+                text=True,
+                stderr=subprocess.STDOUT,
+            )
+        )
         return out or None
     except subprocess.CalledProcessError:
         return None
 
 
 def _dfx_identity_principal() -> str:
-    return _strip_dfx_warnings(subprocess.check_output(
-        ["dfx", "identity", "get-principal"], text=True
-    ))
+    return _strip_dfx_warnings(
+        subprocess.check_output(["dfx", "identity", "get-principal"], text=True)
+    )
 
 
 def _add_controller(canister: str, controller: str, network: str) -> None:
@@ -147,15 +159,22 @@ def _add_controller(canister: str, controller: str, network: str) -> None:
     try:
         info = subprocess.check_output(
             ["dfx", "canister", "info", canister, "--network", network],
-            text=True, stderr=subprocess.DEVNULL,
+            text=True,
+            stderr=subprocess.DEVNULL,
         )
         if controller in info:
             print(f"   ✓ {controller} already controller of {canister}")
             return
     except subprocess.CalledProcessError:
         pass
-    _dfx("canister", "update-settings", canister,
-         "--add-controller", controller, network=network)
+    _dfx(
+        "canister",
+        "update-settings",
+        canister,
+        "--add-controller",
+        controller,
+        network=network,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +189,7 @@ _CYCLEOPS_TEAM = os.environ.get(
 )
 
 _CYCLEOPS_THRESHOLD = 2_000_000_000_000  # 2 TC
-_CYCLEOPS_TOPUP = 4_000_000_000_000      # 4 TC
+_CYCLEOPS_TOPUP = 4_000_000_000_000  # 4 TC
 
 
 def _cycleops_display_name(
@@ -219,34 +238,50 @@ def _register_canister_with_cycleops(
     try:
         result = subprocess.run(
             [
-                "dfx", "canister", "call", "--network", "ic",
-                CYCLEOPS_CANISTER, "addCanister",
-                f'(record {{ '
-                f'asTeamPrincipal = {team_arg}; '
+                "dfx",
+                "canister",
+                "call",
+                "--network",
+                "ic",
+                CYCLEOPS_CANISTER,
+                "addCanister",
+                f"(record {{ "
+                f"asTeamPrincipal = {team_arg}; "
                 f'canisterId = principal "{canister_id}"; '
                 f'name = opt "{display_name}"; '
-                f'topupRule = {topup_rule}; '
-                f'}})',
+                f"topupRule = {topup_rule}; "
+                f"}})",
             ],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if "ok" in (result.stdout or "") or "already" in (result.stdout or ""):
             subprocess.run(
                 [
-                    "dfx", "canister", "call", "--network", "ic",
-                    CYCLEOPS_CANISTER, "verifyBlackholeAddedAsControllerVersioned",
-                    f'(record {{ '
-                    f'asTeamPrincipal = {team_arg}; '
+                    "dfx",
+                    "canister",
+                    "call",
+                    "--network",
+                    "ic",
+                    CYCLEOPS_CANISTER,
+                    "verifyBlackholeAddedAsControllerVersioned",
+                    f"(record {{ "
+                    f"asTeamPrincipal = {team_arg}; "
                     f'canisterId = principal "{canister_id}"; '
-                    f'blackholeVersion = 3 : nat; '
-                    f'}})',
+                    f"blackholeVersion = 3 : nat; "
+                    f"}})",
                 ],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             print(f"   📊 registered {display_name} ({canister_id}) with CycleOps")
         else:
-            print(f"   ⚠ CycleOps addCanister for {display_name}: "
-                  f"{(result.stdout or result.stderr or '')[:200]}")
+            print(
+                f"   ⚠ CycleOps addCanister for {display_name}: "
+                f"{(result.stdout or result.stderr or '')[:200]}"
+            )
     except Exception as e:
         print(f"   ⚠ CycleOps registration failed for {display_name}: {e}")
 
@@ -259,7 +294,9 @@ def _register_canister_with_cycleops(
 INFRA_CANISTERS = ["file_registry", "file_registry_frontend", "realm_installer"]
 
 
-def stage0_bootstrap(descriptor: Dict[str, Any], *, upgrade: bool = False) -> Dict[str, str]:
+def stage0_bootstrap(
+    descriptor: Dict[str, Any], *, upgrade: bool = False
+) -> Dict[str, str]:
     """Bootstrap (and optionally upgrade) infrastructure canisters.
 
     When *upgrade* is True, pinned canisters are redeployed so that code
@@ -328,9 +365,7 @@ def _build_canister_wasm(canister: str, network: str) -> Path:
     print(f"   • building {canister} (WASM) ...")
     main_py = REPO_ROOT / "src" / canister / "main.py"
     if not main_py.exists():
-        raise SystemExit(
-            f"ERROR: cannot build {canister}: {main_py} does not exist"
-        )
+        raise SystemExit(f"ERROR: cannot build {canister}: {main_py} does not exist")
     out_dir = REPO_ROOT / ".basilisk" / canister
     out_dir.mkdir(parents=True, exist_ok=True)
     # Basilisk reads CANISTER_CANDID_PATH from the env (dfx normally
@@ -340,25 +375,40 @@ def _build_canister_wasm(canister: str, network: str) -> Path:
     env = os.environ.copy()
     candid = REPO_ROOT / "src" / canister / f"{canister}.did"
     env["CANISTER_CANDID_PATH"] = str(candid)
-    _run([
-        sys.executable, "-m", "basilisk", canister, str(main_py),
-    ], cwd=REPO_ROOT, env=env)
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "basilisk",
+            canister,
+            str(main_py),
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+    )
     raw_candidates = [
         out_dir / f"{canister}.wasm",
         # dfx-build artifacts as a last-resort fallback for environments
         # that already produced one (e.g. an interactive `dfx build` run).
-        REPO_ROOT / ".dfx" / network / "canisters" / canister
-            / f"{canister}.wasm",
+        REPO_ROOT / ".dfx" / network / "canisters" / canister / f"{canister}.wasm",
     ]
     raw: Optional[Path] = next((c for c in raw_candidates if c.exists()), None)
     if raw is None:
         # Maybe a .wasm.gz already exists (dfx prebuilt).
-        for c in (out_dir / f"{canister}.wasm.gz",
-                  REPO_ROOT / ".dfx" / network / "canisters" / canister
-                      / f"{canister}.wasm.gz"):
+        for c in (
+            out_dir / f"{canister}.wasm.gz",
+            REPO_ROOT
+            / ".dfx"
+            / network
+            / "canisters"
+            / canister
+            / f"{canister}.wasm.gz",
+        ):
             if c.exists():
-                print(f"   • {canister} WASM (pre-gzipped) at {c} "
-                      f"({c.stat().st_size:,} bytes)")
+                print(
+                    f"   • {canister} WASM (pre-gzipped) at {c} "
+                    f"({c.stat().st_size:,} bytes)"
+                )
                 return c
         raise SystemExit(
             f"ERROR: basilisk build for {canister} produced no WASM in any "
@@ -370,6 +420,7 @@ def _build_canister_wasm(canister: str, network: str) -> Path:
     # per-file size limit. dfx does this automatically when a canister
     # has `gzip: true` in dfx.json; basilisk does not.
     import gzip as _gzip
+
     gz = raw.with_suffix(raw.suffix + ".gz")
     with raw.open("rb") as fin, _gzip.open(gz, "wb", compresslevel=9) as fout:
         shutil.copyfileobj(fin, fout)
@@ -388,10 +439,6 @@ _TYPE_TO_WASM: Dict[str, Dict[str, str]] = {
         "source": "realm_backend",
         "path_template": "realm-base-{version}.wasm.gz",
     },
-    "realm_registry": {
-        "source": "realm_registry_backend",
-        "path_template": "realm-registry-{version}.wasm.gz",
-    },
     "marketplace": {
         "source": "marketplace_backend",
         "path_template": "marketplace-{version}.wasm.gz",
@@ -402,6 +449,7 @@ _TYPE_TO_WASM: Dict[str, Dict[str, str]] = {
 # ``wasm_url``), not built from local source. The downloaded file is
 # published to file_registry under this path template.
 _EXTERNAL_WASM_TYPES: Dict[str, str] = {
+    "realm_registry": "realm-registry-{version}.wasm.gz",
     "token": "token-backend-{version}.wasm.gz",
     "token_frontend": "token-frontend-{version}.wasm.gz",
     "nft": "nft-backend-{version}.wasm.gz",
@@ -443,14 +491,18 @@ def _wasm_spec_for_member(
             "url": member["wasm_url"],
         }
     if member.get("wasm_path"):
-        return {"source": member.get("wasm_source", "realm_backend"),
-                "path": member["wasm_path"]}
+        return {
+            "source": member.get("wasm_source", "realm_backend"),
+            "path": member["wasm_path"],
+        }
     if member.get("wasm_source"):
         src = member["wasm_source"]
         return {"source": src, "path": f"{src}-{version}.wasm.gz"}
     spec = _TYPE_TO_WASM.get(mtype) or _TYPE_TO_WASM["realm"]
-    return {"source": spec["source"],
-            "path": spec["path_template"].format(version=version)}
+    return {
+        "source": spec["source"],
+        "path": spec["path_template"].format(version=version),
+    }
 
 
 def _download_external_wasm(url: str, dest_dir: Path, filename: str) -> Path:
@@ -460,11 +512,16 @@ def _download_external_wasm(url: str, dest_dir: Path, filename: str) -> Path:
     """
     import gzip as _gzip
     import urllib.request
+
     dest_dir.mkdir(parents=True, exist_ok=True)
     raw_dest = dest_dir / filename
     print(f"   • downloading {url} → {raw_dest}")
     urllib.request.urlretrieve(url, raw_dest)
     raw_size = raw_dest.stat().st_size
+
+    if str(raw_dest).endswith(".wasm.gz") or raw_dest.suffix == ".gz":
+        print(f"     downloaded {raw_size:,} bytes (already gzipped)")
+        return raw_dest
 
     gz_dest = raw_dest.with_suffix(raw_dest.suffix + ".gz")
     with raw_dest.open("rb") as fin, _gzip.open(gz_dest, "wb", compresslevel=9) as fout:
@@ -482,19 +539,23 @@ def _build_marketplace_frontend(network: str) -> Optional[Path]:
         if not did_path.exists():
             env = os.environ.copy()
             env["CANISTER_CANDID_PATH"] = str(did_path)
-            _run([
-                sys.executable, "-m", "basilisk",
-                canister_name,
-                str(REPO_ROOT / "src" / canister_name / "main.py"),
-            ], cwd=REPO_ROOT, env=env, check=False)
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "basilisk",
+                    canister_name,
+                    str(REPO_ROOT / "src" / canister_name / "main.py"),
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+            )
 
         if did_path.exists():
-            _run(["dfx", "generate", canister_name],
-                 cwd=REPO_ROOT, check=False)
+            _run(["dfx", "generate", canister_name], cwd=REPO_ROOT, check=False)
 
-    _run(["npm", "run", "build",
-          "--workspace=marketplace_frontend"],
-         cwd=REPO_ROOT)
+    _run(["npm", "run", "build", "--workspace=marketplace_frontend"], cwd=REPO_ROOT)
 
     dist = REPO_ROOT / "src" / "marketplace_frontend" / "dist"
     if dist.is_dir() and any(dist.iterdir()):
@@ -512,7 +573,9 @@ def _build_realm_frontend(
     Returns the dist/ directory path on success, None on failure.
     """
     name = member.get("display_name") or member["name"]
-    backend_id = member.get("canister_id") or _canister_id(member["name"], network) or ""
+    backend_id = (
+        member.get("canister_id") or _canister_id(member["name"], network) or ""
+    )
     frontend_id = member.get("frontend_canister_id", "")
 
     if not backend_id:
@@ -533,22 +596,40 @@ def _build_realm_frontend(
     if not did_path.exists():
         did_path.parent.mkdir(parents=True, exist_ok=True)
         meta = subprocess.run(
-            ["dfx", "canister", "metadata", backend_id,
-             "candid:service", "--network", network],
-            capture_output=True, text=True, timeout=60,
+            [
+                "dfx",
+                "canister",
+                "metadata",
+                backend_id,
+                "candid:service",
+                "--network",
+                network,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if meta.returncode == 0 and meta.stdout.strip():
             did_path.write_text(meta.stdout)
         else:
-            _run([
-                sys.executable, "-m", "basilisk",
-                "realm_backend",
-                str(REPO_ROOT / "src" / "realm_backend" / "main.py"),
-            ], cwd=REPO_ROOT, check=False)
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "basilisk",
+                    "realm_backend",
+                    str(REPO_ROOT / "src" / "realm_backend" / "main.py"),
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+            )
 
     if did_path.exists():
-        _run(["dfx", "generate", "realm_backend", "--network", network],
-             cwd=REPO_ROOT, check=False)
+        _run(
+            ["dfx", "generate", "realm_backend", "--network", network],
+            cwd=REPO_ROOT,
+            check=False,
+        )
 
     if src_decls.exists() and (src_decls / "realm_backend").exists():
         lib_decls.mkdir(parents=True, exist_ok=True)
@@ -568,8 +649,7 @@ def _build_realm_frontend(
             text = text.replace("@icp-sdk/core/candid", "@dfinity/candid")
             idx.write_text(text)
 
-    _run(["npm", "run", "build", "--workspace=realm_frontend"],
-         cwd=REPO_ROOT)
+    _run(["npm", "run", "build", "--workspace=realm_frontend"], cwd=REPO_ROOT)
 
     dist = fe_dir / "dist"
     if dist.is_dir() and any(dist.iterdir()):
@@ -578,81 +658,37 @@ def _build_realm_frontend(
     return None
 
 
-def _build_registry_frontend(
-    network: str,
-    *,
-    installer_canister_id: str = "",
-    deploy_queue_network: str = "",
-    deploy_service_url: str = "",
-) -> Optional[Path]:
-    """Build the realm_registry_frontend. Returns dist/ path or None."""
-    did_path = REPO_ROOT / "src" / "realm_registry_backend" / "realm_registry_backend.did"
-    if not did_path.exists():
-        env = os.environ.copy()
-        env["CANISTER_CANDID_PATH"] = str(did_path)
-        _run([
-            sys.executable, "-m", "basilisk",
-            "realm_registry_backend",
-            str(REPO_ROOT / "src" / "realm_registry_backend" / "main.py"),
-        ], cwd=REPO_ROOT, env=env, check=False)
-
-    if did_path.exists():
-        _run(["dfx", "generate", "realm_registry_backend"],
-             cwd=REPO_ROOT, check=False)
-        decl_dir = REPO_ROOT / "src" / "declarations" / "realm_registry_backend"
-        for f in list(decl_dir.glob("*.js")) + list(decl_dir.glob("*.ts")):
-            text = f.read_text()
-            if "@icp-sdk/core" in text:
-                f.write_text(
-                    text.replace("@icp-sdk/core/agent", "@dfinity/agent")
-                        .replace("@icp-sdk/core/principal", "@dfinity/principal")
-                        .replace("@icp-sdk/core/candid", "@dfinity/candid")
-                )
-
-    fe_pkg = REPO_ROOT / "src" / "realm_registry_frontend" / "package.json"
-    pkg_text = fe_pkg.read_text()
-    if '"prebuild"' in pkg_text:
-        pkg_data = json.loads(pkg_text)
-        pkg_data.get("scripts", {}).pop("prebuild", None)
-        fe_pkg.write_text(json.dumps(pkg_data, indent=2) + "\n")
-
-    build_env = os.environ.copy()
-    if deploy_queue_network:
-        build_env["VITE_DEPLOY_QUEUE_NETWORK"] = deploy_queue_network
-        print(f"   • VITE_DEPLOY_QUEUE_NETWORK={deploy_queue_network}")
-    if installer_canister_id:
-        build_env["VITE_REALM_INSTALLER_CANISTER_ID"] = installer_canister_id
-        print(f"   • VITE_REALM_INSTALLER_CANISTER_ID={installer_canister_id}")
-    if deploy_service_url:
-        build_env["VITE_DEPLOY_SERVICE_URL"] = deploy_service_url
-        print(f"   • VITE_DEPLOY_SERVICE_URL={deploy_service_url}")
-
-    _run(["npm", "run", "build", "--workspace=realm_registry_frontend"],
-         cwd=REPO_ROOT, env=build_env)
-
-    fe_pkg.write_text(pkg_text)
-
-    dist = REPO_ROOT / "src" / "realm_registry_frontend" / "dist"
+def _fetch_registry_frontend() -> Optional[Path]:
+    """Fetch prebuilt realm_registry_frontend dist from gos-as-a-service."""
+    fetch_script = REPO_ROOT / "scripts" / "fetch_gos_artifacts.py"
+    _run([sys.executable, str(fetch_script), "--what", "frontend"], cwd=REPO_ROOT)
+    dist = REPO_ROOT / ".external-assets" / "realm_registry_frontend" / "dist"
     if dist.is_dir() and any(dist.iterdir()):
         return dist
-    print("   ⚠ realm_registry_frontend build produced no dist/")
+    print("   ⚠ fetch_gos_artifacts did not produce registry frontend dist/")
     return None
 
 
 def _build_dashboard_frontend(network: str) -> Optional[Path]:
     """Build the platform_dashboard_frontend. Returns dist/ path or None."""
     for canister_name in [
-        "realm_registry_backend", "realm_installer",
-        "marketplace_backend", "file_registry", "realm_backend",
+        "realm_registry_backend",
+        "realm_installer",
+        "marketplace_backend",
+        "file_registry",
+        "realm_backend",
     ]:
-        did_path = REPO_ROOT / "src" / canister_name / f"{canister_name}.did"
-        if did_path.exists():
-            _run(["dfx", "generate", canister_name],
-                 cwd=REPO_ROOT, check=False)
+        vendored_did = (
+            REPO_ROOT / "src" / "declarations" / canister_name / f"{canister_name}.did"
+        )
+        src_did = REPO_ROOT / "src" / canister_name / f"{canister_name}.did"
+        if vendored_did.exists() or src_did.exists():
+            _run(["dfx", "generate", canister_name], cwd=REPO_ROOT, check=False)
 
-    _run(["npm", "run", "build",
-          "--workspace=platform_dashboard_frontend"],
-         cwd=REPO_ROOT)
+    _run(
+        ["npm", "run", "build", "--workspace=platform_dashboard_frontend"],
+        cwd=REPO_ROOT,
+    )
 
     dist = REPO_ROOT / "src" / "platform_dashboard_frontend" / "dist"
     if dist.is_dir() and any(dist.iterdir()):
@@ -673,14 +709,18 @@ def _publish_frontend_dist(
     --publish-frontend CLI arg.
     """
     cmd = [
-        sys.executable, str(REPO_ROOT / "scripts" / "publish_layered.py"),
-        "--registry", file_registry,
-        "--network", network,
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "publish_layered.py"),
+        "--registry",
+        file_registry,
+        "--network",
+        network,
         "--skip-base-wasm",
         "--skip-extensions",
         "--skip-codices",
         "--skip-frontend-build",
-        "--publish-frontend", f"{dist_dir}:{namespace}",
+        "--publish-frontend",
+        f"{dist_dir}:{namespace}",
     ]
     return _run(cmd, check=False).returncode
 
@@ -701,11 +741,16 @@ def stage1_publish(
     print("\n┌─ stage 1: publish artifacts " + "─" * 36)
 
     cmd = [
-        sys.executable, str(REPO_ROOT / "scripts" / "publish_layered.py"),
-        "--registry", file_registry,
-        "--network", network,
-        "--extensions-repo", str(REPO_ROOT),
-        "--codices-root", str(CODICES_ROOT),
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "publish_layered.py"),
+        "--registry",
+        file_registry,
+        "--network",
+        network,
+        "--extensions-repo",
+        str(REPO_ROOT),
+        "--codices-root",
+        str(CODICES_ROOT),
     ]
 
     # Collect every distinct WASM source required by the mundus members
@@ -719,15 +764,18 @@ def stage1_publish(
     # built from source. Frontend-only types (dashboard) have no WASM.
     sources_needed: Dict[str, str] = {}  # source -> registry_path
     external_wasms: Dict[str, Dict[str, str]] = {}  # url -> {path, source}
-    for member in (descriptor.get("mundus") or []):
+    for member in descriptor.get("mundus") or []:
         spec = _wasm_spec_for_member(member, base_version)
         if spec is None:
             continue
         if spec.get("external"):
-            external_wasms.setdefault(spec["url"], {
-                "path": spec["path"],
-                "source": spec["source"],
-            })
+            external_wasms.setdefault(
+                spec["url"],
+                {
+                    "path": spec["path"],
+                    "source": spec["source"],
+                },
+            )
         else:
             sources_needed.setdefault(spec["source"], spec["path"])
 
@@ -740,8 +788,10 @@ def stage1_publish(
         # consumers of `wasm/realm-base-*` keep working.
         base_wasm_path = _build_canister_wasm("realm_backend", network)
         cmd += [
-            "--base-wasm", str(base_wasm_path),
-            "--base-wasm-version", base_version,
+            "--base-wasm",
+            str(base_wasm_path),
+            "--base-wasm-version",
+            base_version,
         ]
         sources_needed.pop("realm_backend", None)
 
@@ -784,8 +834,7 @@ def stage1_publish(
 
     node_modules = REPO_ROOT / "node_modules"
     if not node_modules.exists():
-        _run(["npm", "install", "--legacy-peer-deps"],
-             cwd=REPO_ROOT, check=False)
+        _run(["npm", "install", "--legacy-peer-deps"], cwd=REPO_ROOT, check=False)
 
     install_script = REPO_ROOT / "scripts" / "install_extensions.sh"
     if install_script.exists():
@@ -798,7 +847,8 @@ def stage1_publish(
 
     try:
         realm_members = [
-            m for m in (descriptor.get("mundus") or [])
+            m
+            for m in (descriptor.get("mundus") or [])
             if m.get("frontend_canister_id")
             and (m.get("type") or "realm").strip() == "realm"
         ]
@@ -810,38 +860,25 @@ def stage1_publish(
                 namespace = f"frontend/{member['name']}"
                 rc = _publish_frontend_dist(dist, namespace, file_registry, network)
                 if rc != 0:
-                    raise SystemExit(
-                        f"ERROR: failed to publish frontend for {name}"
-                    )
+                    raise SystemExit(f"ERROR: failed to publish frontend for {name}")
                 print(f"   ✅ {name} frontend published → {namespace}")
     finally:
         ids_file.write_text(original_ids_text)
 
     registry_member = _find_registry_member(descriptor)
     if registry_member and registry_member.get("frontend_canister_id"):
-        print("\n   ▸ building realm_registry_frontend …")
-        _mgmt_url_map = {
-            "staging": "https://management.realmsgos.dev",
-            "demo": "https://management-demo.realmsgos.dev",
-            "test": "https://management-test.realmsgos.dev",
-        }
-        dist = _build_registry_frontend(
-            network,
-            installer_canister_id=infra_ids.get("realm_installer", ""),
-            deploy_queue_network=network,
-            deploy_service_url=_mgmt_url_map.get(network, ""),
-        )
+        print("\n   ▸ fetching realm_registry_frontend from gos-as-a-service …")
+        dist = _fetch_registry_frontend()
         if dist:
             namespace = f"frontend/{registry_member['name']}"
             rc = _publish_frontend_dist(dist, namespace, file_registry, network)
             if rc != 0:
-                raise SystemExit(
-                    "ERROR: failed to publish realm_registry_frontend"
-                )
+                raise SystemExit("ERROR: failed to publish realm_registry_frontend")
             print(f"   ✅ realm_registry_frontend published → {namespace}")
 
     marketplace_members = [
-        m for m in (descriptor.get("mundus") or [])
+        m
+        for m in (descriptor.get("mundus") or [])
         if (m.get("type") or "").strip() == "marketplace"
         and m.get("frontend_canister_id")
     ]
@@ -852,13 +889,12 @@ def stage1_publish(
             namespace = f"frontend/{member['name']}"
             rc = _publish_frontend_dist(dist, namespace, file_registry, network)
             if rc != 0:
-                raise SystemExit(
-                    "ERROR: failed to publish marketplace_frontend"
-                )
+                raise SystemExit("ERROR: failed to publish marketplace_frontend")
             print(f"   ✅ marketplace_frontend published → {namespace}")
 
     dashboard_members = [
-        m for m in (descriptor.get("mundus") or [])
+        m
+        for m in (descriptor.get("mundus") or [])
         if (m.get("type") or "").strip() == "dashboard"
     ]
     for member in dashboard_members:
@@ -871,9 +907,7 @@ def stage1_publish(
             namespace = f"frontend/{member['name']}"
             rc = _publish_frontend_dist(dist, namespace, file_registry, network)
             if rc != 0:
-                raise SystemExit(
-                    "ERROR: failed to publish platform_dashboard_frontend"
-                )
+                raise SystemExit("ERROR: failed to publish platform_dashboard_frontend")
             print(f"   ✅ platform_dashboard_frontend published → {namespace}")
 
     print("   ✅ all frontends published to file_registry")
@@ -884,7 +918,9 @@ def stage1_publish(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_member_extensions(member: Dict[str, Any], artifacts: Dict[str, Any]) -> List[str]:
+def _resolve_member_extensions(
+    member: Dict[str, Any], artifacts: Dict[str, Any]
+) -> List[str]:
     spec = member.get("extensions")
     if spec == "inherit_from_artifacts":
         spec = artifacts.get("extensions")
@@ -893,13 +929,18 @@ def _resolve_member_extensions(member: Dict[str, Any], artifacts: Dict[str, Any]
     return list(spec or [])
 
 
-def _resolve_member_codices(member: Dict[str, Any], artifacts: Dict[str, Any]) -> List[str]:
+def _resolve_member_codices(
+    member: Dict[str, Any], artifacts: Dict[str, Any]
+) -> List[str]:
     spec = member.get("codices")
     if spec == "inherit_from_artifacts":
         spec = artifacts.get("codices")
     if spec == "all":
-        return [p.name for p in CODICES_ROOT.iterdir()
-                if p.is_dir() and p.name not in ("_common", "common")]
+        return [
+            p.name
+            for p in CODICES_ROOT.iterdir()
+            if p.is_dir() and p.name not in ("_common", "common")
+        ]
     return list(spec or [])
 
 
@@ -937,19 +978,19 @@ def _register_realm_with_registry(
     name = member["name"]
     canister_id = member["canister_id"]
     realm_name = member.get("display_name") or name.title()
-    frontend_canister_id = (
-        member.get("frontend_canister_id")
-        or (member.get("canisters") or {}).get("frontend", "")
-    )
+    frontend_canister_id = member.get("frontend_canister_id") or (
+        member.get("canisters") or {}
+    ).get("frontend", "")
     frontend_url = member.get("frontend_url") or _frontend_url(
         frontend_canister_id, network
     )
-    backend_url = member.get("backend_url") or _frontend_url(canister_id, network)
-    canister_ids_packed = "|".join([
-        frontend_canister_id or "",
-        member.get("token_canister_id", ""),
-        member.get("nft_canister_id", ""),
-    ])
+    canister_ids_packed = "|".join(
+        [
+            frontend_canister_id or "",
+            member.get("token_canister_id", ""),
+            member.get("nft_canister_id", ""),
+        ]
+    )
     args = (
         f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", '
         f'"{canister_ids_packed}")'
@@ -957,9 +998,20 @@ def _register_realm_with_registry(
     print(f"   • registering {name} with registry {registry_canister_id}")
     try:
         cp = subprocess.run(
-            ["dfx", "canister", "call", "--network", network,
-             canister_id, "register_realm_with_registry", args],
-            capture_output=True, text=True, check=True, timeout=120,
+            [
+                "dfx",
+                "canister",
+                "call",
+                "--network",
+                network,
+                canister_id,
+                "register_realm_with_registry",
+                args,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=120,
         )
         # The endpoint always returns a JSON string (success or error
         # is inside it), even on canister-side failure paths.
@@ -991,7 +1043,9 @@ _DFX_NETWORKS: Dict[str, Dict[str, Any]] = {
 
 
 def _find_or_build_wasm(
-    member: Dict[str, Any], base_version: str, network: str,
+    member: Dict[str, Any],
+    base_version: str,
+    network: str,
 ) -> Optional[Path]:
     """Locate a locally-built WASM artifact or build it on-the-fly.
 
@@ -1012,7 +1066,11 @@ def _find_or_build_wasm(
         download_dir = REPO_ROOT / ".external-wasms"
         filename = url.rsplit("/", 1)[-1]
         dest = download_dir / filename
-        gz = dest.with_suffix(dest.suffix + ".gz") if not str(dest).endswith(".gz") else dest
+        gz = (
+            dest.with_suffix(dest.suffix + ".gz")
+            if not str(dest).endswith(".gz")
+            else dest
+        )
         if gz.exists():
             return gz
         if dest.exists():
@@ -1035,7 +1093,8 @@ def _find_or_build_wasm(
 
 
 def _build_member_frontend(
-    member: Dict[str, Any], network: str,
+    member: Dict[str, Any],
+    network: str,
     **registry_kwargs,
 ) -> Optional[Path]:
     """Build the correct frontend dist/ for a mundus member's type."""
@@ -1045,7 +1104,7 @@ def _build_member_frontend(
     if mtype == "realm":
         return _build_realm_frontend(member, network)
     if mtype == "realm_registry":
-        return _build_registry_frontend(network, **registry_kwargs)
+        return _fetch_registry_frontend()
     if mtype == "marketplace":
         return _build_marketplace_frontend(network)
     if mtype == "dashboard":
@@ -1054,7 +1113,9 @@ def _build_member_frontend(
 
 
 def _direct_deploy_frontend_assets(
-    canister_id: str, dist_dir: Path, network: str,
+    canister_id: str,
+    dist_dir: Path,
+    network: str,
 ) -> None:
     """Deploy a frontend dist/ to an asset canister using a temp dfx project."""
     tmp = Path(tempfile.mkdtemp(prefix="ci_fe_deploy_"))
@@ -1067,9 +1128,12 @@ def _direct_deploy_frontend_assets(
             "networks": dict(_DFX_NETWORKS),
         }
         (tmp / "dfx.json").write_text(json.dumps(dfx_json, indent=2))
-        (tmp / "canister_ids.json").write_text(json.dumps(
-            {"frontend": {network: canister_id}}, indent=2,
-        ))
+        (tmp / "canister_ids.json").write_text(
+            json.dumps(
+                {"frontend": {network: canister_id}},
+                indent=2,
+            )
+        )
         _run(
             ["dfx", "deploy", "frontend", "--network", network, "--yes"],
             cwd=tmp,
@@ -1143,21 +1207,18 @@ def _dfx_call_text(
     Returns the stripped stdout of `dfx canister call`.  The caller is
     responsible for parsing the returned candid text payload.
     """
-    with tempfile.NamedTemporaryFile(
-        "w", suffix=".did", delete=False
-    ) as fh:
+    with tempfile.NamedTemporaryFile("w", suffix=".did", delete=False) as fh:
         # dfx --argument-file accepts a candid expression directly.
         # text values are written as candid string literals — escape
         # backslashes and double-quotes per Candid's text rules.
-        escaped = arg_text.replace("\\", "\\\\").replace("\"", "\\\"")
+        escaped = arg_text.replace("\\", "\\\\").replace('"', '\\"')
         fh.write(f'("{escaped}")')
         arg_path = fh.name
     try:
         cmd = ["dfx", "canister", "call", "--network", network]
         if query:
             cmd.append("--query")
-        cmd += [canister, method, "--argument-file", arg_path,
-                "--output", "raw"]
+        cmd += [canister, method, "--argument-file", arg_path, "--output", "raw"]
         # --output raw returns the candid hex bytes; we instead want the
         # decoded text, so drop it and parse the default output below.
         cmd = [c for c in cmd if c not in ("--output", "raw")]
@@ -1166,10 +1227,7 @@ def _dfx_call_text(
                 cmd, capture_output=True, text=True, check=True, timeout=timeout
             )
         except subprocess.CalledProcessError as e:
-            print(
-                f"   ✗ dfx call {canister}.{method} failed "
-                f"(exit {e.returncode})"
-            )
+            print(f"   ✗ dfx call {canister}.{method} failed " f"(exit {e.returncode})")
             if e.stderr:
                 print(f"     stderr: {e.stderr.strip()[:500]}")
             if e.stdout:
@@ -1220,7 +1278,7 @@ def _dfx_call_json(
 ) -> Any:
     """``dfx canister call`` with ``--output json`` (for realm_installer variants)."""
     with tempfile.NamedTemporaryFile("w", suffix=".did", delete=False) as fh:
-        escaped = arg_text.replace("\\", "\\\\").replace("\"", "\\\"")
+        escaped = arg_text.replace("\\", "\\\\").replace('"', '\\"')
         fh.write(f'("{escaped}")')
         arg_path = fh.name
     try:
@@ -1229,13 +1287,16 @@ def _dfx_call_json(
             cmd.append("--query")
         cmd += [canister, method, "--argument-file", arg_path]
         cp = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=timeout,
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=timeout,
         )
         return json.loads((cp.stdout or "").strip())
     except subprocess.CalledProcessError as e:
         print(
-            f"   ✗ dfx json call {canister}.{method} failed "
-            f"(exit {e.returncode})"
+            f"   ✗ dfx json call {canister}.{method} failed " f"(exit {e.returncode})"
         )
         if e.stderr:
             print(f"     stderr: {e.stderr.strip()[:500]}")
@@ -1250,12 +1311,18 @@ def _dfx_call_json(
 
 
 def _dfx_realm_text_to_backend(
-    canister_id: str, method: str, payload: Dict[str, Any], network: str,
+    canister_id: str,
+    method: str,
+    payload: Dict[str, Any],
+    network: str,
 ) -> Dict[str, Any]:
     out = _unwrap_candid_text(
         _dfx_call_text(
-            canister_id, method, json.dumps(payload, separators=(",", ":")),
-            network=network, timeout=1200,
+            canister_id,
+            method,
+            json.dumps(payload, separators=(",", ":")),
+            network=network,
+            timeout=1200,
         )
     )
     return json.loads(out, strict=False)
@@ -1287,16 +1354,20 @@ def _offchain_apply_mundus_manifest(
         mode = w.get("mode", "upgrade")
         wasm_file = _find_or_build_wasm(member, base_version, network)
         if not wasm_file:
-            raise SystemExit(
-                f"ERROR: {name}: could not locate or build WASM artifact"
-            )
+            raise SystemExit(f"ERROR: {name}: could not locate or build WASM artifact")
         print(f"     installing WASM {wasm_file.name} → {target} (mode={mode})")
         init_arg = (member.get("init_arg") or "").strip()
         cmd = [
-            "dfx", "canister", "install", target,
-            "--wasm", str(wasm_file),
-            "--mode", mode,
-            "--network", network,
+            "dfx",
+            "canister",
+            "install",
+            target,
+            "--wasm",
+            str(wasm_file),
+            "--mode",
+            mode,
+            "--network",
+            network,
             "--yes",
         ]
         if init_arg:
@@ -1372,12 +1443,20 @@ def _grant_frontend_permissions(
         try:
             subprocess.run(
                 [
-                    "dfx", "canister", "call", "--network", network,
-                    frontend_canister_id, "grant_permission",
+                    "dfx",
+                    "canister",
+                    "call",
+                    "--network",
+                    network,
+                    frontend_canister_id,
+                    "grant_permission",
                     f'(record {{ to_principal = principal "{installer_principal}"; '
-                    f'permission = variant {{ {perm} }} }})',
+                    f"permission = variant {{ {perm} }} }})",
                 ],
-                capture_output=True, text=True, check=True, timeout=60,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=60,
             )
             print(f"   ✓ granted {perm} on {frontend_canister_id}")
         except subprocess.CalledProcessError as e:
@@ -1385,8 +1464,10 @@ def _grant_frontend_permissions(
             if "already" in stderr.lower():
                 print(f"   ✓ {perm} already granted on {frontend_canister_id}")
             else:
-                print(f"   ⚠ grant_permission({perm}) on "
-                      f"{frontend_canister_id}: {stderr[:200]}")
+                print(
+                    f"   ⚠ grant_permission({perm}) on "
+                    f"{frontend_canister_id}: {stderr[:200]}"
+                )
 
 
 def _is_asset_canister_frontend(member: Dict[str, Any]) -> bool:
@@ -1415,7 +1496,9 @@ def _kickoff_deploy(
     is_frontend_only = mtype in _FRONTEND_ONLY_TYPES
 
     if is_frontend_only:
-        canister_id = member.get("frontend_canister_id") or _canister_id(name, network) or ""
+        canister_id = (
+            member.get("frontend_canister_id") or _canister_id(name, network) or ""
+        )
     else:
         canister_id = member.get("canister_id") or _canister_id(name, network)
 
@@ -1432,8 +1515,7 @@ def _kickoff_deploy(
     else:
         wasm_label = "(frontend-only)"
     print(
-        f"\n   ▸ {name} ({canister_id})  [mode={member_mode}]"
-        f"  [wasm={wasm_label}]"
+        f"\n   ▸ {name} ({canister_id})  [mode={member_mode}]" f"  [wasm={wasm_label}]"
     )
     _add_controller(canister_id, realm_installer, network)
 
@@ -1448,7 +1530,9 @@ def _kickoff_deploy(
         _add_controller(frontend_id, CYCLEOPS_BLACKHOLE_V3, network)
         if newly_created:
             fe_display = _cycleops_display_name(
-                name, network, suffix="frontend",
+                name,
+                network,
+                suffix="frontend",
             )
             _register_canister_with_cycleops(frontend_id, fe_display, network)
         if _is_asset_canister_frontend(member):
@@ -1493,7 +1577,9 @@ def _kickoff_deploy(
 
 
 def _link_token_nft_canisters(
-    members: List[Dict[str, Any]], network: str, version: str = "",
+    members: List[Dict[str, Any]],
+    network: str,
+    version: str = "",
     parameters: Dict[str, Any] = None,
 ) -> None:
     """Configure realm backends via set_canister_config after deployment.
@@ -1502,8 +1588,7 @@ def _link_token_nft_canisters(
     network, and test flags on each realm backend.
     """
     realm_members = {
-        m["name"]: m for m in members
-        if (m.get("type") or "realm").strip() == "realm"
+        m["name"]: m for m in members if (m.get("type") or "realm").strip() == "realm"
     }
     if not realm_members:
         return
@@ -1517,7 +1602,9 @@ def _link_token_nft_canisters(
         nft_id = ""
         for m in members:
             if m["name"] == token_name:
-                token_id = m.get("canister_id") or _canister_id(token_name, network) or ""
+                token_id = (
+                    m.get("canister_id") or _canister_id(token_name, network) or ""
+                )
             if m["name"] == nft_name:
                 nft_id = m.get("canister_id") or _canister_id(nft_name, network) or ""
 
@@ -1528,7 +1615,7 @@ def _link_token_nft_canisters(
         def opt(v):
             if not v:
                 return "null"
-            escaped = str(v).replace('\\', '\\\\').replace('"', '\\"')
+            escaped = str(v).replace("\\", "\\\\").replace('"', '\\"')
             return f'opt "{escaped}"'
 
         test_flags_json = ""
@@ -1542,11 +1629,15 @@ def _link_token_nft_canisters(
                 "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
                 "TEST_MODE_SKIP_AUTHENTICATION": "skip_authentication",
             }
-            flags = {fk: bool(parameters[pk]) for pk, fk in _TEST_PARAM_MAP.items() if pk in parameters}
+            flags = {
+                fk: bool(parameters[pk])
+                for pk, fk in _TEST_PARAM_MAP.items()
+                if pk in parameters
+            }
             if flags:
                 test_flags_json = json.dumps(flags)
 
-        arg = f'({opt(frontend_id)}, {opt(token_id)}, {opt(nft_id)}, null, null, {opt(version)}, {opt(network)}, {opt(test_flags_json)})'
+        arg = f"({opt(frontend_id)}, {opt(token_id)}, {opt(nft_id)}, null, null, {opt(version)}, {opt(network)}, {opt(test_flags_json)})"
         parts = [f"frontend={frontend_id or '–'}"]
         if token_id:
             parts.append(f"token={token_id}")
@@ -1556,18 +1647,31 @@ def _link_token_nft_canisters(
             parts.append(f"version={version}")
         parts.append(f"network={network}")
         if test_flags_json:
-            parts.append(f"test_flags")
+            parts.append("test_flags")
         print(f"   🔗 configuring {realm_name}: {', '.join(parts)}")
         try:
-            _dfx("canister", "call", realm_cid, "set_canister_config", arg, network=network)
+            _dfx(
+                "canister",
+                "call",
+                realm_cid,
+                "set_canister_config",
+                arg,
+                network=network,
+            )
         except Exception as e:
             print(f"   ⚠ set_canister_config on {realm_name} failed: {e}")
 
         # Pin /custom/ on the frontend canister so branding survives asset-sync upgrades
         if frontend_id:
             try:
-                _dfx("canister", "call", frontend_id, "pin_directory",
-                     '(record { prefix = "/custom/" })', network=network)
+                _dfx(
+                    "canister",
+                    "call",
+                    frontend_id,
+                    "pin_directory",
+                    '(record { prefix = "/custom/" })',
+                    network=network,
+                )
                 print(f"   📌 Pinned /custom/ on frontend ({frontend_id})")
             except Exception as e:
                 print(f"   ⚠ pin_directory failed (non-fatal): {e}")
@@ -1585,8 +1689,7 @@ def stage2_install(
     registry_member = _find_registry_member(descriptor)
     default_mode = (descriptor.get("install_mode") or "upgrade").strip()
 
-    print("\n┌─ stage 2: install mundus members (dfx, off-chain manifest) "
-          + "─" * 2)
+    print("\n┌─ stage 2: install mundus members (dfx, off-chain manifest) " + "─" * 2)
 
     members = descriptor.get("mundus") or []
     if not members:
@@ -1595,15 +1698,17 @@ def stage2_install(
 
     pending: List[Dict[str, Any]] = []
     for member in members:
-        pending.append(_kickoff_deploy(
-            member,
-            realm_installer=realm_installer,
-            file_registry=file_registry,
-            base_version=base_version,
-            default_mode=default_mode,
-            artifacts=artifacts,
-            network=network,
-        ))
+        pending.append(
+            _kickoff_deploy(
+                member,
+                realm_installer=realm_installer,
+                file_registry=file_registry,
+                base_version=base_version,
+                default_mode=default_mode,
+                artifacts=artifacts,
+                network=network,
+            )
+        )
 
     for p in pending:
         name = p["member"].get("name", "?")
@@ -1618,12 +1723,15 @@ def stage2_install(
             _register_realm_with_registry(
                 member,
                 registry_member.get("canister_id")
-                or _canister_id(registry_member["name"], network) or "",
+                or _canister_id(registry_member["name"], network)
+                or "",
                 network,
             )
 
     _link_token_nft_canisters(
-        members, network, version=base_version,
+        members,
+        network,
+        version=base_version,
         parameters=descriptor.get("parameters"),
     )
 
@@ -1651,11 +1759,23 @@ def stage3_verify(descriptor: Dict[str, Any]) -> None:
         if not seed_path.exists():
             print(f"   ⚠️  {seed_path} not found — skipping seed")
             continue
-        _run(["realms", "import", str(seed_path),
-              "--canister", canister_id, "--network", network], check=False)
+        _run(
+            [
+                "realms",
+                "import",
+                str(seed_path),
+                "--canister",
+                canister_id,
+                "--network",
+                network,
+            ],
+            check=False,
+        )
 
-    print("\n   ✅ verification phase complete (Playwright + integration "
-          "tests run in dedicated workflow jobs)")
+    print(
+        "\n   ✅ verification phase complete (Playwright + integration "
+        "tests run in dedicated workflow jobs)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1664,31 +1784,52 @@ def stage3_verify(descriptor: Dict[str, Any]) -> None:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--file", "-f", required=True, type=Path,
-                        help="Path to a v2 mundus descriptor")
-    parser.add_argument("--stages", default="0,1,2,3",
-                        help="Comma-separated stages to run (default: 0,1,2,3)")
-    parser.add_argument("--infra-ids-out", type=Path, default=None,
-                        help="Write resolved infra canister ids as JSON for downstream jobs")
-    parser.add_argument("--only-realms", default=None,
-                        help="Comma-separated mundus member names. When set, "
-                             "stages 1+2+3 only consider these members "
-                             "(e.g. 'dominion,realm_registry_backend').")
-    parser.add_argument("--only-extensions", default=None,
-                        help="Comma-separated extension ids. When set, "
-                             "stage 1 publishes only these extensions and "
-                             "stage 2 installs only these on each member that "
-                             "would otherwise inherit_from_artifacts=all.")
-    parser.add_argument("--skip-base-wasm", action="store_true",
-                        help="Skip building+publishing the realm_backend "
-                             "(base) WASM in stage 1. Useful when iterating "
-                             "on frontend/extensions only.")
-    parser.add_argument("--install-mode", default=None,
-                        choices=["upgrade", "reinstall", "install"],
-                        help="Override the install mode for all realms "
-                             "(default: from descriptor, usually 'upgrade').")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--file", "-f", required=True, type=Path, help="Path to a v2 mundus descriptor"
+    )
+    parser.add_argument(
+        "--stages",
+        default="0,1,2,3",
+        help="Comma-separated stages to run (default: 0,1,2,3)",
+    )
+    parser.add_argument(
+        "--infra-ids-out",
+        type=Path,
+        default=None,
+        help="Write resolved infra canister ids as JSON for downstream jobs",
+    )
+    parser.add_argument(
+        "--only-realms",
+        default=None,
+        help="Comma-separated mundus member names. When set, "
+        "stages 1+2+3 only consider these members "
+        "(e.g. 'dominion,realm_registry_backend').",
+    )
+    parser.add_argument(
+        "--only-extensions",
+        default=None,
+        help="Comma-separated extension ids. When set, "
+        "stage 1 publishes only these extensions and "
+        "stage 2 installs only these on each member that "
+        "would otherwise inherit_from_artifacts=all.",
+    )
+    parser.add_argument(
+        "--skip-base-wasm",
+        action="store_true",
+        help="Skip building+publishing the realm_backend "
+        "(base) WASM in stage 1. Useful when iterating "
+        "on frontend/extensions only.",
+    )
+    parser.add_argument(
+        "--install-mode",
+        default=None,
+        choices=["upgrade", "reinstall", "install"],
+        help="Override the install mode for all realms "
+        "(default: from descriptor, usually 'upgrade').",
+    )
     args = parser.parse_args(argv)
 
     stages = {int(s) for s in args.stages.split(",") if s}
@@ -1696,7 +1837,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     only_realms = (
         [r.strip() for r in args.only_realms.split(",") if r.strip()]
-        if args.only_realms else None
+        if args.only_realms
+        else None
     )
     if only_realms:
         members = descriptor.get("mundus") or []
@@ -1712,7 +1854,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     only_exts = (
         [e.strip() for e in args.only_extensions.split(",") if e.strip()]
-        if args.only_extensions else None
+        if args.only_extensions
+        else None
     )
     if only_exts:
         descriptor.setdefault("artifacts", {})["extensions"] = list(only_exts)
@@ -1725,7 +1868,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"🎯 only-extensions: {only_exts}")
 
     if args.skip_base_wasm:
-        descriptor.setdefault("artifacts", {}).setdefault("base_wasm", {})["skip"] = True
+        descriptor.setdefault("artifacts", {}).setdefault("base_wasm", {})[
+            "skip"
+        ] = True
         print("⏭  skip-base-wasm: realm_backend WASM build will be skipped")
 
     print(f"📄 descriptor : {args.file}")
@@ -1733,8 +1878,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"🪜 stages     : {sorted(stages)}")
 
     overrides = descriptor.get("infrastructure_overrides") or {}
-    infra_ids = {n: (overrides.get(n) or {}).get("canister_id") or ""
-                 for n in INFRA_CANISTERS}
+    infra_ids = {
+        n: (overrides.get(n) or {}).get("canister_id") or "" for n in INFRA_CANISTERS
+    }
 
     # Allow upstream CI jobs to inject infra ids via env so we don't have
     # to re-discover them from dfx (and don't depend on the descriptor

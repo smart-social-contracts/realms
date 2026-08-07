@@ -100,9 +100,6 @@ jobs:
           sed -i "s/version = \".*\"/version = \"${NEW_VERSION}\"/" cli/pyproject.toml
           sed -i "s/__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" cli/realms/__init__.py
 
-          sed -i "s#deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v[^']*'#deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v${NEW_VERSION}'#" \
-            src/realm_registry_frontend/src/lib/config.js
-
           echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Check if release already exists
@@ -151,10 +148,8 @@ jobs:
           cat checksums.txt
           BACKEND_HASH=$(awk '/realm_backend\.wasm\.gz/ {print $1}' checksums.txt)
           FRONTEND_HASH=$(awk '/realm_frontend\.tar\.gz/ {print $1}' checksums.txt)
-          sed -i "s#'c9c38a714762fe56e53534c488e645351deb7905020001b408f054c034b5c408'#'${BACKEND_HASH}'#" \
-            src/realm_registry_frontend/src/lib/config.js
-          sed -i "s#'58cf46349679f137c9e481aa7831d367ee14f0f6aba78de9b76a2385d5031406'#'${FRONTEND_HASH}'#" \
-            src/realm_registry_frontend/src/lib/config.js
+          echo "Backend checksum: ${BACKEND_HASH}"
+          echo "Frontend checksum: ${FRONTEND_HASH}"
 
       - name: Build and publish CLI to PyPI
         env:
@@ -191,8 +186,7 @@ jobs:
       # Commit version bump + remove the consumed release notes file
       - name: Commit and push version changes
         run: |
-          git add version.txt cli/pyproject.toml cli/realms/__init__.py \
-            src/realm_registry_frontend/src/lib/config.js
+          git add version.txt cli/pyproject.toml cli/realms/__init__.py
           # Remove the release notes file now that the release is published
           if [ -f ".github/RELEASE_NOTES_NEXT.md" ]; then
             git rm .github/RELEASE_NOTES_NEXT.md

@@ -25,8 +25,6 @@ on:
         default: realm
         options:
           - realm
-          - installer
-          - registry
           - file-registry
           - dashboard
           - marketplace

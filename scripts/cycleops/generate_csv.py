@@ -13,7 +13,7 @@ NOTE: The Candid RealmRecord type currently only exposes the backend canister ID
       (the `id` field). frontend_canister_id / token_canister_id / nft_canister_id
       are stored in the ORM but NOT in the Candid Record, so they are not returned
       by `list_realms`. To include those, update the Candid RealmRecord in
-      realm_registry_backend/main.py and redeploy.
+      gos-as-a-service repo and redeploy the live canister.
 """
 
 import argparse

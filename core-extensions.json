@@ -1,5 +1,5 @@
 {
-  "$comment": "Authoritative list of core extensions — owned by Realms core, not extension manifests. Keep in sync with src/realm_backend/core/core_extensions.py and src/realm_registry_frontend/src/lib/extensions-config.json (tier: core).",
+  "$comment": "Authoritative list of core extensions — owned by Realms core, not extension manifests. Keep in sync with src/realm_backend/core/core_extensions.py and gos-as-a-service realm_registry_frontend extensions-config.json (tier: core).",
   "core_extensions": [
     "public_dashboard",
     "member_dashboard",

@@ -75,8 +75,9 @@
       }
     },
     "realm_installer": {
-      "build": "python -m basilisk realm_installer src/realm_installer/main.py",
-      "candid": "src/realm_installer/realm_installer.did",
+      "type": "custom",
+      "candid": "src/gos-vendor/realm_installer/realm_installer.did",
+      "wasm": "https://github.com/smart-social-contracts/gos-as-a-service/releases/download/v0.1.0/realm_installer.wasm.gz",
       "declarations": {
         "node_compatibility": true
       },
@@ -92,28 +93,12 @@
           "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
           "test": "fltjm-tyaaa-aaaap-qunhq-cai"
         }
-      },
-      "tech_stack": {
-        "cdk": {
-          "basilisk": {}
-        },
-        "language": {
-          "python": {}
-        }
-      },
-      "type": "custom",
-      "wasm": ".basilisk/realm_installer/realm_installer.wasm"
-    },
-    "realm_installer_frontend": {
-      "source": [
-        "src/realm_installer_frontend/dist"
-      ],
-      "type": "assets",
-      "workspace": "realm_installer_frontend"
+      }
     },
     "realm_registry_backend": {
-      "build": "python -m basilisk realm_registry_backend src/realm_registry_backend/main.py",
-      "candid": "src/realm_registry_backend/realm_registry_backend.did",
+      "type": "custom",
+      "candid": "src/gos-vendor/realm_registry_backend/realm_registry_backend.did",
+      "wasm": "https://github.com/smart-social-contracts/gos-as-a-service/releases/download/v0.1.0/realm_registry_backend.wasm.gz",
       "declarations": {
         "node_compatibility": true
       },
@@ -129,21 +114,11 @@
           "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
           "test": "yhw3g-fyaaa-aaaas-qgorq-cai"
         }
-      },
-      "tech_stack": {
-        "cdk": {
-          "basilisk": {}
-        },
-        "language": {
-          "python": {}
-        }
-      },
-      "type": "custom",
-      "wasm": ".basilisk/realm_registry_backend/realm_registry_backend.wasm"
+      }
     },
     "realm_registry_frontend": {
       "source": [
-        "src/realm_registry_frontend/dist"
+        ".external-assets/realm_registry_frontend/dist"
       ],
       "type": "assets",
       "workspace": "realm_registry_frontend",

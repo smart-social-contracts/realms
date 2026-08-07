@@ -1,6 +1,7 @@
 # ── IC / dfx ────────────────────────────────────────────────────────────────
 .dfx
 .external-wasms/
+.external-assets/
 .basilisk
 *.wasm
 *.wasm.gz

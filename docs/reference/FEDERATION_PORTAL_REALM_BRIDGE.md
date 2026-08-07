@@ -146,7 +146,7 @@ Conformance is verified by an automated harness (portal test iframe + scripted m
 
 | Component | Repo path (TBD) |
 |---|---|
-| Portal shell + iframe host | `src/realm_registry_frontend` or dedicated portal canister |
+| Portal shell + iframe host | gos-as-a-service (`realm_registry_frontend`) or dedicated portal canister |
 | Realm bridge SDK (Realms) | `src/realm_frontend/src/lib/portal-bridge.ts` |
 | Shared types | `packages/portal-bridge-types` or inline in both sides |
 | Conformance harness | portal E2E / registry admin tool |

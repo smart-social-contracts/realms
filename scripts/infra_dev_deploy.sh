@@ -44,11 +44,9 @@ Examples:
   scripts/infra_dev_deploy.sh -e test -f installer -c backend
   scripts/infra_dev_deploy.sh -e staging -f registry -c both --clean
 
-Before merge, align with Casals:
-  python3 scripts/publish_build.py --environment staging --family registry \
-    --component both --from-main --identity deployer
-  realms rollout -e staging -t realm-registry -s both -m upgrade -v main \
-    --identity deployer --execute --yes
+GaaS stack (registry, installer) uses prebuilt artifacts from gos-as-a-service
+releases (see scripts/fetch_gos_artifacts.py). Before merge, align registry
+frontends with Casals via publish + rollout for realm families only.
 EOF
     exit 1
 }
@@ -88,12 +86,12 @@ case "$FAMILY" in
     registry)
         BACKEND_CANISTER="realm_registry_backend"
         FRONTEND_CANISTER="realm_registry_frontend"
-        FRONTEND_WORKSPACE="realm_registry_frontend"
+        FRONTEND_DIST="$REPO_ROOT/.external-assets/realm_registry_frontend/dist"
         ;;
     installer)
         BACKEND_CANISTER="realm_installer"
         FRONTEND_CANISTER=""
-        FRONTEND_WORKSPACE=""
+        FRONTEND_DIST=""
         ;;
     file-registry)
         BACKEND_CANISTER="file_registry"
@@ -156,6 +154,18 @@ echo -e "${BLUE}Identity:   $(dfx identity get-principal)${NC}"
 echo -e "${YELLOW}Note: Casals catalog is not updated — run publish + rollout before merge.${NC}"
 echo ""
 
+fetch_gos_artifacts() {
+    local what="${1:-all}"
+    echo -e "${GREEN}📥 Fetching GOS artifacts (--what ${what})${NC}"
+    python3 "$REPO_ROOT/scripts/fetch_gos_artifacts.py" --what "$what"
+}
+
+deploy_backend_remote() {
+    local canister_key="$1"
+    echo -e "${GREEN}🚀 Deploying backend $canister_key (remote WASM from dfx.json) → $NETWORK${NC}"
+    dfx deploy "$canister_key" --network "$NETWORK" --mode upgrade --yes
+}
+
 deploy_backend() {
     local canister="$1"
     local canister_key="$2"
@@ -182,6 +192,57 @@ deploy_backend() {
     fi
     echo -e "${GREEN}🚀 Installing backend $canister ($cid) → $NETWORK${NC}"
     dfx canister install "$cid" --network "$NETWORK" --mode upgrade --wasm "$wasm"
+}
+
+deploy_registry_frontend() {
+    local canister_key="$1"
+    local cid
+    cid=$(python3 -c "import json; print(json.load(open('$REPO_ROOT/canister_ids.json')).get('$canister_key', {}).get('$NETWORK', ''))")
+    if [[ -z "$cid" ]]; then
+        echo -e "${RED}No canister id for $canister_key on $NETWORK in canister_ids.json${NC}"
+        exit 1
+    fi
+
+    if [[ "$CLEAN_BUILD" == true ]]; then
+        echo -e "${YELLOW}🧹 Cleaning fetched registry frontend dist${NC}"
+        rm -rf "$FRONTEND_DIST"
+    fi
+
+    fetch_gos_artifacts frontend
+
+    if [[ ! -d "$FRONTEND_DIST" ]]; then
+        echo -e "${RED}Fetched frontend dist not found: $FRONTEND_DIST${NC}"
+        exit 1
+    fi
+
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+    cp -a "$FRONTEND_DIST" "$tmpdir/dist"
+    cat > "$tmpdir/dfx.json" <<EOF
+{
+  "version": 1,
+  "canisters": {
+    "frontend": { "type": "assets", "source": ["dist"] }
+  },
+  "networks": {
+    "$NETWORK": { "providers": ["https://icp0.io"], "type": "persistent" }
+  }
+}
+EOF
+    echo "{\"frontend\": {\"$NETWORK\": \"$cid\"}}" > "$tmpdir/canister_ids.json"
+
+    echo -e "${GREEN}🚀 Uploading registry frontend assets ($cid) → $NETWORK${NC}"
+    local deployer_principal
+    deployer_principal=$(dfx identity get-principal)
+    for perm in Prepare Commit; do
+        dfx canister call "$cid" grant_permission \
+            "(record { to_principal = principal \"$deployer_principal\"; permission = variant { $perm } })" \
+            --network "$NETWORK" --no-wallet 2>/dev/null || true
+    done
+    (cd "$tmpdir" && dfx deploy frontend --network "$NETWORK" --yes --no-wallet --no-asset-upgrade)
+    rm -rf "$tmpdir"
+    trap - EXIT
 }
 
 deploy_frontend() {
@@ -250,8 +311,14 @@ EOF
 
 if [[ "$COMPONENT" == "backend" || "$COMPONENT" == "both" ]]; then
     case "$FAMILY" in
-        registry) deploy_backend "realm_registry_backend" "realm_registry_backend" ;;
-        installer) deploy_backend "realm_installer" "realm_installer" ;;
+        registry)
+            fetch_gos_artifacts wasms
+            deploy_backend_remote "realm_registry_backend"
+            ;;
+        installer)
+            fetch_gos_artifacts wasms
+            deploy_backend_remote "realm_installer"
+            ;;
         file-registry) deploy_backend "file_registry" "file_registry" ;;
         marketplace) deploy_backend "marketplace_backend" "marketplace_backend" ;;
     esac
@@ -259,7 +326,7 @@ fi
 
 if [[ "$COMPONENT" == "frontend" || "$COMPONENT" == "both" ]]; then
     case "$FAMILY" in
-        registry) deploy_frontend "realm_registry_frontend" "realm_registry_frontend" "realm_registry_frontend" ;;
+        registry) deploy_registry_frontend "realm_registry_frontend" ;;
         file-registry) deploy_frontend "file_registry_frontend" "file_registry_frontend" "file_registry_frontend" ;;
         marketplace) deploy_frontend "marketplace_frontend" "marketplace_frontend" "marketplace_frontend" ;;
         dashboard) deploy_frontend "platform_dashboard_frontend" "platform_dashboard_frontend" "platform_dashboard_frontend" ;;

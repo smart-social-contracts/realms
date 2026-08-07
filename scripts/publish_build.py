@@ -37,24 +37,17 @@ _CERTIFIED_ASSETS_WASM_URL = (
 _CERTIFIED_ASSETS_WASM_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
 
 # Per-environment canister IDs (imported from the installed CLI to stay in sync).
-from realms.cli.casals_versions import git_short_sha, main_build_version
-from realms.cli.commands.files import _FILE_REGISTRY_IDS
-from realms.cli.commands.mundus import _REGISTRY_IDS
-from realms.cli.commands.rollout import _CASALS_IDS
+from realms.cli.casals_versions import git_short_sha, main_build_version  # noqa: E402
+from realms.cli.commands.files import _FILE_REGISTRY_IDS  # noqa: E402
+from realms.cli.commands.rollout import _CASALS_IDS  # noqa: E402
 
+# GaaS stack (realm_registry_backend, realm_installer, realm_registry_frontend)
+# is published from github.com/smart-social-contracts/gos-as-a-service releases.
 # family -> {"backend": (canister_name, main_py) | None, "frontend": dir | None}
 FAMILIES = {
     "realm": {
         "backend": ("realm_backend", "src/realm_backend/main.py"),
         "frontend": "src/realm_frontend",
-    },
-    "installer": {
-        "backend": ("realm_installer", "src/realm_installer/main.py"),
-        "frontend": None,
-    },
-    "registry": {
-        "backend": ("realm_registry_backend", "src/realm_registry_backend/main.py"),
-        "frontend": "src/realm_registry_frontend",
     },
     "file-registry": {
         "backend": ("file_registry", "src/file_registry/main.py"),
@@ -111,7 +104,9 @@ def _build_realm_backend(root: Path) -> Path:
     bpy = _basilisk_python(root)
     env = {
         **os.environ,
-        "CANISTER_CANDID_PATH": str(root / "src" / "realm_backend" / "realm_backend.did"),
+        "CANISTER_CANDID_PATH": str(
+            root / "src" / "realm_backend" / "realm_backend.did"
+        ),
     }
     _run([bpy, "scripts/build_base_wasm.py", "--gzip"], cwd=root, env=env)
     gz = root / ".basilisk" / "realm_backend" / "realm_backend.wasm.gz"
@@ -140,6 +135,7 @@ def _build_backend(root: Path, canister: str, main_py: str) -> Path:
     gz = root / f"{canister}.wasm.gz"
     with open(wasm, "rb") as fi:
         import gzip as _gz
+
         with _gz.open(gz, "wb") as fo:
             fo.write(fi.read())
     print(f"  backend wasm: {gz} ({gz.stat().st_size:,} bytes)")
@@ -184,9 +180,11 @@ def _build_frontend(root: Path, fe_dir: str, environment: str) -> Path:
 
 
 def _find_assets_wasm(root: Path, environment: str) -> str:
-    candidates = list((root / ".dfx" / environment / "canisters").glob("*/assetstorage.wasm.gz")) if (
-        root / ".dfx" / environment / "canisters"
-    ).is_dir() else []
+    candidates = (
+        list((root / ".dfx" / environment / "canisters").glob("*/assetstorage.wasm.gz"))
+        if (root / ".dfx" / environment / "canisters").is_dir()
+        else []
+    )
     if candidates:
         return str(candidates[0])
     try:
@@ -199,7 +197,9 @@ def _find_assets_wasm(root: Path, environment: str) -> str:
     # frontend canisters. Cache to /tmp so repeated publishes skip the download.
     if not _CERTIFIED_ASSETS_WASM_CACHE.exists():
         print(f"  downloading assetstorage.wasm.gz from {_CERTIFIED_ASSETS_WASM_URL}")
-        urllib.request.urlretrieve(_CERTIFIED_ASSETS_WASM_URL, _CERTIFIED_ASSETS_WASM_CACHE)
+        urllib.request.urlretrieve(
+            _CERTIFIED_ASSETS_WASM_URL, _CERTIFIED_ASSETS_WASM_CACHE
+        )
         print(f"  saved to {_CERTIFIED_ASSETS_WASM_CACHE}")
     else:
         print(f"  using cached assetstorage.wasm.gz at {_CERTIFIED_ASSETS_WASM_CACHE}")
@@ -220,18 +220,32 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--environment", required=True, help="test | staging | demo")
     ap.add_argument("--family", required=True, help=f"one of: {', '.join(FAMILIES)}")
-    ap.add_argument("--component", default="both", choices=["backend", "frontend", "both"])
-    ap.add_argument("--version", default=None, help="semver release label (omit with --from-main)")
-    ap.add_argument("--from-main", action="store_true",
-                    help="publish current checkout as main.<ts>.<sha> (no release bump)")
+    ap.add_argument(
+        "--component", default="both", choices=["backend", "frontend", "both"]
+    )
+    ap.add_argument(
+        "--version", default=None, help="semver release label (omit with --from-main)"
+    )
+    ap.add_argument(
+        "--from-main",
+        action="store_true",
+        help="publish current checkout as main.<ts>.<sha> (no release bump)",
+    )
     ap.add_argument("--identity", default=None)
-    ap.add_argument("--assets-wasm", default=None, help="override certified-assets WASM path")
-    ap.add_argument("--update-catalog", action="store_true",
-                    help="also record the version in the realm catalog (Casals-only envs)")
+    ap.add_argument(
+        "--assets-wasm", default=None, help="override certified-assets WASM path"
+    )
+    ap.add_argument(
+        "--update-catalog",
+        action="store_true",
+        help="also record the version in the realm catalog (Casals-only envs)",
+    )
     args = ap.parse_args()
 
     if args.family not in FAMILIES:
-        sys.exit(f"unsupported family '{args.family}'. Buildable: {', '.join(FAMILIES)}.")
+        sys.exit(
+            f"unsupported family '{args.family}'. Buildable: {', '.join(FAMILIES)}."
+        )
 
     root = _root()
     version = _resolve_version(args.from_main, args.version, root)
@@ -266,9 +280,19 @@ def main():
             assets_wasm = _find_assets_wasm(root, env)
 
     cmd = [
-        "realms", "files", "publish-release",
-        "--network", env, "--family", args.family, "--version", version,
-        "--registry", file_registry, "--casals", casals,
+        "realms",
+        "files",
+        "publish-release",
+        "--network",
+        env,
+        "--family",
+        args.family,
+        "--version",
+        version,
+        "--registry",
+        file_registry,
+        "--casals",
+        casals,
     ]
     if backend_wasm:
         cmd += ["--backend-wasm", str(backend_wasm)]
@@ -278,14 +302,12 @@ def main():
             cmd += ["--assets-wasm", str(assets_wasm)]
     if args.identity:
         cmd += ["--identity", args.identity]
-    if args.update_catalog:
-        registry_backend = _REGISTRY_IDS.get(env)
-        if registry_backend:
-            cmd += ["--registry-backend", registry_backend]
 
     _run(cmd, cwd=root)
     print(f"\npublish_build complete (version={version}).")
-    print(f"  rollout: realms rollout -e {env} -t <targets> -s {args.component} -v main --execute")
+    print(
+        f"  rollout: realms rollout -e {env} -t <targets> -s {args.component} -v main --execute"
+    )
 
 
 if __name__ == "__main__":

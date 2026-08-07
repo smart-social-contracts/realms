@@ -69,6 +69,7 @@ artifacts:
 mundus:
   - name: realm_registry_backend
     type: realm_registry
+    wasm_url: https://github.com/smart-social-contracts/gos-as-a-service/releases/download/v0.1.0/realm_registry_backend.wasm.gz
     extensions: []
     codices: []
 

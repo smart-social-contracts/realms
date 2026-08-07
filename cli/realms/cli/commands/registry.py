@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -15,6 +16,48 @@ from rich.table import Table
 
 from .create import create_command
 from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_realms_logger, set_log_dir, run_command, get_registry_canister_id
+
+GOS_REPO = "https://github.com/smart-social-contracts/gos-as-a-service"
+GOS_RELEASE = "v0.1.0"
+
+
+def _gos_release_url(artifact: str) -> str:
+    return f"{GOS_REPO}/releases/download/{GOS_RELEASE}/{artifact}"
+
+
+def _fetch_gos_artifacts(root: Path, what: str = "all") -> None:
+    """Fetch prebuilt registry/installer artifacts from the pinned GOS release."""
+    script = root / "scripts" / "fetch_gos_artifacts.py"
+    if not script.is_file():
+        console.print(
+            "[red]❌ scripts/fetch_gos_artifacts.py not found.[/red]\n"
+            f"Registry stack source and releases live in [link={GOS_REPO}]{GOS_REPO}[/link]. "
+            "Develop registry/wizard UI there; Realms consumes prebuilt artifacts only."
+        )
+        raise typer.Exit(1)
+    cmd = [sys.executable, str(script), "--what", what]
+    console.print(f"[dim]$ {' '.join(cmd)}[/dim]")
+    res = subprocess.run(cmd, cwd=root)
+    if res.returncode != 0:
+        raise typer.Exit(res.returncode)
+
+
+def _materialize_registry_frontend_dist(registry_dir: Path, repo_root: Path) -> None:
+    """Copy fetched registry frontend dist into the local registry project layout."""
+    src = repo_root / ".external-assets" / "realm_registry_frontend" / "dist"
+    if not src.is_dir():
+        console.print(
+            "[red]❌ Fetched registry frontend dist not found.[/red]\n"
+            f"Run: python3 scripts/fetch_gos_artifacts.py --what frontend\n"
+            f"Or develop the wizard in [link={GOS_REPO}]{GOS_REPO}[/link]."
+        )
+        raise typer.Exit(1)
+    dest = registry_dir / "src" / "realm_registry_frontend" / "dist"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(src, dest)
+    console.print("   ✅ Materialized src/realm_registry_frontend/dist from GOS release")
 
 
 def _run_dfx_command(
@@ -310,60 +353,47 @@ def registry_create_command(
         Path to created registry directory
     """
     console.print(Panel.fit("📋 Creating Registry", style="bold blue"))
-    
-    # Get project root and paths
-    repo_root = Path.cwd()
-    while not (repo_root / "src" / "realm_registry_backend").exists():
-        if repo_root.parent == repo_root:
-            console.print("[red]❌ Error: Could not find realm_registry_backend source[/red]")
-            raise typer.Exit(1)
-        repo_root = repo_root.parent
-    
+
+    repo_root = get_project_root()
+    console.print(
+        "[dim]Registry stack is released from "
+        f"[link={GOS_REPO}]smart-social-contracts/gos-as-a-service[/link] "
+        f"({GOS_RELEASE}); fetching prebuilt artifacts…[/dim]"
+    )
+    _fetch_gos_artifacts(repo_root, "all")
+
     # Generate output directory name with timestamp
     dir_name = generate_output_dir_name("registry", registry_name)
     registry_dir = Path(output_dir) / dir_name
     registry_dir.mkdir(parents=True, exist_ok=True)
-    
+
     console.print(f"📁 Registry directory: {registry_dir}")
-    
-    # Create src directory
-    src_dir = registry_dir / "src"
-    src_dir.mkdir(exist_ok=True)
-    
-    # Copy registry backend source
-    backend_src = repo_root / "src" / "realm_registry_backend"
-    backend_dest = src_dir / "realm_registry_backend"
-    
-    if backend_src.exists():
-        shutil.copytree(backend_src, backend_dest, dirs_exist_ok=True)
-        console.print(f"   ✅ Copied backend to src/realm_registry_backend/")
-    else:
-        console.print(f"[red]❌ Backend source not found: {backend_src}[/red]")
-        raise typer.Exit(1)
-    
-    # Copy registry frontend source
-    frontend_src = repo_root / "src" / "realm_registry_frontend"
-    frontend_dest = src_dir / "realm_registry_frontend"
-    
-    if frontend_src.exists():
-        shutil.copytree(frontend_src, frontend_dest, dirs_exist_ok=True)
-        console.print(f"   ✅ Copied frontend to src/realm_registry_frontend/")
-    
+
+    # Prebuilt frontend bundle (no local src/realm_registry_frontend in Realms)
+    _materialize_registry_frontend_dist(registry_dir, repo_root)
+
     # Create dfx.json
     dfx_template = repo_root / "dfx.template.json"
     if not dfx_template.exists():
-        console.print(f"[red]❌ Template dfx.template.json not found at {dfx_template}[/red]")
+        dfx_template = repo_root / "dfx.json"
+    if not dfx_template.exists():
+        console.print(f"[red]❌ dfx template not found at repo root[/red]")
         raise typer.Exit(1)
-    
+
     with open(dfx_template, 'r') as f:
         dfx_config = json.load(f)
-    
-    # Create registry-only dfx.json (strip remote block - it's only for CLI registry list)
-    backend_config = dfx_config["canisters"]["realm_registry_backend"].copy()
-    backend_config.pop("remote", None)  # Remove remote block if present
-    
+
+    # Registry-only dfx.json — WASM/candid from GOS release (no local backend source)
+    backend_config = {
+        "type": "custom",
+        "candid": _gos_release_url("realm_registry_backend.did"),
+        "wasm": _gos_release_url("realm_registry_backend.wasm.gz"),
+        "gzip": True,
+    }
     frontend_config = dfx_config["canisters"]["realm_registry_frontend"].copy()
     frontend_config.pop("remote", None)
+    frontend_config["source"] = ["src/realm_registry_frontend/dist"]
+    frontend_config.pop("workspace", None)
     
     registry_canisters = {
         "realm_registry_backend": backend_config,

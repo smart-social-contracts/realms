@@ -84,8 +84,8 @@ flowchart LR
 The system is organized into four logical layers:
 
 - **Realms** — each realm is a self-contained unit with its own frontend + backend canister pair, optional quarters (additional backend instances for horizontal scaling), and optional per-realm tokens (fungible ICRC-1 and land NFT ICRC-7).
-- **Realm Registry** — central directory where all realms register themselves, plus a credit/billing ledger. The registry frontend also drives realm creation by coordinating with the installer.
-- **Project Infrastructure** — shared services: `file_registry` (on-chain blob store for WASM/manifests/packages), `realm_installer` (timer-driven orchestrator for chunked WASM deploys), and `marketplace` (extension/codex catalog with listings and licenses).
+- **Realm Registry** — central directory where all realms register themselves, plus a credit/billing ledger. The registry frontend also drives realm creation by coordinating with the installer. **Source and releases:** [smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service) (Realms fetches prebuilt artifacts).
+- **Project Infrastructure** — shared services: `file_registry` (on-chain blob store for WASM/manifests/packages; built in Realms), `realm_installer` (released from gos-as-a-service), and `marketplace` (extension/codex catalog with listings and licenses; built in Realms).
 - **External** — platform-level canisters and services not owned by the project: Internet Identity (auth), IC management canister (vetKD + chunked code install), ckBTC ledger, and an off-chain billing service.
 
 ### Core Components

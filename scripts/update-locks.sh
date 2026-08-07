@@ -20,9 +20,6 @@ echo "    requirements.txt"
 ${COMPILE} --output-file=cli/realms/cli/requirements.txt cli/realms/cli/requirements.in
 echo "    cli/realms/cli/requirements.txt"
 
-${COMPILE} --output-file=src/realm_registry_backend/requirements.txt src/realm_registry_backend/requirements.in
-echo "    src/realm_registry_backend/requirements.txt"
-
 ${COMPILE} --output-file=src/marketplace_backend/requirements.txt src/marketplace_backend/requirements.in
 echo "    src/marketplace_backend/requirements.txt"
 

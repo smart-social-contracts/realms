@@ -137,16 +137,14 @@ jobs:
           sleep 3
           dfx ping
 
+      - name: Fetch GOS artifacts
+        run: python3 scripts/fetch_gos_artifacts.py --what all
+
       - name: Run all four stages on the local mundus
         run: |
           python3 scripts/ci_install_mundus.py \
               --file deployment-descriptors/local-mundus.yml \
               --stages 0,1,2,3
-
-      # Run realm_installer API contract tests against the
-      # live replica that stages 0-3 just bootstrapped.
-      - name: realm_installer API tests
-        run: python3 tests/integration/test_realm_installer_api.py
 
       # Cross-quarter addressing end-to-end: single-canister endpoints plus a
       # real inter-canister sync_quarters round-trip against a 2nd realm_backend.

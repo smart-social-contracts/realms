@@ -335,7 +335,7 @@ if [ -n "$BACKENDS" ]; then
         for canister in $BACKENDS; do
             # If canister name matches pattern *_backend (but NOT *_token_backend, *_nft_backend, or quarter_*_backend), copy to realm_backend
             # This ensures only the main backend gets copied, not token/nft/quarter backends
-            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != *"token_backend" ]] && [[ "$canister" != *"nft_backend" ]] && [[ "$canister" != quarter_*_backend ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
+            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != *"token_backend" ]] && [[ "$canister" != *"nft_backend" ]] && [[ "$canister" != quarter_*_backend ]] && [[ "$canister" != "realm_backend" ]]; then
                 if [ -d "src/declarations/$canister" ]; then
                     # Remove existing realm_backend to avoid cp -r creating a subdirectory
                     rm -rf "src/declarations/realm_backend"
@@ -446,14 +446,7 @@ else
     echo "   ℹ️  No background.png found in realm directory"
 fi
 
-# Copy logo to registry frontend static folder if this is a registry deployment
-if [ -d "src/realm_registry_frontend/static/images" ] && [ -f "logo.png" ]; then
-    echo ""
-    echo "🖼️  Checking for registry logo..."
-    LOGO_DEST="src/realm_registry_frontend/static/images/logo_horizontal.svg"
-    cp "logo.png" "$LOGO_DEST"
-    echo "   ✅ Copied registry logo: logo.png → $LOGO_DEST"
-fi
+# Registry frontend assets come from gos-as-a-service releases (.external-assets/).
 
 # Build and deploy frontends
 if [ -n "$FRONTENDS" ]; then

@@ -53,7 +53,10 @@ being implemented and the system is experimental. Live sandbox: [demo.realmsgos.
 ## System at a Glance
 
 A Realm is a **Python monolith** (`realm_backend`) running on the Basilisk CDK, with a
-static frontend and an artifact registry. Extensions and codices run *inside* the backend,
+static frontend and an artifact registry. The **realm registry** (directory + credits +
+create-realm wizard) and **realm_installer** are released from
+[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
+Extensions and codices run *inside* the backend,
 sharing one stable memory — so governance operations over the entity graph stay atomic.
 
 ```mermaid
@@ -151,6 +154,9 @@ Discover, publish, and install extensions and codices.
 
 - **Basilisk interpreter** — CPython-on-WASM CDK; replaced the deprecated Kybra toolchain.
   Ongoing performance and compatibility work. *(done, maintained)*
+- **GOS platform** — registry, installer, and wizard UI in
+  [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service); Realms
+  pins prebuilt releases. *(v0.1.0 extracted; ongoing)*
 - **ICP platform adaptation** — opportunistic: migrate off `dfx` to ICP CLI; adopt
   application bundling / sync plugins where they reduce our own maintenance. *(as it serves us)*
 - **Docs & developer experience** — reference docs, extension authoring guide, examples.

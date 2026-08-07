@@ -82,6 +82,7 @@ SKIP_CODEX_IDS = {"_common", "common"}
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _run(cmd: List[str], cwd: Optional[Path] = None, *, quiet: bool = False) -> int:
     """Run a subprocess and stream its stdout/stderr live; return rc.
 
@@ -94,7 +95,8 @@ def _run(cmd: List[str], cwd: Optional[Path] = None, *, quiet: bool = False) -> 
         proc = subprocess.run(cmd, cwd=str(cwd) if cwd else None)
     else:
         proc = subprocess.run(
-            cmd, cwd=str(cwd) if cwd else None,
+            cmd,
+            cwd=str(cwd) if cwd else None,
             capture_output=True,
         )
         if proc.returncode != 0 and proc.stderr:
@@ -187,6 +189,7 @@ def _list_codices(codices_root: Path, only: Optional[List[str]]) -> List[Path]:
 # Steps
 # ---------------------------------------------------------------------------
 
+
 def _step_build_frontends(
     extensions_repo: Path,
     only: Optional[List[str]],
@@ -247,12 +250,15 @@ def _step_publish_base_wasm(
 
     def _dfx_call(method: str, payload: dict) -> int:
         import tempfile as _tempfile
+
         cmd = ["dfx", "canister", "call"]
         if identity:
             cmd.extend(["--identity", identity])
         if network:
             cmd.extend(["--network", network])
-        candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        candid = (
+            '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        )
         if len(candid.encode("utf-8")) >= 100 * 1024:
             fd, arg_path = _tempfile.mkstemp(prefix="dfx-arg-", suffix=".did")
             try:
@@ -288,6 +294,7 @@ def _step_publish_base_wasm(
                 print(f"  chunk {i + 1}/{total_chunks} upload failed", file=sys.stderr)
                 return rc
     import hashlib as _hashlib
+
     h = _hashlib.sha256()
     with base_wasm_path.open("rb") as fh:
         for blob in iter(lambda: fh.read(1024 * 1024), b""):
@@ -297,18 +304,20 @@ def _step_publish_base_wasm(
 
     first = True
     while True:
-        payload = {"namespace": namespace, "path": registry_path,
-                   "batch_size": 1}
+        payload = {"namespace": namespace, "path": registry_path, "batch_size": 1}
         if first:
             payload["expected_sha256"] = expected_sha
             first = False
         import subprocess as _sp
+
         cmd = ["dfx", "canister", "call"]
         if identity:
             cmd.extend(["--identity", identity])
         if network:
             cmd.extend(["--network", network])
-        candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        candid = (
+            '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        )
         cmd.extend([registry, "finalize_chunked_file_step", candid])
         print("$", " ".join(cmd), flush=True)
         cp = _sp.run(cmd, capture_output=True, text=True)
@@ -319,17 +328,18 @@ def _step_publish_base_wasm(
         try:
             start = raw.index('"')
             end = raw.rindex('"')
-            inner = raw[start + 1:end].encode("utf-8").decode("unicode_escape")
+            inner = raw[start + 1 : end].encode("utf-8").decode("unicode_escape")
             resp = json.loads(inner)
         except Exception as e:
-            print(f"  could not parse step response: {raw!r} ({e})",
-                  file=sys.stderr)
+            print(f"  could not parse step response: {raw!r} ({e})", file=sys.stderr)
             return 1
         if resp.get("error"):
             print(f"  finalize step error: {resp['error']}", file=sys.stderr)
             return 1
-        print(f"  step ok: processed={resp.get('processed')}/"
-              f"{resp.get('total')} done={resp.get('done')}")
+        print(
+            f"  step ok: processed={resp.get('processed')}/"
+            f"{resp.get('total')} done={resp.get('done')}"
+        )
         if resp.get("done"):
             break
 
@@ -366,7 +376,9 @@ def _step_publish_extensions(
             "and is the root cause of issue: package_manager not "
             "publishing on staging."
         )
-    print(f"\nPublishing {len(ext_dirs)} extensions → {registry}:{namespace_prefix}/<id>/<ver>")
+    print(
+        f"\nPublishing {len(ext_dirs)} extensions → {registry}:{namespace_prefix}/<id>/<ver>"
+    )
     failures: List[str] = []
     for ext_dir in ext_dirs:
         cmd = realms_cli + [
@@ -406,7 +418,9 @@ def _step_publish_codices(
     if not codex_dirs:
         print("No codices to publish.")
         return 0
-    print(f"\nPublishing {len(codex_dirs)} codices → {registry}:{namespace_prefix}/<id>/<ver>")
+    print(
+        f"\nPublishing {len(codex_dirs)} codices → {registry}:{namespace_prefix}/<id>/<ver>"
+    )
     failures: List[str] = []
     for codex_dir in codex_dirs:
         cmd = realms_cli + [
@@ -491,6 +505,7 @@ def _registry_dfx_call(
 ) -> int:
     """Call a file_registry method via dfx. Returns subprocess exit code."""
     import tempfile as _tempfile
+
     cmd = ["dfx", "canister", "call"]
     if identity:
         cmd.extend(["--identity", identity])
@@ -577,14 +592,20 @@ def _upload_blob_to_registry(
     for i in range(total_chunks):
         start = i * chunk_size
         end = min(start + chunk_size, file_size)
-        rc = _registry_dfx_call(registry, network, identity, "store_file_chunk", {
-            "namespace": namespace,
-            "path": path,
-            "chunk_index": i,
-            "total_chunks": total_chunks,
-            "data_b64": base64.b64encode(blob[start:end]).decode("ascii"),
-            "content_type": content_type,
-        })
+        rc = _registry_dfx_call(
+            registry,
+            network,
+            identity,
+            "store_file_chunk",
+            {
+                "namespace": namespace,
+                "path": path,
+                "chunk_index": i,
+                "total_chunks": total_chunks,
+                "data_b64": base64.b64encode(blob[start:end]).decode("ascii"),
+                "content_type": content_type,
+            },
+        )
         if rc != 0:
             print(f"  chunk {i + 1}/{total_chunks} failed for {path}", file=sys.stderr)
             return rc
@@ -601,7 +622,9 @@ def _upload_blob_to_registry(
             cmd.extend(["--identity", identity])
         if network:
             cmd.extend(["--network", network])
-        candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        candid = (
+            '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        )
         cmd.extend([registry, "finalize_chunked_file_step", candid])
         cp = subprocess.run(cmd, capture_output=True, text=True)
         if cp.returncode != 0:
@@ -611,7 +634,7 @@ def _upload_blob_to_registry(
         try:
             s = raw.index('"')
             e = raw.rindex('"')
-            inner = raw[s + 1:e].encode("utf-8").decode("unicode_escape")
+            inner = raw[s + 1 : e].encode("utf-8").decode("unicode_escape")
             resp = json.loads(inner)
         except Exception as exc:
             print(f"  finalize parse error: {raw!r} ({exc})", file=sys.stderr)
@@ -656,9 +679,7 @@ def _step_publish_frontend(
         print(f"ERROR: dist dir not found: {dist_dir}", file=sys.stderr)
         return 1
 
-    all_files = sorted(
-        p for p in dist_dir.rglob("*") if p.is_file()
-    )
+    all_files = sorted(p for p in dist_dir.rglob("*") if p.is_file())
     if not all_files:
         print(f"ERROR: dist dir is empty: {dist_dir}", file=sys.stderr)
         return 1
@@ -706,7 +727,9 @@ def _step_publish_frontend(
         manifest_entries.append(entry)
 
     total_uploads = len(upload_tasks)
-    print(f"  {total_uploads} upload tasks ({len(manifest_entries)} files + gzip variants)")
+    print(
+        f"  {total_uploads} upload tasks ({len(manifest_entries)} files + gzip variants)"
+    )
 
     # Phase 2: upload in parallel, skipping unchanged files
     progress_lock = threading.Lock()
@@ -718,7 +741,11 @@ def _step_publish_frontend(
         blob, upath, ct = task
         local_sha = hashlib.sha256(blob).hexdigest()
         remote_sha = _check_remote_sha256(
-            registry, network, identity, namespace, upath,
+            registry,
+            network,
+            identity,
+            namespace,
+            upath,
         )
         if remote_sha == local_sha:
             with progress_lock:
@@ -793,9 +820,15 @@ def _step_publish_frontend(
         return rc
     print(f"  ✓ _manifest.json ({len(manifest_entries)} files listed)")
 
-    rc = _registry_dfx_call(registry, network, identity, "publish_namespace", {
-        "namespace": namespace,
-    })
+    rc = _registry_dfx_call(
+        registry,
+        network,
+        identity,
+        "publish_namespace",
+        {
+            "namespace": namespace,
+        },
+    )
     if rc != 0:
         print(f"  FAILED to publish namespace {namespace}", file=sys.stderr)
         return rc
@@ -813,6 +846,7 @@ def _step_publish_frontend(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv: Iterable[str]) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -821,12 +855,14 @@ def main(argv: Iterable[str]) -> int:
         )
     )
     parser.add_argument(
-        "--registry", "-r",
+        "--registry",
+        "-r",
         required=True,
         help="file_registry canister id on the target network",
     )
     parser.add_argument(
-        "--network", "-n",
+        "--network",
+        "-n",
         default="ic",
         help="dfx network (default: ic)",
     )
@@ -914,8 +950,8 @@ def main(argv: Iterable[str]) -> int:
             "Publish an additional WASM to the registry. Repeatable. "
             "Format: <path>:<version>:<registry_path>[:<namespace>]. "
             "Example: --extra-wasm out/realm_registry.wasm.gz:0.5.0:realm-registry-{version}.wasm.gz "
-            "Use this to publish per-canister-type WASMs (e.g. realm_registry_backend) "
-            "alongside the realm base WASM."
+            "Use this to publish per-canister-type WASMs (e.g. gos-as-a-service "
+            "realm_registry_backend release artifacts) alongside the realm base WASM."
         ),
     )
 
@@ -931,7 +967,9 @@ def main(argv: Iterable[str]) -> int:
     )
 
     parser.add_argument(
-        "--frontend-build-jobs", type=int, default=1,
+        "--frontend-build-jobs",
+        type=int,
+        default=1,
         help="Concurrent frontend-rt builds (default: 1)",
     )
     parser.add_argument(
@@ -948,7 +986,7 @@ def main(argv: Iterable[str]) -> int:
         help=(
             "Publish a frontend dist/ directory to file_registry. Repeatable. "
             "Format: <dist_dir>:<namespace>. "
-            "Example: --publish-frontend src/realm_registry_frontend/dist:frontend/realm_registry_frontend"
+            "Example: --publish-frontend .external-assets/realm_registry_frontend/dist:frontend/realm_registry_backend"
         ),
     )
 
@@ -1008,7 +1046,7 @@ def main(argv: Iterable[str]) -> int:
             print("\nERROR: base WASM publish failed", file=sys.stderr)
             return rc
 
-    # 2b. Publish extra WASMs (e.g. realm_registry, file_registry) ----------
+    # 2b. Publish extra WASMs (e.g. gos-as-a-service realm_registry, file_registry) ----------
     for spec in args.extra_wasm:
         parts = spec.split(":")
         if len(parts) < 3 or len(parts) > 4:

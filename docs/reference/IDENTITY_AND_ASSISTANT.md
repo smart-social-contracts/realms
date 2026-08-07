@@ -36,7 +36,7 @@ each frontend in its `/.well-known/ii-alternative-origins`.
 
 ### Moving parts
 
-1. **Registry frontend** (`src/realm_registry_frontend`)
+1. **Registry frontend** (gos-as-a-service — `realm_registry_frontend`)
    - `src/lib/config.js` → `CONFIG.ii_derivation_origin` (per-env; override with
      `VITE_II_DERIVATION_ORIGIN`).
    - `src/lib/auth.js` passes `derivationOrigin` into `client.login(...)`.

@@ -8,7 +8,7 @@
 #
 # Flow:
 #   1. Start local dfx replica (--clean)
-#   2. Build + deploy realm_installer and realm_registry_backend
+#   2. Fetch GOS artifacts + deploy realm_installer and realm_registry_backend
 #   3. Seed credits so the test identity can deploy
 #   4. Start the deploy worker (uvicorn) pointed at the local replica
 #   5. Submit a deployment via request_deployment on the registry
@@ -115,13 +115,6 @@ if ! python3 -c "import fastapi, uvicorn, pydantic_settings" 2>/dev/null; then
 fi
 pass "Deploy service dependencies OK"
 
-# Install canister-specific Python dependencies
-for req in src/realm_installer/requirements.txt src/realm_registry_backend/requirements.txt; do
-  if [[ -f "$req" ]]; then
-    pip3 install -q -r "$req" 2>&1 | tail -1 || true
-  fi
-done
-
 # ── Phase 1: Start local dfx replica ────────────────────────────────
 info "\n Phase 1: Start local dfx replica"
 
@@ -180,8 +173,11 @@ fi
 dfx canister deposit-cycles 50000000000000 mock_cycleops 2>&1 | tail -1 || true
 pass "Mock CycleOps deployed: $MOCK_CYCLEOPS_ID (funded with 50T cycles)"
 
-# 2b. Deploy realm_installer
-info "  Building and deploying realm_installer..."
+# 2b. Fetch GOS artifacts and deploy infra canisters
+info "  Fetching GOS release artifacts..."
+python3 scripts/fetch_gos_artifacts.py --what wasms
+
+info "  Deploying realm_installer..."
 dfx deploy realm_installer --yes 2>&1 | tail -5
 INSTALLER_ID=$(dfx canister id realm_installer 2>/dev/null || echo "")
 if [[ -z "$INSTALLER_ID" ]]; then
@@ -190,8 +186,7 @@ if [[ -z "$INSTALLER_ID" ]]; then
 fi
 pass "realm_installer deployed: $INSTALLER_ID"
 
-# 2c. Deploy realm_registry_backend
-info "  Building and deploying realm_registry_backend..."
+info "  Deploying realm_registry_backend..."
 dfx deploy realm_registry_backend --yes 2>&1 | tail -5
 REGISTRY_ID=$(dfx canister id realm_registry_backend 2>/dev/null || echo "")
 if [[ -z "$REGISTRY_ID" ]]; then

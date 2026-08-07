@@ -30,8 +30,12 @@ registry version catalog, so old and new deployment paths coexist.
 """
 
 import json
+import os
 import re
+import subprocess
+import sys
 import time
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -42,6 +46,7 @@ from rich.table import Table
 from ..casals_versions import MAIN_CHANNEL, pick_latest_main_key
 from ..utils import get_project_root
 from .extension import _dfx_call
+from .files import _FILE_REGISTRY_IDS, files_publish_release_command
 
 console = Console()
 
@@ -78,6 +83,24 @@ _INFRA_FAMILY = {
 # Reinstalling these wipes shared platform state (artifact store / realm
 # catalog), so they are excluded from reinstall unless explicitly opted in.
 _DESTRUCTIVE_INFRA_REINSTALL = {"file-registry", "realm-registry"}
+
+# Registry + installer artifacts are built and released from gos-as-a-service,
+# not from this repo. Keep in sync with scripts/fetch_gos_artifacts.py.
+_GOS_RELEASE = "v0.1.0"
+_GOS_VERSION = "0.1.0"
+_GOS_STAND_FAMILY = {
+    "installer": "installer",
+    "realm-registry": "registry",
+}
+_GOS_BACKEND_WASM = {
+    "installer": "realm_installer.wasm.gz",
+    "registry": "realm_registry_backend.wasm.gz",
+}
+_CERTIFIED_ASSETS_WASM_URL = (
+    "https://github.com/smart-social-contracts/certified-assets"
+    "/releases/download/v0.3.0/assetstorage.wasm.gz"
+)
+_CERTIFIED_ASSETS_WASM_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
 
 # How many bundle files to copy per provision_assets ingress call. Kept small so
 # a single call (which pulls each file from file_registry and pushes it into the
@@ -119,6 +142,134 @@ def _resolve_environments(environments: str) -> list[str]:
 
 def _wasm_family(pub_family: str, kind: str) -> str:
     return f"{pub_family}-backend" if kind == "backend" else f"{pub_family}-assets"
+
+
+def _gos_artifact_version(stand_name: str, version: str) -> str:
+    """Registry/installer use the pinned GOS release — never Realms ``-v``."""
+    if stand_name in _GOS_STAND_FAMILY:
+        return _GOS_VERSION
+    return version
+
+
+def _find_assets_wasm(root: Path) -> str:
+    candidates = (
+        list((root / ".dfx" / "ic" / "canisters").glob("*/assetstorage.wasm.gz"))
+        if (root / ".dfx" / "ic" / "canisters").is_dir()
+        else []
+    )
+    if candidates:
+        return str(candidates[0])
+    if not _CERTIFIED_ASSETS_WASM_CACHE.is_file():
+        urllib.request.urlretrieve(_CERTIFIED_ASSETS_WASM_URL, _CERTIFIED_ASSETS_WASM_CACHE)
+    return str(_CERTIFIED_ASSETS_WASM_CACHE)
+
+
+def _run_fetch_gos_artifacts(root: Path, what: str) -> None:
+    script = root / "scripts" / "fetch_gos_artifacts.py"
+    if not script.is_file():
+        raise typer.BadParameter(
+            f"{script} not found. Registry/installer artifacts are released from "
+            "https://github.com/smart-social-contracts/gos-as-a-service — fetch via "
+            "scripts/fetch_gos_artifacts.py (or clone that repo to develop them)."
+        )
+    cmd = [sys.executable, str(script), "--what", what]
+    console.print(f"[dim]$ {' '.join(cmd)}[/dim]")
+    res = subprocess.run(cmd, cwd=root)
+    if res.returncode != 0:
+        raise typer.Exit(res.returncode)
+
+
+def _publish_gos_family(
+    root: Path,
+    env: str,
+    family: str,
+    component: str,
+    identity: Optional[str],
+) -> None:
+    """Fetch prebuilt GOS artifacts and upload + authorize in file_registry/Casals."""
+    if component in ("backend", "both"):
+        _run_fetch_gos_artifacts(root, "wasms")
+    if component in ("frontend", "both") and family == "registry":
+        _run_fetch_gos_artifacts(root, "frontend")
+
+    wasms_dir = root / ".external-wasms"
+    backend_wasm = None
+    if component in ("backend", "both"):
+        wasm_name = _GOS_BACKEND_WASM[family]
+        candidate = wasms_dir / wasm_name
+        if not candidate.is_file():
+            raise typer.BadParameter(f"GOS backend wasm not found after fetch: {candidate}")
+        backend_wasm = str(candidate)
+
+    frontend_dist = None
+    assets_wasm = None
+    if component in ("frontend", "both") and family == "registry":
+        dist = root / ".external-assets" / "realm_registry_frontend" / "dist"
+        if not dist.is_dir():
+            raise typer.BadParameter(f"GOS registry frontend dist not found after fetch: {dist}")
+        frontend_dist = str(dist)
+        assets_wasm = _find_assets_wasm(root)
+
+    casals = _CASALS_IDS.get(env)
+    file_registry = _FILE_REGISTRY_IDS.get(env)
+    if not casals or not file_registry:
+        raise typer.BadParameter(f"no Casals/file_registry configured for '{env}'")
+
+    console.print(
+        f"[bold blue]Publishing GOS {family} {_GOS_VERSION} into {env} "
+        f"(fetch → upload → authorize)[/bold blue]"
+    )
+    files_publish_release_command(
+        network=env,
+        family=family,
+        version=_GOS_VERSION,
+        backend_wasm=backend_wasm,
+        frontend_dist=frontend_dist,
+        registry=file_registry,
+        identity=identity,
+        casals=casals,
+        assets_wasm=assets_wasm,
+    )
+
+
+def _maybe_publish_gos_infra(
+    env_list: list[str],
+    target_list: list[str],
+    scope: str,
+    mode: str,
+    version: str,
+    realm_family: str,
+    all_actions: list[dict],
+    identity: Optional[str],
+) -> list[dict]:
+    """When rollout targets registry/installer, fetch+publish if not yet authorized."""
+    stands_needed = {
+        a["stand"]
+        for a in all_actions
+        if a["stand"] in _GOS_STAND_FAMILY and not a["wasm_key"]
+    }
+    if not stands_needed:
+        return all_actions
+
+    root = get_project_root()
+    for env in env_list:
+        env_stands = {a["stand"] for a in all_actions if a["env"] == env}
+        for stand in sorted(stands_needed & env_stands):
+            family = _GOS_STAND_FAMILY[stand]
+            comp = scope
+            if comp == "both" and family == "installer":
+                comp = "backend"
+            _publish_gos_family(root, env, family, comp, identity)
+
+    refreshed: list[dict] = []
+    for env in env_list:
+        casals = _CASALS_IDS.get(env)
+        if not casals:
+            continue
+        refreshed.extend(
+            _build_plan(env, casals, target_list, scope, mode, version, realm_family)
+        )
+    return refreshed
 
 
 def _resolve_wasm_key(authorized: list, pub_family: str, kind: str, version: str) -> Optional[str]:
@@ -194,14 +345,21 @@ def _build_plan(env: str, casals: str, targets: list[str], scope: str,
             if not pub_family:
                 action["note"] = f"no family mapping for stand '{stand_name}'"
             else:
-                key = _resolve_wasm_key(authorized, pub_family, kind, version)
+                eff_version = _gos_artifact_version(stand_name, version)
+                key = _resolve_wasm_key(authorized, pub_family, kind, eff_version)
                 if key:
                     action["wasm_key"] = key
                 else:
-                    action["note"] = (
-                        f"no authorized {_wasm_family(pub_family, kind)} "
-                        f"@{version} in {env} Casals"
-                    )
+                    if stand_name in _GOS_STAND_FAMILY:
+                        action["note"] = (
+                            f"no authorized {_wasm_family(pub_family, kind)} "
+                            f"@{eff_version} (GOS release {_GOS_RELEASE}) in {env} Casals"
+                        )
+                    else:
+                        action["note"] = (
+                            f"no authorized {_wasm_family(pub_family, kind)} "
+                            f"@{version} in {env} Casals"
+                        )
             actions.append(action)
     return actions
 
@@ -448,6 +606,21 @@ def rollout_command(
         console.print(f"[dim]Reading {env} Casals ({casals})...[/dim]")
         all_actions.extend(
             _build_plan(env, casals, target_list, scope, mode, version, realm_family)
+        )
+
+    gos_missing = [
+        a for a in all_actions
+        if a["stand"] in _GOS_STAND_FAMILY and not a["wasm_key"]
+    ]
+    if gos_missing and execute:
+        all_actions = _maybe_publish_gos_infra(
+            env_list, target_list, scope, mode, version, realm_family, all_actions, identity,
+        )
+    elif gos_missing:
+        console.print(
+            "[yellow]Registry/installer targets need GOS artifacts published first. "
+            "Re-run with --execute to fetch from gos-as-a-service, upload, and authorize "
+            f"(pinned release {_GOS_RELEASE}).[/yellow]"
         )
 
     if not all_actions:
