@@ -201,7 +201,13 @@ def _unwrap_call_result(result) -> str:
     if isinstance(result, str):
         return result
     if isinstance(result, dict):
-        return result.get("Ok", result.get("ok", str(result)))
+        ok = result.get("Ok", result.get("ok"))
+        if ok is not None:
+            return ok
+        err = result.get("Err", result.get("err"))
+        if err is not None:
+            raise RuntimeError(f"inter-canister call rejected: {err}")
+        return str(result)
     if hasattr(result, "Ok"):
         return result.Ok
     return str(result)

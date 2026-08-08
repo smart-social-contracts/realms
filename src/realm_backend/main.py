@@ -6631,9 +6631,14 @@ def get_setup_state() -> text:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@query
+@update
 def list_available_codices() -> Async[text]:
-    """List codex packages available from the configured file registry."""
+    """List codex packages available from the configured file registry.
+
+    Exported as update, not composite_query: basilisk's async driver issues
+    ic0.call_new, which the replica rejects in composite-query execution, so
+    the inter-canister list_codices call fails when exported as a query.
+    """
     try:
         from api.setup import list_available_codices as _list
 
