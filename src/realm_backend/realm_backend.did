@@ -357,6 +357,12 @@ service : {
   "install_codex_from_registry" : (text) -> (text);
   "install_branding_from_registry" : (text) -> (text);
   "register_realm_from_registry" : (text) -> (text);
+  "get_setup_state" : () -> (text) query;
+  "list_available_codices" : () -> (text) query;
+  "setup_install_codex" : (text) -> (text);
+  "setup_configure_token" : (text) -> (text);
+  "setup_set_branding" : (text) -> (text);
+  "complete_setup" : () -> (text);
   "reload_entity_method_overrides" : () -> (text);
   "list_extensions" : (text) -> (RealmResponse) query;
   "get_canister_logs" : (opt int, opt int, opt text, opt text) -> (vec text) query;

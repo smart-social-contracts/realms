@@ -83,6 +83,7 @@ from api.vetkeys import (
 )
 from api.zones import get_zone_aggregation
 from core.access import _check_access, require, require_controller, set_controller
+from core.setup import setup_gate_error
 from core.cross_quarter import (
     ResolutionStatus,
     classify_ref,
@@ -596,6 +597,12 @@ def join_realm(
         from ggg import Quarter, Realm, User
 
         realm = Realm.load("1")
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error=gate_err),
+            )
         has_invite = bool(invite_code_checksum_hex and invite_code_checksum_hex.strip())
         granted_profile = profile
         # Organization the invite code links to (per-department staff invites,
@@ -1001,9 +1008,14 @@ def grant_delegation_json(args: text) -> text:
     Caller must be grantor or realm admin.
     """
     try:
-        from core.delegation import grant_delegation
+        caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return json.dumps({"success": False, "error": gate_err})
 
         params = json.loads(args) if args else {}
+        from core.delegation import grant_delegation
+
         grantor = (params.get("grantor") or "").strip()
         delegate = (params.get("delegate") or "").strip()
         scope = params.get("scope") or {}
@@ -1036,6 +1048,11 @@ def accept_delegation_json(args: text) -> text:
     try:
         from core.delegation import accept_delegation
 
+        caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return json.dumps({"success": False, "error": gate_err})
+
         params = json.loads(args) if args else {}
         delegation_id = (params.get("delegation_id") or "").strip()
         if not delegation_id:
@@ -1051,6 +1068,11 @@ def revoke_delegation_json(args: text) -> text:
     """Revoke a delegation. JSON args: delegation_id."""
     try:
         from core.delegation import revoke_delegation
+
+        caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return json.dumps({"success": False, "error": gate_err})
 
         params = json.loads(args) if args else {}
         delegation_id = (params.get("delegation_id") or "").strip()
@@ -1082,6 +1104,11 @@ def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
         from ggg import Quarter, Realm
 
         caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=gate_err)
+            )
 
         # Validate the target quarter exists and is active
         realm = Realm.load("1")
@@ -1372,7 +1399,20 @@ def set_canister_config_json(args: text) -> text:
             treasury_token_indexer_id=params.get("treasury_token_indexer_id"),
             treasury_token_type=params.get("treasury_token_type"),
         )
-        return json.dumps(_realm_response_to_json_dict(resp))
+        out = _realm_response_to_json_dict(resp)
+        if out.get("success"):
+            from ggg import Realm
+            from core.setup import set_creator_principal, set_realm_registry_canister_id
+
+            realm = Realm.load("1")
+            if realm:
+                if params.get("creator_principal"):
+                    set_creator_principal(realm, params["creator_principal"])
+                if params.get("realm_registry_canister_id"):
+                    set_realm_registry_canister_id(
+                        realm, params["realm_registry_canister_id"]
+                    )
+        return json.dumps(out)
     except Exception as e:
         logger.error(f"set_canister_config_json error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
@@ -2655,7 +2695,13 @@ def get_my_extensions() -> text:
 @require(Operations.SELF_UPDATE_PUBLIC_PROFILE)
 def update_my_public_profile(nickname: str, avatar: str) -> RealmResponse:
     try:
-        result = user_update_public_profile(ic.caller().to_str(), nickname, avatar)
+        caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=gate_err)
+            )
+        result = user_update_public_profile(caller, nickname, avatar)
         if not result["success"]:
             return RealmResponse(
                 success=False, data=RealmResponseData(error=result["error"])
@@ -2685,7 +2731,13 @@ def update_my_public_profile(nickname: str, avatar: str) -> RealmResponse:
 @require(Operations.SELF_UPDATE_PRIVATE_DATA)
 def update_my_private_data(private_data: str) -> RealmResponse:
     try:
-        result = user_update_private_data(ic.caller().to_str(), private_data)
+        caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=gate_err)
+            )
+        result = user_update_private_data(caller, private_data)
         if not result["success"]:
             return RealmResponse(
                 success=False, data=RealmResponseData(error=result["error"])
@@ -3678,7 +3730,8 @@ def _sync_profile_baseline() -> void:
 
 def create_foundational_objects() -> void:
     """Create the foundational objects required for every realm to operate."""
-    from ggg import Calendar, Identity, Profiles, Realm, Treasury, User, UserProfile
+        from ggg import Calendar, Identity, Profiles, Realm, Treasury, User, UserProfile
+        from ggg.governance.realm import RealmStatus
     from ggg.governance.calendar import DEFAULTS as CALENDAR_DEFAULTS
 
     logger.info("Creating foundational objects...")
@@ -3773,6 +3826,7 @@ def create_foundational_objects() -> void:
             principal_id="",
             manifest_data=manifest_json_str,
             open_registration=bool(realm_open_registration),
+            status=RealmStatus.SETUP,
         )
 
         logger.info(f"Created realm: {realm_name}")
@@ -4355,6 +4409,12 @@ def extension_call(extension_name: text, function_name: text, args: text) -> Ext
 def extension_sync_call(extension_name: text, function_name: text, args: text) -> ExtensionCallResponse:
     try:
         caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return ExtensionCallResponse(
+                success=False,
+                response=json.dumps({"error": gate_err}),
+            )
         if not _check_access(caller, Operations.EXTENSION_SYNC_CALL):
             return ExtensionCallResponse(
                 success=False,
@@ -4398,6 +4458,12 @@ def extension_sync_call(extension_name: text, function_name: text, args: text) -
 def extension_async_call(extension_name: text, function_name: text, args: text) -> Async[ExtensionCallResponse]:
     try:
         caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return ExtensionCallResponse(
+                success=False,
+                response=json.dumps({"error": gate_err}),
+            )
         if not _check_access(caller, Operations.EXTENSION_ASYNC_CALL):
             return ExtensionCallResponse(
                 success=False,
@@ -6547,4 +6613,79 @@ def register_realm_from_registry(args: text) -> Async[text]:
         return json.dumps(result)
     except Exception as e:
         logger.error(f"register_realm_from_registry error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+# ── In-realm setup wizard (issue #8) ─────────────────────────────────────
+
+
+@query
+def get_setup_state() -> text:
+    """Return setup wizard state for the in-realm configuration flow."""
+    try:
+        from api.setup import get_setup_state as _get_setup_state
+
+        return _get_setup_state()
+    except Exception as e:
+        logger.error(f"get_setup_state error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def list_available_codices() -> Async[text]:
+    """List codex packages available from the configured file registry."""
+    try:
+        from api.setup import list_available_codices as _list
+
+        return (yield from _list())
+    except Exception as e:
+        logger.error(f"list_available_codices error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def setup_install_codex(args: text) -> Async[text]:
+    """Install a codex during setup (creator or realm admin)."""
+    try:
+        from api.setup import setup_install_codex as _install
+
+        return (yield from _install(args))
+    except Exception as e:
+        logger.error(f"setup_install_codex error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def setup_configure_token(args: text) -> text:
+    """Record token configuration during setup (existing ledger only in v1)."""
+    try:
+        from api.setup import setup_configure_token as _configure
+
+        return _configure(args)
+    except Exception as e:
+        logger.error(f"setup_configure_token error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def setup_set_branding(args: text) -> text:
+    """Store branding selections during setup (creator or realm admin)."""
+    try:
+        from api.setup import setup_set_branding as _set_branding
+
+        return _set_branding(args)
+    except Exception as e:
+        logger.error(f"setup_set_branding error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def complete_setup() -> Async[text]:
+    """Finish setup: require codex, flip to alpha, notify registry."""
+    try:
+        from api.setup import complete_setup as _complete
+
+        return (yield from _complete())
+    except Exception as e:
+        logger.error(f"complete_setup error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})

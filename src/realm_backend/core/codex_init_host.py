@@ -161,7 +161,12 @@ def apply_init_policy(codex_id: str) -> Dict[str, Any]:
     if manifest.get("welcome_message") and not getattr(realm, "welcome_message", ""):
         realm.welcome_message = manifest["welcome_message"]
 
-    if not getattr(realm, "status", None):
+    # Lifecycle during setup is managed by complete_setup(); codex init must
+    # not advance setup → alpha (issue #8).
+    current_status = getattr(realm, "status", None) or "setup"
+    if current_status == "setup":
+        pass
+    elif not getattr(realm, "status", None):
         realm.status = "alpha"
 
     logger.info(f"apply_init_policy complete for codex '{codex_id}'")

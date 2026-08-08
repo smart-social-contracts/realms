@@ -70,7 +70,7 @@ def get_status() -> "dict[str, Any]":
     realm_manifesto = ""
     realm_open_registration = False
     realm_ai_assistant_enabled = True
-    realm_stage = "alpha"
+    realm_stage = "setup"
     logo_url = ""
     background_image_url = ""
     file_registry_canister_id = ""
@@ -84,7 +84,7 @@ def get_status() -> "dict[str, Any]":
             realm_open_registration = bool(getattr(first_realm, "open_registration", False))
             _ai_flag = getattr(first_realm, "ai_assistant_enabled", None)
             realm_ai_assistant_enabled = True if _ai_flag is None else bool(_ai_flag)
-            realm_stage = getattr(first_realm, "status", None) or "alpha"
+            realm_stage = getattr(first_realm, "status", None) or "setup"
             logo_url = getattr(first_realm, "logo_url", None) or ""
             background_image_url = getattr(first_realm, "background_image_url", None) or ""
             file_registry_canister_id = getattr(first_realm, "file_registry_canister_id", None) or ""

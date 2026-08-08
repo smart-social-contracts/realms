@@ -6,6 +6,7 @@ logger = get_logger("entity.realm")
 
 
 class RealmStatus:
+    SETUP = "setup"              # Creator-only configuration stage (pre-alpha)
     ALPHA = "alpha"              # Gathering interest, deposits refundable
     BETA = "beta"                # Deposits locked, auctions & land bidding
     PRODUCTION = "production"    # Fully operational
@@ -38,7 +39,7 @@ class Realm(Entity, TimestampedMixin):
             obj.setdefault("trusted_approvers", "")
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
-    status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.ALPHA)
+    status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.SETUP)
     manifest_data = String(max_length=4096, default="{}")
     calendar = OneToOne("Calendar", "realm")
     treasury = OneToOne("Treasury", "realm")
