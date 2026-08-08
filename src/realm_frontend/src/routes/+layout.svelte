@@ -10,6 +10,7 @@
 	import { initializeTheme } from '$lib/theme/init';
 	import { restoreAuthSession, resetAuthSessionRestore, getPortalRedirectUrl } from '$lib/auth';
 	import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge.ts';
+	import SetupStageGate from '$lib/components/SetupStageGate.svelte';
 
 	export const SITE_NAME = "Realms GOS";
 
@@ -118,7 +119,9 @@
 
 <div class="app">
 	{#if browser && i18nReady}
-		<slot />
+		<SetupStageGate>
+			<slot />
+		</SetupStageGate>
 	{:else}
 		<div class="loading">
 			<div class="loading-dots">
