@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import { backendStore, backendReady } from '$lib/canisters';
+import { backendStore, backendActorReady } from '$lib/canisters';
 
 export interface QuarterInfo {
 	name: string;
@@ -32,9 +32,11 @@ const createQuartersStore = () => {
 		fetch: async () => {
 			update((state: QuartersState) => ({ ...state, loading: true, error: null }));
 
-			try {
-				await backendReady;
-				const currentActor = get(backendStore);
+		try {
+			// Await the provisional actor, not backendReady — see realmInfo.ts
+			// (backendReady includes auth init, which awaits these fetches).
+			await backendActorReady;
+			const currentActor = get(backendStore);
 				if (!currentActor) {
 					throw new Error('Actor not initialized');
 				}

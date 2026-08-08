@@ -69,6 +69,17 @@ export const backendStore = writable(buildingOrTesting ? dummyActor() : null);
 // Singleton promise so concurrent callers all wait for the same init.
 let _initBackendPromise = null;
 
+// Resolves as soon as the provisional anonymous actor is in the store.
+// Stores must await THIS (not backendReady) before calling the backend:
+// initializeBackendStore() itself awaits realmInfo.fetch(), so a fetch that
+// awaits backendReady deadlocks the whole boot (circular await).
+let _resolveActorReady;
+export const backendActorReady = buildingOrTesting
+	? Promise.resolve()
+	: new Promise((resolve) => {
+			_resolveActorReady = resolve;
+		});
+
 // Initialize the backend store after imports are loaded
 function initializeBackendStore() {
 	if (buildingOrTesting) return Promise.resolve();
@@ -85,6 +96,7 @@ function initializeBackendStore() {
 		}
 		let actor = createActor(canisterId, { agent });
 		backendStore.set(actor);
+		_resolveActorReady();
 
 		// Runtime flags (incl. test_mode_ii_bypass) come from backend status(), not
 		// canister_ids.js. Fetch before auth init so test-mode auto-login is not

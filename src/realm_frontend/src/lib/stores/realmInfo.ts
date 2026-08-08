@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import { backendStore, backendReady } from '$lib/canisters';
+import { backendStore, backendActorReady } from '$lib/canisters';
 
 interface CanisterInfo {
 	canister_id: string;
@@ -64,10 +64,12 @@ const createRealmInfoStore = () => {
 			update(state => ({ ...state, loading: true, error: null }));
 			
 			try {
-				// Mount-time callers (sidebar layout, navbar) race the provisional
-				// actor setup in canisters.js. Wait for backend init instead of
-				// erroring with "Actor not initialized" on a cold load.
-				await backendReady;
+			// Mount-time callers (sidebar layout, navbar) race the provisional
+			// actor setup in canisters.js. Wait for the provisional actor instead of
+			// erroring with "Actor not initialized" on a cold load. Must NOT await
+			// backendReady here: initializeBackendStore() awaits this fetch, so
+			// awaiting backendReady would deadlock the boot (circular await).
+			await backendActorReady;
 				const currentActor = get(backendStore);
 				if (!currentActor) {
 					throw new Error('Actor not initialized');
