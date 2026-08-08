@@ -60,15 +60,20 @@ export async function fetchSetupState(): Promise<SetupState> {
 export async function listAvailableCodices(): Promise<AvailableCodex[]> {
 	const actor = await getActor();
 	const raw = await actor.list_available_codices();
-	const parsed = parseJson<AvailableCodex[] | { error?: string }>(raw);
-	if (!Array.isArray(parsed)) {
+	const parsed = parseJson<
+		AvailableCodex[] | { success?: boolean; codices?: AvailableCodex[]; error?: string }
+	>(raw);
+	// Backend wraps the list in a {success, codices} envelope; older builds
+	// returned a bare array. Accept both.
+	const list = Array.isArray(parsed) ? parsed : parsed?.codices;
+	if (!Array.isArray(list)) {
 		throw new Error(
 			typeof parsed === 'object' && parsed && 'error' in parsed
 				? String(parsed.error)
 				: 'Invalid codex list response'
 		);
 	}
-	return parsed;
+	return list;
 }
 
 export async function installSetupCodex(payload: {

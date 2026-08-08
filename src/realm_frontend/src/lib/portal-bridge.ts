@@ -267,6 +267,14 @@ export function requestAuthRefresh() {
   requestDelegation(true);
 }
 
+export function requestSilentAuthProbe() {
+  // Periodic non-interactive re-probe while waiting on a host session (e.g.
+  // the setup gate): never triggers the host's sign-in overlay. Covers the
+  // case where the host's session became available only after the initial
+  // probe was answered with auth:pending.
+  requestDelegation(false);
+}
+
 /**
  * Wait for the portal host to deliver a scoped II delegation.
  *

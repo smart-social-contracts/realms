@@ -20,6 +20,7 @@
 
 	let authReady = $state(false);
 	let pollTimer: ReturnType<typeof setInterval> | undefined;
+	let probeTimer: ReturnType<typeof setInterval> | undefined;
 
 	const gateInput = $derived({
 		loading: !authReady || $setupStateStore.loading,
@@ -63,11 +64,24 @@
 					void refreshSetupState();
 				}
 			}, 8000);
+
+			// The initial silent delegation probe can be answered before the
+			// portal host's session is ready (auth:pending), and nothing else
+			// re-asks — leaving the gate stuck on "anonymous" for a signed-in
+			// portal user. Re-probe silently until a delegation lands.
+			const { isEmbeddedInPortal, requestSilentAuthProbe } = await import(
+				'$lib/portal-bridge'
+			);
+			probeTimer = setInterval(() => {
+				if (cancelled || get(isAuthenticated) || !isEmbeddedInPortal()) return;
+				requestSilentAuthProbe();
+			}, 10_000);
 		})();
 
 		return () => {
 			cancelled = true;
 			if (pollTimer) clearInterval(pollTimer);
+			if (probeTimer) clearInterval(probeTimer);
 		};
 	});
 
