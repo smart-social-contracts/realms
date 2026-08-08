@@ -86,8 +86,8 @@ _DESTRUCTIVE_INFRA_REINSTALL = {"file-registry", "realm-registry"}
 
 # Registry + installer artifacts are built and released from gos-as-a-service,
 # not from this repo. Keep in sync with scripts/fetch_gos_artifacts.py.
-_GOS_RELEASE = "v0.1.0"
-_GOS_VERSION = "0.1.0"
+_GOS_RELEASE = "v0.3.2"
+_GOS_VERSION = "0.3.2"
 _GOS_STAND_FAMILY = {
     "installer": "installer",
     "realm-registry": "registry",
