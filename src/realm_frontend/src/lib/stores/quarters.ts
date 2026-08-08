@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import { backendStore } from '$lib/canisters';
+import { backendStore, backendReady } from '$lib/canisters';
 
 export interface QuarterInfo {
 	name: string;
@@ -33,6 +33,7 @@ const createQuartersStore = () => {
 			update((state: QuartersState) => ({ ...state, loading: true, error: null }));
 
 			try {
+				await backendReady;
 				const currentActor = get(backendStore);
 				if (!currentActor) {
 					throw new Error('Actor not initialized');
