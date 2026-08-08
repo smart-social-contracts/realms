@@ -12,8 +12,6 @@ export interface AccountTransaction {
   'id' : bigint,
   'transaction' : Transaction,
 }
-export type AddCreditsResult = { 'Ok' : UserCreditsRecord } |
-  { 'Err' : string };
 export type AddRealmResult = { 'Ok' : string } |
   { 'Err' : string };
 export type Address = string;
@@ -102,12 +100,6 @@ export type AuthorityResult = { 'Ok' : bigint } |
   { 'Err' : AuthorityError };
 export interface BadBurn { 'min_burn_amount' : bigint }
 export interface BadFee { 'expected_fee' : bigint }
-export interface BillingStatusRecord {
-  'total_spent' : bigint,
-  'total_balance' : bigint,
-  'total_purchased' : bigint,
-  'users_count' : bigint,
-}
 export type BitcoinAddress = string;
 export type BitcoinNetwork = { 'Mainnet' : null } |
   { 'Regtest' : null } |
@@ -164,26 +156,8 @@ export interface CanisterStatusResult {
 export interface CapitalPopulationService {
   'report_quarter_population' : ActorMethod<[bigint], string>,
 }
-export interface CasalsConfigView {
-  'create_stand_baton' : boolean,
-  'provision_via_casals' : boolean,
-  'casals_section' : string,
-  'registry_principal' : string,
-  'casals_canister_id' : string,
-  'baton_wasm_key' : string,
-}
 export interface CasalsProvisionService {
   'create_canister' : ActorMethod<[string], string>,
-}
-export interface CasalsService {
-  'create_canister' : ActorMethod<[string], string>,
-  'create_stand' : ActorMethod<[string], string>,
-  'destroy_realm_stand' : ActorMethod<[string], string>,
-  'get_tree' : ActorMethod<[], string>,
-  'orchestration_configure_baton' : ActorMethod<[string], string>,
-  'orchestration_hand_to_baton' : ActorMethod<[string], string>,
-  'set_commander' : ActorMethod<[string], string>,
-  'upgrade_to' : ActorMethod<[string], string>,
 }
 export interface ChunkHash { 'hash' : Uint8Array | number[] }
 export interface ClearChunkStoreArgs { 'canister_id' : Principal }
@@ -238,15 +212,6 @@ export type ConfigResult = { 'Ok' : ConfigRecord } |
   { 'Err' : string };
 export interface CreateCanisterArgs { 'settings' : [] | [CanisterSettings] }
 export interface CreateCanisterResult { 'canister_id' : Principal }
-export interface CreditTransactionRecord {
-  'id' : string,
-  'transaction_type' : string,
-  'description' : string,
-  'timestamp' : number,
-  'stripe_session_id' : string,
-  'principal_id' : string,
-  'amount' : bigint,
-}
 export interface CryptoResponse {
   'data' : CryptoResponseData,
   'success' : boolean,
@@ -260,8 +225,6 @@ export type CryptoResponseData = { 'scopeList' : ScopeListRecord } |
   { 'message' : string } |
   { 'groupList' : GroupListRecord };
 export interface DecimalsResult { 'decimals' : number }
-export type DeductCreditsResult = { 'Ok' : UserCreditsRecord } |
-  { 'Err' : string };
 export interface DefiniteCanisterSettings {
   'freezing_threshold' : bigint,
   'controllers' : Array<Principal>,
@@ -275,40 +238,6 @@ export interface DeleteCanisterSnapshotArgs {
 }
 export interface DemoRegistrationService {
   'register_demo_citizens' : ActorMethod<[string], string>,
-}
-export interface DeployStepView {
-  'idx' : number,
-  'status' : string,
-  'kind' : string,
-  'label' : string,
-  'error' : string,
-}
-export interface DeployTaskView {
-  'status' : string,
-  'task_id' : string,
-  'completed_count' : number,
-  'steps' : Array<DeployStepView>,
-  'total_count' : number,
-}
-export interface DeploymentJobView {
-  'status' : string,
-  'expected_wasm_hash' : string,
-  'registry_canister_id' : string,
-  'backend_canister_id' : string,
-  'ext_deploy_task_id' : string,
-  'assets_verified' : number,
-  'expected_step_count' : number,
-  'network' : string,
-  'frontend_wasm_verified' : number,
-  'created_at' : bigint,
-  'error' : string,
-  'wasm_verified' : number,
-  'job_id' : string,
-  'realm_name' : string,
-  'actual_wasm_hash' : string,
-  'caller_principal' : string,
-  'completed_at' : bigint,
-  'frontend_canister_id' : string,
 }
 export interface DepositCyclesArgs { 'canister_id' : Principal }
 export interface DeveloperLicense {
@@ -332,12 +261,6 @@ export interface EcdsaPublicKeyArgs {
 export interface EcdsaPublicKeyResult {
   'public_key' : Uint8Array | number[],
   'chain_code' : Uint8Array | number[],
-}
-export interface EnqueueOk {
-  'status' : string,
-  'network' : string,
-  'job_id' : string,
-  'realm_name' : string,
 }
 export interface EnvelopeListRecord { 'envelopes' : Array<EnvelopeRecord> }
 export interface EnvelopeRecord {
@@ -474,8 +397,6 @@ export interface GetBalanceArgs {
   'address' : BitcoinAddress,
   'min_confirmations' : [] | [number],
 }
-export type GetBillingStatusResult = { 'Ok' : BillingStatusRecord } |
-  { 'Err' : string };
 export interface GetBlocksArgs { 'start' : BlockIndex, 'length' : bigint }
 export type GetCreditsResult = { 'Ok' : UserCreditsRecord } |
   { 'Err' : string };
@@ -487,10 +408,6 @@ export interface GetExchangeRateRequest {
 }
 export type GetExchangeRateResult = { 'Ok' : ExchangeRate } |
   { 'Err' : ExchangeRateError };
-export type GetRealmResult = { 'Ok' : RealmRecord } |
-  { 'Err' : string };
-export type GetStatusResult = { 'Ok' : StatusRecord } |
-  { 'Err' : string };
 export type GetTransactionsResult = { 'Ok' : GetAccountTransactionsResponse } |
   { 'Err' : string };
 export interface GetUtxosArgs {
@@ -511,7 +428,6 @@ export interface GroupRecord { 'name' : string, 'description' : string }
 export type GuardResult = { 'Ok' : null } |
   { 'Err' : string };
 export type Header = [string, string];
-export interface HealthView { 'ok' : boolean, 'canister' : string }
 export interface HttpHeader { 'value' : string, 'name' : string }
 export type HttpMethod = { 'get' : null } |
   { 'head' : null } |
@@ -588,21 +504,10 @@ export interface InstallCodeArgs {
 export type InstallCodeMode = { 'reinstall' : null } |
   { 'upgrade' : null } |
   { 'install' : null };
-export interface InstallerError { 'message' : string, 'traceback' : string }
 export interface InstallerProvisionService {
   'provision_quarter' : ActorMethod<[string], string>,
 }
 export interface InsufficientFunds { 'balance' : bigint }
-export interface JobStatusAck {
-  'status' : string,
-  'prev_status' : string,
-  'noop' : boolean,
-  'job_id' : string,
-}
-export interface JobsListOk {
-  'jobs' : Array<DeploymentJobView>,
-  'count' : number,
-}
 export interface KeyId { 'name' : string, 'curve' : EcdsaCurve }
 export interface KeyTooLarge { 'max' : number, 'given' : number }
 export interface Ledger {
@@ -765,21 +670,6 @@ export interface PendingAudit {
   'item_id' : string,
   'developer' : string,
 }
-export interface PendingJobEntry {
-  'job' : DeploymentJobView,
-  'manifest' : string,
-}
-export interface PendingJobsOk {
-  'jobs' : Array<PendingJobEntry>,
-  'count' : number,
-}
-export interface ProvisionOk {
-  'status' : string,
-  'backend_canister_id' : string,
-  'stand' : string,
-  'job_id' : string,
-  'frontend_canister_id' : string,
-}
 export interface ProvisionalCreateCanisterWithCyclesArgs {
   'settings' : [] | [CanisterSettings],
   'amount' : [] | [bigint],
@@ -790,13 +680,6 @@ export interface ProvisionalCreateCanisterWithCyclesResult {
 export interface ProvisionalTopUpCanisterArgs {
   'canister_id' : Principal,
   'amount' : bigint,
-}
-export interface PublicLogEntry {
-  'id' : bigint,
-  'level' : string,
-  'logger_name' : string,
-  'message' : string,
-  'timestamp' : bigint,
 }
 export interface PurchaseRecord {
   'purchased_at' : number,
@@ -848,44 +731,11 @@ export interface QueryBlocksResponse_archived_blocks {
   'start' : BlockIndex,
   'length' : bigint,
 }
-export interface REnqueueOk {
-  'status' : string,
-  'network' : string,
-  'job_id' : string,
-  'realm_name' : string,
-}
-export interface RInstallerError { 'message' : string, 'traceback' : string }
-export interface RProvisionOk {
-  'status' : string,
-  'backend_canister_id' : string,
-  'stand' : string,
-  'job_id' : string,
-  'frontend_canister_id' : string,
-}
-export type RResultEnqueue = { 'Ok' : REnqueueOk } |
-  { 'Err' : RInstallerError };
-export type RResultProvision = { 'Ok' : RProvisionOk } |
-  { 'Err' : RInstallerError };
-export interface RealmInstallerService {
-  'cancel_deployment' : ActorMethod<[string], string>,
-  'enqueue_deployment' : ActorMethod<[string], RResultEnqueue>,
-  'provision_via_casals' : ActorMethod<[string], RResultProvision>,
-}
 export interface RealmMessagingService {
   'receive_realm_message' : ActorMethod<
     [string, string, string, string],
     string
   >,
-}
-export interface RealmRecord {
-  'id' : string,
-  'url' : string,
-  'logo' : string,
-  'name' : string,
-  'created_at' : number,
-  'backend_url' : string,
-  'frontend_canister_id' : string,
-  'users_count' : bigint,
 }
 export interface RealmRegistryService {
   'register_realm' : ActorMethod<
@@ -909,10 +759,6 @@ export type RealmResponseData = { 'status' : StatusRecord } |
   { 'userGet' : UserGetRecord } |
   { 'error' : string } |
   { 'message' : string };
-export interface RealmTargetService {
-  'install_codex_from_registry' : ActorMethod<[string], string>,
-  'install_extension_from_registry' : ActorMethod<[string], string>,
-}
 export type RecordKey = [string, string];
 export type RejectionCode = { 'NoError' : null } |
   { 'CanisterError' : null } |
@@ -921,50 +767,6 @@ export type RejectionCode = { 'NoError' : null } |
   { 'Unknown' : null } |
   { 'SysFatal' : null } |
   { 'CanisterReject' : null };
-export interface ReportFrontendOk {
-  'status' : string,
-  'assets_verified' : number,
-  'failed_verification' : boolean,
-  'frontend_wasm_verified' : boolean,
-  'job_id' : string,
-  'actual_assets_hash' : string,
-  'actual_frontend_wasm_hash' : string,
-}
-export interface ReportReadyOk {
-  'status' : string,
-  'expected_wasm_hash' : string,
-  'failed_verification' : boolean,
-  'extensions_started' : boolean,
-  'wasm_verified' : boolean,
-  'job_id' : string,
-  'actual_wasm_hash' : string,
-}
-export type ResultCasalsConfig = { 'Ok' : CasalsConfigView } |
-  { 'Err' : InstallerError };
-export type ResultDeployTaskStatus = { 'Ok' : DeployTaskView } |
-  { 'Err' : InstallerError };
-export type ResultEnqueue = { 'Ok' : EnqueueOk } |
-  { 'Err' : InstallerError };
-export type ResultJobCancel = { 'Ok' : JobStatusAck } |
-  { 'Err' : InstallerError };
-export type ResultJobIdStatus = { 'Ok' : DeploymentJobView } |
-  { 'Err' : InstallerError };
-export type ResultJobManifest = { 'Ok' : string } |
-  { 'Err' : InstallerError };
-export type ResultJobsList = { 'Ok' : JobsListOk } |
-  { 'Err' : InstallerError };
-export type ResultPendingJobs = { 'Ok' : PendingJobsOk } |
-  { 'Err' : InstallerError };
-export type ResultProvision = { 'Ok' : ProvisionOk } |
-  { 'Err' : InstallerError };
-export type ResultReportFailure = { 'Ok' : JobStatusAck } |
-  { 'Err' : InstallerError };
-export type ResultReportFrontend = { 'Ok' : ReportFrontendOk } |
-  { 'Err' : InstallerError };
-export type ResultReportReady = { 'Ok' : ReportReadyOk } |
-  { 'Err' : InstallerError };
-export type ResultTakeSnapshot = { 'Ok' : TakeSnapshotOk } |
-  { 'Err' : InstallerError };
 export type Satoshi = bigint;
 export interface ScopeListRecord { 'scopes' : Array<string> }
 export interface SendTransactionArgs {
@@ -1056,11 +858,6 @@ export interface TakeCanisterSnapshotArgs {
   'replace_snapshot' : [] | [Uint8Array | number[]],
   'canister_id' : Principal,
 }
-export interface TakeSnapshotOk {
-  'skipped' : boolean,
-  'job_id' : string,
-  'snapshot_id' : string,
-}
 export interface TimeStamp { 'timestamp_nanos' : bigint }
 export type TimerId = bigint;
 export interface TokenAccount {
@@ -1090,10 +887,6 @@ export interface Transaction {
   'created_at_time' : TimeStamp,
   'transfer' : [] | [TransferTx],
 }
-export type TransactionHistoryResult = {
-    'Ok' : Array<CreditTransactionRecord>
-  } |
-  { 'Err' : string };
 export interface TransferArg {
   'to' : Account,
   'fee' : [] | [bigint],
@@ -1172,14 +965,6 @@ export interface Utxo {
 export type UtxosFilter = { 'Page' : Page } |
   { 'MinConfirmations' : number };
 export interface ValueTooLarge { 'max' : number, 'given' : number }
-export interface VersionInfoRecord {
-  'backend_wasm_hash' : string,
-  'backend_wasm_url' : string,
-  'published_at' : number,
-  'frontend_tar_url' : string,
-  'version' : string,
-  'frontend_tar_hash' : string,
-}
 export type VetKDCurve = { 'bls12_381_g2' : null };
 export interface VetKDDeriveKeyArgs {
   'context' : Uint8Array | number[],
@@ -1311,7 +1096,7 @@ export interface _SERVICE {
   'get_canister_id' : ActorMethod<[], string>,
   'get_canister_logs' : ActorMethod<
     [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
-    Array<PublicLogEntry>
+    Array<string>
   >,
   'get_extension_frontend_info' : ActorMethod<[string], string>,
   'get_extensions' : ActorMethod<[], RealmResponse>,

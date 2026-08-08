@@ -224,6 +224,8 @@ export const idlFactory = ({ IDL }) => {
   const StatusResult = IDL.Variant({ 'Ok' : StatusRecord, 'Err' : IDL.Text });
   return IDL.Service({
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
+    'add_reviewer' : IDL.Func([IDL.Text], [GenericResult], []),
+    'admin_approve_namespace' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'buy_assistant' : IDL.Func([IDL.Text], [GenericResult], []),
     'buy_codex' : IDL.Func([IDL.Text], [GenericResult], []),
     'buy_extension' : IDL.Func([IDL.Text], [GenericResult], []),
@@ -297,6 +299,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'list_pending_audits' : IDL.Func([], [IDL.Vec(PendingAudit)], ['query']),
+    'list_reviewers' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'my_likes' : IDL.Func([], [IDL.Vec(LikeRecord)], ['query']),
     'record_license_payment' : IDL.Func(
         [LicensePaymentInput],
@@ -304,7 +307,13 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'recount_listing_likes' : IDL.Func([], [GenericResult], []),
+    'remove_reviewer' : IDL.Func([IDL.Text], [GenericResult], []),
     'request_audit' : IDL.Func([IDL.Text, IDL.Text], [GenericResult], []),
+    'review_listing' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Bool, IDL.Text],
+        [IDL.Text],
+        [],
+      ),
     'revoke_license' : IDL.Func([IDL.Text], [GenericResult], []),
     'search_assistants' : IDL.Func(
         [IDL.Text, IDL.Bool],

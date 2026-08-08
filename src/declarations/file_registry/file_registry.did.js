@@ -50,6 +50,7 @@ export const idlFactory = ({ IDL }) => {
     'list_codices' : IDL.Func([], [IDL.Text], ['query']),
     'list_extensions' : IDL.Func([], [IDL.Text], ['query']),
     'list_files' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+    'list_files_icc' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'list_namespaces' : IDL.Func([], [IDL.Text], ['query']),
     'publish_namespace' : IDL.Func([IDL.Text], [IDL.Text], []),
     'purge_old_versions' : IDL.Func([IDL.Text], [IDL.Text], []),

@@ -132,13 +132,6 @@ export const idlFactory = ({ IDL }) => {
     'response' : IDL.Text,
     'success' : IDL.Bool,
   });
-  const PublicLogEntry = IDL.Record({
-    'id' : IDL.Nat,
-    'level' : IDL.Text,
-    'logger_name' : IDL.Text,
-    'message' : IDL.Text,
-    'timestamp' : IDL.Nat,
-  });
   const Header = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -299,12 +292,12 @@ export const idlFactory = ({ IDL }) => {
     'get_canister_id' : IDL.Func([], [IDL.Text], ['query']),
     'get_canister_logs' : IDL.Func(
         [
-          IDL.Opt(IDL.Nat),
-          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Int),
+          IDL.Opt(IDL.Int),
           IDL.Opt(IDL.Text),
           IDL.Opt(IDL.Text),
         ],
-        [IDL.Vec(PublicLogEntry)],
+        [IDL.Vec(IDL.Text)],
         ['query'],
       ),
     'get_extension_frontend_info' : IDL.Func([IDL.Text], [IDL.Text], ['query']),

@@ -3,6 +3,7 @@ import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 import { getTestModeIIBypass } from '$lib/config.js';
 import { isEmbeddedInPortal, getPortalDelegationIdentity } from '$lib/portal-bridge.ts';
+import { normalizePortalRedirectPath } from '$lib/portal-redirect-path.ts';
 
 const II_URL = globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app';
 console.log(`Using Identity Provider: ${II_URL}`);
@@ -33,6 +34,10 @@ export function getPortalRedirectUrl() {
   if (!PORTAL_URL || typeof window === 'undefined') return '';
   // Inside the portal iframe the bridge handles auth — nothing to redirect.
   if (isEmbeddedInPortal()) return '';
+  // Never redirect from inside any iframe: window.location targets the iframe
+  // document, which would load the portal origin inside the frame (blocked by
+  // frame-ancestors 'none') instead of navigating the top-level browser tab.
+  if (window.self !== window.top) return '';
   // Skip for local dev, where the portal doesn't exist.
   const host = window.location.hostname;
   if (host.includes('localhost') || host.includes('127.0.0.1')) return '';
@@ -54,9 +59,10 @@ export function getPortalRedirectUrl() {
   } catch {
     // ignore
   }
-  // The portal's /r/[slug]/[...path] route mirrors any in-realm path.
-  const path = window.location.pathname === '/' ? '' : window.location.pathname;
-  return `${PORTAL_URL}${path}${window.location.search}${window.location.hash}`;
+  // The portal's /r/[slug]/[...path] route mirrors user-facing in-realm paths.
+  const path = normalizePortalRedirectPath(window.location.pathname);
+  const normalizedPath = path === '/' ? '' : path;
+  return `${PORTAL_URL}${normalizedPath}${window.location.search}${window.location.hash}`;
 }
 
 let authClient;
