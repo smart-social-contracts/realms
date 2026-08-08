@@ -42,6 +42,17 @@ export interface ExtensionManifest {
   [key: string]: unknown;
 }
 
+export function fileRegistryBaseUrlFor(canisterId: string): string {
+  const host = typeof window !== 'undefined' ? window.location.host : '';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+
+  if (isLocal) {
+    const port = host.split(':')[1] ?? '4943';
+    return `http://${canisterId}.localhost:${port}`;
+  }
+  return `https://${canisterId}.icp0.io`;
+}
+
 const HANDSHAKE_TIMEOUT_MS = 30_000;
 
 async function resolveInstalledVersion(

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { get } from 'svelte/store';
+	import type { SidebarConfig } from '$lib/config/sidebar';
 	import { locale } from 'svelte-i18n';
 	
 	import { styles, cn } from '$lib/theme/utilities';
@@ -12,6 +13,7 @@
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { unreadCount } from '$lib/stores/notifications';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
+	import { isNavItemActive } from '$lib/utils/breadcrumb';
 	import { IconLogin, IconLayoutDashboard } from '@tabler/icons-svelte';
 	// @ts-ignore
 	import { backend, quarterBackendStore } from '$lib/canisters';
@@ -23,15 +25,31 @@
 	let lastSidebarActor: unknown = null;
 
 	const STORAGE_KEY = 'sidebar_collapsed';
+	const ACTIVE_ITEM_CLASSES =
+		'bg-gray-200 text-gray-900 font-medium hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-[var(--color-gray-600)]';
+
+	$: navPathname = $page.url.pathname;
+	$: navSearch = $page.url.search;
 
 	let collapsedCategories: Set<string> = new Set();
+	let categoriesInitialized = false;
 
-	onMount(() => {
+	function defaultCollapsedCategories(config: SidebarConfig): Set<string> {
+		return new Set(config.categories.map((category) => category.id));
+	}
+
+	function initCollapsedCategories(config: SidebarConfig) {
+		if (categoriesInitialized) return;
+		categoriesInitialized = true;
 		try {
 			const saved = localStorage.getItem(STORAGE_KEY);
-			if (saved) collapsedCategories = new Set(JSON.parse(saved));
-		} catch {}
-	});
+			collapsedCategories = saved
+				? new Set(JSON.parse(saved))
+				: defaultCollapsedCategories(config);
+		} catch {
+			collapsedCategories = defaultCollapsedCategories(config);
+		}
+	}
 
 	function toggleCategory(id: string) {
 		if (collapsedCategories.has(id)) {
@@ -66,18 +84,11 @@
 	}
 	
 	onMount(() => {
-		setTimeout(() => {
-			const sidebar = document.querySelector('aside.fixed');
-			if (sidebar) {
-				const scrollDiv = sidebar.querySelector('.overflow-y-auto');
-				if (scrollDiv) {
-					sidebarContainer = scrollDiv as HTMLElement;
-					sidebarContainer.addEventListener('scroll', checkScrollPosition);
-					checkScrollPosition();
-				}
-			}
-		}, 100);
-		
+		if (sidebarContainer) {
+			sidebarContainer.addEventListener('scroll', checkScrollPosition);
+			checkScrollPosition();
+		}
+
 		return () => {
 			if (sidebarContainer) {
 				sidebarContainer.removeEventListener('scroll', checkScrollPosition);
@@ -89,18 +100,84 @@
 		drawerHidden = true;
 	};
 
-	afterNavigate((navigation) => {
+	afterNavigate(() => {
 		document.getElementById('svelte')?.scrollTo({ top: 0 });
-		activeUrl = navigation.to?.url.pathname ?? '';
 	});
 
-	let activeUrl = '';
-
 	function isActive(href: string): boolean {
-		const pagePath = $page.url.pathname + $page.url.search;
-		if (href === pagePath) return true;
-		if (href.includes('?')) return false;
-		return $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
+		return isNavItemActive(href, navPathname, navSearch);
+	}
+
+	function itemClasses(href: string): string {
+		return cn(styles.sidebar.item(), isActive(href) ? ACTIVE_ITEM_CLASSES : '');
+	}
+
+	function iconClasses(href: string, extra = ''): string {
+		return cn(
+			extra,
+			isActive(href) ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-900',
+		);
+	}
+
+	function expandForActivePage(config: SidebarConfig) {
+		let changed = false;
+
+		if (topUtilityItems.some((item) => isActive(item.href))) {
+			if (collapsedCategories.has('__section_me__')) {
+				collapsedCategories.delete('__section_me__');
+				changed = true;
+			}
+		}
+
+		const inRealm =
+			config.welcomeItems.some((item) => isActive(item.href)) ||
+			config.categories.some((category) => category.items.some((item) => isActive(item.href))) ||
+			config.mundusItems.some((item) => isActive(item.href));
+
+		if (inRealm && collapsedCategories.has('__section_realm__')) {
+			collapsedCategories.delete('__section_realm__');
+			changed = true;
+		}
+
+		for (const category of config.categories) {
+			if (category.items.some((item) => isActive(item.href)) && collapsedCategories.has(category.id)) {
+				collapsedCategories.delete(category.id);
+				changed = true;
+			}
+		}
+
+		if (changed) {
+			collapsedCategories = collapsedCategories;
+		}
+	}
+
+	function scrollActiveIntoView() {
+		if (!sidebarContainer) return;
+
+		requestAnimationFrame(() => {
+			const activeLink = sidebarContainer.querySelector('[data-sidebar-active="true"]');
+			if (!activeLink) return;
+
+			const containerRect = sidebarContainer.getBoundingClientRect();
+			const linkRect = activeLink.getBoundingClientRect();
+			const offset =
+				linkRect.top - containerRect.top - containerRect.height / 2 + linkRect.height / 2;
+
+			sidebarContainer.scrollTo({
+				top: sidebarContainer.scrollTop + offset,
+				behavior: 'smooth',
+			});
+			checkScrollPosition();
+		});
+	}
+
+	$: if ($sidebarConfig) {
+		initCollapsedCategories($sidebarConfig);
+	}
+
+	$: if ($sidebarConfig && $isAuthenticated && navPathname) {
+		expandForActivePage($sidebarConfig);
+		void tick().then(() => scrollActiveIntoView());
 	}
 
 	function sidebarTooltip(node: HTMLElement, text: string | undefined) {
@@ -149,7 +226,10 @@
 	class="fixed top-0 left-0 z-40 flex-none h-[calc(100vh-4rem)] w-64 mt-16 border-r border-gray-200 transition-transform duration-500 ease-in-out {drawerHidden ? '-translate-x-full' : 'translate-x-0'}"
 >
 	<h4 class="sr-only">Main menu</h4>
-	<div class={cn(styles.sidebar.container(), "overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain")}>
+	<div
+		bind:this={sidebarContainer}
+		class={cn(styles.sidebar.container(), "overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain")}
+	>
 		<nav>
 			{#if !$isAuthenticated}
 				<ul class="pt-5 lg:pt-3 pb-1 space-y-1">
@@ -170,12 +250,11 @@
 					<li>
 						<a
 							href="/extensions/public_dashboard"
-							class={cn(
-								styles.sidebar.item(),
-								isActive('/extensions/public_dashboard') ? 'bg-gray-100 font-medium' : ''
-							)}
+							class={itemClasses('/extensions/public_dashboard')}
+							data-sidebar-active={isActive('/extensions/public_dashboard') ? 'true' : undefined}
+							aria-current={isActive('/extensions/public_dashboard') ? 'page' : undefined}
 						>
-							<IconLayoutDashboard size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+							<IconLayoutDashboard size={22} class={iconClasses('/extensions/public_dashboard', 'flex-shrink-0 w-5 h-5')} />
 							<span class="ml-3">Public Dashboard</span>
 						</a>
 					</li>
@@ -206,16 +285,15 @@
 							<a 
 								href={item.href}
 								use:sidebarTooltip={item.tooltip}
-								class={cn(
-									styles.sidebar.item(),
-									isActive(item.href) ? 'bg-gray-100 font-medium' : ''
-								)}
+								class={itemClasses(item.href)}
+								data-sidebar-active={isActive(item.href) ? 'true' : undefined}
+								aria-current={isActive(item.href) ? 'page' : undefined}
 							>
 								<span class="relative flex-shrink-0">
-									<svelte:component this={IconComp} size={22} class="w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+									<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'w-5 h-5')} />
 									{#if item.href === '/messages' && $unreadCount > 0}
 										<span
-											class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
+											class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 {isActive(item.href) ? 'ring-gray-200' : 'ring-white'}"
 											aria-hidden="true"
 										></span>
 									{/if}
@@ -258,15 +336,17 @@
 				{#if !collapsedCategories.has('__section_realm__')}
 					<!-- Welcome items (My Dashboard, etc.) -->
 					<ul class="pb-1 space-y-1">
-						{#each $sidebarConfig.welcomeItems as item}
+						{#each $sidebarConfig.welcomeItems as item (item.href)}
 							{@const IconComp = getTablerIcon(item.icon)}
 							<li>
 								<a 
 									href={item.href}
 									use:sidebarTooltip={item.tooltip}
-									class={styles.sidebar.item()}
+									class={itemClasses(item.href)}
+									data-sidebar-active={isActive(item.href) ? 'true' : undefined}
+									aria-current={isActive(item.href) ? 'page' : undefined}
 								>
-									<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+									<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5')} />
 									<span class="ml-3">{item.label}</span>
 								</a>
 							</li>
@@ -293,18 +373,17 @@
 								</button>
 							</li>
 						{#if !collapsedCategories.has(category.id)}
-							{#each category.items as item}
+							{#each category.items as item (item.href)}
 								{@const IconComp = getTablerIcon(item.icon)}
 								<li>
 									<a 
 										href={item.href}
 										use:sidebarTooltip={item.tooltip}
-										class={cn(
-											styles.sidebar.item(),
-											isActive(item.href) ? 'bg-gray-100 font-medium' : ''
-										)}
+										class={itemClasses(item.href)}
+										data-sidebar-active={isActive(item.href) ? 'true' : undefined}
+										aria-current={isActive(item.href) ? 'page' : undefined}
 									>
-										<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+										<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5')} />
 										<span class="ml-3">{item.label}</span>
 									</a>
 								</li>
@@ -327,12 +406,11 @@
 								<a 
 									href={item.href}
 									use:sidebarTooltip={item.tooltip}
-									class={cn(
-										styles.sidebar.item(),
-										isActive(item.href) ? 'bg-gray-100 font-medium' : ''
-									)}
+									class={itemClasses(item.href)}
+									data-sidebar-active={isActive(item.href) ? 'true' : undefined}
+									aria-current={isActive(item.href) ? 'page' : undefined}
 								>
-									<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+									<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5')} />
 									<span class="ml-3">{item.label}</span>
 								</a>
 							</li>

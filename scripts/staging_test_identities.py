@@ -182,6 +182,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--all-staging-realms", action="store_true")
     parser.add_argument("--registry", action="store_true", help="Also patch registry frontend")
+    parser.add_argument(
+        "--portal-url",
+        default="",
+        help="portal_url for /canister_ids.js (raw icp0.io → portal redirect)",
+    )
+    parser.add_argument(
+        "--derivation-origin",
+        default="https://staging.gos.earth",
+        help="II derivationOrigin (default: https://staging.gos.earth on staging)",
+    )
     args = parser.parse_args(argv)
 
     if args.print_js:
@@ -201,6 +211,8 @@ def main(argv: list[str] | None = None) -> int:
                 backends[name],
                 network=args.network,
                 identity=args.identity,
+                portal_url=args.portal_url,
+                derivation_origin=args.derivation_origin,
             )
     elif args.frontend:
         for spec in args.frontend:
@@ -215,6 +227,8 @@ def main(argv: list[str] | None = None) -> int:
                 backend_id,
                 network=args.network,
                 identity=args.identity,
+                portal_url=args.portal_url,
+                derivation_origin=args.derivation_origin,
             )
     elif not args.registry:
         parser.error("Specify --all-staging-realms, --frontend, or --registry")

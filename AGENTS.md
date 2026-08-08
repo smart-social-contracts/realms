@@ -163,6 +163,39 @@ realms mundus deploy deployment-descriptors/test-mundus-layered.yml \
 Descriptors: `deployment-descriptors/test-mundus-layered.yml`, `staging-mundus-layered.yml`,
 `demo-mundus-layered.yml` (each sets the network).
 
+#### Avoid breaking login after a frontend deploy
+
+The SPA resolves its **realm backend canister id** from `/canister_ids.js` on the frontend
+asset canister (`globalThis.__CANISTER_IDS.realm_backend`). That file is **not** part of
+the Vite build — `realms mundus deploy` injects it as the **final post-deploy step**
+(`_store_canister_ids` in `cli/commands/mundus.py`).
+
+| Do | Don't |
+|---|---|
+| Use **`realms mundus deploy`** for realm frontend/backend iteration | Run raw **`dfx deploy frontend`** on a wizard-provisioned realm without restoring config |
+| Use the realm's **own manifest** from the registry / descriptor | Point mundus at **`examples/demo/realm3/manifest.json`** for a custom staging realm (overwrites `/custom/` branding) |
+| After any manual asset upload, **re-store `/canister_ids.js`** | Rely on `.env` / build-time `CANISTER_ID_REALM_BACKEND` — wrong id → II delegation errors and login fails |
+
+If login breaks with *"Canister '…' is not one of the delegation targets"*, the frontend is
+talking to the wrong backend. Fix by restoring `/canister_ids.js` with the realm's actual
+backend + `derivation_origin` + `portal_url`:
+
+```bash
+export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
+dfx identity use deployer  # or the frontend controller identity
+
+python3 scripts/staging_test_identities.py \
+  --frontend ul3la-6iaaa-aaaac-bfula-cai:ucya4-iaaaa-aaaac-bfukq-cai \
+  --portal-url https://staging.gos.earth/r/testsyntropiaweekendstaging1 \
+  --network staging
+```
+
+(`--frontend` is `frontend_canister_id:backend_canister_id` — repeat for multiple realms.
+Optional `--portal-url` and `--derivation-origin` set II + portal redirect fields.)
+
+**Verify after deploy:** open DevTools → Network → confirm `/canister_ids.js` loads and
+`realm_backend` matches the realm's backend canister (not a demo/test default from `.env`).
+
 ### Casals rollout (pre-merge / authoritative)
 
 Use Casals when you need the environment's **authorized-WASM catalog** updated — e.g.

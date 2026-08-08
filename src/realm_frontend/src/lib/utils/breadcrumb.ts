@@ -6,14 +6,20 @@ export interface BreadcrumbSegment {
 	href?: string;
 }
 
-function normalizePath(pathname: string): string {
+export function normalizePath(pathname: string): string {
 	const path = pathname.split('?')[0].replace(/\/$/, '');
 	return path || '/';
 }
 
-function pathMatches(href: string, path: string): boolean {
+export function pathMatches(href: string, path: string): boolean {
 	if (href.includes('?')) return href === path;
 	return path === href || path.startsWith(href + '/');
+}
+
+/** Whether a sidebar/nav href matches the current location (shared with breadcrumbs). */
+export function isNavItemActive(href: string, pathname: string, search = ''): boolean {
+	if (href.includes('?')) return href === pathname + search;
+	return pathMatches(href, normalizePath(pathname));
 }
 
 export function titleFromSlug(slug: string): string {
