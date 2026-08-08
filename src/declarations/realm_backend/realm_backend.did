@@ -22,11 +22,12 @@ type ExtensionCallArgs = record { extension_name : text; function_name : text; a
 type ExtensionCallResponse = record { success : bool; response : text };
 type Header = record { 0 : text; 1 : text };
 type HttpRequest = record { method : text; url : text; headers : vec Header; body : blob };
-type HttpResponseIncoming = record { status_code : nat16; headers : vec Header; body : blob; streaming_strategy : opt StreamingStrategy; upgrade : opt bool };
 type StreamingToken = record { key : text };
 type StreamingCallbackHttpResponse = record { body : blob; token : opt StreamingToken };
 type Callback = func (StreamingToken) -> (StreamingCallbackHttpResponse) query;
 type CallbackStrategy = record { callback : Callback; token : StreamingToken };
+type StreamingStrategy = variant { Callback : CallbackStrategy };
+type HttpResponseIncoming = record { status_code : nat16; headers : vec Header; body : blob; streaming_strategy : opt StreamingStrategy; upgrade : opt bool };
 type KeyTooLarge = record { given : nat32; max : nat32 };
 type ValueTooLarge = record { given : nat32; max : nat32 };
 type AssetClass = variant { Cryptocurrency : null; FiatCurrency : null };
@@ -179,7 +180,6 @@ type DeveloperLicense = record { "principal" : text; created_at : float64; expir
 type LicensePaymentInput = record { "principal" : text; stripe_session_id : text; amount_usd_cents : nat64; duration_seconds : nat64; payment_method : text; note : text };
 type PendingAudit = record { item_kind : text; item_id : text; name : text; developer : text; version : text; updated_at : float64 };
 type MarketplaceInitArg = record { file_registry : opt text; billing_service_principal : opt text };
-type StreamingStrategy = variant { Callback : CallbackStrategy };
 type GuardResult = variant { Ok : null; Err : text };
 type RejectionCode = variant { NoError : null; SysFatal : null; SysTransient : null; DestinationInvalid : null; CanisterReject : null; CanisterError : null; Unknown : null };
 type NotifyResult = variant { Ok : null; Err : RejectionCode };
@@ -228,6 +228,7 @@ type CasalsProvisionService = service { create_canister : (text) -> (text) };
 type QuarterBootstrapService = service { bootstrap_as_quarter : (text) -> (text) };
 type RealmRegistryService = service { register_realm : (text, text, text, text, text) -> (AddRealmResult) };
 type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (GetCreditsResult) query; get_latest_version : () -> (UpgradeResult) query };
+type RealmRegistrySetupService = service { realm_setup_completed : (text) -> (text) };
 type DemoRegistrationService = service { register_demo_citizens : (text) -> (text) };
 type FederationService = service { federation_message : (text) -> (text) };
 type TokenAuthorityService = service { forced_transfer : (ForcedTransferArgs) -> (TokenAuthorityResult); freeze_account : (FreezeAccountArgs) -> (TokenAuthorityResult); unfreeze_account : (TokenAccount) -> (TokenAuthorityResult) };
@@ -358,7 +359,7 @@ service : {
   "install_branding_from_registry" : (text) -> (text);
   "register_realm_from_registry" : (text) -> (text);
   "get_setup_state" : () -> (text) query;
-  "list_available_codices" : () -> (text) query;
+  "list_available_codices" : () -> (text) composite_query;
   "setup_install_codex" : (text) -> (text);
   "setup_configure_token" : (text) -> (text);
   "setup_set_branding" : (text) -> (text);

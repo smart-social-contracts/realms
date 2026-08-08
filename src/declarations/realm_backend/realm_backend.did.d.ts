@@ -743,6 +743,9 @@ export interface RealmRegistryService {
     AddRealmResult
   >,
 }
+export interface RealmRegistrySetupService {
+  'realm_setup_completed' : ActorMethod<[string], string>,
+}
 export interface RealmRegistryUpgradeService {
   'get_credits' : ActorMethod<[string], GetCreditsResult>,
   'get_latest_version' : ActorMethod<[], UpgradeResult>,
@@ -1035,6 +1038,7 @@ export interface _SERVICE {
   'approve_orchestration_action' : ActorMethod<[string], string>,
   'bootstrap_as_quarter' : ActorMethod<[string], string>,
   'change_quarter' : ActorMethod<[string], RealmResponse>,
+  'complete_setup' : ActorMethod<[], string>,
   'create_multi_step_scheduled_task' : ActorMethod<
     [string, string, bigint, bigint],
     string
@@ -1122,6 +1126,7 @@ export interface _SERVICE {
   'get_runtime_flags' : ActorMethod<[], string>,
   'get_sandbox_config' : ActorMethod<[], string>,
   'get_scale_status' : ActorMethod<[], string>,
+  'get_setup_state' : ActorMethod<[], string>,
   'get_sharing_root_public_key' : ActorMethod<[], RealmResponse>,
   'get_sidebar' : ActorMethod<[string], string>,
   'get_sidebar_manifests' : ActorMethod<[], string>,
@@ -1137,6 +1142,7 @@ export interface _SERVICE {
   'install_extension_from_registry' : ActorMethod<[string], string>,
   'join_federation' : ActorMethod<[string, boolean], RealmResponse>,
   'join_realm' : ActorMethod<[string, string, string], RealmResponse>,
+  'list_available_codices' : ActorMethod<[], string>,
   'list_codex_packages' : ActorMethod<[], string>,
   'list_delegations_json' : ActorMethod<[], string>,
   'list_extensions' : ActorMethod<[string], RealmResponse>,
@@ -1189,6 +1195,9 @@ export interface _SERVICE {
   'set_quarter_provisioning_config' : ActorMethod<[string], string>,
   'set_sandbox_config' : ActorMethod<[string], string>,
   'set_test_flags_json' : ActorMethod<[string], string>,
+  'setup_configure_token' : ActorMethod<[string], string>,
+  'setup_install_codex' : ActorMethod<[string], string>,
+  'setup_set_branding' : ActorMethod<[string], string>,
   'start_task_manager' : ActorMethod<[], string>,
   'status' : ActorMethod<[], RealmResponse>,
   'store_admin_invite_hash' : ActorMethod<[string], RealmResponse>,

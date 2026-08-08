@@ -3730,8 +3730,8 @@ def _sync_profile_baseline() -> void:
 
 def create_foundational_objects() -> void:
     """Create the foundational objects required for every realm to operate."""
-        from ggg import Calendar, Identity, Profiles, Realm, Treasury, User, UserProfile
-        from ggg.governance.realm import RealmStatus
+    from ggg import Calendar, Identity, Profiles, Realm, Treasury, User, UserProfile
+    from ggg.governance.realm import RealmStatus
     from ggg.governance.calendar import DEFAULTS as CALENDAR_DEFAULTS
 
     logger.info("Creating foundational objects...")
