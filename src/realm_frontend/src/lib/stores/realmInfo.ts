@@ -1,6 +1,44 @@
 import { writable, derived, get } from 'svelte/store';
 import { backendStore, backendActorReady } from '$lib/canisters';
 
+const RUNTIME_FLAGS_TIMEOUT_MS = 12_000;
+const STATUS_QUERY_TIMEOUT_MS = 12_000;
+const JOIN_TARGETS_TIMEOUT_MS = 8_000;
+
+/** Prevent hung IC queries from blocking backendReady forever during boot. */
+function withQueryTimeout<T>(
+	promise: Promise<T>,
+	ms: number,
+	label: string
+): Promise<T | null> {
+	return new Promise((resolve) => {
+		let settled = false;
+		const timer = setTimeout(() => {
+			if (!settled) {
+				console.warn(`[realmInfo] ${label} timed out after ${ms}ms`);
+				settled = true;
+				resolve(null);
+			}
+		}, ms);
+		promise
+			.then((value) => {
+				if (!settled) {
+					settled = true;
+					clearTimeout(timer);
+					resolve(value);
+				}
+			})
+			.catch((err) => {
+				if (!settled) {
+					settled = true;
+					clearTimeout(timer);
+					console.warn(`[realmInfo] ${label} failed:`, err);
+					resolve(null);
+				}
+			});
+	});
+}
+
 interface CanisterInfo {
 	canister_id: string;
 	canister_type: string;
@@ -79,21 +117,30 @@ const createRealmInfoStore = () => {
 				// Full status() may exceed the instruction limit; flags alone are enough
 				// for the join flow (test mode, open registration, branding).
 				let flagsPayload: Record<string, unknown> | null = null;
-				try {
-					const flagsRaw = await currentActor.get_runtime_flags();
-					flagsPayload = typeof flagsRaw === 'string' ? JSON.parse(flagsRaw) : flagsRaw;
-				} catch {
-					flagsPayload = null;
+				const flagsRaw = await withQueryTimeout(
+					currentActor.get_runtime_flags(),
+					RUNTIME_FLAGS_TIMEOUT_MS,
+					'get_runtime_flags'
+				);
+				if (flagsRaw != null) {
+					try {
+						flagsPayload =
+							typeof flagsRaw === 'string' ? JSON.parse(flagsRaw) : flagsRaw;
+					} catch {
+						flagsPayload = null;
+					}
 				}
 
+				// status() can exceed the instruction limit on large mainnet realms and
+				// never return, which blocked initializeBackendStore → backendReady.
 				let status: Record<string, unknown> | null = null;
-				try {
-					const response = await currentActor.status();
-					if (response.success && response.data.status) {
-						status = response.data.status as Record<string, unknown>;
-					}
-				} catch {
-					status = null;
+				const response = await withQueryTimeout(
+					currentActor.status(),
+					STATUS_QUERY_TIMEOUT_MS,
+					'status'
+				);
+				if (response?.success && response.data.status) {
+					status = response.data.status as Record<string, unknown>;
 				}
 
 				// status().quarters counts populations by scanning the capital's own
@@ -105,7 +152,12 @@ const createRealmInfoStore = () => {
 				const quarters = (status?.quarters as Array<Record<string, unknown>>) || [];
 				if (quarters.length > 0) {
 					try {
-						const raw = await currentActor.get_join_targets();
+						const raw = await withQueryTimeout(
+							currentActor.get_join_targets(),
+							JOIN_TARGETS_TIMEOUT_MS,
+							'get_join_targets'
+						);
+						if (raw == null) throw new Error('get_join_targets timed out');
 						const directory = (JSON.parse(raw)?.quarters || []) as Array<
 							Record<string, unknown>
 						>;

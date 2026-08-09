@@ -1,6 +1,41 @@
 import { writable, derived, get } from 'svelte/store';
 import { backendStore, backendActorReady } from '$lib/canisters';
 
+const STATUS_QUERY_TIMEOUT_MS = 12_000;
+
+function withQueryTimeout<T>(
+	promise: Promise<T>,
+	ms: number,
+	label: string
+): Promise<T | null> {
+	return new Promise((resolve) => {
+		let settled = false;
+		const timer = setTimeout(() => {
+			if (!settled) {
+				console.warn(`[quarters] ${label} timed out after ${ms}ms`);
+				settled = true;
+				resolve(null);
+			}
+		}, ms);
+		promise
+			.then((value) => {
+				if (!settled) {
+					settled = true;
+					clearTimeout(timer);
+					resolve(value);
+				}
+			})
+			.catch((err) => {
+				if (!settled) {
+					settled = true;
+					clearTimeout(timer);
+					console.warn(`[quarters] ${label} failed:`, err);
+					resolve(null);
+				}
+			});
+	});
+}
+
 export interface QuarterInfo {
 	name: string;
 	canister_id: string;
@@ -41,9 +76,13 @@ const createQuartersStore = () => {
 					throw new Error('Actor not initialized');
 				}
 
-				const response = await currentActor.status();
+				const response = await withQueryTimeout(
+					currentActor.status(),
+					STATUS_QUERY_TIMEOUT_MS,
+					'status'
+				);
 
-				if (response.success && response.data.status) {
+				if (response?.success && response.data.status) {
 					const status = response.data.status;
 					update((state: QuartersState) => ({
 						...state,

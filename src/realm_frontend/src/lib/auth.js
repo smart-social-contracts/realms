@@ -346,6 +346,7 @@ async function _restoreAuthSession() {
     isAuthenticatedStore.set(true);
     userIdentity.set(principalText);
     principal.set(principalText);
+    console.log(`[portal] Authenticated via delegation: ${principalText}`);
     try {
       const { initBackendWithIdentity } = await import('$lib/canisters.js');
       await initBackendWithIdentity(portalId);

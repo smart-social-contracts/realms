@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { backendStore, backendReady } from '$lib/canisters';
+import { backendStore, backendActorReady } from '$lib/canisters';
 import type {
 	AvailableCodex,
 	SetupActionResult,
@@ -17,7 +17,10 @@ function asSetupActor(actor: unknown): SetupBackendActor {
 }
 
 async function getActor(): Promise<SetupBackendActor> {
-	await backendReady;
+	// SetupStageGate restores portal auth before the wizard mounts; the store
+	// may already hold an authenticated actor while backendReady is still
+	// waiting on realmInfo.fetch() (e.g. a slow/hung status() on mainnet).
+	await backendActorReady;
 	const actor = get(backendStore);
 	if (!actor) throw new Error('Backend actor not initialized');
 	return asSetupActor(actor);

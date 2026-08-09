@@ -4,7 +4,7 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { get } from 'svelte/store';
-	import { backendReady } from '$lib/canisters';
+	import { backendStore, backendActorReady } from '$lib/canisters';
 	import { restoreAuthSession } from '$lib/auth';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { realmName, realmInfo } from '$lib/stores/realmInfo';
@@ -51,7 +51,9 @@
 		let cancelled = false;
 
 		(async () => {
-			await backendReady;
+			// Provisional actor is enough here — restoreAuthSession() hydrates the
+			// authenticated actor via portal delegation before setup queries run.
+			await backendActorReady;
 			await restoreAuthSession();
 			void realmInfo.fetch();
 			if (cancelled) return;
