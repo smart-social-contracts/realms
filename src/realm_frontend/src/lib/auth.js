@@ -4,6 +4,7 @@ import { Principal } from '@dfinity/principal';
 import { getTestModeIIBypass } from '$lib/config.js';
 import { isEmbeddedInPortal, getPortalDelegationIdentity } from '$lib/portal-bridge.ts';
 import { normalizePortalRedirectPath } from '$lib/portal-redirect-path.ts';
+import { resolveAuthChannel, shouldUseTestModeAuth } from '$lib/auth-precedence.ts';
 
 const II_URL = globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app';
 console.log(`Using Identity Provider: ${II_URL}`);
@@ -69,9 +70,9 @@ let authClient;
 let authClientMode = null;
 
 function getAuthMode() {
-  if (getTestModeIIBypass()) return 'test';
-  // Portal iframe uses scoped delegation when available; otherwise II + derivationOrigin.
-  if (isEmbeddedInPortal() && getPortalDelegationIdentity()) return 'portal';
+  const channel = resolveAuthChannel(isEmbeddedInPortal(), getTestModeIIBypass());
+  if (channel === 'portal') return 'portal';
+  if (channel === 'test') return 'test';
   return 'ii';
 }
 
@@ -176,41 +177,10 @@ export async function initializeAuthClient() {
 }
 
 export async function login({ random = false, identityIndex = null } = {}) {
-  // Test-mode II bypass: pick a deterministic persona locally — even inside the
-  // portal iframe. Must run before the portal delegation branch.
-  if (getTestModeIIBypass()) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const asParam = urlParams.get('as');
-    const pemParam = urlParams.get('pem');
-
-    let identity;
-    if (asParam && pemParam) {
-      const { Secp256k1KeyIdentity } = await import('@dfinity/identity');
-      const decodedPem = decodeURIComponent(pemParam);
-      identity = Secp256k1KeyIdentity.fromPem(decodedPem);
-      _testIdentity = identity;
-      _testIdentityIndex = null;
-      console.log(`[TEST MODE] Logged in as ${asParam} with Secp256k1 PEM: ${identity.getPrincipal().toText()}`);
-    } else {
-      if (asParam) {
-        console.warn(`[TEST MODE] ?as=${asParam} present but ?pem= missing — using test identity index`);
-      }
-      identity = await _createTestIdentity({
-        random,
-        identityIndex: identityIndex ?? (random ? null : 0),
-      });
-    }
-    _testLoggedIn = true;
-    authClient = _createTestAuthClientMock();
-    authClientMode = 'test';
-    const principal = identity.getPrincipal();
-    console.log(`[TEST MODE] Logged in with principal: ${principal.toText()}`);
-    return { identity, principal };
-  }
-
   // Federation portal embed: authenticate via the host's scoped delegation.
   // Never open Internet Identity from inside the iframe — the per-realm icp0.io
   // origin is not in the canonical /.well-known/ii-alternative-origins.
+  // Takes precedence over test-mode II bypass when embedded.
   if (isEmbeddedInPortal()) {
     let identity = getPortalDelegationIdentity();
     if (!identity) {
@@ -237,6 +207,37 @@ export async function login({ random = false, identityIndex = null } = {}) {
     }
     console.warn('[portal] No delegation from host — user must sign in on the portal origin');
     return { identity: null, principal: null };
+  }
+
+  // Test-mode II bypass: deterministic personas for standalone (non-embedded) realms.
+  if (shouldUseTestModeAuth(isEmbeddedInPortal(), getTestModeIIBypass())) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const asParam = urlParams.get('as');
+    const pemParam = urlParams.get('pem');
+
+    let identity;
+    if (asParam && pemParam) {
+      const { Secp256k1KeyIdentity } = await import('@dfinity/identity-secp256k1');
+      const decodedPem = decodeURIComponent(pemParam);
+      identity = Secp256k1KeyIdentity.fromPem(decodedPem);
+      _testIdentity = identity;
+      _testIdentityIndex = null;
+      console.log(`[TEST MODE] Logged in as ${asParam} with Secp256k1 PEM: ${identity.getPrincipal().toText()}`);
+    } else {
+      if (asParam) {
+        console.warn(`[TEST MODE] ?as=${asParam} present but ?pem= missing — using test identity index`);
+      }
+      identity = await _createTestIdentity({
+        random,
+        identityIndex: identityIndex ?? (random ? null : 0),
+      });
+    }
+    _testLoggedIn = true;
+    authClient = _createTestAuthClientMock();
+    authClientMode = 'test';
+    const principal = identity.getPrincipal();
+    console.log(`[TEST MODE] Logged in with principal: ${principal.toText()}`);
+    return { identity, principal };
   }
 
   const client = await initializeAuthClient();
@@ -285,7 +286,7 @@ export async function login({ random = false, identityIndex = null } = {}) {
 
 export async function logout() {
   resetAuthSessionRestore();
-  if (getTestModeIIBypass()) {
+  if (shouldUseTestModeAuth(isEmbeddedInPortal(), getTestModeIIBypass())) {
     _testLoggedIn = false;
     _testIdentity = null;
     _testIdentityIndex = null;
@@ -297,11 +298,13 @@ export async function logout() {
 }
 
 export async function isAuthenticated() {
+  if (isEmbeddedInPortal()) {
+    if (getPortalDelegationIdentity()) return true;
+    const client = await initializeAuthClient();
+    return client.isAuthenticated();
+  }
   if (getTestModeIIBypass()) {
     return _testLoggedIn;
-  }
-  if (isEmbeddedInPortal() && getPortalDelegationIdentity()) {
-    return true;
   }
   const client = await initializeAuthClient();
   return client.isAuthenticated();
@@ -329,29 +332,9 @@ export async function restoreAuthSession() {
 }
 
 async function _restoreAuthSession() {
-  if (getTestModeIIBypass() && _testLoggedIn && _testIdentity) {
-    await initializeAuthClient();
-    const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
-      '$lib/stores/auth.js'
-    );
-    const principalText = _testIdentity.getPrincipal().toText();
-    isAuthenticatedStore.set(true);
-    userIdentity.set(principalText);
-    principal.set(principalText);
-    try {
-      const { initBackendWithIdentity } = await import('$lib/canisters.js');
-      await initBackendWithIdentity(_testIdentity);
-      const { loadUserProfiles } = await import('$lib/stores/profiles.js');
-      await loadUserProfiles();
-    } catch (e) {
-      console.warn('[TEST MODE] backend init deferred:', e);
-    }
-    return { authenticated: true, principal: principalText };
-  }
-
   const restorePortal = async () => {
-    if (getTestModeIIBypass()) return null;
-    const portalId = isEmbeddedInPortal() ? getPortalDelegationIdentity() : null;
+    if (!isEmbeddedInPortal()) return null;
+    const portalId = getPortalDelegationIdentity();
     if (!portalId) return null;
     // Swap the shared authClient to the portal mock so every later
     // isAuthenticated()/getIdentity() consumer sees the bridged session.
@@ -376,6 +359,26 @@ async function _restoreAuthSession() {
 
   const viaPortal = await restorePortal();
   if (viaPortal) return viaPortal;
+
+  if (shouldUseTestModeAuth(isEmbeddedInPortal(), getTestModeIIBypass()) && _testLoggedIn && _testIdentity) {
+    await initializeAuthClient();
+    const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
+      '$lib/stores/auth.js'
+    );
+    const principalText = _testIdentity.getPrincipal().toText();
+    isAuthenticatedStore.set(true);
+    userIdentity.set(principalText);
+    principal.set(principalText);
+    try {
+      const { initBackendWithIdentity } = await import('$lib/canisters.js');
+      await initBackendWithIdentity(_testIdentity);
+      const { loadUserProfiles } = await import('$lib/stores/profiles.js');
+      await loadUserProfiles();
+    } catch (e) {
+      console.warn('[TEST MODE] backend init deferred:', e);
+    }
+    return { authenticated: true, principal: principalText };
+  }
 
   const authenticated = await isAuthenticated();
   const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(

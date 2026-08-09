@@ -15,7 +15,8 @@
  * Reference roster (indices 0–9): config/deterministic-test-identity-principals.json
  */
 
-import { Ed25519KeyIdentity, Secp256k1KeyIdentity } from '@dfinity/identity';
+import { Ed25519KeyIdentity } from '@dfinity/identity';
+import { Secp256k1KeyIdentity } from '@dfinity/identity-secp256k1';
 
 export const TEST_IDENTITY_MAGIC = [0xed, 0x57];
 /** Indices 0–1 shown as fixed cards in the join-page picker (Identity 1–2). */
