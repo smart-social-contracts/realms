@@ -1096,6 +1096,7 @@ def _copy_frontend_to_asset_canister(
         f"from registry {registry_canister_id} to frontend {frontend_canister_id}"
     )
 
+    pulled_from_registry = files is None
     if files is None:
         registry = FileRegistryService(Principal.from_str(registry_canister_id))
         files, resolved_version, err = yield from _pull_extension_frontend_files(
@@ -1107,6 +1108,14 @@ def _copy_frontend_to_asset_canister(
         version = resolved_version or version
 
     if not files:
+        if pulled_from_registry:
+            namespace, _, ns_err = yield from _resolve_registry_namespace(
+                registry, "ext", ext_id, version or ""
+            )
+            if ns_err:
+                err_obj = json.loads(ns_err)
+                return err_obj.get("error", ns_err)
+            return f"no frontend files found in registry namespace {namespace}"
         return None
 
     resolved_version = version

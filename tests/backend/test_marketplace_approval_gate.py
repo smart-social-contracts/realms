@@ -440,6 +440,49 @@ def test_nested_init_py_path_is_also_refused():
     assert error
 
 
+# ---------------------------------------------------------------------------
+# Extension frontend resync guard
+# ---------------------------------------------------------------------------
+
+
+def test_copy_frontend_to_asset_canister_errors_on_empty_registry_namespace():
+    original_pull = fr._pull_extension_frontend_files
+    original_resolve = fr._resolve_registry_namespace
+    original_frs = fr.FileRegistryService
+
+    def fake_pull(registry, ext_id, version):
+        if False:
+            yield
+        return {}, "1.3.9", None
+
+    def fake_resolve(registry, category, item_id, version):
+        if False:
+            yield
+        return "ext/public_dashboard/1.3.9", "1.3.9", None
+
+    fr._pull_extension_frontend_files = fake_pull
+    fr._resolve_registry_namespace = fake_resolve
+    fr.FileRegistryService = lambda principal: object()
+
+    try:
+        err = run_async(
+            fr._copy_frontend_to_asset_canister(
+                "registry-id",
+                "public_dashboard",
+                "1.3.9",
+                "frontend-id",
+            ),
+            [],
+        )
+        assert err == (
+            "no frontend files found in registry namespace ext/public_dashboard/1.3.9"
+        )
+    finally:
+        fr._pull_extension_frontend_files = original_pull
+        fr._resolve_registry_namespace = original_resolve
+        fr.FileRegistryService = original_frs
+
+
 def test_run_codex_init_never_executes(tmp_path, monkeypatch):
     """Even a leftover call site must not exec the file."""
     from core import runtime_codex
