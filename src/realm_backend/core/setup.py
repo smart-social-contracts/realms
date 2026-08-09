@@ -174,19 +174,29 @@ def get_setup_state_payload() -> dict:
     }
 
 
+def _safe_log(level: str, message: str, *args: Any) -> None:
+    """Best-effort logging that must never fail setup completion."""
+    try:
+        getattr(logger, level)(message, *args)
+    except Exception:
+        pass
+
+
 def notify_registry_setup_completed(registry_canister_id: str) -> Async[None]:
     backend_id = str(ic.id())
     payload = json.dumps({"realm_backend_canister_id": backend_id})
     try:
         registry = RealmRegistrySetupService(Principal.from_str(registry_canister_id))
         result: CallResult = yield registry.realm_setup_completed(payload)
-        logger.info(
+        _safe_log(
+            "info",
             "realm_setup_completed notify to %s: %s",
             registry_canister_id,
             result,
         )
     except Exception as exc:
-        logger.warning(
+        _safe_log(
+            "warning",
             "realm_setup_completed notify to %s failed (non-fatal): %s",
             registry_canister_id,
             exc,

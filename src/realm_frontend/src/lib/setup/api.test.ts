@@ -136,6 +136,43 @@ describe('installSetupCodex', () => {
 		vi.useRealTimers();
 	});
 
+	it('polls setup state when the raw install call never settles', async () => {
+		let setupReads = 0;
+		const mockActor = makeActor({
+			setup_install_codex: vi.fn().mockReturnValue(new Promise(() => {})),
+			get_setup_state: vi.fn().mockImplementation(async () => {
+				setupReads += 1;
+				const codex =
+					setupReads >= 2
+						? { package: 'syntropia', version: '1.0.0' }
+						: null;
+				return JSON.stringify({
+					status: 'setup',
+					creator: '',
+					is_caller_authorized: true,
+					codex,
+					token: null,
+					branding: null
+				});
+			})
+		});
+		backendStore.set(mockActor);
+		actorReadyResolve();
+
+		const { installSetupCodex } = await import('./api');
+		const promise = installSetupCodex(
+			{ package: 'syntropia', version: '1.0.0' },
+			{ rawCallGraceMs: 100, pollIntervalMs: 50 }
+		);
+		await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(100);
+		await vi.advanceTimersByTimeAsync(50);
+		const result = await promise;
+
+		expect(result.success).toBe(true);
+		expect(mockActor.get_setup_state).toHaveBeenCalled();
+	});
+
 	it('polls setup state when the raw install call throws an ambiguous error', async () => {
 		let setupReads = 0;
 		const mockActor = makeActor({
@@ -162,8 +199,13 @@ describe('installSetupCodex', () => {
 		actorReadyResolve();
 
 		const { installSetupCodex } = await import('./api');
-		const promise = installSetupCodex({ package: 'syntropia', version: '1.0.0' });
-		await vi.advanceTimersByTimeAsync(5_000);
+		const promise = installSetupCodex(
+			{ package: 'syntropia', version: '1.0.0' },
+			{ rawCallGraceMs: 100, pollIntervalMs: 50 }
+		);
+		await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(100);
+		await vi.advanceTimersByTimeAsync(50);
 		const result = await promise;
 
 		expect(result.success).toBe(true);
@@ -174,14 +216,97 @@ describe('installSetupCodex', () => {
 		const mockActor = makeActor({
 			setup_install_codex: vi
 				.fn()
-				.mockResolvedValue(JSON.stringify({ success: false, error: 'Not authorized' })),
+				.mockResolvedValue(JSON.stringify({ success: false, error: 'approval denied' })),
 			get_setup_state: vi.fn()
 		});
 		backendStore.set(mockActor);
 		actorReadyResolve();
 
 		const { installSetupCodex } = await import('./api');
-		const result = await installSetupCodex({ package: 'syntropia', version: '1.0.0' });
+		const result = await installSetupCodex(
+			{ package: 'syntropia', version: '1.0.0' },
+			{ rawCallGraceMs: 100 }
+		);
+		await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(100);
+
+		expect(result).toEqual({ success: false, error: 'approval denied' });
+		expect(mockActor.get_setup_state).not.toHaveBeenCalled();
+	});
+
+	it('throws on non-ambiguous install errors without polling', async () => {
+		const mockActor = makeActor({
+			setup_install_codex: vi.fn().mockImplementation(() => {
+				throw new Error('Network error');
+			}),
+			get_setup_state: vi.fn()
+		});
+		backendStore.set(mockActor);
+		actorReadyResolve();
+
+		const { installSetupCodex } = await import('./api');
+
+		await expect(
+			installSetupCodex({ package: 'syntropia', version: '1.0.0' }, { rawCallGraceMs: 100 })
+		).rejects.toThrow('Network error');
+		expect(mockActor.get_setup_state).not.toHaveBeenCalled();
+	});
+});
+
+describe('completeSetup', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.resetModules();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('polls setup state when the raw complete call never settles', async () => {
+		let setupReads = 0;
+		const mockActor = makeActor({
+			complete_setup: vi.fn().mockReturnValue(new Promise(() => {})),
+			get_setup_state: vi.fn().mockImplementation(async () => {
+				setupReads += 1;
+				return JSON.stringify({
+					status: setupReads >= 2 ? 'alpha' : 'setup',
+					creator: '',
+					is_caller_authorized: true,
+					codex: { package: 'syntropia', version: '1.0.0' },
+					token: null,
+					branding: null
+				});
+			})
+		});
+		backendStore.set(mockActor);
+		actorReadyResolve();
+
+		const { completeSetup } = await import('./api');
+		const promise = completeSetup({ rawCallGraceMs: 100, pollIntervalMs: 50 });
+		await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(100);
+		await vi.advanceTimersByTimeAsync(50);
+		const result = await promise;
+
+		expect(result).toEqual({ success: true });
+		expect(mockActor.get_setup_state).toHaveBeenCalled();
+	});
+
+	it('returns fast failures without polling', async () => {
+		const mockActor = makeActor({
+			complete_setup: vi
+				.fn()
+				.mockResolvedValue(JSON.stringify({ success: false, error: 'Not authorized' })),
+			get_setup_state: vi.fn()
+		});
+		backendStore.set(mockActor);
+		actorReadyResolve();
+
+		const { completeSetup } = await import('./api');
+		const result = await completeSetup({ rawCallGraceMs: 100 });
+		await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(100);
 
 		expect(result).toEqual({ success: false, error: 'Not authorized' });
 		expect(mockActor.get_setup_state).not.toHaveBeenCalled();

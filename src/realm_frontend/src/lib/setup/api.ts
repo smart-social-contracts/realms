@@ -11,6 +11,10 @@ const CODEX_CATALOG_POLL_MS = 2_500;
 const CODEX_CATALOG_TIMEOUT_MS = 90_000;
 const CODEX_INSTALL_POLL_MS = 5_000;
 const CODEX_INSTALL_TIMEOUT_MS = 20 * 60 * 1_000;
+const RAW_INSTALL_CALL_GRACE_MS = 90_000;
+const RAW_COMPLETE_CALL_GRACE_MS = 60_000;
+const COMPLETE_SETUP_POLL_MS = 5_000;
+const COMPLETE_SETUP_TIMEOUT_MS = 5 * 60 * 1_000;
 
 function parseJson<T>(raw: unknown): T {
 	if (typeof raw === 'string') return JSON.parse(raw) as T;
@@ -83,6 +87,32 @@ function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+type RaceOutcome<T> = {
+	settled: boolean;
+	result?: T;
+	error?: unknown;
+};
+
+async function raceWithGrace<T>(promise: Promise<T>, graceMs: number): Promise<RaceOutcome<T>> {
+	let settled = false;
+	let result: T | undefined;
+	let error: unknown;
+
+	const settlement = promise.then(
+		(value) => {
+			settled = true;
+			result = value;
+		},
+		(err) => {
+			settled = true;
+			error = err;
+		}
+	);
+
+	await Promise.race([sleep(graceMs), settlement]);
+	return { settled, result, error };
+}
+
 async function readCachedCodices(actor: SetupBackendActor): Promise<AvailableCodex[] | null> {
 	if (typeof actor.get_available_codices_cached !== 'function') return null;
 	try {
@@ -146,30 +176,66 @@ export async function pollUntilCodexInstalled(
 	);
 }
 
-export async function installSetupCodex(payload: {
-	package: string;
-	version: string;
-	params?: Record<string, unknown>;
-}): Promise<SetupActionResult> {
+async function pollUntilSetupComplete(
+	timeoutMs = COMPLETE_SETUP_TIMEOUT_MS,
+	intervalMs = COMPLETE_SETUP_POLL_MS
+): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		const state = await fetchSetupState();
+		if (state.status !== 'setup') {
+			return;
+		}
+		await sleep(intervalMs);
+	}
+	throw new Error(
+		`Setup completion timed out after ${Math.round(timeoutMs / 60_000)} minutes. Please refresh and check realm status.`
+	);
+}
+
+export async function installSetupCodex(
+	payload: {
+		package: string;
+		version: string;
+		params?: Record<string, unknown>;
+	},
+	options?: {
+		rawCallGraceMs?: number;
+		pollTimeoutMs?: number;
+		pollIntervalMs?: number;
+	}
+): Promise<SetupActionResult> {
 	const actor = await getActor();
 	let resolvedVersion = payload.version;
+	const rawCallGraceMs = options?.rawCallGraceMs ?? RAW_INSTALL_CALL_GRACE_MS;
 
-	try {
-		const raw = await actor.setup_install_codex(JSON.stringify(payload));
-		const result = parseJson<SetupActionResult>(raw);
-		if (!result.success) {
-			return result;
-		}
-		if (result.resolved_version) {
-			resolvedVersion = result.resolved_version;
-		}
-	} catch (error) {
-		if (!isAmbiguousInstallError(error)) {
-			throw error;
+	const { settled, result: raw, error: callError } = await raceWithGrace(
+		actor.setup_install_codex(JSON.stringify(payload)),
+		rawCallGraceMs
+	);
+
+	if (settled) {
+		if (callError !== undefined) {
+			if (!isAmbiguousInstallError(callError)) {
+				throw callError;
+			}
+		} else if (raw !== undefined) {
+			const parsed = parseJson<SetupActionResult>(raw);
+			if (!parsed.success) {
+				return parsed;
+			}
+			if (parsed.resolved_version) {
+				resolvedVersion = parsed.resolved_version;
+			}
 		}
 	}
 
-	await pollUntilCodexInstalled(payload.package, resolvedVersion);
+	await pollUntilCodexInstalled(
+		payload.package,
+		resolvedVersion,
+		options?.pollTimeoutMs,
+		options?.pollIntervalMs
+	);
 
 	return { success: true, resolved_version: resolvedVersion };
 }
@@ -192,7 +258,33 @@ export async function setSetupBranding(payload: {
 	);
 }
 
-export async function completeSetup(): Promise<SetupActionResult> {
+export async function completeSetup(options?: {
+	rawCallGraceMs?: number;
+	pollTimeoutMs?: number;
+	pollIntervalMs?: number;
+}): Promise<SetupActionResult> {
 	const actor = await getActor();
-	return parseJson<SetupActionResult>(await actor.complete_setup());
+	const rawCallGraceMs = options?.rawCallGraceMs ?? RAW_COMPLETE_CALL_GRACE_MS;
+
+	const { settled, result: raw, error: callError } = await raceWithGrace(
+		actor.complete_setup(),
+		rawCallGraceMs
+	);
+
+	if (settled) {
+		if (callError !== undefined) {
+			if (!isAmbiguousInstallError(callError)) {
+				throw callError;
+			}
+		} else if (raw !== undefined) {
+			const parsed = parseJson<SetupActionResult>(raw);
+			if (!parsed.success) {
+				return parsed;
+			}
+			return parsed;
+		}
+	}
+
+	await pollUntilSetupComplete(options?.pollTimeoutMs, options?.pollIntervalMs);
+	return { success: true };
 }

@@ -333,6 +333,52 @@ def test_complete_setup_transitions_and_notifies(monkeypatch):
     assert setup_cfg["codex"]["version"] == "1.0.0"
 
 
+def test_complete_setup_returns_success_when_notify_succeeds(monkeypatch):
+    setup_api = _import_setup_api()
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "realm_registry_canister_id": "registry-canister",
+                    "codex": {"package": "syntropia", "version": "1.0.0"},
+                }
+            }
+        ),
+    )
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+
+    def _fake_notify(registry_id):
+        yield {"Ok": "registered"}
+
+    monkeypatch.setattr(setup_core, "notify_registry_setup_completed", _fake_notify)
+
+    gen = setup_api.complete_setup()
+    try:
+        while True:
+            next(gen)
+    except StopIteration as stop:
+        result = json.loads(stop.value)
+
+    assert result["success"] is True
+    assert result["registry_notified"] is True
+    assert realm.status == RealmStatus.ALPHA
+
+
+def test_safe_log_swallows_logger_failures(monkeypatch):
+    monkeypatch.setattr(
+        setup_core.logger,
+        "info",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("logging subsystem unavailable")
+        ),
+    )
+    setup_core._safe_log("info", "realm_setup_completed notify to %s: %s", "registry", {"Ok": "ok"})
+
+
 def test_runtime_flags_default_stage_is_setup(monkeypatch):
     from core import runtime_flags
 
