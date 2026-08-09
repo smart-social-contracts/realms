@@ -62,3 +62,21 @@ def test_extension_async_call_uses_allow_suspend(monkeypatch):
     )
     assert hasattr(gen, "__next__")
     assert next(gen) == "http-outcall"
+
+
+def test_drive_suspending_generator_resumes_with_send():
+    from core import extensions as core_extensions
+
+    def inner():
+        first = yield "http-outcall"
+        return f"done:{first}"
+
+    gen = inner()
+    driver = core_extensions.drive_suspending_generator(gen)
+    assert next(driver) == "http-outcall"
+    try:
+        driver.send({"status": 200})
+    except StopIteration as done:
+        assert done.value == "done:{'status': 200}"
+    else:
+        raise AssertionError("expected StopIteration")

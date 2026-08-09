@@ -157,6 +157,24 @@ def call_extension_function(
     return result
 
 
+def drive_suspending_generator(gen):
+    """Forward IC outcall yields from an extension generator and resume with results.
+
+    Use inside a Kybra ``Async`` endpoint. After the inner generator yields an
+    outcall, the IC resume value must be passed back via ``gen.send``, not
+    another ``next`` call.
+    """
+    try:
+        pending = next(gen)
+    except StopIteration as done:
+        return done.value
+    while True:
+        try:
+            pending = gen.send((yield pending))
+        except StopIteration as done:
+            return done.value
+
+
 def extension_async_call(
     extension_name: str, function_name: str, args: str
 ) -> Async[Any]:

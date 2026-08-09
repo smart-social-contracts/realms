@@ -4483,10 +4483,25 @@ def extension_async_call(extension_name: text, function_name: text, args: text) 
             f"Async calling extension '{extension_name}' entry point '{function_name}' with args {args}"
         )
 
-        extension_coroutine = api.extensions.extension_async_call(
-            extension_name, function_name, args
+        from core import extensions as core_extensions
+
+        gen = core_extensions.call_extension_function(
+            extension_name, function_name, args, allow_suspend=True
         )
-        extension_result = yield extension_coroutine
+        if not hasattr(gen, "__next__"):
+            extension_result = gen
+        else:
+            driver = core_extensions.drive_suspending_generator(gen)
+            try:
+                pending = next(driver)
+                while True:
+                    try:
+                        pending = driver.send((yield pending))
+                    except StopIteration as done:
+                        extension_result = done.value
+                        break
+            except StopIteration as done:
+                extension_result = done.value
 
         logger.debug(
             f"Got extension result from {extension_name} function {function_name}: {extension_result}, type: {type(extension_result)}"

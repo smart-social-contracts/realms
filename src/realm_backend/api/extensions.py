@@ -53,7 +53,10 @@ def extension_sync_call(extension_name: str, function_name: str, args: str) -> A
 def extension_async_call(
     extension_name: str, function_name: str, args: str
 ) -> Async[Any]:
-    response = yield core.extensions.extension_async_call(
-        extension_name, function_name, args
+    """Drive in-process extension generators so HTTP/outcall yields reach the IC."""
+    gen = core.extensions.call_extension_function(
+        extension_name, function_name, args, allow_suspend=True
     )
-    return response
+    if not hasattr(gen, "__next__"):
+        return gen
+    return (yield from core.extensions.drive_suspending_generator(gen))
