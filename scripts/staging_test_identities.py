@@ -94,6 +94,12 @@ def build_test_identity_js(config: dict | None = None, config_path: Path = DEFAU
     return "".join(parts)
 
 
+# Sync hints for portal iframe boot before backend status() loads (see config.js).
+_STAGING_CANISTER_ID_BOOLS = {
+    "test_mode_ii_bypass": True,
+}
+
+
 def build_canister_ids_js(
     *,
     backend_id: str,
@@ -102,6 +108,8 @@ def build_canister_ids_js(
     portal_url: str = "",
     test_identity_config: dict | None = None,
     test_identity_config_path: Path = DEFAULT_CONFIG,
+    network: str = "staging",
+    bool_fields: dict[str, bool] | None = None,
 ) -> str:
     fields = {
         "realm_backend": backend_id,
@@ -113,8 +121,12 @@ def build_canister_ids_js(
         fields["derivation_origin"] = derivation_origin
     if portal_url:
         fields["portal_url"] = portal_url
-    body = ",".join(f'{k}:"{v}"' for k, v in fields.items())
-    js = "globalThis.__CANISTER_IDS={" + body + "};"
+    parts = [f'{k}:"{v}"' for k, v in fields.items()]
+    merged_bools = dict(_STAGING_CANISTER_ID_BOOLS) if network == "staging" else {}
+    if bool_fields:
+        merged_bools.update(bool_fields)
+    parts.extend(f"{k}:{'true' if v else 'false'}" for k, v in merged_bools.items())
+    js = "globalThis.__CANISTER_IDS={" + ",".join(parts) + "};"
     if test_identity_config is not None or test_identity_config_path.is_file():
         js += build_test_identity_js(test_identity_config, test_identity_config_path)
     return js
@@ -164,6 +176,7 @@ def patch_staging_realm(
         file_registry_id=file_registry_id,
         derivation_origin=derivation_origin,
         portal_url=portal_url,
+        network=network,
     )
     print(f"Patching {name} frontend {frontend_id} …")
     store_canister_ids_js(frontend_id, js, network, identity)

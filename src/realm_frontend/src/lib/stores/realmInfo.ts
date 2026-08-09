@@ -232,7 +232,11 @@ export const aiAssistantEnabled = derived(realmInfo, $realmInfo => $realmInfo.ai
 
 // Derived stores for test mode flags (source of truth: backend status)
 export const testMode = derived(realmInfo, $r => $r.testMode);
-export const testModeIIBypass = derived(realmInfo, $r => $r.testModeIIBypass);
+/** Backend status is source of truth; fall back to /canister_ids.js sync hint during boot. */
+export const testModeIIBypass = derived(
+	realmInfo,
+	$r => $r.testModeIIBypass || !!globalThis.__CANISTER_IDS?.test_mode_ii_bypass,
+);
 export const testModeUserSelfRegistration = derived(realmInfo, $r => $r.testModeUserSelfRegistration);
 export const testModeDemoData = derived(realmInfo, $r => $r.testModeDemoData);
 export const testModeSkipTerms = derived(realmInfo, $r => $r.testModeSkipTerms);

@@ -33,18 +33,8 @@
 		}
 	}
 	
-	$: if (browser && initialized) {
+	$: if (browser && initialized && typeof window !== 'undefined' && window.innerWidth >= 1024) {
 		saveSidebarState(drawerHidden);
-	}
-
-	$: if (browser) {
-		if (!drawerHidden && typeof window !== 'undefined' && window.innerWidth < 1024) {
-			document.body.classList.add('overflow-hidden');
-			document.body.style.touchAction = 'none';
-		} else {
-			document.body.classList.remove('overflow-hidden');
-			document.body.style.touchAction = '';
-		}
 	}
 
 	onMount(() => {
@@ -53,16 +43,20 @@
 			void realmInfo.fetch();
 			document.documentElement.classList.remove('dark');
 			document.documentElement.classList.add('light');
-			
+			document.body.classList.remove('overflow-hidden');
+
+			const isMobile = window.innerWidth < 1024;
 			try {
 				const savedSidebar = localStorage.getItem(SIDEBAR_STATE_KEY);
-				if (savedSidebar !== null) {
+				// Mobile drawer always starts closed — persisting "open" traps users when
+				// scroll-lock or backdrop stacking breaks touch on real devices.
+				if (!isMobile && savedSidebar !== null) {
 					drawerHidden = JSON.parse(savedSidebar);
 				} else {
-					drawerHidden = window.innerWidth < 1024;
+					drawerHidden = true;
 				}
 			} catch {
-				drawerHidden = window.innerWidth < 1024;
+				drawerHidden = true;
 			}
 			
 			initialized = true;
@@ -103,18 +97,25 @@
 				unsubHostActions();
 				unsubFocus();
 				unsubAuth();
+				document.body.classList.remove('overflow-hidden');
 			};
 		}
 	});
 
 	afterNavigate(() => {
 		if (get(isAuthenticated)) void loadNotifications();
+		if (browser && typeof window !== 'undefined' && window.innerWidth < 1024) {
+			drawerHidden = true;
+		}
 	});
 
 	$: isFullBleedExtension =
 		$page.url.pathname.includes('/extensions/codex_viewer') ||
 		$page.url.pathname.includes('/extensions/zone_selector') ||
 		$page.url.pathname.includes('/extensions/land_registry');
+
+	$: mobileDrawerOpen =
+		browser && !drawerHidden && typeof window !== 'undefined' && window.innerWidth < 1024;
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden">
@@ -123,21 +124,22 @@
 	>
 		<Navbar bind:drawerHidden />
 	</header>
-	<div class="flex flex-1 overflow-hidden">
-		<!-- Sidebar (left) -->
+	<div class="flex min-h-0 flex-1 overflow-hidden bg-white">
+		<!-- Sidebar (left, in-flow on lg; mobile drawer is a separate overlay) -->
 		<Sidebar bind:drawerHidden />
 
 		<!-- Main Content -->
 		<div
-			class="main-content-area relative flex-1 overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {isFullBleedExtension ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-y-auto'} {!drawerHidden ? 'lg:ml-64' : ''}"
+			class="main-content-area relative min-w-0 flex-1 overflow-x-hidden bg-white {isFullBleedExtension ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-y-auto'}"
+			inert={mobileDrawerOpen ? true : undefined}
 		>
 			<DemoBanner />
 			<DelegationBanner />
 
 			<div
 				class="{isFullBleedExtension
-					? 'flex min-h-0 flex-1 flex-col overflow-hidden px-0 lg:pl-0 lg:pr-0'
-					: 'px-4 lg:pl-6 lg:pr-0'}"
+					? 'flex min-h-0 flex-1 flex-col overflow-hidden px-0'
+					: 'px-4 lg:px-6'}"
 			>
 				{#if !isFullBleedExtension}
 					<PageBreadcrumb />

@@ -567,10 +567,23 @@ def _resolve_portal_url(realm: dict, network: str, derivation_origin: str) -> st
     return f"{derivation_origin.rstrip('/')}/r/{slug}"
 
 
+def _canister_ids_bool_fields(network: str, parameters: dict | None = None) -> dict[str, bool]:
+    """Sync hints written into /canister_ids.js for portal iframe boot."""
+    fields: dict[str, bool] = {}
+    if network == "staging":
+        # Staging realms use II bypass unless explicitly disabled in the descriptor.
+        fields["test_mode_ii_bypass"] = bool((parameters or {}).get("TEST_MODE_II_BYPASS", True))
+    elif parameters:
+        if "TEST_MODE_II_BYPASS" in parameters:
+            fields["test_mode_ii_bypass"] = bool(parameters["TEST_MODE_II_BYPASS"])
+    return fields
+
+
 def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
                          file_registry_id: str = "", derivation_origin: str = "",
                          portal_url: str = "",
-                         infra: dict | None = None) -> None:
+                         infra: dict | None = None,
+                         parameters: dict | None = None) -> None:
     """(Re)write /canister_ids.js onto the frontend canister.
 
     This file is NOT part of the built asset bundle — it carries the realm's
@@ -598,6 +611,8 @@ def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
         # getPortalRedirectUrl); without it a direct icp0.io visit tries II
         # login on the raw origin and fails with "Unverified origin".
         fields.append('portal_url:"' + portal_url + '"')
+    for key, value in _canister_ids_bool_fields(network, parameters).items():
+        fields.append(f"{key}:{'true' if value else 'false'}")
     js = 'globalThis.__CANISTER_IDS={' + ",".join(fields) + '};'
     js += _staging_test_identity_js(network, infra)
     escaped = js.replace('\\', '\\\\').replace('"', '\\"')
@@ -698,7 +713,8 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
         _store_canister_ids(frontend_id, backend_id, network,
                             file_registry_id=fr_id, derivation_origin=deriv,
                             portal_url=portal_url,
-                            infra=infra)
+                            infra=infra,
+                            parameters=parameters)
 
 
 def _submit_and_poll(manifest: dict, network: str) -> bool:

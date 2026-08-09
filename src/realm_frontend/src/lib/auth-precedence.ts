@@ -25,3 +25,16 @@ export function shouldUseTestModeAuth(
 ): boolean {
 	return testModeIIBypass && !embeddedInPortal;
 }
+
+/** Join page may opt into test identities even inside the portal iframe. */
+export function shouldPreferTestModeLogin(
+	preferTestMode: boolean,
+	testModeIIBypass: boolean
+): boolean {
+	return preferTestMode && testModeIIBypass;
+}
+
+/** Test sessions may be restored after iframe reloads when II bypass is on. */
+export function shouldRestoreTestModeSession(testModeIIBypass: boolean): boolean {
+	return testModeIIBypass;
+}

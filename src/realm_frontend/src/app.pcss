@@ -387,12 +387,25 @@ html::-webkit-scrollbar-thumb:hover {
   color: #262626;
 }
 
+/* Sidebar active nav row — keep visible even if utility-class order shifts */
+aside nav a.sidebar-nav-active,
+aside nav a[aria-current='page'],
+aside nav a[data-sidebar-active='true'] {
+  background-color: rgb(229 231 235) !important;
+  color: rgb(17 24 39);
+  font-weight: 500;
+}
+
+aside nav a.sidebar-nav-active:hover,
+aside nav a[aria-current='page']:hover,
+aside nav a[data-sidebar-active='true']:hover {
+  background-color: rgb(229 231 235) !important;
+  color: rgb(17 24 39);
+}
+
 /* Prevent body scroll when sidebar is open on mobile */
 body.overflow-hidden {
   overflow: hidden;
-  position: fixed;
-  width: 100%;
-  height: 100%;
   overscroll-behavior: none;
 }
 

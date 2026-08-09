@@ -272,7 +272,7 @@
         realmName = $realmNameStore;
       }
 
-      if ($testModeIIBypass && !embeddedInPortal) {
+      if ($testModeIIBypass) {
         await logout();
         isAuthenticated.set(false);
         principal.set('');
@@ -291,7 +291,7 @@
       targetsResolved = true;
       maybeAdvanceFromStores();
 
-      if (embeddedInPortal) {
+      if (embeddedInPortal && !$testModeIIBypass) {
         onPortalAuth = () => {
           if ($isAuthenticated) return;
           void handleLogin();
@@ -454,7 +454,8 @@
     loading = true;
     error = '';
     try {
-      const { principal: userPrincipal } = await login(options);
+      const preferTestMode = get(testModeIIBypass);
+      const { principal: userPrincipal } = await login({ ...options, preferTestMode });
       if (userPrincipal) {
         await completeAuthAfterLogin(userPrincipal);
       } else {
@@ -710,7 +711,7 @@
             </div>
             <h2 class="text-2xl font-bold text-gray-900 mb-2">Sign in to continue</h2>
             <p class="text-gray-500">
-              {#if $testModeIIBypass && !embeddedInPortal}
+              {#if $testModeIIBypass}
                 Choose how to sign in to {realmName}
               {:else}
                 Authenticate with Internet Identity to join {realmName}
@@ -718,7 +719,7 @@
             </p>
           </div>
 
-          {#if $testModeIIBypass && !embeddedInPortal}
+          {#if $testModeIIBypass}
             <div class="space-y-3">
               <p class="text-sm text-gray-600 text-center mb-2">
                 Pick a test identity (Internet Identity is bypassed on the test network).
