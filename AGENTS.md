@@ -130,6 +130,12 @@ is missing it runs the fetch → upload → authorize flow via
 
 **Hard-refresh** the browser (Ctrl+Shift+R) after deploy — asset canisters cache aggressively.
 
+**After any frontend deploy, verify the UI actually looks correct** — don't stop at
+`canister_ids.js` or a successful mundus job. Open the target realm in a browser (portal
+URL when available), hard-refresh, and confirm layout, sidebar, and the changed page render
+as expected. Technical checks alone miss visual regressions (e.g. sidebar overlapping main
+content, wrong active highlight, clipped headings).
+
 ### Fast realm deploy (mundus) — default
 
 Builds from your **local checkout**, uploads artifacts, and upgrades the target realm
@@ -195,6 +201,8 @@ Optional `--portal-url` and `--derivation-origin` set II + portal redirect field
 
 **Verify after deploy:** open DevTools → Network → confirm `/canister_ids.js` loads and
 `realm_backend` matches the realm's backend canister (not a demo/test default from `.env`).
+Then **load the realm in a browser** and eyeball the affected screens (sidebar, layout,
+navigation) — a green deploy log does not prove the UI is right.
 
 ### Casals rollout (pre-merge / authoritative)
 
