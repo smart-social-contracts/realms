@@ -29,6 +29,7 @@ export interface SetupActionResult {
 
 export interface SetupBackendActor {
 	get_setup_state: () => Promise<string>;
+	get_available_codices_cached?: () => Promise<string>;
 	list_available_codices: () => Promise<string>;
 	setup_install_codex: (json: string) => Promise<string>;
 	setup_configure_token: (json: string) => Promise<string>;

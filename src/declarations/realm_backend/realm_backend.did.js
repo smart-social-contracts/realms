@@ -331,6 +331,7 @@ export const idlFactory = ({ IDL }) => {
     'get_sandbox_config' : IDL.Func([], [IDL.Text], ['query']),
     'get_scale_status' : IDL.Func([], [IDL.Text], ['query']),
     'get_setup_state' : IDL.Func([], [IDL.Text], ['query']),
+    'get_available_codices_cached' : IDL.Func([], [IDL.Text], ['query']),
     'get_sharing_root_public_key' : IDL.Func([], [RealmResponse], []),
     'get_sidebar' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_sidebar_manifests' : IDL.Func([], [IDL.Text], ['query']),

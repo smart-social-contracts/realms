@@ -33,6 +33,7 @@
 	let selectedCodexId = $state('');
 	let selectedVersion = $state('');
 	let resolvedCodexVersion = $state('');
+	let codexInstallProgress = $state('');
 	let tokenSymbol = $state('REALMS');
 	let primaryColor = $state('#3b82f6');
 	let logoPreview = $state('');
@@ -114,6 +115,7 @@
 		}
 		busy = true;
 		error = '';
+		codexInstallProgress = `Installing ${selectedCodexId}@${selectedVersion}… this can take several minutes`;
 		try {
 			const result = await installSetupCodex({
 				package: selectedCodexId,
@@ -131,6 +133,7 @@
 			error = e instanceof Error ? e.message : 'Codex installation failed';
 		} finally {
 			busy = false;
+			codexInstallProgress = '';
 		}
 	}
 
@@ -329,6 +332,9 @@
 					{/if}
 
 					<div class="setup-wizard__actions">
+						{#if codexInstallProgress}
+							<P class="text-sm text-gray-600">{codexInstallProgress}</P>
+						{/if}
 						<Button color="blue" disabled={busy || !selectedCodexId} onclick={handleCodexInstall}>
 							{busy ? 'Installing…' : setupState?.codex ? 'Continue' : 'Install codex'}
 						</Button>

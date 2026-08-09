@@ -1127,6 +1127,7 @@ export interface _SERVICE {
   'get_sandbox_config' : ActorMethod<[], string>,
   'get_scale_status' : ActorMethod<[], string>,
   'get_setup_state' : ActorMethod<[], string>,
+  'get_available_codices_cached' : ActorMethod<[], string>,
   'get_sharing_root_public_key' : ActorMethod<[], RealmResponse>,
   'get_sidebar' : ActorMethod<[string], string>,
   'get_sidebar_manifests' : ActorMethod<[], string>,

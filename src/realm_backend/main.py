@@ -6631,6 +6631,20 @@ def get_setup_state() -> text:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@query
+def get_available_codices_cached() -> text:
+    """Return the cached codex catalog (fast local read, no inter-canister calls)."""
+    try:
+        from api.setup import get_available_codices_cached as _get_cached
+
+        return _get_cached()
+    except Exception as e:
+        logger.error(
+            f"get_available_codices_cached error: {e}\n{traceback.format_exc()}"
+        )
+        return json.dumps({"success": False, "error": str(e)})
+
+
 @update
 def list_available_codices() -> Async[text]:
     """List codex packages available from the configured file registry.

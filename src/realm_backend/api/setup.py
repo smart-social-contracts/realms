@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Optional
 
-from _cdk import Async, CallResult, Principal, ic
+from _cdk import Async, CallResult, Principal, StableBTreeMap, ic
 from ic_python_logging import get_logger
 
 from api.file_registry import FileRegistryService, _unwrap_call_result
@@ -22,6 +22,37 @@ from core.setup import (
 from ggg.governance.realm import RealmStatus
 
 logger = get_logger("api.setup")
+
+# Durable catalog cache (separate from Realm.manifest_data, which is capped at
+# 4096 chars). memory_id=2 avoids colliding with ic_python_db storage (id=1).
+_SETUP_CATALOG_CACHE = StableBTreeMap[str, str](
+    memory_id=2, max_key_size=64, max_value_size=262_144
+)
+_SETUP_CATALOG_CACHE_KEY = "catalog"
+
+
+def _read_catalog_cache() -> Optional[Dict[str, Any]]:
+    raw = _SETUP_CATALOG_CACHE.get(_SETUP_CATALOG_CACHE_KEY)
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _write_catalog_cache(envelope: Dict[str, Any]) -> None:
+    payload = dict(envelope)
+    payload["fetched_at"] = ic.time()
+    _SETUP_CATALOG_CACHE.insert(_SETUP_CATALOG_CACHE_KEY, json.dumps(payload))
+
+
+def get_available_codices_cached() -> str:
+    cached = _read_catalog_cache()
+    if not cached or not cached.get("codices"):
+        return json.dumps({"success": False, "error": "empty"})
+    return json.dumps({"success": True, "codices": cached.get("codices") or []})
 
 
 def get_setup_state() -> str:
@@ -80,7 +111,9 @@ def list_available_codices() -> Async[str]:
             }
         )
 
-    return json.dumps({"success": True, "codices": catalog})
+    envelope = {"success": True, "codices": catalog}
+    _write_catalog_cache(envelope)
+    return json.dumps(envelope)
 
 
 def setup_install_codex(args_json: str) -> Async[str]:
