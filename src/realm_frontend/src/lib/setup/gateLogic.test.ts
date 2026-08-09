@@ -1,5 +1,68 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSetupGate, shouldPollSetupState } from './gateLogic';
+import { resolveSetupGate, shouldPollSetupState, shouldShowSetupLoading } from './gateLogic';
+
+const settledAuthorized = {
+	loading: false,
+	status: 'setup' as const,
+	isAuthenticated: true,
+	isCallerAuthorized: true,
+	authChannelSettled: true,
+	setupStateLoaded: true
+};
+
+describe('shouldShowSetupLoading', () => {
+	it('shows loading while gate input is loading', () => {
+		expect(
+			shouldShowSetupLoading({
+				loading: true,
+				status: 'setup',
+				isAuthenticated: false,
+				isCallerAuthorized: false,
+				authChannelSettled: false,
+				setupStateLoaded: false,
+				pathname: '/setup'
+			})
+		).toBe(true);
+	});
+
+	it('shows loading until auth channel settles during setup', () => {
+		expect(
+			shouldShowSetupLoading({
+				loading: false,
+				status: 'setup',
+				isAuthenticated: true,
+				isCallerAuthorized: false,
+				authChannelSettled: false,
+				setupStateLoaded: false,
+				pathname: '/setup'
+			})
+		).toBe(true);
+	});
+
+	it('shows loading until setup state is fetched after auth settles', () => {
+		expect(
+			shouldShowSetupLoading({
+				loading: false,
+				status: 'setup',
+				isAuthenticated: true,
+				isCallerAuthorized: false,
+				authChannelSettled: true,
+				setupStateLoaded: false,
+				pathname: '/setup'
+			})
+		).toBe(true);
+	});
+
+	it('does not load forever once auth and setup state have settled', () => {
+		expect(
+			shouldShowSetupLoading({
+				...settledAuthorized,
+				isCallerAuthorized: false,
+				pathname: '/setup'
+			})
+		).toBe(false);
+	});
+});
 
 describe('resolveSetupGate', () => {
 	it('shows loading while gate input is loading', () => {
@@ -9,6 +72,8 @@ describe('resolveSetupGate', () => {
 				status: null,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
+				authChannelSettled: false,
+				setupStateLoaded: false,
 				pathname: '/'
 			})
 		).toEqual({ kind: 'loading' });
@@ -21,6 +86,8 @@ describe('resolveSetupGate', () => {
 				status: null,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
+				authChannelSettled: true,
+				setupStateLoaded: true,
 				pathname: '/'
 			})
 		).toEqual({ kind: 'normal' });
@@ -33,6 +100,8 @@ describe('resolveSetupGate', () => {
 				status: 'alpha',
 				isAuthenticated: false,
 				isCallerAuthorized: false,
+				authChannelSettled: true,
+				setupStateLoaded: true,
 				pathname: '/'
 			})
 		).toEqual({ kind: 'normal' });
@@ -45,21 +114,39 @@ describe('resolveSetupGate', () => {
 				status: 'setup',
 				isAuthenticated: false,
 				isCallerAuthorized: false,
+				authChannelSettled: true,
+				setupStateLoaded: true,
 				pathname: '/'
 			})
 		).toEqual({ kind: 'gate', variant: 'anonymous' });
 	});
 
-	it('shows unauthorized gate for logged-in non-creators', () => {
+	it('shows unauthorized gate for logged-in non-creators after settlement', () => {
 		expect(
 			resolveSetupGate({
 				loading: false,
 				status: 'setup',
 				isAuthenticated: true,
 				isCallerAuthorized: false,
+				authChannelSettled: true,
+				setupStateLoaded: true,
 				pathname: '/dashboard'
 			})
 		).toEqual({ kind: 'gate', variant: 'unauthorized' });
+	});
+
+	it('keeps loading instead of unauthorized while authorization is unresolved', () => {
+		expect(
+			resolveSetupGate({
+				loading: false,
+				status: 'setup',
+				isAuthenticated: true,
+				isCallerAuthorized: false,
+				authChannelSettled: false,
+				setupStateLoaded: false,
+				pathname: '/setup'
+			})
+		).toEqual({ kind: 'loading' });
 	});
 
 	it('allows join flow during setup', () => {
@@ -69,6 +156,8 @@ describe('resolveSetupGate', () => {
 				status: 'setup',
 				isAuthenticated: false,
 				isCallerAuthorized: false,
+				authChannelSettled: true,
+				setupStateLoaded: true,
 				pathname: '/join'
 			})
 		).toEqual({ kind: 'normal' });
@@ -77,10 +166,7 @@ describe('resolveSetupGate', () => {
 	it('redirects authorized creators to the wizard', () => {
 		expect(
 			resolveSetupGate({
-				loading: false,
-				status: 'setup',
-				isAuthenticated: true,
-				isCallerAuthorized: true,
+				...settledAuthorized,
 				pathname: '/settings'
 			})
 		).toEqual({ kind: 'redirect', to: '/setup' });
@@ -89,10 +175,7 @@ describe('resolveSetupGate', () => {
 	it('shows setup wizard on /setup for authorized creators', () => {
 		expect(
 			resolveSetupGate({
-				loading: false,
-				status: 'setup',
-				isAuthenticated: true,
-				isCallerAuthorized: true,
+				...settledAuthorized,
 				pathname: '/setup'
 			})
 		).toEqual({ kind: 'setup_wizard' });

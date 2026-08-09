@@ -12,6 +12,10 @@ export interface ResolveSetupGateInput {
 	status: string | null;
 	isAuthenticated: boolean;
 	isCallerAuthorized: boolean;
+	/** Portal / II auth channel has finished its initial bootstrap. */
+	authChannelSettled: boolean;
+	/** Setup state fetched at least once after auth channel settled. */
+	setupStateLoaded: boolean;
 	pathname: string;
 }
 
@@ -26,9 +30,21 @@ function isSetupPath(pathname: string): boolean {
 	return pathname === SETUP_PATH || pathname.startsWith(`${SETUP_PATH}/`);
 }
 
+/**
+ * True while setup gate must not show anonymous/unauthorized copy yet.
+ * Keeps a neutral loading state until auth + setup state have settled.
+ */
+export function shouldShowSetupLoading(input: ResolveSetupGateInput): boolean {
+	if (input.loading) return true;
+	if (input.status !== 'setup') return false;
+	if (!input.authChannelSettled) return true;
+	if (!input.setupStateLoaded) return true;
+	return false;
+}
+
 /** Pure gate resolver — unit-tested. */
 export function resolveSetupGate(input: ResolveSetupGateInput): SetupGateDecision {
-	if (input.loading) {
+	if (shouldShowSetupLoading(input)) {
 		return { kind: 'loading' };
 	}
 

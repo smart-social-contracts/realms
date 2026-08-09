@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { Button, Heading, Input, Label, P } from 'flowbite-svelte';
 	import {
@@ -13,8 +14,13 @@
 	import type { AvailableCodex, SetupState } from '$lib/setup/types';
 	import {
 		canAdvanceFromCodexStep,
+		canNavigateToWizardStep,
+		getCodexStepPrimaryLabel,
+		getPreviousWizardStep,
+		isCodexPrimaryActionDisabled,
 		reconcileCodexVersion,
 		resolveSelectedCodexVersion,
+		shouldClearCodexAdvanceError,
 		type WizardStep
 	} from '$lib/setup/wizardLogic';
 	import { fileToCompressedDataUrl } from '$lib/utils/imageDataUrl';
@@ -44,9 +50,21 @@
 	let backgroundPreview = $state('');
 	let logoDataUrl = $state('');
 	let backgroundDataUrl = $state('');
+	let leftSetup = $state(false);
 
 	const selectedCodex = $derived(codices.find((c) => c.id === selectedCodexId) ?? null);
 	const stepIndex = $derived(steps.findIndex((s) => s.id === currentStep));
+	const previousStep = $derived(getPreviousWizardStep(currentStep));
+	const codexPrimaryLabel = $derived(getCodexStepPrimaryLabel(setupState, busy));
+	const codexPrimaryDisabled = $derived(
+		isCodexPrimaryActionDisabled(busy, selectedCodexId, selectedVersion, setupState)
+	);
+
+	$effect(() => {
+		if (shouldClearCodexAdvanceError(currentStep, error)) {
+			error = '';
+		}
+	});
 
 	function latestVersion(codex: AvailableCodex): string {
 		return codex.versions[codex.versions.length - 1] ?? '';
@@ -80,11 +98,12 @@
 		try {
 			const [state, available] = await Promise.all([fetchSetupState(), listAvailableCodices()]);
 			if (state.status !== 'setup') {
-				window.location.replace('/');
+				leftSetup = true;
+				void goto('/', { replaceState: true });
 				return;
 			}
 			if (!state.is_caller_authorized) {
-				window.location.replace('/');
+				await setupStateStore.refresh();
 				return;
 			}
 			codices = available;
@@ -209,7 +228,8 @@
 				return;
 			}
 			await setupStateStore.refresh();
-			window.location.replace('/');
+			leftSetup = true;
+			void goto('/', { replaceState: true });
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not launch realm';
 		} finally {
@@ -244,11 +264,21 @@
 	}
 
 	function goToStep(step: WizardStep) {
-		if (step !== 'codex' && !canAdvanceFromCodexStep(setupState)) {
-			error = 'Install a codex before continuing to later steps';
+		const navigation = canNavigateToWizardStep(currentStep, step, setupState);
+		if (!navigation.allowed) {
+			if (navigation.showError && navigation.errorMessage) {
+				error = navigation.errorMessage;
+			}
 			return;
 		}
 		currentStep = step;
+		error = '';
+	}
+
+	function goBack() {
+		const previous = getPreviousWizardStep(currentStep);
+		if (!previous) return;
+		currentStep = previous;
 		error = '';
 	}
 
@@ -263,10 +293,13 @@
 		if (!browser) return;
 		void loadWizard();
 		const timer = setInterval(async () => {
+			if (leftSetup) return;
 			try {
 				const state = await fetchSetupState();
 				if (state.status !== 'setup') {
-					window.location.replace('/');
+					leftSetup = true;
+					await setupStateStore.refresh();
+					void goto('/', { replaceState: true });
 					return;
 				}
 				const hadCodex = canAdvanceFromCodexStep(setupState);
@@ -371,8 +404,8 @@
 						{#if codexInstallProgress}
 							<P class="text-sm text-gray-600">{codexInstallProgress}</P>
 						{/if}
-						<Button color="blue" disabled={busy || !selectedCodexId} onclick={handleCodexInstall}>
-							{busy ? 'Installing…' : setupState?.codex ? 'Continue' : 'Install codex'}
+						<Button color="blue" disabled={codexPrimaryDisabled} onclick={handleCodexInstall}>
+							{codexPrimaryLabel}
 						</Button>
 					</div>
 				</section>
@@ -385,9 +418,12 @@
 						<Input id="token-symbol" bind:value={tokenSymbol} placeholder="REALMS" />
 					</div>
 					<div class="setup-wizard__actions">
+						{#if previousStep}
+							<Button color="light" disabled={busy} onclick={goBack}>Back</Button>
+						{/if}
 						<Button color="light" disabled={busy} onclick={skipStep}>Skip</Button>
 						<Button color="blue" disabled={busy} onclick={handleTokenSave}>
-							{busy ? 'Saving…' : 'Save token'}
+							{busy ? 'Saving…' : 'Continue'}
 						</Button>
 					</div>
 				</section>
@@ -411,9 +447,12 @@
 						</div>
 
 						<div class="setup-wizard__actions">
+							{#if previousStep}
+								<Button color="light" disabled={busy} onclick={goBack}>Back</Button>
+							{/if}
 							<Button color="light" disabled={busy} onclick={skipStep}>Skip</Button>
 							<Button color="blue" disabled={busy} onclick={handleBrandingSave}>
-								{busy ? 'Saving…' : 'Save branding'}
+								{busy ? 'Saving…' : 'Continue'}
 							</Button>
 						</div>
 					</div>
@@ -463,7 +502,9 @@
 					</dl>
 
 					<div class="setup-wizard__actions">
-						<Button color="light" disabled={busy} onclick={() => goToStep('codex')}>Back</Button>
+						{#if previousStep}
+							<Button color="light" disabled={busy} onclick={goBack}>Back</Button>
+						{/if}
 						<Button color="blue" disabled={busy || !setupState?.codex} onclick={handleLaunch}>
 							{busy ? 'Launching…' : 'Launch realm'}
 						</Button>
