@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { Alert } from 'flowbite-svelte';
@@ -24,7 +24,8 @@
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import { createMarketplaceExtensionBackend } from '$lib/marketplace-extension-backend';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
-	import { getExtensionManifest } from '$lib/utils/extension-manifest';
+	import { getExtensionManifestWithRetry } from '$lib/utils/extension-manifest';
+	import { resolveExtensionMountMode } from '$lib/utils/extension-runtime-mode';
 	import BridgeModalHost from '$lib/components/BridgeModalHost.svelte';
 	import type { HostRealmInfo, HostState } from '@realmsgos/extension-bridge';
 	import BridgeToastHost from '$lib/components/BridgeToastHost.svelte';
@@ -51,6 +52,7 @@
 	let mountPoint: HTMLDivElement | undefined;
 	let status: 'loading' | 'ready' | 'error' | 'access_denied' | 'sdk_mismatch' = 'loading';
 	let errorMsg = '';
+	let errorRetryable = false;
 	let accessDeniedOperation = '';
 	let mounted: MountResult | SandboxMountResult | void;
 	let sandboxed = false;
@@ -260,36 +262,55 @@
 		}
 	}
 
+	async function ensureMountPoint(): Promise<HTMLDivElement> {
+		await tick();
+		if (mountPoint) return mountPoint;
+		await tick();
+		if (mountPoint) return mountPoint;
+		throw new Error('mount point not ready');
+	}
+
 	async function loadRuntimeExtension(id: string) {
 		cleanupMounted();
 		status = 'loading';
 		errorMsg = '';
+		errorRetryable = false;
 
 		try {
 			const [version, manifest] = await Promise.all([
 				resolveExtensionVersion(backend as any, id),
-				getExtensionManifest(id),
+				getExtensionManifestWithRetry(id),
 				resolveInfraConfig()
 			]);
-			if (!version) {
+
+			const mountMode = resolveExtensionMountMode(version, manifest, isPrivilegedExtension(id));
+			if (mountMode.kind === 'not_installed') {
 				status = 'error';
 				errorMsg = `Extension '${id}' is not installed on this realm_backend.`;
 				return;
 			}
-
-			if (!mountPoint) {
-				throw new Error('mount point not ready');
+			if (mountMode.kind === 'manifest_unavailable') {
+				status = 'error';
+				errorMsg = `Extension manifest unavailable for '${id}'. Please retry.`;
+				errorRetryable = true;
+				return;
 			}
+			if (mountMode.kind === 'not_privileged') {
+				status = 'error';
+				errorMsg = `Extension '${id}' is not on the privileged allowlist and must declare runtime:"sandboxed".`;
+				return;
+			}
+
+			const mountEl = await ensureMountPoint();
 
 			console.debug(`[extension] Loading ${id}@${version}...`);
 
 			await loadExtensionTranslation(id, version, get(locale) || 'en');
 
-			const runtime = manifest?.runtime;
-			if (runtime === 'sandboxed') {
+			if (mountMode.kind === 'sandboxed') {
 				sandboxed = true;
 				const ctx = await buildContext(id, version);
-				mounted = await mountSandboxedExtension(id, version, mountPoint, {
+				mounted = await mountSandboxedExtension(id, version, mountEl, {
 					manifest: {
 						sdk_version: manifest?.sdk_version as string | undefined,
 						capabilities: manifest?.capabilities as string[] | undefined,
@@ -316,13 +337,8 @@
 				await (mounted as SandboxMountResult).ready;
 				console.debug(`[extension] Sandboxed bridge ready ${id}@${version}`);
 			} else {
-				if (!isPrivilegedExtension(id)) {
-					status = 'error';
-					errorMsg = `Extension '${id}' is not on the privileged allowlist and must declare runtime:"sandboxed".`;
-					return;
-				}
 				const ctx = await buildContext(id, version);
-				mounted = await mountExtension(id, version, mountPoint, ctx);
+				mounted = await mountExtension(id, version, mountEl, ctx);
 				console.debug(`[extension] Mounted ${id}@${version}`);
 			}
 			status = 'ready';
@@ -406,6 +422,15 @@
 		<Alert color="red" class="mb-4">
 			<div class="font-semibold">Failed to load extension '{extensionId}'</div>
 			<div class="text-sm mt-1">{errorMsg}</div>
+			{#if errorRetryable}
+				<button
+					type="button"
+					class="mt-3 text-sm font-medium text-red-800 underline dark:text-red-200"
+					onclick={() => loadRuntimeExtension(extensionId)}
+				>
+					Retry
+				</button>
+			{/if}
 		</Alert>
 	{/if}
 
