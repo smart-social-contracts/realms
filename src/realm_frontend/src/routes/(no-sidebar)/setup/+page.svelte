@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import { Button, Heading, Input, Label, P, Select } from 'flowbite-svelte';
+	import { Button, Heading, Input, Label, P } from 'flowbite-svelte';
 	import {
 		completeSetup,
 		configureSetupToken,
@@ -11,11 +11,15 @@
 		setSetupBranding
 	} from '$lib/setup/api';
 	import type { AvailableCodex, SetupState } from '$lib/setup/types';
+	import {
+		canAdvanceFromCodexStep,
+		reconcileCodexVersion,
+		resolveSelectedCodexVersion,
+		type WizardStep
+	} from '$lib/setup/wizardLogic';
 	import { fileToCompressedDataUrl } from '$lib/utils/imageDataUrl';
 	import { setupStateStore } from '$lib/stores/setupState';
 	import { realmName } from '$lib/stores/realmInfo';
-
-	type WizardStep = 'codex' | 'token' | 'branding' | 'review';
 
 	const steps: { id: WizardStep; label: string; skippable: boolean }[] = [
 		{ id: 'codex', label: 'Codex', skippable: false },
@@ -90,8 +94,13 @@
 				selectedVersion = latestVersion(codices[0]);
 			} else {
 				const codex = codices.find((c) => c.id === selectedCodexId);
-				if (codex && !codex.versions.includes(selectedVersion)) {
-					selectedVersion = latestVersion(codex);
+				if (codex) {
+					selectedVersion = reconcileCodexVersion(
+						codex.versions,
+						selectedVersion,
+						state.codex?.version,
+						latestVersion
+					);
 				}
 			}
 		} catch (e) {
@@ -101,34 +110,40 @@
 		}
 	}
 
+	function advanceToTokenStep() {
+		currentStep = 'token';
+		error = '';
+	}
+
 	async function handleCodexInstall() {
-		if (!selectedCodexId || !selectedVersion) {
+		if (canAdvanceFromCodexStep(setupState)) {
+			advanceToTokenStep();
+			return;
+		}
+
+		const versionToInstall = resolveSelectedCodexVersion(selectedVersion, setupState);
+		if (!selectedCodexId || !versionToInstall) {
 			error = 'Choose a codex and version';
 			return;
 		}
-		if (
-			setupState?.codex?.package === selectedCodexId &&
-			setupState?.codex?.version === selectedVersion
-		) {
-			currentStep = 'token';
-			return;
-		}
+		selectedVersion = versionToInstall;
+
 		busy = true;
 		error = '';
-		codexInstallProgress = `Installing ${selectedCodexId}@${selectedVersion}… this can take several minutes`;
+		codexInstallProgress = `Installing ${selectedCodexId}@${versionToInstall}… this can take several minutes`;
 		try {
 			const result = await installSetupCodex({
 				package: selectedCodexId,
-				version: selectedVersion
+				version: versionToInstall
 			});
 			if (!result.success) {
 				error = result.error || 'Codex installation failed';
 				return;
 			}
-			resolvedCodexVersion = result.resolved_version || selectedVersion;
+			resolvedCodexVersion = result.resolved_version || versionToInstall;
 			const refreshed = await fetchSetupState();
 			applySetupState(refreshed);
-			currentStep = 'token';
+			advanceToTokenStep();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Codex installation failed';
 		} finally {
@@ -229,6 +244,10 @@
 	}
 
 	function goToStep(step: WizardStep) {
+		if (step !== 'codex' && !canAdvanceFromCodexStep(setupState)) {
+			error = 'Install a codex before continuing to later steps';
+			return;
+		}
 		currentStep = step;
 		error = '';
 	}
@@ -248,6 +267,14 @@
 				const state = await fetchSetupState();
 				if (state.status !== 'setup') {
 					window.location.replace('/');
+					return;
+				}
+				const hadCodex = canAdvanceFromCodexStep(setupState);
+				if (state.codex) {
+					applySetupState(state);
+				}
+				if (!busy && !hadCodex && canAdvanceFromCodexStep(state) && currentStep === 'codex') {
+					advanceToTokenStep();
 				}
 			} catch {
 				// ignore transient poll errors
@@ -293,6 +320,7 @@
 				<div class="setup-wizard__error" role="alert">{error}</div>
 			{/if}
 
+			{#key currentStep}
 			{#if currentStep === 'codex'}
 				<section class="setup-wizard__panel">
 					<Heading tag="h2" class="text-xl font-semibold">Choose a codex</Heading>
@@ -323,7 +351,15 @@
 					{#if selectedCodex}
 						<div class="setup-wizard__field">
 							<Label for="codex-version">Version</Label>
-							<Select id="codex-version" bind:value={selectedVersion} items={selectedCodex.versions.map((v) => ({ value: v, name: v }))} />
+							<select
+								id="codex-version"
+								class="setup-wizard__version-select"
+								bind:value={selectedVersion}
+							>
+								{#each selectedCodex.versions as version (version)}
+									<option value={version}>{version}</option>
+								{/each}
+							</select>
 						</div>
 					{/if}
 
@@ -434,6 +470,7 @@
 					</div>
 				</section>
 			{/if}
+			{/key}
 		{/if}
 	</div>
 </div>
@@ -563,6 +600,17 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
+	}
+
+	.setup-wizard__version-select {
+		display: block;
+		width: 100%;
+		border: 1px solid #d1d5db;
+		border-radius: 0.5rem;
+		background: #f9fafb;
+		color: #111827;
+		font-size: 0.875rem;
+		padding: 0.625rem 0.75rem;
 	}
 
 	.setup-wizard__actions {
