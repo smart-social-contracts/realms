@@ -23,6 +23,37 @@ from rich.table import Table
 
 console = Console()
 
+# Allowlisted extensions under frontend-rt/dist/ (recursive). Source maps excluded.
+_FRONTEND_DIST_SUFFIXES = (
+    ".html",
+    ".js",
+    ".css",
+    ".png",
+    ".svg",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".json",
+    ".webmanifest",
+)
+
+
+def _iter_frontend_dist_uploads(dist_dir: str) -> list[tuple[str, str]]:
+    """Return (registry_path, local_path) pairs for allowlisted dist artifacts."""
+    if not os.path.isdir(dist_dir):
+        return []
+    specs: list[tuple[str, str]] = []
+    for root, _dirs, files in os.walk(dist_dir):
+        for fname in sorted(files):
+            if fname.endswith(".map"):
+                continue
+            if not fname.endswith(_FRONTEND_DIST_SUFFIXES):
+                continue
+            local = os.path.join(root, fname)
+            rel = os.path.relpath(local, dist_dir).replace(os.sep, "/")
+            specs.append((f"frontend/dist/{rel}", local))
+    return specs
+
 
 def validate_extension_id(extension_id):
     """Validate extension ID (no hyphens allowed)"""
@@ -1385,7 +1416,7 @@ def publish_extension_command(
     Layout uploaded:
       manifest.json
       backend/<py files>
-      frontend/dist/index.js                      (if bundle exists)
+      frontend/dist/index.html, index.js, assets/…   (if frontend-rt/dist exists)
       frontend/i18n/locales/<locale>.json         (if frontend/i18n/ exists)
 
     Then, unless ``skip_publish`` is set, marks the namespace as published so
@@ -1452,28 +1483,20 @@ def publish_extension_command(
                 rel = os.path.relpath(local, backend_dir).replace(os.sep, "/")
                 _upload(f"backend/{rel}", local)
 
-    # Frontend runtime bundle (preferred input order):
-    #   1. explicit --bundle-path
-    #   2. <source_dir>/frontend-rt/dist/index.js
-    bundles = []
-    if bundle_path:
-        bundles.append(bundle_path)
-    auto_bundle = os.path.join(source_dir, "frontend-rt", "dist", "index.js")
-    if not bundle_path and os.path.exists(auto_bundle):
-        bundles.append(auto_bundle)
-
-    for b in bundles:
-        if not os.path.exists(b):
-            console.print(f"  [yellow]![/yellow] bundle not found, skipping: {b}")
-            continue
-        _upload("frontend/dist/index.js", b)
-
+    # Frontend runtime dist (index.html, index.js, nested assets/, …).
     dist_dir = os.path.join(source_dir, "frontend-rt", "dist")
-    if os.path.isdir(dist_dir):
-        for fname in sorted(os.listdir(dist_dir)):
-            if fname == "index.js" or not fname.endswith((".js", ".css")):
-                continue
-            _upload(f"frontend/dist/{fname}", os.path.join(dist_dir, fname))
+    if bundle_path:
+        if not os.path.exists(bundle_path):
+            console.print(
+                f"  [yellow]![/yellow] bundle not found, skipping: {bundle_path}"
+            )
+        else:
+            _upload("frontend/dist/index.js", bundle_path)
+
+    for reg_path, local in _iter_frontend_dist_uploads(dist_dir):
+        if bundle_path and reg_path == "frontend/dist/index.js":
+            continue
+        _upload(reg_path, local)
 
     # Frontend i18n must land at ext/<id>/<ver>/frontend/i18n/<locale>.json
     # (realm_frontend fetch URL). Monorepo layout stores files under
