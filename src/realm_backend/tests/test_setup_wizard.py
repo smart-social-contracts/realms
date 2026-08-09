@@ -25,6 +25,21 @@ if "_cdk" not in sys.modules:
     _cdk.ic = MagicMock()
     _cdk.service_update = lambda fn: fn
     _cdk.text = str
+
+    class _FakeStableMap:
+        def __class_getitem__(cls, _item):
+            return cls
+
+        def __init__(self, *args, **kwargs):
+            self._data = {}
+
+        def insert(self, key, value):
+            self._data[key] = value
+
+        def get(self, key):
+            return self._data.get(key)
+
+    _cdk.StableBTreeMap = _FakeStableMap
     sys.modules["_cdk"] = _cdk
 
 mock_ic = MagicMock()
@@ -221,6 +236,34 @@ def test_codex_init_does_not_flip_setup_to_alpha(monkeypatch):
     )
     codex_init_host.apply_init_policy("test_codex")
     assert realm.status == RealmStatus.SETUP
+
+
+def test_apply_init_policy_preserves_setup_block(monkeypatch):
+    setup_block = {
+        "creator_principal": "creator-1",
+        "realm_registry_canister_id": "registry-canister",
+        "token": {"symbol": "REALMS"},
+    }
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": setup_block,
+                "scaling": {"capacity": 2000},
+            }
+        ),
+    )
+    _FakeRealm.reset(realm)
+    monkeypatch.setattr(codex_init_host, "_realm", lambda: realm)
+    monkeypatch.setattr(
+        codex_init_host,
+        "_load_manifest",
+        lambda _codex_id: {"name": "Test Codex", "onboarding": {}},
+    )
+    codex_init_host.apply_init_policy("test_codex")
+    manifest = json.loads(realm.manifest_data)
+    assert manifest["setup"] == setup_block
+    assert manifest["scaling"] == {"capacity": 2000}
 
 
 def test_branding_size_cap_rejects_large_data_url():

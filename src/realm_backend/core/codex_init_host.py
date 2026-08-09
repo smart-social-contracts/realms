@@ -35,6 +35,9 @@ _PRESERVE_MANIFEST_KEYS = (
     "lifecycle_overrides",
     "casals",
     "scaling",
+    # Written post-deploy by the installer/wizard; must survive codex install and
+    # upgrades (creator_principal, realm_registry_canister_id, token, branding).
+    "setup",
 )
 
 
