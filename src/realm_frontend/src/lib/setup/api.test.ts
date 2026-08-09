@@ -313,6 +313,74 @@ describe('completeSetup', () => {
 	});
 });
 
+describe('pollUntilCodexInstalled', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.resetModules();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('succeeds on a final setup-state check after the poll deadline', async () => {
+		let setupReads = 0;
+		const mockActor = makeActor({
+			get_setup_state: vi.fn().mockImplementation(async () => {
+				setupReads += 1;
+				const codex =
+					setupReads >= 3
+						? { package: 'syntropia', version: '1.0.0' }
+						: null;
+				return JSON.stringify({
+					status: 'setup',
+					creator: '',
+					is_caller_authorized: true,
+					codex,
+					token: null,
+					branding: null
+				});
+			})
+		});
+		backendStore.set(mockActor);
+		actorReadyResolve();
+
+		const { pollUntilCodexInstalled } = await import('./api');
+		const promise = pollUntilCodexInstalled('syntropia', '1.0.0', 100, 50);
+		await vi.advanceTimersByTimeAsync(100);
+		await promise;
+
+		expect(mockActor.get_setup_state).toHaveBeenCalledTimes(3);
+	});
+
+	it('throws a 40-minute timeout error when the final check still has no codex', async () => {
+		const mockActor = makeActor({
+			get_setup_state: vi.fn().mockResolvedValue(
+				JSON.stringify({
+					status: 'setup',
+					creator: '',
+					is_caller_authorized: true,
+					codex: null,
+					token: null,
+					branding: null
+				})
+			)
+		});
+		backendStore.set(mockActor);
+		actorReadyResolve();
+
+		const { pollUntilCodexInstalled } = await import('./api');
+		const timeoutMs = 40 * 60 * 1_000;
+		const promise = pollUntilCodexInstalled('syntropia', '1.0.0', timeoutMs, 5_000);
+		const expectation = expect(promise).rejects.toThrow(
+			/Codex installation timed out after 40 minutes/
+		);
+		await vi.advanceTimersByTimeAsync(timeoutMs);
+		await expectation;
+		expect(mockActor.get_setup_state).toHaveBeenCalled();
+	});
+});
+
 describe('isAmbiguousInstallError', () => {
 	it('detects agent-js ambiguous sync-call failures', async () => {
 		const { isAmbiguousInstallError } = await import('./api');

@@ -10,7 +10,8 @@ import type {
 const CODEX_CATALOG_POLL_MS = 2_500;
 const CODEX_CATALOG_TIMEOUT_MS = 90_000;
 const CODEX_INSTALL_POLL_MS = 5_000;
-const CODEX_INSTALL_TIMEOUT_MS = 20 * 60 * 1_000;
+// Mainnet Syntropia codex installs have been observed at ~25 min.
+const CODEX_INSTALL_TIMEOUT_MS = 40 * 60 * 1_000;
 const RAW_INSTALL_CALL_GRACE_MS = 90_000;
 const RAW_COMPLETE_CALL_GRACE_MS = 60_000;
 const COMPLETE_SETUP_POLL_MS = 5_000;
@@ -171,6 +172,15 @@ export async function pollUntilCodexInstalled(
 		}
 		await sleep(intervalMs);
 	}
+
+	const finalState = await fetchSetupState();
+	if (
+		finalState.codex?.package === packageName &&
+		finalState.codex?.version === version
+	) {
+		return;
+	}
+
 	throw new Error(
 		`Codex installation timed out after ${Math.round(timeoutMs / 60_000)} minutes. Please refresh and check setup state.`
 	);
