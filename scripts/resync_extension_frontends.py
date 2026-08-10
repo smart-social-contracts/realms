@@ -55,7 +55,8 @@ def main() -> int:
         [{"type": Types.Text}],
     )
     listed = json.loads(_decode_text(listed_raw))
-    installed = listed.get("installed") or []
+    # list_runtime_extensions uses runtime_extensions; older payloads used installed.
+    installed = listed.get("runtime_extensions") or listed.get("installed") or []
     manifests = listed.get("all_manifests") or {}
     ext_ids = [args.ext] if args.ext else installed
 

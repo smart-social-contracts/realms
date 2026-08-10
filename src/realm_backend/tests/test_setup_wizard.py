@@ -379,6 +379,61 @@ def test_safe_log_swallows_logger_failures(monkeypatch):
     setup_core._safe_log("info", "realm_setup_completed notify to %s: %s", "registry", {"Ok": "ok"})
 
 
+def test_setup_configure_token_resolves_existing_symbol(monkeypatch):
+    setup_api = _import_setup_api()
+    tokens_mod = types.ModuleType("api.tokens")
+    tokens_mod.resolve_shared_token = lambda symbol, network: (
+        {
+            "ledger": "nusyl-jiaaa-aaaae-qj6mq-cai",
+            "indexer": "nusyl-jiaaa-aaaae-qj6mq-cai",
+            "decimals": 8,
+        }
+        if symbol == "REALMS" and network == "test"
+        else None
+    )
+    tokens_mod.register_treasury_token = MagicMock()
+    sys.modules["api.tokens"] = tokens_mod
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+    )
+    realm.network = "test"
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+
+    result = json.loads(setup_api.setup_configure_token(json.dumps({"existing": "REALMS"})))
+
+    assert result["success"] is True
+    assert result["token"]["token_canister_id"] == "nusyl-jiaaa-aaaae-qj6mq-cai"
+    assert result["token"]["existing"] == "REALMS"
+    assert realm.token_canister_id == "nusyl-jiaaa-aaaae-qj6mq-cai"
+    tokens_mod.register_treasury_token.assert_called_once()
+
+
+def test_setup_configure_token_unknown_symbol_returns_helpful_error(monkeypatch):
+    setup_api = _import_setup_api()
+    tokens_mod = types.ModuleType("api.tokens")
+    tokens_mod.resolve_shared_token = lambda _symbol, _network: None
+    sys.modules["api.tokens"] = tokens_mod
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+    )
+    realm.network = "test"
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+
+    result = json.loads(
+        setup_api.setup_configure_token(json.dumps({"existing": "NOTATOKEN"}))
+    )
+
+    assert result["success"] is False
+    assert "NOTATOKEN" in result["error"]
+    assert "test" in result["error"]
+
+
 def test_runtime_flags_default_stage_is_setup(monkeypatch):
     from core import runtime_flags
 

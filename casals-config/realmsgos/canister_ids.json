@@ -1,0 +1,17 @@
+{
+  "casals_backend": {
+    "test": "qugvi-7yaaa-aaaap-quwnq-cai",
+    "demo": "uvvmt-xaaaa-aaaae-agzta-cai",
+    "staging": "bjzut-ryaaa-aaaaj-a6uta-cai"
+  },
+  "casals_frontend": {
+    "test": "qtht4-saaaa-aaaap-quwna-cai",
+    "demo": "usukh-2yaaa-aaaae-agztq-cai",
+    "staging": "boysh-4aaaa-aaaaj-a6utq-cai"
+  },
+  "multisig": {
+    "test": "qbbef-6qaaa-aaaap-quwoa-cai",
+    "demo": "v72oj-vqaaa-aaaae-agzua-cai",
+    "staging": "adwwj-tiaaa-aaaaj-a6uua-cai"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "network": "demo",
+  "casals_backend": "uvvmt-xaaaa-aaaae-agzta-cai",
+  "casals_frontend": "usukh-2yaaa-aaaae-agztq-cai",
+  "multisig": "v72oj-vqaaa-aaaae-agzua-cai",
+  "token_backend": "xbkkh-syaaa-aaaah-qq3ya-cai",
+  "token_frontend": "xglmt-7aaaa-aaaah-qq3yq-cai",
+  "nft_backend": "6hrip-iiaaa-aaaaf-qdoha-cai",
+  "nft_frontend": "6aqo3-fqaaa-aaaaf-qdohq-cai",
+  "marketplace_backend": "ehyfg-wyaaa-aaaae-qg3qq-cai",
+  "marketplace_frontend": "ulsvn-pyaaa-aaaae-qj4tq-cai",
+  "file_registry": "vi64l-3aaaa-aaaae-qj4va-cai",
+  "file_registry_frontend": "7ja5c-dqaaa-aaaae-qj5oa-cai",
+  "tokens": {
+    "REALMS": {
+      "ledger": "xbkkh-syaaa-aaaah-qq3ya-cai",
+      "symbol": "REALMS"
+    }
+  }
+}

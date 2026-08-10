@@ -1,0 +1,20 @@
+{
+  "network": "test",
+  "casals_backend": "qugvi-7yaaa-aaaap-quwnq-cai",
+  "casals_frontend": "qtht4-saaaa-aaaap-quwna-cai",
+  "multisig": "qbbef-6qaaa-aaaap-quwoa-cai",
+  "token_backend": "nusyl-jiaaa-aaaae-qj6mq-cai",
+  "token_frontend": "33mmr-pyaaa-aaaam-ai47q-cai",
+  "nft_backend": "eelas-yyaaa-aaaao-qps7a-cai",
+  "nft_frontend": "ysrkl-eqaaa-aaaas-qgosa-cai",
+  "marketplace_backend": "2wldc-niaaa-aaaad-qlxga-cai",
+  "marketplace_frontend": "mxyd5-3qaaa-aaaao-ba2xq-cai",
+  "file_registry": "uq2mu-kaaaa-aaaah-avqcq-cai",
+  "file_registry_frontend": "2no7h-xqaaa-aaaad-qlxeq-cai",
+  "tokens": {
+    "REALMS": {
+      "ledger": "nusyl-jiaaa-aaaae-qj6mq-cai",
+      "symbol": "REALMS"
+    }
+  }
+}

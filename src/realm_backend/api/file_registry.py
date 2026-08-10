@@ -201,13 +201,7 @@ def _unwrap_call_result(result) -> str:
     if isinstance(result, str):
         return result
     if isinstance(result, dict):
-        ok = result.get("Ok", result.get("ok"))
-        if ok is not None:
-            return ok
-        err = result.get("Err", result.get("err"))
-        if err is not None:
-            raise RuntimeError(f"inter-canister call rejected: {err}")
-        return str(result)
+        return result.get("Ok", result.get("ok", str(result)))
     if hasattr(result, "Ok"):
         return result.Ok
     return str(result)
@@ -1096,7 +1090,6 @@ def _copy_frontend_to_asset_canister(
         f"from registry {registry_canister_id} to frontend {frontend_canister_id}"
     )
 
-    pulled_from_registry = files is None
     if files is None:
         registry = FileRegistryService(Principal.from_str(registry_canister_id))
         files, resolved_version, err = yield from _pull_extension_frontend_files(
@@ -1108,14 +1101,6 @@ def _copy_frontend_to_asset_canister(
         version = resolved_version or version
 
     if not files:
-        if pulled_from_registry:
-            namespace, _, ns_err = yield from _resolve_registry_namespace(
-                registry, "ext", ext_id, version or ""
-            )
-            if ns_err:
-                err_obj = json.loads(ns_err)
-                return err_obj.get("error", ns_err)
-            return f"no frontend files found in registry namespace {namespace}"
         return None
 
     resolved_version = version
