@@ -17,6 +17,7 @@
 		canNavigateToWizardStep,
 		getCodexStepPrimaryLabel,
 		getPreviousWizardStep,
+		getWelcomeAdvanceStep,
 		isCodexPrimaryActionDisabled,
 		reconcileCodexVersion,
 		resolveSelectedCodexVersion,
@@ -28,13 +29,19 @@
 	import { realmName } from '$lib/stores/realmInfo';
 
 	const steps: { id: WizardStep; label: string; skippable: boolean }[] = [
+		{ id: 'welcome', label: 'Welcome', skippable: false },
 		{ id: 'codex', label: 'Codex', skippable: false },
 		{ id: 'token', label: 'Token', skippable: true },
 		{ id: 'branding', label: 'Branding', skippable: true },
 		{ id: 'review', label: 'Launch', skippable: false }
 	];
 
-	let currentStep = $state<WizardStep>('codex');
+	const primaryButtonClass =
+		'bg-gray-900 text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900';
+	const secondaryButtonClass =
+		'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700';
+
+	let currentStep = $state<WizardStep>('welcome');
 	let loading = $state(true);
 	let busy = $state(false);
 	let error = $state('');
@@ -131,6 +138,11 @@
 
 	function advanceToTokenStep() {
 		currentStep = 'token';
+		error = '';
+	}
+
+	function handleWelcomeContinue() {
+		currentStep = getWelcomeAdvanceStep();
 		error = '';
 	}
 
@@ -354,7 +366,21 @@
 			{/if}
 
 			{#key currentStep}
-			{#if currentStep === 'codex'}
+			{#if currentStep === 'welcome'}
+				<section class="setup-wizard__panel setup-wizard__panel--welcome">
+					<h2 class="setup-wizard__welcome-title">
+						Welcome to {$realmName || 'your realm'}
+					</h2>
+					<P class="setup-wizard__welcome-lead">
+						A few steps to choose governance, token, and branding — then launch.
+					</P>
+					<div class="setup-wizard__actions setup-wizard__actions--welcome">
+						<Button color="none" class={primaryButtonClass} onclick={handleWelcomeContinue}>
+							Continue
+						</Button>
+					</div>
+				</section>
+			{:else if currentStep === 'codex'}
 				<section class="setup-wizard__panel">
 					<Heading tag="h2" class="text-xl font-semibold">Choose a codex</Heading>
 					<P class="text-gray-600">Pick the governance package that defines how this realm runs.</P>
@@ -397,14 +423,24 @@
 					{/if}
 
 					{#if resolvedCodexVersion}
-						<P class="text-sm text-green-700">Installed codex version: {resolvedCodexVersion}</P>
+						<P class="text-sm text-gray-600">Installed codex version: {resolvedCodexVersion}</P>
 					{/if}
 
 					<div class="setup-wizard__actions">
 						{#if codexInstallProgress}
 							<P class="text-sm text-gray-600">{codexInstallProgress}</P>
 						{/if}
-						<Button color="blue" disabled={codexPrimaryDisabled} onclick={handleCodexInstall}>
+						{#if previousStep}
+							<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
+								Back
+							</Button>
+						{/if}
+						<Button
+							color="none"
+							class={primaryButtonClass}
+							disabled={codexPrimaryDisabled}
+							onclick={handleCodexInstall}
+						>
 							{codexPrimaryLabel}
 						</Button>
 					</div>
@@ -419,10 +455,14 @@
 					</div>
 					<div class="setup-wizard__actions">
 						{#if previousStep}
-							<Button color="light" disabled={busy} onclick={goBack}>Back</Button>
+							<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
+								Back
+							</Button>
 						{/if}
-						<Button color="light" disabled={busy} onclick={skipStep}>Skip</Button>
-						<Button color="blue" disabled={busy} onclick={handleTokenSave}>
+						<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={skipStep}>
+							Skip
+						</Button>
+						<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleTokenSave}>
 							{busy ? 'Saving…' : 'Continue'}
 						</Button>
 					</div>
@@ -448,10 +488,19 @@
 
 						<div class="setup-wizard__actions">
 							{#if previousStep}
-								<Button color="light" disabled={busy} onclick={goBack}>Back</Button>
+								<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
+									Back
+								</Button>
 							{/if}
-							<Button color="light" disabled={busy} onclick={skipStep}>Skip</Button>
-							<Button color="blue" disabled={busy} onclick={handleBrandingSave}>
+							<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={skipStep}>
+								Skip
+							</Button>
+							<Button
+								color="none"
+								class={primaryButtonClass}
+								disabled={busy}
+								onclick={handleBrandingSave}
+							>
 								{busy ? 'Saving…' : 'Continue'}
 							</Button>
 						</div>
@@ -503,9 +552,16 @@
 
 					<div class="setup-wizard__actions">
 						{#if previousStep}
-							<Button color="light" disabled={busy} onclick={goBack}>Back</Button>
+							<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
+								Back
+							</Button>
 						{/if}
-						<Button color="blue" disabled={busy || !setupState?.codex} onclick={handleLaunch}>
+						<Button
+							color="none"
+							class={primaryButtonClass}
+							disabled={busy || !setupState?.codex}
+							onclick={handleLaunch}
+						>
 							{busy ? 'Launching…' : 'Launch realm'}
 						</Button>
 					</div>
@@ -577,15 +633,15 @@
 	}
 
 	.setup-wizard__step--active {
-		border-color: #3b82f6;
-		background: #eff6ff;
-		color: #1d4ed8;
+		border-color: #475569;
+		background: #f1f5f9;
+		color: #0f172a;
 	}
 
 	.setup-wizard__step--done {
-		border-color: #86efac;
-		background: #f0fdf4;
-		color: #166534;
+		border-color: #cbd5e1;
+		background: #f8fafc;
+		color: #334155;
 	}
 
 	.setup-wizard__step-index {
@@ -633,8 +689,56 @@
 	}
 
 	.setup-wizard__codex-card--selected {
-		border-color: #3b82f6;
-		background: #eff6ff;
+		border-color: #475569;
+		background: #f8fafc;
+	}
+
+	.setup-wizard__panel--welcome {
+		align-items: flex-start;
+		padding: 0.5rem 0 1rem;
+		max-width: 36rem;
+	}
+
+	.setup-wizard__welcome-title {
+		font-size: clamp(1.75rem, 4vw, 2.25rem);
+		font-weight: 600;
+		line-height: 1.2;
+		color: #0f172a;
+		margin: 0;
+		animation: setup-welcome-fade-in 0.6s ease-out both;
+	}
+
+	.setup-wizard__welcome-lead {
+		color: #64748b;
+		font-size: 1.0625rem;
+		line-height: 1.6;
+		margin: 0;
+		animation: setup-welcome-fade-in 0.6s ease-out 0.12s both;
+	}
+
+	.setup-wizard__actions--welcome {
+		margin-top: 1.5rem;
+		animation: setup-welcome-rise 0.55s ease-out 0.22s both;
+	}
+
+	@keyframes setup-welcome-fade-in {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	@keyframes setup-welcome-rise {
+		from {
+			opacity: 0;
+			transform: translateY(0.5rem);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.setup-wizard__field {

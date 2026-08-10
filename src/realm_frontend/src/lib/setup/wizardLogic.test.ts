@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
 	canAdvanceFromCodexStep,
+	canAdvanceFromWelcomeStep,
 	canNavigateToWizardStep,
 	getCodexStepPrimaryLabel,
+	getNextWizardStep,
 	getPreviousWizardStep,
+	getWelcomeAdvanceStep,
 	isCodexInstalled,
 	isCodexPrimaryActionDisabled,
 	reconcileCodexVersion,
@@ -79,9 +82,36 @@ describe('wizardLogic', () => {
 		});
 	});
 
+	describe('welcome step', () => {
+		it('always allows advancing to codex without backend state', () => {
+			expect(canAdvanceFromWelcomeStep()).toBe(true);
+			expect(getWelcomeAdvanceStep()).toBe('codex');
+		});
+
+		it('places welcome first in the step order', () => {
+			expect(getPreviousWizardStep('welcome')).toBeNull();
+			expect(getPreviousWizardStep('codex')).toBe('welcome');
+			expect(getNextWizardStep('welcome')).toBe('codex');
+			expect(getNextWizardStep('review')).toBeNull();
+		});
+
+		it('allows navigation from welcome to codex without an installed codex', () => {
+			expect(canNavigateToWizardStep('welcome', 'codex', freshState)).toEqual({ allowed: true });
+		});
+
+		it('blocks skipping ahead from welcome past codex', () => {
+			expect(canNavigateToWizardStep('welcome', 'token', freshState)).toEqual({
+				allowed: false,
+				showError: false,
+				errorMessage: 'Install a codex before continuing to later steps'
+			});
+		});
+	});
+
 	describe('back navigation', () => {
-		it('returns the previous step for steps 2-4', () => {
-			expect(getPreviousWizardStep('codex')).toBeNull();
+		it('returns the previous step for steps 2-5', () => {
+			expect(getPreviousWizardStep('welcome')).toBeNull();
+			expect(getPreviousWizardStep('codex')).toBe('welcome');
 			expect(getPreviousWizardStep('token')).toBe('codex');
 			expect(getPreviousWizardStep('branding')).toBe('token');
 			expect(getPreviousWizardStep('review')).toBe('branding');

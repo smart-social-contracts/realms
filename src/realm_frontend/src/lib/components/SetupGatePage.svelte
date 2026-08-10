@@ -20,6 +20,17 @@
 			? 'Check back soon. If you are the creator, sign in to continue setup.'
 			: 'The creator is finishing initial configuration. Please check back later.'
 	);
+
+	const LOGO_SVG = '/images/logo_sphere_only.svg';
+	const LOGO_PNG = '/images/logo.png';
+
+	let logoSrc = $state(LOGO_SVG);
+
+	function onLogoError() {
+		if (logoSrc !== LOGO_PNG) {
+			logoSrc = LOGO_PNG;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -28,11 +39,17 @@
 
 <main class="setup-gate">
 	<div class="setup-gate__card">
-		<img src="/images/logo_sphere_only.svg" alt="" class="setup-gate__logo" />
+		<img src={logoSrc} alt="" class="setup-gate__logo" onerror={onLogoError} />
 		<h1>{title}</h1>
 		<P class="setup-gate__text">{description}</P>
 		{#if variant === 'anonymous'}
-			<Button href="/join" color="blue" class="setup-gate__button">Log in</Button>
+			<Button
+				href="/join"
+				color="none"
+				class="setup-gate__button bg-gray-900 text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900"
+			>
+				Log in
+			</Button>
 		{/if}
 	</div>
 </main>
@@ -44,7 +61,7 @@
 		min-height: 100dvh;
 		align-items: center;
 		justify-content: center;
-		background: linear-gradient(160deg, #f8fafc 0%, #e2e8f0 100%);
+		background: #f8fafc;
 		padding: 1.5rem;
 	}
 
@@ -56,14 +73,14 @@
 		border-radius: 1rem;
 		padding: 2rem;
 		text-align: center;
-		box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+		box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 	}
 
 	.setup-gate__logo {
 		width: 3.5rem;
 		height: 3.5rem;
 		margin: 0 auto 1rem;
-		opacity: 0.85;
+		opacity: 0.9;
 	}
 
 	h1 {

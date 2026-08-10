@@ -1,8 +1,8 @@
 import type { SetupState } from './types';
 
-export type WizardStep = 'codex' | 'token' | 'branding' | 'review';
+export type WizardStep = 'welcome' | 'codex' | 'token' | 'branding' | 'review';
 
-export const WIZARD_STEPS: WizardStep[] = ['codex', 'token', 'branding', 'review'];
+export const WIZARD_STEPS: WizardStep[] = ['welcome', 'codex', 'token', 'branding', 'review'];
 
 const CODEX_ADVANCE_ERROR = 'Install a codex before continuing to later steps';
 
@@ -57,6 +57,21 @@ export function getPreviousWizardStep(current: WizardStep): WizardStep | null {
 	return WIZARD_STEPS[index - 1] ?? null;
 }
 
+export function getNextWizardStep(current: WizardStep): WizardStep | null {
+	const index = WIZARD_STEPS.indexOf(current);
+	if (index < 0 || index >= WIZARD_STEPS.length - 1) return null;
+	return WIZARD_STEPS[index + 1] ?? null;
+}
+
+/** Welcome always advances to codex without a backend call. */
+export function getWelcomeAdvanceStep(): WizardStep {
+	return 'codex';
+}
+
+export function canAdvanceFromWelcomeStep(): boolean {
+	return true;
+}
+
 export function getCodexStepPrimaryLabel(
 	setupState: SetupState | null | undefined,
 	busy: boolean
@@ -102,6 +117,10 @@ export function canNavigateToWizardStep(
 	}
 
 	if (toIndex <= fromIndex) {
+		return { allowed: true };
+	}
+
+	if (from === 'welcome' && to === 'codex') {
 		return { allowed: true };
 	}
 
