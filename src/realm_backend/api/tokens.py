@@ -340,6 +340,16 @@ def resolve_shared_token_by_ledger(ledger_canister_id: str, network: str = "") -
     ledger = (ledger_canister_id or "").strip()
     if not ledger:
         return None
+
+    try:
+        from api.env_services import resolve_shared_token_by_ledger as _env_by_ledger
+
+        found = _env_by_ledger(ledger, network)
+        if found:
+            return found
+    except Exception as e:
+        logger.debug(f"env_services ledger lookup failed: {e}")
+
     net = (network or "").strip().lower()
     networks = [net] if net else list(_SHARED_TOKEN_LEDGERS.keys())
     for net_key in networks:
@@ -357,6 +367,18 @@ def resolve_shared_token(symbol: str, network: str) -> Optional[dict]:
     sym = (symbol or "").strip()
     if not sym:
         return None
+
+    try:
+        from api.env_services import resolve_shared_token as _env_resolve
+
+        found = _env_resolve(sym, network)
+        if found:
+            return found
+    except Exception as e:
+        logger.debug(f"env_services token resolve failed: {e}")
+
+    # Legacy fallback for tokens/networks not yet in env-services snapshots
+    # (e.g. ckBTC, ckUSDC, ic/production).
     net_map = _SHARED_TOKEN_LEDGERS.get((network or "").strip().lower(), {})
     if sym in net_map:
         return dict(net_map[sym])

@@ -188,24 +188,51 @@ def setup_configure_token(args_json: str) -> str:
     except json.JSONDecodeError:
         return json.dumps({"success": False, "error": "Invalid JSON"})
 
-    token_canister_id = (params.get("token_canister_id") or "").strip()
-    if not token_canister_id:
-        return json.dumps({"success": False, "error": "token_canister_id is required"})
-
-    # TODO(setup-wizard): support provisioning a new token canister from the wizard.
-    token_record = {
-        "token_canister_id": token_canister_id,
-        "symbol": (params.get("symbol") or "").strip(),
-        "decimals": params.get("decimals"),
-        "indexer_canister_id": (params.get("indexer_canister_id") or "").strip(),
-        "token_type": (params.get("token_type") or "realm").strip() or "realm",
-    }
-
     from ggg import Realm
 
     realm = Realm.load("1")
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
+
+    symbol = (
+        (params.get("symbol") or params.get("existing") or "").strip()
+    )
+    token_canister_id = (params.get("token_canister_id") or "").strip()
+    indexer_canister_id = (params.get("indexer_canister_id") or "").strip()
+    decimals = params.get("decimals")
+
+    if not token_canister_id and symbol:
+        from api.tokens import resolve_shared_token
+
+        network = (getattr(realm, "network", "") or "").strip()
+        shared = resolve_shared_token(symbol, network)
+        if shared:
+            token_canister_id = (shared.get("ledger") or "").strip()
+            if not indexer_canister_id:
+                indexer_canister_id = (shared.get("indexer") or "").strip()
+            if decimals is None:
+                decimals = shared.get("decimals")
+
+    if not token_canister_id:
+        if symbol:
+            network = (getattr(realm, "network", "") or "").strip() or "unknown"
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": f"Unknown token symbol '{symbol}' for network '{network}'",
+                }
+            )
+        return json.dumps({"success": False, "error": "token_canister_id is required"})
+
+    # TODO(setup-wizard): support provisioning a new token canister from the wizard.
+    token_record = {
+        "token_canister_id": token_canister_id,
+        "symbol": symbol,
+        "existing": symbol,
+        "decimals": decimals,
+        "indexer_canister_id": indexer_canister_id,
+        "token_type": (params.get("token_type") or "realm").strip() or "realm",
+    }
 
     realm.token_canister_id = token_canister_id
     update_setup_config(realm, {"token": token_record})

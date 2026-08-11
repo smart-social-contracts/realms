@@ -1,0 +1,24 @@
+{
+  "$comment": "RealmsGOS shared-infra Casals sheet (realms#288 / Casals#11). Deploys only casals_backend (implicit), casals_frontend (implicit), and the multisig stand. Shared platform canisters (token, nft, marketplace, file_registry) are NOT in this sheet — register them after deploy via scripts/register_shared_infra.py once Casals is a controller of those canisters. NO realm stands, NO batons.",
+  "name": "realmsgos-shared-infra",
+  "description": "RealmsGOS shared infrastructure: Infra/multisig only. Reused Realms canisters are register_canister'd post-deploy.",
+  "sections": [
+    {
+      "name": "Infra",
+      "description": "Orchestration governance (multisig only). Shared services registered separately after sheet deploy.",
+      "stands": [
+        {
+          "name": "multisig",
+          "description": "Root multisig for Casals + shared-infra IC control (signers configured post-deploy).",
+          "canisters": [
+            {
+              "name": "multisig",
+              "wasm_key": "orchestration-multisig",
+              "kind": "backend"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
