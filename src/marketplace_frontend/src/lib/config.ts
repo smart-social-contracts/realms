@@ -6,9 +6,17 @@
 
 const env = (typeof process !== 'undefined' && (process as any).env) || ({} as Record<string, string | undefined>);
 
+// NOTE: in the browser bundle `process` is undefined, so `pick()` below only
+// works in SSR/build contexts. Vite replaces `import.meta.env` with a real
+// object literal containing all VITE_* vars from the build environment, so
+// browser-visible config must read from `_viteEnv` (direct property access
+// also works, but the object form keeps dynamic key helpers possible).
+const _viteEnv: Record<string, string | undefined> =
+  typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {};
+
 function pick(...keys: string[]): string {
   for (const k of keys) {
-    const v = env[k];
+    const v = _viteEnv[k] ?? env[k];
     if (v && String(v).trim() !== '') return String(v);
   }
   return '';
@@ -26,9 +34,9 @@ export const CONFIG = {
   // Marketplace + file_registry canister ids — primarily resolved via the
   // generated declarations module (declarations/marketplace_backend), but
   // exposed here for convenience (e.g. constructing file URLs).
-  marketplace_canister_id: pick('CANISTER_ID_MARKETPLACE_BACKEND'),
-  file_registry_canister_id: pick('CANISTER_ID_FILE_REGISTRY'),
-  internet_identity_canister_id: pick('CANISTER_ID_INTERNET_IDENTITY'),
+  marketplace_canister_id: pick('VITE_CANISTER_ID_MARKETPLACE_BACKEND', 'CANISTER_ID_MARKETPLACE_BACKEND'),
+  file_registry_canister_id: pick('VITE_CANISTER_ID_FILE_REGISTRY', 'CANISTER_ID_FILE_REGISTRY'),
+  internet_identity_canister_id: pick('VITE_CANISTER_ID_INTERNET_IDENTITY', 'CANISTER_ID_INTERNET_IDENTITY'),
 
   // Off-chain billing service that handles credit-card → Stripe → license payment.
   // Plan §4.3.1 names this BILLING_SERVICE_URL; we also accept the
@@ -45,9 +53,6 @@ export const CONFIG = {
 
 // --- TEST_MODE umbrella and sub-flags ---
 // Activation: URL param (?testmode=1), sessionStorage, or VITE_TEST_MODE env var.
-
-const _viteEnv: Record<string, string | undefined> =
-  typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {};
 
 function _readFlag(envKey: string, urlParam: string): boolean {
   if (_viteEnv[envKey] === 'true') return true;

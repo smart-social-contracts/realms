@@ -339,6 +339,10 @@ def _build_marketplace_frontend(
     build_env["DFX_NETWORK"] = network
     build_env["CANISTER_ID_MARKETPLACE_BACKEND"] = marketplace_backend_id
     build_env["CANISTER_ID_FILE_REGISTRY"] = file_registry_id
+    # VITE_-prefixed aliases: import.meta.env (the only env object that exists
+    # in the browser bundle) only exposes VITE_* vars.
+    build_env["VITE_CANISTER_ID_MARKETPLACE_BACKEND"] = marketplace_backend_id
+    build_env["VITE_CANISTER_ID_FILE_REGISTRY"] = file_registry_id
     build_env["VITE_ENV_NAME"] = env_config.get("name", "")
     build_env["VITE_PORTAL_URL"] = env_config.get("portal_url", "")
     build_env["VITE_REALMS_VERSION"] = env_config.get("realms_version", "main")
