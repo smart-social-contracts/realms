@@ -1,0 +1,14 @@
+{
+  "name": "test",
+  "network": "test",
+  "domain": "test.realmsgos.org",
+  "portal_url": "https://test.gos.earth",
+  "realms_version": "main",
+  "billing_service_principal": "",
+  "canisters": [
+    "file_registry",
+    "file_registry_frontend",
+    "marketplace_backend",
+    "marketplace_frontend"
+  ]
+}

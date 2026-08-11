@@ -15,6 +15,7 @@ from .commands.export_data import export_data_command
 from .commands.extension import extension_command, codex_command
 from .commands.wasm_registry import wasm_command
 from .commands.installer import installer_health_command
+from .commands.env import env_deploy_command, env_status_command
 from .commands.marketplace import (
     marketplace_call_command,
     marketplace_deploy_command,
@@ -1526,6 +1527,84 @@ def registry_call(
     except Exception as e:
         sys.stderr.write(f"Error: {e}\n")
         raise typer.Exit(1)
+
+
+# ============== Environment product-stack commands ==============
+
+env_app = typer.Typer(
+    name="env",
+    help="Deploy the Realms GOS product stack per environment (demo/staging/test).",
+)
+app.add_typer(env_app, name="env", rich_help_panel="Lifecycle")
+
+
+@env_app.command("deploy")
+def env_deploy(
+    env: str = typer.Option(
+        ...,
+        "--env",
+        "-e",
+        help="Environment name (demo, staging, test) — loads environments/<name>.json",
+    ),
+    mode: str = typer.Option(
+        "auto",
+        "--mode",
+        "-m",
+        help="Deploy mode: auto, install, upgrade, reinstall",
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity name or PEM file"
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip confirmations (stale-id recreate, reinstall)"
+    ),
+    skip_frontend_build: bool = typer.Option(
+        False,
+        "--skip-frontend-build",
+        help="Skip npm build for marketplace_frontend (deploy existing dist/)",
+    ),
+    with_domain: bool = typer.Option(
+        True,
+        "--domain/--no-domain",
+        help="Write .well-known/ic-domains before frontend build (default: on when domain set)",
+    ),
+) -> None:
+    """Deploy file_registry + marketplace stack for one environment.
+
+    Deploys the complete Realms GOS product surface to the IC environment
+  defined in ``environments/<env>.json``: file registry, registry admin UI,
+  marketplace backend, and marketplace frontend (landing + extension store).
+
+    \b
+    EXAMPLES:
+      realms env deploy --env demo --identity deployer
+      realms env deploy --env staging --mode upgrade --yes
+      realms env deploy --env test --skip-frontend-build
+    """
+    env_deploy_command(
+        env_name=env,
+        mode=mode,
+        identity=identity,
+        yes=yes,
+        skip_frontend_build=skip_frontend_build,
+        with_domain=with_domain,
+    )
+
+
+@env_app.command("status")
+def env_status(
+    env: str = typer.Option(
+        ...,
+        "--env",
+        "-e",
+        help="Environment name (demo, staging, test)",
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity (informational only)"
+    ),
+) -> None:
+    """Show canister IDs and dfx status for an environment product stack."""
+    env_status_command(env_name=env, identity=identity)
 
 
 # ============== Marketplace Commands ==============
