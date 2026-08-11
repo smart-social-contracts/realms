@@ -36,6 +36,11 @@ export const CONFIG = {
   // convention without needing the dfx-style CANISTER_ prefix.
   billing_service_url:
     pick('BILLING_SERVICE_URL', 'VITE_BILLING_SERVICE_URL') || 'https://billing.realmsgos.dev',
+
+  // Per-environment landing page metadata (set at build time for demo/staging/test).
+  env_name: pick('VITE_ENV_NAME'),
+  portal_url: pick('VITE_PORTAL_URL'),
+  realms_version: pick('VITE_REALMS_VERSION'),
 };
 
 // --- TEST_MODE umbrella and sub-flags ---

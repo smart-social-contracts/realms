@@ -39,6 +39,18 @@
     "all": "全部",
     "language": "语言"
   },
+  "landing": {
+    "product_name": "Realms GOS",
+    "pitch": "Decentralized governance realms on the Internet Computer.",
+    "feature_launch": "Launch a realm in minutes",
+    "feature_install": "Install codices & extensions",
+    "feature_community": "Community-owned on IC",
+    "cta_launch": "Launch a realm",
+    "cta_browse_extensions": "Browse extensions",
+    "cta_browse_codices": "Browse codices",
+    "badge_env": "{env} environment",
+    "badge_version": "Realms GOS {version}"
+  },
   "discover": {
     "title": "提升您的 realm 成员的体验。",
     "subtitle": "探索为 Realms 提供支持的扩展、法典和 AI 助手。",

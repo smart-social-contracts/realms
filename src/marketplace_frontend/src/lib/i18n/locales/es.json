@@ -39,6 +39,18 @@
     "all": "Todos",
     "language": "Idioma"
   },
+  "landing": {
+    "product_name": "Realms GOS",
+    "pitch": "Decentralized governance realms on the Internet Computer.",
+    "feature_launch": "Launch a realm in minutes",
+    "feature_install": "Install codices & extensions",
+    "feature_community": "Community-owned on IC",
+    "cta_launch": "Launch a realm",
+    "cta_browse_extensions": "Browse extensions",
+    "cta_browse_codices": "Browse codices",
+    "badge_env": "{env} environment",
+    "badge_version": "Realms GOS {version}"
+  },
   "discover": {
     "title": "Mejora la experiencia de los miembros de tu realm.",
     "subtitle": "Encuentra las extensiones, códices y asistentes de IA que impulsan los Realms.",
