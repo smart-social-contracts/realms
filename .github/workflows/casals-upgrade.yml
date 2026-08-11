@@ -266,6 +266,7 @@ jobs:
           casals_backend = cid("casals_backend")
           backend = cid("file_registry")
           frontend = cid("file_registry_frontend")
+          installer = cid("realm_installer")
           if not casals_backend:
               print(f"::warning::no casals_backend id for {env}; skipping settings sync")
               sys.exit(0)
@@ -276,6 +277,7 @@ jobs:
           payload = json.dumps({
               "file_registry_canister_id": backend,
               **({"file_registry_frontend_canister_id": frontend} if frontend else {}),
+              **({"delegated_destroy_principals": [installer]} if installer else {}),
           })
           escaped = payload.replace("\\", "\\\\").replace('"', '\\"')
           with tempfile.NamedTemporaryFile(mode="w", suffix=".candid", delete=False) as tmp:

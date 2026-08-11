@@ -15,10 +15,24 @@
               "name": "dominion-baton",
               "wasm_key": "orchestration-baton",
               "kind": "backend",
+              "wasm_type": "baton",
+              "teardown_priority": 40,
               "install_arg": { "top_commander": "$self" }
             },
-            { "name": "dominion-backend", "wasm_key": "realm-backend", "kind": "backend" },
-            { "name": "dominion-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
+            {
+              "name": "dominion-backend",
+              "wasm_key": "realm-backend",
+              "kind": "backend",
+              "wasm_type": "basilisk",
+              "teardown_priority": 30
+            },
+            {
+              "name": "dominion-frontend",
+              "wasm_key": "realm-assets",
+              "kind": "frontend",
+              "wasm_type": "assets",
+              "teardown_priority": 20
+            }
           ]
         },
         {
@@ -29,10 +43,24 @@
               "name": "agora-baton",
               "wasm_key": "orchestration-baton",
               "kind": "backend",
+              "wasm_type": "baton",
+              "teardown_priority": 40,
               "install_arg": { "top_commander": "$self" }
             },
-            { "name": "agora-backend", "wasm_key": "realm-backend", "kind": "backend" },
-            { "name": "agora-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
+            {
+              "name": "agora-backend",
+              "wasm_key": "realm-backend",
+              "kind": "backend",
+              "wasm_type": "basilisk",
+              "teardown_priority": 30
+            },
+            {
+              "name": "agora-frontend",
+              "wasm_key": "realm-assets",
+              "kind": "frontend",
+              "wasm_type": "assets",
+              "teardown_priority": 20
+            }
           ]
         },
         {
@@ -43,10 +71,24 @@
               "name": "syntropia-baton",
               "wasm_key": "orchestration-baton",
               "kind": "backend",
+              "wasm_type": "baton",
+              "teardown_priority": 40,
               "install_arg": { "top_commander": "$self" }
             },
-            { "name": "syntropia-backend", "wasm_key": "realm-backend", "kind": "backend" },
-            { "name": "syntropia-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
+            {
+              "name": "syntropia-backend",
+              "wasm_key": "realm-backend",
+              "kind": "backend",
+              "wasm_type": "basilisk",
+              "teardown_priority": 30
+            },
+            {
+              "name": "syntropia-frontend",
+              "wasm_key": "realm-assets",
+              "kind": "frontend",
+              "wasm_type": "assets",
+              "teardown_priority": 20
+            }
           ]
         }
       ]
@@ -59,7 +101,13 @@
           "name": "governance",
           "description": "Orchestration governance: the multisig canister (signers + threshold configured post-deploy via its configure method).",
           "canisters": [
-            { "name": "multisig", "wasm_key": "orchestration-multisig", "kind": "backend" }
+            {
+              "name": "multisig",
+              "wasm_key": "orchestration-multisig",
+              "kind": "backend",
+              "wasm_type": "multisig",
+              "teardown_priority": 30
+            }
           ]
         },
         {
@@ -70,6 +118,8 @@
               "name": "infra-baton",
               "wasm_key": "orchestration-baton",
               "kind": "backend",
+              "wasm_type": "baton",
+              "teardown_priority": 40,
               "install_arg": { "top_commander": "$self" }
             }
           ]
@@ -78,15 +128,33 @@
           "name": "installer",
           "description": "Installer backend.",
           "canisters": [
-            { "name": "installer-backend", "wasm_key": "installer-backend", "kind": "backend" }
+            {
+              "name": "installer-backend",
+              "wasm_key": "installer-backend",
+              "kind": "backend",
+              "wasm_type": "basilisk",
+              "teardown_priority": 30
+            }
           ]
         },
         {
           "name": "realm-registry",
           "description": "Realm registry backend + its certified-assets frontend.",
           "canisters": [
-            { "name": "registry-backend", "wasm_key": "registry-backend", "kind": "backend" },
-            { "name": "registry-frontend", "wasm_key": "registry-assets", "kind": "frontend" }
+            {
+              "name": "registry-backend",
+              "wasm_key": "registry-backend",
+              "kind": "backend",
+              "wasm_type": "basilisk",
+              "teardown_priority": 30
+            },
+            {
+              "name": "registry-frontend",
+              "wasm_key": "registry-assets",
+              "kind": "frontend",
+              "wasm_type": "assets",
+              "teardown_priority": 20
+            }
           ]
         }
       ]

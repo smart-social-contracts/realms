@@ -196,6 +196,14 @@ def build_steps(
                     "version": None,
                 },
             })
+        steps.append({
+            "target": be,
+            "method": "resync_extension_frontends",
+            "args": {
+                "registry_canister_id": file_registry,
+                "frontend_canister_id": r["frontend"],
+            },
+        })
     return steps
 
 
@@ -262,7 +270,8 @@ def main() -> None:
                 f"(canister ids + parameters.test_flags) and examples/demo manifests. "
                 f"Per realm: set_canister_config_json → update_realm_config → "
                 f"register_realm_from_registry → install_branding_from_registry → "
-                f"install_codex_from_registry → install_extension_from_registry (each ext). "
+                f"install_codex_from_registry → install_extension_from_registry (each ext) → "
+                f"resync_extension_frontends. "
                 f"Apply in batches via Casals apply_arrangement. "
                 f"Regenerate: python3 casals-config/_gen_arrangements.py."
             ),

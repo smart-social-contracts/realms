@@ -1,5 +1,5 @@
 {
-  "$comment": "Full-fidelity demo-environment arrangement for the realms mundus. Generated from deployment-descriptors/demo-mundus-layered.yml (canister ids + parameters.test_flags) and examples/demo manifests. Per realm: set_canister_config_json \u2192 update_realm_config \u2192 register_realm_from_registry \u2192 install_branding_from_registry \u2192 install_codex_from_registry \u2192 install_extension_from_registry (each ext). Apply in batches via Casals apply_arrangement. Regenerate: python3 casals-config/_gen_arrangements.py.",
+  "$comment": "Full-fidelity demo-environment arrangement for the realms mundus. Generated from deployment-descriptors/demo-mundus-layered.yml (canister ids + parameters.test_flags) and examples/demo manifests. Per realm: set_canister_config_json \u2192 update_realm_config \u2192 register_realm_from_registry \u2192 install_branding_from_registry \u2192 install_codex_from_registry \u2192 install_extension_from_registry (each ext) \u2192 resync_extension_frontends. Apply in batches via Casals apply_arrangement. Regenerate: python3 casals-config/_gen_arrangements.py.",
   "name": "demo",
   "description": "Realms demo environment: runtime flags (demo_data=True, ii_bypass=False, skip_passport_zkproof=False, skip_terms=False, test_mode=True, user_self_registration=True) + identity + codex + full extensions.",
   "active": true,
@@ -323,6 +323,14 @@
       }
     },
     {
+      "target": "h5vpp-qyaaa-aaaac-qai3a-cai",
+      "method": "resync_extension_frontends",
+      "args": {
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
+        "frontend_canister_id": "gzya5-jyaaa-aaaac-qai5a-cai"
+      }
+    },
+    {
       "target": "3bohd-2yaaa-aaaac-qcyla-cai",
       "method": "set_canister_config_json",
       "args": {
@@ -637,6 +645,14 @@
       }
     },
     {
+      "target": "3bohd-2yaaa-aaaac-qcyla-cai",
+      "method": "resync_extension_frontends",
+      "args": {
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
+        "frontend_canister_id": "3gpbx-xaaaa-aaaac-qcylq-cai"
+      }
+    },
+    {
       "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
       "method": "set_canister_config_json",
       "args": {
@@ -930,6 +946,14 @@
         "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
         "ext_id": "mundus_explorer",
         "version": null
+      }
+    },
+    {
+      "target": "2lbfz-yiaaa-aaaac-qcyma-cai",
+      "method": "resync_extension_frontends",
+      "args": {
+        "registry_canister_id": "vi64l-3aaaa-aaaae-qj4va-cai",
+        "frontend_canister_id": "2madn-vqaaa-aaaac-qcymq-cai"
       }
     }
   ]

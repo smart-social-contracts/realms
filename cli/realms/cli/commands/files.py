@@ -330,6 +330,21 @@ def _sha256_file(path: str) -> str:
     return h.hexdigest()
 
 
+_REALM_CANISTER_IDS_TEMPLATE = (
+    '{"realm_backend":"$BACKEND","internet_identity":"$INTERNET_IDENTITY",'
+    '"file_registry":"$FILE_REGISTRY"}'
+)
+
+
+def _wasm_type_for_publish(family: str, kind: str) -> str:
+    """Explicit wasm_type for Casals add_authorized_wasm (issue #293)."""
+    if kind == "frontend":
+        return "assets"
+    if kind == "backend":
+        return "basilisk"
+    return ""
+
+
 def _casals_add_authorized_wasm(casals: str, params: dict, network: str, identity: Optional[str]) -> bool:
     """Call Casals add_authorized_wasm with a JSON arg. Returns success."""
     arg = json.dumps(params)
@@ -427,6 +442,7 @@ def files_publish_release_command(
                 "key": backend_key, "kind": "backend",
                 "registry_namespace": backend_ns, "registry_path": backend_path,
                 "wasm_hash": backend_hash,
+                "wasm_type": _wasm_type_for_publish(family, "backend"),
                 "description": f"{family} realm backend {version}",
             }, network, identity)
         if frontend_dist:
@@ -447,8 +463,13 @@ def files_publish_release_command(
                     "key": frontend_key, "kind": "frontend",
                     "registry_namespace": assets_ns, "registry_path": assets_path,
                     "wasm_hash": assets_hash,
+                    "wasm_type": _wasm_type_for_publish(family, "frontend"),
                     "bundle_namespace": frontend_ns,
                     "description": f"{family} realm frontend {version}",
+                    **(
+                        {"canister_ids_template": _REALM_CANISTER_IDS_TEMPLATE}
+                        if family == "realm" else {}
+                    ),
                 }, network, identity)
 
     # 4. Record the version in the realm catalog ----------------------------

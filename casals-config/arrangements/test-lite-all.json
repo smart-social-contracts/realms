@@ -190,6 +190,14 @@
       }
     },
     {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "resync_extension_frontends",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai"
+      }
+    },
+    {
       "target": "rnghe-haaaa-aaaak-qyxyq-cai",
       "method": "set_canister_config_json",
       "args": {
@@ -361,6 +369,14 @@
       }
     },
     {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "resync_extension_frontends",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "frontend_canister_id": "pqwsi-vyaaa-aaaau-agrbq-cai"
+      }
+    },
+    {
       "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
       "method": "set_canister_config_json",
       "args": {
@@ -529,6 +545,14 @@
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "hello_world",
         "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "resync_extension_frontends",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "frontend_canister_id": "2dmsp-maaaa-aaaad-qlxfq-cai"
       }
     }
   ]

@@ -341,7 +341,17 @@ def _build_plan(env: str, casals: str, targets: list[str], scope: str,
                 "stand": stand_name, "canister": can.get("name", ""),
                 "canister_id": can.get("canister_id", ""), "kind": kind,
                 "mode": mode, "wasm_key": None, "note": "",
+                "realm_backend_id": "",
             }
+            if kind == "frontend" and section_name == _DEPLOYMENTS_SECTION:
+                for peer in stand.get("canisters", []):
+                    pname = peer.get("name", "")
+                    if (
+                        peer.get("kind") == "backend"
+                        and pname.endswith("-backend")
+                    ):
+                        action["realm_backend_id"] = peer.get("canister_id", "")
+                        break
             if not pub_family:
                 action["note"] = f"no family mapping for stand '{stand_name}'"
             else:
@@ -383,6 +393,30 @@ def _print_plan(actions: list[dict]) -> None:
     console.print(table)
 
 
+def _resync_extension_frontends(action: dict, identity: Optional[str]) -> tuple[bool, str]:
+    """Re-copy extension bundles after a frontend reinstall/provision."""
+    backend_id = (action.get("realm_backend_id") or "").strip()
+    if action.get("section") != _DEPLOYMENTS_SECTION or not backend_id:
+        return True, "resync skipped"
+    file_registry = _FILE_REGISTRY_IDS.get(action["env"])
+    payload: dict[str, str] = {"frontend_canister_id": action["canister_id"]}
+    if file_registry:
+        payload["registry_canister_id"] = file_registry
+    candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+    try:
+        raw = _dfx_call(
+            backend_id, "resync_extension_frontends", candid,
+            _CASALS_NETWORK, identity, timeout=600,
+        )
+        result = json.loads(raw)
+    except Exception as e:  # noqa: BLE001
+        return False, f"resync_extension_frontends: {e}"
+    if result.get("success"):
+        synced = len(result.get("synced") or [])
+        return True, f"resynced {synced} extension bundle(s)"
+    return False, result.get("error") or str(result)
+
+
 def _upgrade_frontend(action: dict, identity: Optional[str]) -> tuple[bool, str]:
     casals, name = action["casals"], action["canister"]
     # 1. Install the new certified-assets WASM (repoints wasm_key/bundle namespace).
@@ -414,9 +448,15 @@ def _upgrade_frontend(action: dict, identity: Optional[str]) -> tuple[bool, str]
         if not bundle:
             break
         if bundle.get("done"):
-            return True, f"bundle {bundle.get('total', '?')} files"
+            ok, detail = _resync_extension_frontends(action, identity)
+            if not ok:
+                return False, detail
+            return True, f"bundle {bundle.get('total', '?')} files; {detail}"
         offset = bundle.get("next_offset", offset + _BUNDLE_BATCH)
-    return True, "uploaded"
+    ok, detail = _resync_extension_frontends(action, identity)
+    if not ok:
+        return False, detail
+    return True, f"uploaded; {detail}"
 
 
 def _upgrade_backend(action: dict, identity: Optional[str]) -> tuple[bool, str]:
