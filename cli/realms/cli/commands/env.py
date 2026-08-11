@@ -31,6 +31,7 @@ from .marketplace import (
     _dfx_call,
     _dfx_canister_id,
 )
+from ..basilisk_env import basilisk_python_executable, dfx_env_with_basilisk
 from ..utils import (
     console,
     display_canister_urls_json,
@@ -221,6 +222,7 @@ def _dfx_deploy(
     identity: Optional[str],
     *,
     extra_args: Optional[List[str]] = None,
+    env: Optional[Dict[str, str]] = None,
     logger=None,
 ) -> None:
     cmd = ["dfx", "deploy", canister, "--network", network, "--yes"]
@@ -230,7 +232,7 @@ def _dfx_deploy(
         cmd.extend(["--identity", identity])
     if extra_args:
         cmd.extend(extra_args)
-    rc = run_command(cmd, logger=logger)
+    rc = run_command(cmd, env=env, logger=logger)
     if rc.returncode != 0:
         console.print(f"[red]❌ {canister} deploy failed[/red]")
         if "not found" in (rc.stderr or "").lower() or "not found" in (rc.stdout or "").lower():
@@ -260,19 +262,30 @@ def _fetch_gos_frontend_artifacts(project_root: Path, *, logger) -> None:
         raise typer.Exit(1)
 
 
-def _ensure_marketplace_declarations(project_root: Path, *, logger) -> None:
+def _ensure_marketplace_declarations(
+    project_root: Path,
+    *,
+    dfx_env: Optional[Dict[str, str]] = None,
+    logger=None,
+) -> None:
     """Generate candid declarations needed by marketplace_frontend build."""
     did_path = project_root / "src" / MARKETPLACE_BACKEND / f"{MARKETPLACE_BACKEND}.did"
     if did_path.is_file():
-        run_command(["dfx", "generate", MARKETPLACE_BACKEND], cwd=str(project_root), logger=logger)
+        run_command(
+            ["dfx", "generate", MARKETPLACE_BACKEND],
+            cwd=str(project_root),
+            env=dfx_env,
+            logger=logger,
+        )
         return
-    env = os.environ.copy()
+    env = (dfx_env or os.environ).copy()
     env["CANISTER_CANDID_PATH"] = str(did_path)
     main_py = project_root / "src" / MARKETPLACE_BACKEND / "main.py"
     if main_py.is_file():
+        basilisk_py = basilisk_python_executable(project_root)
         run_command(
             [
-                sys.executable,
+                basilisk_py,
                 "-m",
                 "basilisk",
                 MARKETPLACE_BACKEND,
@@ -283,7 +296,12 @@ def _ensure_marketplace_declarations(project_root: Path, *, logger) -> None:
             logger=logger,
         )
     if did_path.is_file():
-        run_command(["dfx", "generate", MARKETPLACE_BACKEND], cwd=str(project_root), logger=logger)
+        run_command(
+            ["dfx", "generate", MARKETPLACE_BACKEND],
+            cwd=str(project_root),
+            env=dfx_env,
+            logger=logger,
+        )
 
 
 def _write_ic_domains(project_root: Path, domain: str) -> None:
@@ -302,7 +320,8 @@ def _build_marketplace_frontend(
     marketplace_backend_id: str,
     file_registry_id: str,
     skip_build: bool,
-    logger,
+    dfx_env: Optional[Dict[str, str]] = None,
+    logger=None,
 ) -> None:
     dist = project_root / "src" / MARKETPLACE_FRONTEND / "dist"
     if skip_build:
@@ -314,7 +333,7 @@ def _build_marketplace_frontend(
         console.print("[dim]Skipping marketplace_frontend npm build (--skip-frontend-build)[/dim]")
         return
 
-    _ensure_marketplace_declarations(project_root, logger=logger)
+    _ensure_marketplace_declarations(project_root, dfx_env=dfx_env, logger=logger)
 
     build_env = os.environ.copy()
     build_env["DFX_NETWORK"] = network
@@ -456,6 +475,8 @@ def env_deploy_command(
         logger.info(f"identity={identity}")
     logger.info("=" * 60)
 
+    dfx_env = dfx_env_with_basilisk(project_root)
+
     console.print(
         Panel.fit(
             f"🚀 Deploying Realms product stack\n"
@@ -488,11 +509,13 @@ def env_deploy_command(
 
     # b. file_registry + file_registry_frontend
     console.print(Panel.fit("📦 Deploying file_registry", style="bold blue"))
-    _dfx_deploy(FILE_REGISTRY, network, mode, identity, logger=logger)
+    _dfx_deploy(FILE_REGISTRY, network, mode, identity, env=dfx_env, logger=logger)
 
     console.print(Panel.fit("📦 Deploying file_registry_frontend", style="bold blue"))
     _fetch_gos_frontend_artifacts(project_root, logger=logger)
-    _dfx_deploy(FILE_REGISTRY_FRONTEND, network, mode, identity, logger=logger)
+    _dfx_deploy(
+        FILE_REGISTRY_FRONTEND, network, mode, identity, env=dfx_env, logger=logger
+    )
 
     fr_id = _dfx_canister_id(FILE_REGISTRY, network) or resolved[FILE_REGISTRY]
 
@@ -504,6 +527,7 @@ def env_deploy_command(
         mode,
         identity,
         extra_args=["--argument", "(null)"],
+        env=dfx_env,
         logger=logger,
     )
     _wire_marketplace_backend(network, fr_id, billing_principal)
@@ -521,11 +545,14 @@ def env_deploy_command(
         marketplace_backend_id=mb_id,
         file_registry_id=fr_id,
         skip_build=skip_frontend_build,
+        dfx_env=dfx_env,
         logger=logger,
     )
 
     console.print(Panel.fit("🖼️  Deploying marketplace_frontend", style="bold blue"))
-    _dfx_deploy(MARKETPLACE_FRONTEND, network, mode, identity, logger=logger)
+    _dfx_deploy(
+        MARKETPLACE_FRONTEND, network, mode, identity, env=dfx_env, logger=logger
+    )
 
     mf_id = _dfx_canister_id(MARKETPLACE_FRONTEND, network) or resolved[MARKETPLACE_FRONTEND]
 

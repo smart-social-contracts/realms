@@ -36,6 +36,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
+from ..basilisk_env import dfx_env_with_basilisk
 from ..utils import (
     console,
     display_canister_urls_json,
@@ -118,6 +119,8 @@ def marketplace_deploy_command(
         logger.info(f"identity={identity}")
     logger.info("=" * 60)
 
+    dfx_env = dfx_env_with_basilisk(project_root)
+
     if not (project_root / "src" / MARKETPLACE_BACKEND / "main.py").exists():
         console.print(f"[red]❌ marketplace_backend source not found at src/{MARKETPLACE_BACKEND}/main.py[/red]")
         raise typer.Exit(1)
@@ -138,7 +141,7 @@ def marketplace_deploy_command(
             deploy_args.extend(["--mode", mode])
         if identity:
             deploy_args.extend(["--identity", identity])
-        rc = run_command(deploy_args, cwd=str(project_root), logger=logger)
+        rc = run_command(deploy_args, cwd=str(project_root), env=dfx_env, logger=logger)
         if rc.returncode != 0:
             console.print("[red]❌ file_registry deploy failed[/red]")
             raise typer.Exit(rc.returncode)
@@ -167,7 +170,7 @@ def marketplace_deploy_command(
         deploy_args.extend(["--mode", mode])
     if identity:
         deploy_args.extend(["--identity", identity])
-    rc = run_command(deploy_args, cwd=str(project_root), logger=logger)
+    rc = run_command(deploy_args, cwd=str(project_root), env=dfx_env, logger=logger)
     if rc.returncode != 0:
         console.print("[red]❌ marketplace_backend deploy failed[/red]")
         raise typer.Exit(rc.returncode)
@@ -179,7 +182,7 @@ def marketplace_deploy_command(
         deploy_args.extend(["--mode", mode])
     if identity:
         deploy_args.extend(["--identity", identity])
-    rc = run_command(deploy_args, cwd=str(project_root), logger=logger)
+    rc = run_command(deploy_args, cwd=str(project_root), env=dfx_env, logger=logger)
     if rc.returncode != 0:
         console.print("[red]❌ marketplace_frontend deploy failed[/red]")
         raise typer.Exit(rc.returncode)
