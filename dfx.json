@@ -173,13 +173,6 @@
           "name": "candid:service"
         }
       ],
-      "remote": {
-        "id": {
-          "demo": "ehyfg-wyaaa-aaaae-qg3qq-cai",
-          "staging": "jji3o-uyaaa-aaaah-qreja-cai",
-          "test": "2wldc-niaaa-aaaad-qlxga-cai"
-        }
-      },
       "tech_stack": {
         "cdk": {
           "basilisk": {}
@@ -196,14 +189,7 @@
         "src/marketplace_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "marketplace_frontend",
-      "remote": {
-        "id": {
-          "demo": "ulsvn-pyaaa-aaaae-qj4tq-cai",
-          "staging": "joj52-zaaaa-aaaah-qrejq-cai",
-          "test": "mxyd5-3qaaa-aaaao-ba2xq-cai"
-        }
-      }
+      "workspace": "marketplace_frontend"
     },
     "platform_dashboard_frontend": {
       "source": [
