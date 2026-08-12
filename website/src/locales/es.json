@@ -3,8 +3,11 @@
     "forPeople": "Para Personas",
     "forInstitutions": "Para Instituciones",
     "howItWorks": "Cómo Funciona",
+    "marketplace": "Marketplace",
     "roadmap": "Hoja de Ruta",
-    "github": "GitHub"
+    "github": "GitHub",
+    "login": "Log in",
+    "logout": "Log out"
   },
   "hero": {
     "title": "El Sistema Operativo de Gobernanza",
@@ -178,5 +181,39 @@
     "builtOn": "Construido en",
     "withLove": "con ❤️ desde 🇨🇭",
     "openSource": "Código Abierto • Licencia MIT"
+  },
+  "marketplace": {
+    "title": "Marketplace",
+    "subtitle": "Extensions, codices, and AI assistants to enhance your realm",
+    "environment": "Showing catalog for {{env}}",
+    "search": "Search",
+    "searchPlaceholder": "Search extensions, codices, and assistants…",
+    "filterByCategory": "Filter by category",
+    "verifiedOnly": "Verified only",
+    "retry": "Retry",
+    "empty": "No items found",
+    "verified": "Verified",
+    "version": "Version",
+    "installs": "Installs",
+    "likes": "Likes",
+    "launchRealm": "Launch a realm on",
+    "fullExperience": "Full marketplace experience available in the realm portal",
+    "tabs": {
+      "extensions": "Extensions",
+      "codices": "Codices",
+      "assistants": "Assistants"
+    },
+    "categories": {
+      "all": "All",
+      "administration": "Administration",
+      "finances": "Finances",
+      "governance": "Governance",
+      "land_territory": "Land Territory",
+      "public_services": "Public Services",
+      "settings": "Settings",
+      "other": "Other"
+    },
+    "envBanner": "You are viewing the {{env}} environment",
+    "showing": "Showing {{count}} {{type}}"
   }
 }
