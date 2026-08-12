@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Button, P } from 'flowbite-svelte';
-	export let title = 'Something has gone seriously wrong';
+	export let title = 'Something went wrong';
 	export let description =
-		"It's always time for a coffee break. We should be back by the time you finish your coffee.";
+		"We're having trouble loading this page. Try refreshing, or wait a few seconds and try again.";
 	export let btnHref = '/';
 	export let btnTitle = 'Go back home';
 	/** When set, the primary button reloads the page instead of navigating. */
@@ -71,9 +71,9 @@
 @component
 [Go to docs](https://flowbite-svelte-admin-dashboard.vercel.app/)
 ## Props
-@prop export let title = 'Something has gone seriously wrong';
+@prop export let title = 'Something went wrong';
 @prop export let description =
-		"It's always time for a coffee break. We should be back by the time you finish your coffee.";
+		"We're having trouble loading this page. Try refreshing, or wait a few seconds and try again.";
 @prop export let btnHref = '/';
 @prop export let btnTitle = 'Go back home';
 @prop export let mainClass = 'bg-gray-50 dark:bg-gray-900';

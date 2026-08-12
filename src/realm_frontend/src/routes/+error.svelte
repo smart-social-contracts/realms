@@ -33,7 +33,7 @@
 {#if index === 500}
 	<ServerError
 		description={errMessage ||
-			"It's always time for a coffee break. We should be back by the time you finish your coffee."}
+			"We're having trouble loading this page. Try refreshing, or wait a few seconds and try again."}
 		btnTitle={errMessage ? 'Refresh page' : 'Go back home'}
 		reloadOnClick={!!errMessage}
 	/>
