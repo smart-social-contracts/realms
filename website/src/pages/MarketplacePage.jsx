@@ -58,6 +58,7 @@ function MarketplacePage() {
   const envKey = useMemo(() => resolveEnv(searchParams), [searchParams])
   const config = ENVIRONMENTS[envKey]
   const showEnvBanner = envKey !== 'production'
+  const isProductionComingSoon = envKey === 'production'
 
   const items = useMemo(() => {
     let data = []
@@ -88,6 +89,30 @@ function MarketplacePage() {
     { id: 'codices', label: t('marketplace.tabs.codices', 'Codices'), icon: BookOpen, count: builtinCodices.length },
     { id: 'assistants', label: t('marketplace.tabs.assistants', 'Assistants'), icon: Bot, count: builtinAssistants.length },
   ]
+
+  if (isProductionComingSoon) {
+    return (
+      <div className="min-h-screen">
+        <SiteNav active="marketplace" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-28">
+          <div className="text-center">
+            <h1 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-800">
+              {t('marketplace.title', 'Marketplace')}
+            </h1>
+            <p className="text-xl font-semibold text-primary-700 mb-4">
+              {t('marketplace.comingSoon', 'Coming soon')}
+            </p>
+            <p className="text-base text-slate-600 max-w-2xl mx-auto">
+              {t(
+                'marketplace.comingSoonDescription',
+                'Extensions, codices, and AI assistants for your realm will be available here soon.',
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen">

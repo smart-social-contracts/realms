@@ -21,9 +21,9 @@ export const ENVIRONMENTS = {
   },
   production: {
     name: 'Production',
-    marketplace: 'ehyfg-wyaaa-aaaae-qg3qq-cai',
-    fileRegistry: 'vi64l-3aaaa-aaaae-qj4va-cai',
-    portal: 'https://demo.gos.earth',
+    marketplace: null,
+    fileRegistry: null,
+    portal: null,
   },
 }
 
@@ -38,7 +38,7 @@ export const CATEGORY_KEYS = [
   'other',
 ]
 
-/** Detect deployment environment from hostname (or optional ?env=). Production falls back to demo for now. */
+/** Detect deployment environment from hostname (or optional ?env=). */
 export function detectEnvironment(searchParams) {
   const envParam =
     searchParams?.get?.('env') ||
@@ -54,8 +54,8 @@ export function detectEnvironment(searchParams) {
   if (hostname.startsWith('staging.')) return 'staging'
   if (hostname === 'localhost' || hostname === '127.0.0.1') return 'demo'
 
-  // realmsgos.org (production) — not ready yet; use demo catalog/portal wiring
-  return 'demo'
+  // realmsgos.org, www.realmsgos.org, and any other non-env hostname
+  return 'production'
 }
 
 export function getEnvironmentConfig() {
