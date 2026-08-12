@@ -176,6 +176,29 @@ def marketplace_deploy_command(
         raise typer.Exit(rc.returncode)
 
     # 3. marketplace_frontend (depends on backend declarations being generated).
+    # Build explicitly: dfx.json no longer declares the `workspace` key, so
+    # `dfx deploy` uploads dist/ as-is instead of rebuilding it (a deploy-time
+    # rebuild would drop the CANISTER_ID_* env baking).
+    console.print(Panel.fit("🔨 Building marketplace_frontend", style="bold blue"))
+    mb_id = _dfx_canister_id(MARKETPLACE_BACKEND, network) or ""
+    build_env = (dfx_env or os.environ.copy()).copy()
+    build_env["DFX_NETWORK"] = network
+    if mb_id:
+        build_env["CANISTER_ID_MARKETPLACE_BACKEND"] = mb_id
+        build_env["VITE_CANISTER_ID_MARKETPLACE_BACKEND"] = mb_id
+    if fr_id:
+        build_env["CANISTER_ID_FILE_REGISTRY"] = fr_id
+        build_env["VITE_CANISTER_ID_FILE_REGISTRY"] = fr_id
+    rc = run_command(
+        ["npm", "run", "build", "--workspace=marketplace_frontend"],
+        cwd=str(project_root),
+        env=build_env,
+        logger=logger,
+    )
+    if rc.returncode != 0:
+        console.print("[red]❌ marketplace_frontend build failed[/red]")
+        raise typer.Exit(rc.returncode)
+
     console.print(Panel.fit("🖼️  Deploying marketplace_frontend", style="bold blue"))
     deploy_args = ["dfx", "deploy", MARKETPLACE_FRONTEND, "--network", network, "--yes"]
     if mode != "auto":

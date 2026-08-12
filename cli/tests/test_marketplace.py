@@ -43,5 +43,17 @@ class TestMarketplaceDeployBasiliskEnv:
         marketplace_deploy_command(network="test", with_registry=False)
 
         mock_dfx_env.assert_called_once_with(tmp_path)
+        basilisk_path = f"{tmp_path}/.venv-basilisk/bin"
         for call in mock_run.call_args_list:
-            assert call.kwargs.get("env") == mock_dfx_env.return_value
+            env = call.kwargs.get("env")
+            assert env is not None
+            # dfx calls use the basilisk env verbatim; the npm frontend build
+            # extends it with CANISTER_ID_* baking vars. Both must be based on
+            # the basilisk venv PATH.
+            assert env.get("PATH", "").startswith(basilisk_path)
+        # The frontend build must bake canister IDs for the bundle.
+        npm_calls = [c for c in mock_run.call_args_list if "npm" in c.args[0]]
+        assert npm_calls, "expected an explicit npm build before frontend deploy"
+        build_env = npm_calls[0].kwargs["env"]
+        assert build_env["CANISTER_ID_MARKETPLACE_BACKEND"] == "aaaaa-aa"
+        assert build_env["VITE_CANISTER_ID_MARKETPLACE_BACKEND"] == "aaaaa-aa"
