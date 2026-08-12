@@ -189,6 +189,24 @@ def marketplace_deploy_command(
     if fr_id:
         build_env["CANISTER_ID_FILE_REGISTRY"] = fr_id
         build_env["VITE_CANISTER_ID_FILE_REGISTRY"] = fr_id
+    # Persist canister ids as a Vite env file so any production build bakes
+    # them — dfx's post-build `npm run build` at the repo root runs with dfx's
+    # own env and would otherwise overwrite dist/ with a config-less bundle.
+    env_file = project_root / "src" / MARKETPLACE_FRONTEND / ".env.production"
+    env_vars = {}
+    if env_file.is_file():
+        for line in env_file.read_text().splitlines():
+            if "=" in line and not line.strip().startswith("#"):
+                k, _, v = line.partition("=")
+                env_vars[k.strip()] = v.strip()
+    if mb_id:
+        env_vars["VITE_CANISTER_ID_MARKETPLACE_BACKEND"] = mb_id
+    if fr_id:
+        env_vars["VITE_CANISTER_ID_FILE_REGISTRY"] = fr_id
+    if env_vars and env_file.parent.is_dir():
+        env_file.write_text("\n".join(f"{k}={v}" for k, v in env_vars.items()) + "\n")
+        if logger:
+            logger.info(f"Wrote {env_file} ({len(env_vars)} vars)")
     rc = run_command(
         ["npm", "run", "build", "--workspace=marketplace_frontend"],
         cwd=str(project_root),

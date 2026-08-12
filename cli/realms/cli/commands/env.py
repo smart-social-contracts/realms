@@ -352,6 +352,33 @@ def _build_marketplace_frontend(
     if billing_url:
         build_env["VITE_BILLING_SERVICE_URL"] = billing_url
 
+    # Persist the build-time config as a Vite env file so that ANY production
+    # build bakes the right values — including dfx's post-build `npm run build`
+    # at the repo root, which runs with dfx's own env (no VITE_* vars) and would
+    # otherwise overwrite dist/ with a config-less bundle before the asset sync.
+    env_file = project_root / "src" / MARKETPLACE_FRONTEND / ".env.production"
+    env_vars: Dict[str, str] = {}
+    if env_file.is_file():
+        for line in env_file.read_text().splitlines():
+            if "=" in line and not line.strip().startswith("#"):
+                k, _, v = line.partition("=")
+                env_vars[k.strip()] = v.strip()
+    env_vars.update(
+        {
+            "VITE_CANISTER_ID_MARKETPLACE_BACKEND": marketplace_backend_id,
+            "VITE_CANISTER_ID_FILE_REGISTRY": file_registry_id,
+            "VITE_ENV_NAME": env_config.get("name", ""),
+            "VITE_PORTAL_URL": env_config.get("portal_url", ""),
+            "VITE_REALMS_VERSION": env_config.get("realms_version", "main"),
+        }
+    )
+    if billing_url:
+        env_vars["VITE_BILLING_SERVICE_URL"] = billing_url
+    if env_file.parent.is_dir():
+        env_file.write_text("\n".join(f"{k}={v}" for k, v in env_vars.items()) + "\n")
+        if logger:
+            logger.info(f"Wrote {env_file} ({len(env_vars)} vars)")
+
     console.print(Panel.fit("🔨 Building marketplace_frontend", style="bold blue"))
     rc = run_command(
         ["npm", "run", "build", "--workspace=marketplace_frontend"],
