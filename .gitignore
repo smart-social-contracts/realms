@@ -79,3 +79,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# icp-cli local state (canister ID mappings, build cache)
+.icp/

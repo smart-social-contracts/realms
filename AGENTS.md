@@ -15,6 +15,32 @@ When running as **Kimi K3**, spin up **Composer 2.5** subagents (Task tool / wor
 
 ---
 
+## Toolchain: prefer `icp` over `dfx`
+
+Realms still has **`dfx.json` and no `icp.yaml` yet** — be honest about that. When you
+touch deploy or tooling, **prefer `icp`** and plan migration to `icp.yaml`; do not
+paper over the gap indefinitely.
+
+On operator hosts (e.g. srv1), bare `dfx` is a wrapper that prints and exits 1:
+
+> Prefer icp when possible. Use dfx only if icp cannot do the job yet (no equivalent
+> for that workflow). Make the necessary changes in your code now (including migrating
+> unmigrated dfx.json project, if needed) to use icp instead of dfx immediately. If you
+> still need dfx you can re-run this command using the flag `--run-deprecated`.
+
+**Agents:** when you hit this gate, migrate the workflow to `icp` rather than relying on
+`--run-deprecated` long-term. Until Realms has `icp.yaml`, many scripts and examples
+still need dfx — use **`dfx --run-deprecated …`** (or **`dfx_deprecated …`**) and
+**plan/do the migration** when you work those paths.
+
+Install/upgrade icp-cli: `npm i -g @icp-sdk/icp-cli` (latest on srv1: **1.3.0**;
+verify with `icp --version`).
+
+When invoking deprecated dfx, also export `TERM=xterm` and
+`DFX_WARNING=-mainnet_plaintext_identity` (see [dfx in this environment](#dfx-in-this-environment)).
+
+---
+
 ## Project Structure
 
 ```
@@ -63,7 +89,7 @@ per realm.
 |---|---|---|
 | **Realm UI or backend change** (Agora, Dominion, Syntropia) | `realms mundus deploy` with `--version build` | ~90s |
 | **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install, **or** [direct runtime install](#direct-runtime-install-no-file-registry) | ~26s via registry; direct path skips registry |
-| **Registry / installer / other infra** during dev | fetch GOS artifacts + `dfx deploy` (registry/installer) or `scripts/infra_dev_deploy.sh` (file_registry, …) or `realms env deploy` (full product stack) | ~2–5 min |
+| **Registry / installer / other infra** during dev | fetch GOS artifacts + `dfx --run-deprecated deploy` (registry/installer) or `scripts/infra_dev_deploy.sh` (file_registry, …) or `realms env deploy` (full product stack) | ~2–5 min |
 | **Pre-merge / make Casals authoritative** | `publish-build` → `rollout` | several min |
 
 ### What changed?
@@ -112,7 +138,7 @@ each IC environment) are Realms-owned and deployed via
 
 ```bash
 export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
-dfx identity use deployer
+dfx --run-deprecated identity use deployer
 
 # 1. Fetch prebuilt WASM + frontend from the pinned GOS release
 python3 scripts/fetch_gos_artifacts.py --what all
@@ -184,7 +210,7 @@ the Vite build — `realms mundus deploy` injects it as the **final post-deploy 
 
 | Do | Don't |
 |---|---|
-| Use **`realms mundus deploy`** for realm frontend/backend iteration | Run raw **`dfx deploy frontend`** on a wizard-provisioned realm without restoring config |
+| Use **`realms mundus deploy`** for realm frontend/backend iteration | Run raw **`dfx --run-deprecated deploy frontend`** on a wizard-provisioned realm without restoring config |
 | Use the realm's **own manifest** from the registry / descriptor | Point mundus at **`examples/demo/realm3/manifest.json`** for a custom staging realm (overwrites `/custom/` branding) |
 | After any manual asset upload, **re-store `/canister_ids.js`** | Rely on `.env` / build-time `CANISTER_ID_REALM_BACKEND` — wrong id → II delegation errors and login fails |
 
@@ -194,7 +220,7 @@ backend + `derivation_origin` + `portal_url`:
 
 ```bash
 export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
-dfx identity use deployer  # or the frontend controller identity
+dfx --run-deprecated identity use deployer  # or the frontend controller identity
 
 python3 scripts/staging_test_identities.py \
   --frontend ul3la-6iaaa-aaaac-bfula-cai:ucya4-iaaaa-aaaac-bfukq-cai \
@@ -370,7 +396,7 @@ lands; realm semver releases and GOS releases are versioned independently.
 |---|---|---|
 | Realm backends + frontends (Dominion, Agora, Syntropia) | Yes | Yes |
 | Extensions/codices on realms | Yes (manifest + `file_registry`) | Yes (arrangement) |
-| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.gos.earth) | **No** (mundus) — **Yes** via [fetch GOS artifacts + `dfx deploy`](#fast-infra-deploy-dev-only) | Yes (`realms rollout -t realm-registry`; publish fetches from gos-as-a-service) |
+| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.gos.earth) | **No** (mundus) — **Yes** via [fetch GOS artifacts + `dfx --run-deprecated deploy`](#fast-infra-deploy-dev-only) | Yes (`realms rollout -t realm-registry`; publish fetches from gos-as-a-service) |
 | Installer, `file_registry`, marketplace, dashboard | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) for file_registry et al.; installer via GOS fetch + publish | Yes (`all-infra` or per-family; installer uses GOS fetch) |
 
 Notes:
@@ -418,13 +444,14 @@ realms rollout -e staging -t all-realms -s both -v main --identity deployer --ex
 ### Fast infra deploy (dev only)
 
 While developing **file_registry**, marketplace, dashboard, or other Realms-owned infra,
-skip Casals publish + rollout and **deploy directly with `dfx`** from the repo root
+skip Casals publish + rollout and **deploy directly with deprecated dfx** (`dfx --run-deprecated`)
+from the repo root
 (~2–5 min per component). This updates the live canister code immediately but does
 **not** update the Casals authorized-WASM catalog — run the full Casals path before merge.
 
 **Registry and installer** no longer have source in this repo. For those stands, the dev
 path is: **fetch prebuilt WASM from the pinned gos-as-a-service release** via
-`scripts/fetch_gos_artifacts.py`, then either `dfx deploy` (direct canister upgrade) or
+`scripts/fetch_gos_artifacts.py`, then either `dfx --run-deprecated deploy` (direct canister upgrade) or
 `realms files publish-release` + `realms rollout` (Casals-authoritative). Develop
 registry/wizard/installer code in
 [smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
@@ -434,7 +461,7 @@ registry/wizard/installer code in
 ```bash
 export TERM=xterm
 export DFX_WARNING=-mainnet_plaintext_identity
-dfx identity use deployer
+dfx --run-deprecated identity use deployer
 ```
 
 **Registry / installer (prebuilt GOS artifacts):**
@@ -445,15 +472,15 @@ python3 scripts/fetch_gos_artifacts.py --what all
 
 # Direct dfx upgrade — registry backend on staging (canister id still valid)
 export DFX_NETWORK=staging
-dfx canister install 7wzxh-wyaaa-aaaau-aggyq-cai --network staging --mode upgrade \
+dfx --run-deprecated canister install 7wzxh-wyaaa-aaaau-aggyq-cai --network staging --mode upgrade \
   --wasm .external-wasms/realm_registry_backend.wasm.gz
 
 # Registry frontend (asset canister)
-dfx deploy realm_registry_frontend --network staging --yes
+dfx --run-deprecated deploy realm_registry_frontend --network staging --yes
 # (dfx.json points source at .external-assets/realm_registry_frontend/dist)
 
 # Installer backend only
-dfx canister install lusjm-wqaaa-aaaau-ago7q-cai --network staging --mode upgrade \
+dfx --run-deprecated canister install lusjm-wqaaa-aaaau-ago7q-cai --network staging --mode upgrade \
   --wasm .external-wasms/realm_installer.wasm.gz
 
 # Casals-authoritative (upload + authorize + rollout)
@@ -650,7 +677,7 @@ These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
 - **Orchestra canisters** (every realm + infra canister Casals manages): controlled
   by **Casals** plus **CycleOps** (`cpbhu-5iaaa-aaaad-aalta-cai`, for cycle top-ups).
   On **test/staging**, **`deployer`** (`ah6ac-cc73l-...`) is also a co-controller so
-  direct `dfx canister install` with fetched GOS WASM can upgrade registry/installer
+  direct `dfx --run-deprecated canister install` with fetched GOS WASM can upgrade registry/installer
   during development. Casals remains the authoritative upgrade path before merge.
 - **Casals canisters**: controlled by `ah6ac-cc73l-...` (the `my_dev_identity_1` /
   `deployer` key), the dedicated CI key, and a conductor Internet Identity.
@@ -871,7 +898,7 @@ All commands run from the **`realms/` project root**.
 ```bash
 export TERM=xterm
 export DFX_WARNING=-mainnet_plaintext_identity
-dfx identity use my_dev_identity_1
+dfx --run-deprecated identity use my_dev_identity_1
 ```
 
 `my_dev_identity_1` (principal `ah6ac-cc73l-...`) is a controller of the test canisters.
@@ -881,7 +908,7 @@ dfx identity use my_dev_identity_1
 ```bash
 realms files build --extensions <ext_id> \
   && realms files publish --network test --extensions-only --extensions <ext_id> \
-  && dfx canister call <backend_canister_id> install_extension_from_registry \
+  && dfx --run-deprecated canister call <backend_canister_id> install_extension_from_registry \
      '("{\"registry_canister_id\": \"<file_registry_id>\", \"ext_id\": \"<ext_id>\", \"version\": \"<version>\"}")' \
      --network test
 ```
@@ -890,14 +917,14 @@ realms files build --extensions <ext_id> \
 |------|---------|------|-------------|
 | Build | `realms files build --extensions <ext_id>` | ~4s | Runs `npm install && npm run build` in `frontend-rt/` |
 | Publish | `realms files publish --network test ...` | ~8s | Uploads bundle to the file_registry canister |
-| Install | `dfx canister call ... install_extension_from_registry` | ~14s | Backend pulls bundle from registry and installs it |
+| Install | `dfx --run-deprecated canister call ... install_extension_from_registry` | ~14s | Backend pulls bundle from registry and installs it |
 
 **Concrete example** — `public_dashboard` on Agora (test):
 
 ```bash
 realms files build --extensions public_dashboard \
   && realms files publish --network test --extensions-only --extensions public_dashboard \
-  && dfx canister call rnghe-haaaa-aaaak-qyxyq-cai install_extension_from_registry \
+  && dfx --run-deprecated canister call rnghe-haaaa-aaaak-qyxyq-cai install_extension_from_registry \
      '("{\"registry_canister_id\": \"uq2mu-kaaaa-aaaah-avqcq-cai\", \"ext_id\": \"public_dashboard\", \"version\": \"1.3.0\"}")' \
      --network test
 ```
@@ -929,26 +956,26 @@ artifact, not local edits.
 
 **Constraints:**
 - The extension bundle must stay under ~200KB for `files publish` to succeed (file_registry instruction limit). Keep heavy libraries (leaflet, h3-js) loaded at runtime via `fetch()` + `eval()` instead of bundling them.
-- The extension `version` in `manifest.json` must match the version in the `dfx canister call`. Bump the version when you need to force cache invalidation.
+- The extension `version` in `manifest.json` must match the version in the `dfx --run-deprecated canister call`. Bump the version when you need to force cache invalidation.
 - After finishing iteration, commit the changes to the submodule and update the ref in `realms` (see "Deploying Extension Changes" above).
 
 ### Direct runtime install (no file registry, no Casals installer)
 
 When iterating on **one specific realm** and the file registry is unavailable,
 out of cycles, or the Casals installer is slow/stuck, push packages straight to
-the realm canister with `dfx`. No publish step, no ICP for the registry, no
+the realm canister with deprecated dfx (`dfx --run-deprecated`). No publish step, no ICP for the registry, no
 installer polling.
 
 | What changed | Direct command | Notes |
 |---|---|---|
-| **Realm backend** (`src/realm_backend/`) | Build WASM locally → `dfx canister install --mode upgrade` | ~25s; preserves canister state |
+| **Realm backend** (`src/realm_backend/`) | Build WASM locally → `dfx --run-deprecated canister install --mode upgrade` | ~25s; preserves canister state |
 | **Extension** (backend + frontend bundle) | `realms extension runtime-install` | Backend via `install_extension`; frontend via asset-canister `store` |
 | **Codex** (`kind: codex` packages) | `realms codex runtime-install --run-init` | Backend via `install_extension`; runs codex `init` hook |
 
 > **Not the same as `mundus deploy`.** `realms mundus deploy --version build`
 > builds locally but still submits to the Casals installer canister (artifact
 > upload + verify polling). Use that when the installer is healthy (~90s). Use
-> the pure `dfx` path below when you need to skip the installer entirely.
+> the pure deprecated dfx path below when you need to skip the installer entirely.
 
 **Setup (once per session):**
 
@@ -956,7 +983,7 @@ installer polling.
 export TERM=xterm-256color DFX_WARNING=-mainnet_plaintext_identity
 export PATH="$PWD/.venv-basilisk/bin:$PATH"   # basilisk refuses to build outside this venv
 export CANISTER_CANDID_PATH=src/realm_backend/realm_backend.did
-dfx identity use deployer   # or my_dev_identity_1 on test
+dfx --run-deprecated identity use deployer   # or my_dev_identity_1 on test
 ```
 
 **Staging canister IDs:**
@@ -978,7 +1005,7 @@ cd /path/to/realms
 # 1. Backend WASM — build locally, upgrade directly (~25s)
 python -m basilisk realm_backend src/realm_backend/main.py
 gzip -c .basilisk/realm_backend/realm_backend.wasm > /tmp/realm_backend.wasm.gz
-dfx canister install 4ilhs-2iaaa-aaaac-bfsaq-cai \
+dfx --run-deprecated canister install 4ilhs-2iaaa-aaaac-bfsaq-cai \
   --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network staging
 
 # 2. Codex (seeds court hierarchy via init → seed_justice)
@@ -999,7 +1026,7 @@ realms extension runtime-install \
 Repeat steps 2–3 on TestSyntropia1 or DemoSyntropia1 using the backend/frontend IDs
 from the table above (same `--source-dir codices/codices/syntropia`).
 
-**What the pure `dfx` backend upgrade skips (usually fine on staging):**
+**What the pure deprecated dfx backend upgrade skips (usually fine on staging):**
 
 - Casals protective snapshot / automatic rollback
 - `set_canister_config` post-deploy (frontend ID, version string, test flags — these
@@ -1028,7 +1055,7 @@ quarter bootstrap can pull the new packages.
 
    ```bash
    # Staging realm_registry_backend canister (authoritative ID table: gos-as-a-service)
-   dfx canister call 7wzxh-wyaaa-aaaau-aggyq-cai list_realms '()' \
+   dfx --run-deprecated canister call 7wzxh-wyaaa-aaaau-aggyq-cai list_realms '()' \
      --network staging --query | grep -i manualtest
    ```
 
@@ -1048,11 +1075,11 @@ quarter bootstrap can pull the new packages.
 
    ```bash
    # Verify what the loader will use:
-   dfx canister call <backend-id> get_extension_frontend_info \
+   dfx --run-deprecated canister call <backend-id> get_extension_frontend_info \
      '("{\"extension_id\": \"justice_litigation\"}")' --network staging --query
 
    # Should return the new version. If not, patch _source.json:
-   dfx canister call <backend-id> install_extension \
+   dfx --run-deprecated canister call <backend-id> install_extension \
      '("{\"extension_id\":\"justice_litigation\",\"files\":{\"_source.json\":\"{\\\"registry_canister_id\\\":\\\"iebdk-kqaaa-aaaau-agoxq-cai\\\",\\\"version\\\":\\\"0.4.0\\\"}\"}}")' \
      --network staging
    ```
@@ -1080,29 +1107,41 @@ pip install -r requirements.txt -r requirements-dev.txt
 pip install -e cli
 ```
 
-Verify: `realms --help` and `dfx --version`.
+Verify: `realms --help` and `icp --version` (require **≥ 1.3.0**;
+`npm i -g @icp-sdk/icp-cli`). For unmigrated dfx-only paths, `dfx --run-deprecated --version`
+is the escape hatch — prefer migrating to `icp` instead.
 
 ---
 
 ## dfx in this environment
 
-dfx 0.30.2 crashes with `ColorOutOfRange` (`panicked at src/dfx/src/main.rs: Failed to set stderr output color`) unless the terminal is set up correctly. Always export these before running any `dfx` command:
+Bare `dfx` on operator hosts (e.g. srv1) is gated — use **`dfx --run-deprecated …`**
+(or **`dfx_deprecated …`**) until Realms migrates to `icp.yaml`. See
+[Toolchain: prefer `icp` over `dfx`](#toolchain-prefer-icp-over-dfx) above.
+
+When you **do** run deprecated dfx, dfx 0.30.2 crashes with `ColorOutOfRange`
+(`panicked at src/dfx/src/main.rs: Failed to set stderr output color`) unless the
+terminal is set up correctly. Always export these before any deprecated dfx command:
 
 ```bash
 export TERM=xterm
 export DFX_WARNING=-mainnet_plaintext_identity
 ```
 
-The first fixes the color panic, the second suppresses the plaintext identity warning that blocks execution on `test`/`staging` networks.
+The first fixes the color panic, the second suppresses the plaintext identity warning
+that blocks execution on `test`/`staging` networks.
 
-**If the panic still occurs** (including inside wrappers like `realms files publish`, which shells out to dfx): the shell has `NO_COLOR` and/or `FORCE_COLOR` set, and dfx panics on the conflict. **Unset both** and use a color-capable TERM:
+**If the panic still occurs** (including inside wrappers like `realms files publish`,
+which shells out to dfx): the shell has `NO_COLOR` and/or `FORCE_COLOR` set, and dfx
+panics on the conflict. **Unset both** and use a color-capable TERM:
 
 ```bash
 env -u NO_COLOR -u FORCE_COLOR TERM=xterm-256color DFX_WARNING=-mainnet_plaintext_identity \
   realms files publish --network staging --extensions-only --extensions <ext_id>
 ```
 
-Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the panic — dfx needs a real color terminal, not a colorless one.
+Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the panic
+— dfx needs a real color terminal, not a colorless one.
 
 ---
 
@@ -1130,14 +1169,14 @@ counts, keys, or individual records without writing Python.
 
 ```bash
 export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
-dfx identity use my_dev_identity_1
+dfx --run-deprecated identity use my_dev_identity_1
 
 # Schema of stable structures
-dfx canister call <canister_id> __browse__ \
+dfx --run-deprecated canister call <canister_id> __browse__ \
   '("{\"action\": \"schema\"}")' --query --network ic
 
 # List keys / fetch one item (see basilisk AGENTS.md for actions)
-dfx canister call <canister_id> __browse__ \
+dfx --run-deprecated canister call <canister_id> __browse__ \
   '("{\"action\": \"len\", \"map\": \"User\"}")' --query --network ic
 ```
 
@@ -1152,7 +1191,7 @@ Executes arbitrary Python against the live `ggg` entity model (`User`,
 from one call are visible on the next.
 
 ```bash
-dfx canister call <canister_id> __shell__ \
+dfx --run-deprecated canister call <canister_id> __shell__ \
   '("from ggg import User; print(len(list(User.instances())))")' \
   --network ic --identity my_dev_identity_1
 ```
@@ -1171,7 +1210,7 @@ When you are not a controller, relay through Casals (Casals *is* a quarter
 controller):
 
 ```bash
-dfx canister call <casals_id> canister_exec \
+dfx --run-deprecated canister call <casals_id> canister_exec \
   '("{\"canister\":\"agora-quarter-2\",\"code\":\"from ggg import User; print(len(list(User.instances())))\"}")' \
   --network ic --identity my_dev_identity_1
 ```
@@ -1214,7 +1253,9 @@ until updated manually or re-provisioned.
 - Always scope rollouts as narrowly as possible:
   - **Target:** `-f targets=agora` — roll out one realm, not `all-realms`.
   - **Scope:** `-f scope=frontend` or `-f scope=backend` — skip the half you didn't change.
-- The dfx identity is `deployer`. Use `dfx identity use <name>` to switch.
+- Prefer **`icp identity default <name>`** for identity selection. Realms still has
+  unmigrated dfx paths: use **`dfx --run-deprecated identity use <name>`** there. The
+  deployer identity is `deployer`.
 - **Monitor every workflow you trigger.** After launching a workflow, watch it until it goes green. If it fails, diagnose the error, fix it, re-push, and re-trigger — repeat until the run succeeds. Never leave a red workflow behind.
 
 ---
@@ -1228,7 +1269,7 @@ The `@Browser` tool (Cursor IDE browser tab) works with ICP canister frontends. 
 **Gotcha — test mode identity is stateful**: the test environment uses `TEST_MODE_II_BYPASS=true`, which auto-logs-in with a deterministic hardcoded identity (seed `0xED, 0x57` → principal `2eqns-rmzes-...`). This identity is the **same across all browser sessions**. If a previous test activated, modified, or consumed resources for that principal, subsequent sessions will see the post-modification state. Before concluding a feature is broken, check whether the test identity's on-chain state already reflects a previous test run:
 
 ```bash
-dfx canister call <canister_id> is_principal_activated '("2eqns-rmzes-7npxw-dxpw2-qdy2s-mw6ix-svdo2-oya7o-a6ldc-sqgwh-bqe")' --network test
+dfx --run-deprecated canister call <canister_id> is_principal_activated '("2eqns-rmzes-7npxw-dxpw2-qdy2s-mw6ix-svdo2-oya7o-a6ldc-sqgwh-bqe")' --network test
 ```
 
 **Gotcha — extension UIs live in an iframe**: runtime extensions render inside
@@ -1313,10 +1354,10 @@ await target.locator("text=Advanced").first.click()
 | Scenario | Tool |
 |---|---|
 | Quick visual check of a page | Cursor `@Browser` |
-| Verify canister logic (queries, updates, guards) | `dfx canister call` |
+| Verify canister logic (queries, updates, guards) | `dfx --run-deprecated canister call` |
 | Automated UI test with screenshots and form interaction | Playwright |
 | Full user flow (UI → canister → UI update) | Playwright |
-| Admin operations (create codes, toggle modes) | `dfx canister call` with controller identity |
+| Admin operations (create codes, toggle modes) | `dfx --run-deprecated canister call` with controller identity |
 
 ---
 
