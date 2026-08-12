@@ -105,6 +105,20 @@ def test_flags_default_false_when_realm_load_raises(fake_ggg, monkeypatch):
     assert fake_ggg.skip_passport_zkproof() is False
 
 
+@pytest.mark.parametrize(
+    "network,can_test_mode,expected",
+    [
+        ("ic", False, False),
+        ("ic", True, True),
+        ("test", False, True),
+        ("production", False, False),
+        ("", False, True),
+    ],
+)
+def test_test_flags_allowed(network, can_test_mode, expected, fake_ggg):
+    assert fake_ggg.test_flags_allowed(network, can_test_mode) is expected
+
+
 def test_runtime_flags_payload_includes_realm_stage(fake_ggg):
     _set_realm(status="beta", name="Demo Realm")
     payload = fake_ggg.get_runtime_flags_payload()

@@ -32,6 +32,16 @@ def get_realm_flag(name: str, default: bool = False) -> bool:
         return default
 
 
+def test_flags_allowed(network: str, can_test_mode: bool) -> bool:
+    """Return whether runtime test flags may be enabled for this network.
+
+    On production networks (``ic`` or ``production``) test flags are blocked unless
+    ``can_test_mode`` is set (e.g. by GaaS). An empty network is not production.
+    """
+    production = (network or "").strip().lower() in ("ic", "production")
+    return bool(can_test_mode) or not production
+
+
 def is_test_mode() -> bool:
     """True when the realm is running in test mode."""
     return get_realm_flag("test_mode", False)

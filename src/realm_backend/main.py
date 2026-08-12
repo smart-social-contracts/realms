@@ -1212,6 +1212,7 @@ def _set_canister_config_impl(
     installed_version=None,
     network=None,
     test_flags_json=None,
+    can_test_mode=None,
     accounting_currency=None,
     accounting_currency_decimals=None,
     treasury_token_symbol=None,
@@ -1232,7 +1233,8 @@ def _set_canister_config_impl(
         network: Optional IC network name (e.g. "test", "staging", "demo", "ic")
         test_flags_json: Optional JSON with test mode flags, e.g.
             {"test_mode":true,"ii_bypass":true,"user_self_registration":true,...}
-            Rejected on mainnet (network=="ic") for security.
+            Rejected on production (network ic/production) unless can_test_mode is set.
+        can_test_mode: When True, allows test flags on production networks.
     """
     try:
         from ggg import Realm
@@ -1258,16 +1260,32 @@ def _set_canister_config_impl(
         if network:
             realm.network = network
 
-        # Apply test flags (network-gated: rejected on mainnet)
+        if can_test_mode is not None:
+            realm.can_test_mode = bool(can_test_mode)
+
+        # Apply test flags (network-gated: rejected on production unless can_test_mode)
         if test_flags_json:
+            from core.runtime_flags import test_flags_allowed
+
             effective_network = network or getattr(realm, "network", "") or ""
             flags = json.loads(test_flags_json)
+            if "can_test_mode" in flags:
+                if can_test_mode is None:
+                    realm.can_test_mode = bool(flags.pop("can_test_mode"))
+                else:
+                    flags.pop("can_test_mode")
             any_flag_true = any(v for v in flags.values() if v)
-            if any_flag_true and effective_network == "ic":
+            allowed = test_flags_allowed(
+                effective_network, bool(getattr(realm, "can_test_mode", False))
+            )
+            if any_flag_true and not allowed:
                 return RealmResponse(
                     success=False,
                     data=RealmResponseData(
-                        error="Test mode flags cannot be enabled on mainnet (network=ic)"
+                        error=(
+                            "Test mode flags cannot be enabled on mainnet (network=ic) "
+                            "unless can_test_mode is set"
+                        )
                     ),
                 )
             _FLAG_MAP = {
@@ -1374,16 +1392,27 @@ def set_canister_config_json(args: text) -> text:
     nft_canister_id, file_registry_canister_id, marketplace_canister_id,
     installed_version, network, accounting_currency, accounting_currency_decimals,
     treasury_token_symbol, treasury_token_indexer_id, treasury_token_type,
-    and either test_flags_json (a JSON string) or
+    can_test_mode (bool), and either test_flags_json (a JSON string) or
     test_flags (a JSON object, e.g. {"test_mode":true,"demo_data":true})}.
+    can_test_mode may also appear inside test_flags (non-flag); top-level wins.
 
     Returns: {"success": bool, "message"?: str, "error"?: str}.
     """
     try:
         params = json.loads(args) if args else {}
+        can_test_mode = params.get("can_test_mode")
         flags = params.get("test_flags_json")
         if flags is None and isinstance(params.get("test_flags"), dict):
-            flags = json.dumps(params["test_flags"])
+            test_flags_dict = dict(params["test_flags"])
+            if can_test_mode is None and "can_test_mode" in test_flags_dict:
+                can_test_mode = test_flags_dict.pop("can_test_mode")
+            flags = json.dumps(test_flags_dict)
+        elif flags is not None:
+            parsed_flags = json.loads(flags)
+            if isinstance(parsed_flags, dict):
+                if can_test_mode is None and "can_test_mode" in parsed_flags:
+                    can_test_mode = parsed_flags.pop("can_test_mode")
+                flags = json.dumps(parsed_flags)
         resp = _set_canister_config_impl(
             frontend_canister_id=params.get("frontend_canister_id"),
             token_canister_id=params.get("token_canister_id"),
@@ -1393,6 +1422,7 @@ def set_canister_config_json(args: text) -> text:
             installed_version=params.get("installed_version"),
             network=params.get("network"),
             test_flags_json=flags,
+            can_test_mode=can_test_mode,
             accounting_currency=params.get("accounting_currency"),
             accounting_currency_decimals=params.get("accounting_currency_decimals"),
             treasury_token_symbol=params.get("treasury_token_symbol"),

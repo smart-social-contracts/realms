@@ -16,7 +16,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 6
+    __version__ = 7
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -37,6 +37,8 @@ class Realm(Entity, TimestampedMixin):
             # Realms predating the trust policy adopt the secure default.
             obj.setdefault("require_marketplace_approval", True)
             obj.setdefault("trusted_approvers", "")
+        if from_version < 7:
+            obj.setdefault("can_test_mode", False)
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.SETUP)
@@ -109,7 +111,9 @@ class Realm(Entity, TimestampedMixin):
     installed_version = String(max_length=32, default="")
     # IC network this realm is deployed on (e.g. "test", "staging", "demo", "ic")
     network = String(max_length=16, default="")
-    # Test mode flags (set via set_canister_config; hard-rejected on network=="ic")
+    # Test mode flags (set via set_canister_config; rejected on production
+    # network ic/production unless can_test_mode is set)
+    can_test_mode = Boolean(default=False)
     test_mode = Boolean(default=False)
     test_mode_ii_bypass = Boolean(default=False)
     test_mode_user_self_registration = Boolean(default=False)
