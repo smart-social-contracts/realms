@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build:website && npm run build:docs && npm run merge:docs",
-    "build:website": "vite build",
+    "build:website": "vite build && node scripts/spa-fallback.js",
     "build:docs": "cd ../docs && npm install --include=dev && npm run docs:build",
     "merge:docs": "mkdir -p dist/docs && cp -r ../docs/.vitepress/dist/* dist/docs/",
     "preview": "vite preview"

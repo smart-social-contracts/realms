@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v0.1.0/docs/schemas/icp-yaml-schema.json
+#
+# Realms GOS marketing site (realmsgos.org) — static assets via icp-cli.
+
+canisters:
+  - name: website
+    recipe:
+      type: "@dfinity/asset-canister@v2.2.0"
+      configuration:
+        dir: dist
