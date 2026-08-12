@@ -719,32 +719,52 @@ def _parse_candid_string(raw: str) -> str:
     return raw
 
 
+# dfx → icp translation notes:
+# - This toolchain deprecates dfx in favour of icp; use icp when present.
+# - The dfx network aliases test/staging/demo all point at mainnet (icp0.io);
+#   icp addresses mainnet as "ic".
+# - The dfx identity "deployer" exists in the icp store as "my_dev_identity_1"
+#   (same principal). Unknown identity names are passed through unchanged.
+_ICP_NETWORK_ALIASES = {"test": "ic", "staging": "ic", "demo": "ic"}
+_ICP_IDENTITY_ALIASES = {"deployer": "my_dev_identity_1"}
+
+
 def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=120):
-    """Run a dfx canister call and return parsed output.
+    """Run a canister call (via icp when available, else dfx) and return parsed output.
 
     For large candid arguments (≥ 100 KiB) the argument is written to a
-    temporary file and passed via ``--argument-file``, otherwise Linux's
-    per-argument size limit (MAX_ARG_STRLEN, 128 KiB) blows up before
-    dfx ever sees the call.
+    temporary file and passed via ``--args-file``/``--argument-file``, otherwise
+    Linux's per-argument size limit (MAX_ARG_STRLEN, 128 KiB) blows up before
+    the call ever reaches the replica.
     """
     import tempfile as _tempfile
 
-    cmd = ["dfx", "canister", "call"]
-    if identity:
-        cmd.extend(["--identity", identity])
-    if network:
-        cmd.extend(["--network", network])
-    if is_query:
-        cmd.append("--query")
+    use_icp = shutil.which("icp") is not None
+    if use_icp:
+        cmd = ["icp", "canister", "call"]
+        icp_identity = _ICP_IDENTITY_ALIASES.get(identity, identity)
+        if icp_identity:
+            cmd.extend(["--identity", icp_identity])
+        cmd.extend(["--network", _ICP_NETWORK_ALIASES.get(network, network or "ic")])
+        if is_query:
+            cmd.append("--query")
+    else:
+        cmd = ["dfx", "canister", "call"]
+        if identity:
+            cmd.extend(["--identity", identity])
+        if network:
+            cmd.extend(["--network", network])
+        if is_query:
+            cmd.append("--query")
 
     arg_file = None
     arg_size = len(arg.encode("utf-8")) if isinstance(arg, str) else len(arg)
     if arg_size >= 100 * 1024:
-        fd, arg_file = _tempfile.mkstemp(prefix="dfx-arg-", suffix=".did")
+        fd, arg_file = _tempfile.mkstemp(prefix="call-arg-", suffix=".did")
         try:
             with os.fdopen(fd, "w") as fh:
                 fh.write(arg)
-            cmd.extend([canister, method, "--argument-file", arg_file])
+            cmd.extend([canister, method, "--args-file" if use_icp else "--argument-file", arg_file])
         except Exception:
             try:
                 os.unlink(arg_file)
@@ -764,7 +784,7 @@ def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=
         console.print(f"[red]Error: canister call timed out ({timeout}s)[/red]")
         raise typer.Exit(1)
     except FileNotFoundError:
-        console.print("[red]Error: dfx not found. Install the DFINITY SDK.[/red]")
+        console.print("[red]Error: neither icp nor dfx found. Install the IC toolchain.[/red]")
         raise typer.Exit(1)
     finally:
         if arg_file:
@@ -1482,6 +1502,14 @@ def publish_extension_command(
                 local = os.path.join(root, fname)
                 rel = os.path.relpath(local, backend_dir).replace(os.sep, "/")
                 _upload(f"backend/{rel}", local)
+
+    # Sandboxed extensions additionally ship a standalone shell app under
+    # frontend/dist (index.html + hashed assets) that the iframe loader mounts
+    # at /ext/<id>/<ver>/frontend/dist/index.html. Upload it before the
+    # frontend-rt bundle so the rt index.js wins if both provide one.
+    sandbox_dist_dir = os.path.join(source_dir, "frontend", "dist")
+    for reg_path, local in _iter_frontend_dist_uploads(sandbox_dist_dir):
+        _upload(reg_path, local)
 
     # Frontend runtime dist (index.html, index.js, nested assets/, …).
     dist_dir = os.path.join(source_dir, "frontend-rt", "dist")
