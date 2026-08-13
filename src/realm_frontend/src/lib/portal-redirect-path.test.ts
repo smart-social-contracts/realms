@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePortalRedirectPath } from './portal-redirect-path';
+import {
+  normalizePortalRedirectPath,
+  resolvePortalNavSyncHref,
+} from './portal-redirect-path';
 
 describe('normalizePortalRedirectPath', () => {
   it('returns empty string for root', () => {
@@ -21,5 +24,32 @@ describe('normalizePortalRedirectPath', () => {
     expect(normalizePortalRedirectPath('/ext/voting/0.2.0/frontend/dist/index.js')).toBe(
       '/extensions/voting',
     );
+  });
+});
+
+describe('resolvePortalNavSyncHref', () => {
+  it('does not navigate when the host path matches except iframe-only params', () => {
+    expect(resolvePortalNavSyncHref('/join?portal=1&slug=realmtest4', '/join')).toBeNull();
+    expect(
+      resolvePortalNavSyncHref('/join?portal=1&slug=realmtest4', '/join?portal=1&slug=realmtest4'),
+    ).toBeNull();
+  });
+
+  it('preserves portal embed params when the host path actually changes', () => {
+    expect(resolvePortalNavSyncHref('/join?portal=1&slug=realmtest4', '/extensions/member_dashboard')).toBe(
+      '/extensions/member_dashboard?portal=1&slug=realmtest4',
+    );
+  });
+
+  it('keeps invite query params from the sync path', () => {
+    expect(resolvePortalNavSyncHref('/join?portal=1&slug=x', '/join?invite=abc')).toBe(
+      '/join?invite=abc&portal=1&slug=x',
+    );
+  });
+
+  it('does not drop an invite already on the iframe URL when the host syncs pathname only', () => {
+    expect(
+      resolvePortalNavSyncHref('/join?portal=1&slug=x&invite=abc', '/join'),
+    ).toBeNull();
   });
 });

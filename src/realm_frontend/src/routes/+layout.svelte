@@ -10,6 +10,7 @@
 	import { initializeTheme } from '$lib/theme/init';
 	import { restoreAuthSession, resetAuthSessionRestore, getPortalRedirectUrl } from '$lib/auth';
 	import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge.ts';
+	import { resolvePortalNavSyncHref } from '$lib/portal-redirect-path.ts';
 	import SetupStageGate from '$lib/components/SetupStageGate.svelte';
 
 	export const SITE_NAME = "Realms GOS";
@@ -79,9 +80,10 @@
 			const onPortalNavSync = (event) => {
 				const path = event?.detail?.path;
 				if (!path || typeof path !== 'string') return;
-				const current = `${window.location.pathname}${window.location.search}`;
-				if (current === path) return;
-				void goto(path, { replaceState: true, noScroll: true });
+				const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+				const next = resolvePortalNavSyncHref(current, path);
+				if (!next) return;
+				void goto(next, { replaceState: true, noScroll: true });
 			};
 			window.addEventListener('portal:auth', onPortalAuth);
 			window.addEventListener('portal:nav-sync', onPortalNavSync);
