@@ -5,19 +5,19 @@ import { DelegationIdentity, DelegationChain, Ed25519KeyIdentity } from '@dfinit
 
 const BRIDGE_VERSION = '1';
 const PORTAL_SESSION_KEY = 'realms:portal-embed';
-let port = null;
-let portalConfig = null;
+let port: MessagePort | null = null;
+let portalConfig: { slug?: string; backendCanisterId?: string; frontendCanisterId?: string; env?: string } | null = null;
 let pendingDelegationRequest = false;
-/** @type {{ path: string, replace: boolean } | null} */
-let pendingNavPush = null;
-/** @type {{ source: string, uri: string, label?: string } | null | undefined} */
-let pendingFocusPush = undefined;
-/** @type {boolean} */
-let pendingAssistantOpen = false;
-/** @type {Ed25519KeyIdentity | null} */
-let sessionIdentity = null;
-/** @type {DelegationIdentity | null} */
-let delegationIdentity = null;
+let pendingNavPush: { path: string; replace: boolean } | null = null;
+let pendingFocusPush: { source: string; uri: string; label?: string } | null | undefined = undefined;
+let pendingAssistantOpen: boolean = false;
+let sessionIdentity: Ed25519KeyIdentity | null = null;
+let delegationIdentity: DelegationIdentity | null = null;
+let delegationExpiresAt: number | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Refresh 5 minutes before expiry to avoid edge-of-expiry failures. */
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 function markPortalEmbedded() {
   if (typeof window === 'undefined') return;
@@ -42,7 +42,7 @@ function isPortalEmbedded() {
   }
 }
 
-function post(msg) {
+function post(msg: Record<string, unknown>) {
   if (!port) return;
   port.postMessage(msg);
 }
@@ -54,7 +54,7 @@ function ensureSessionIdentity() {
   return sessionIdentity;
 }
 
-function onPortMessage(event) {
+function onPortMessage(event: MessageEvent) {
   const msg = event.data;
   if (!msg || typeof msg.type !== 'string') return;
 
@@ -69,6 +69,11 @@ function onPortMessage(event) {
       break;
     case 'auth:logout':
       delegationIdentity = null;
+      delegationExpiresAt = null;
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
       window.dispatchEvent(new CustomEvent('portal:logout'));
       break;
     case 'auth:pending':
@@ -93,15 +98,26 @@ function onPortMessage(event) {
   }
 }
 
-async function applyDelegation(payload) {
+async function applyDelegation(payload: { delegation?: unknown; backendCanisterId?: string; expiresAt?: number }) {
   if (!payload?.delegation) return;
-  const session = ensureSessionIdentity();
   const json =
     typeof payload.delegation === 'string'
       ? payload.delegation
       : JSON.stringify(payload.delegation);
+  const session = ensureSessionIdentity();
   const chain = DelegationChain.fromJSON(json);
-  delegationIdentity = DelegationIdentity.fromDelegation(session, chain);
+  const next = DelegationIdentity.fromDelegation(session, chain);
+  // Silent auth probes re-deliver a freshly signed delegation for the SAME
+  // principal every few seconds. Absorb it (fresher expiry) but don't
+  // re-dispatch portal:auth — each dispatch makes listeners reset and
+  // re-restore session state, visible as a periodic UI flicker on /join.
+  const unchanged =
+    !!delegationIdentity &&
+    delegationIdentity.getPrincipal().toText() === next.getPrincipal().toText();
+  delegationIdentity = next;
+  delegationExpiresAt = payload.expiresAt || null;
+  scheduleRefresh();
+  if (unchanged) return;
   window.dispatchEvent(
     new CustomEvent('portal:auth', {
       detail: {
@@ -111,6 +127,26 @@ async function applyDelegation(payload) {
       }
     })
   );
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+  if (!delegationExpiresAt) return;
+  const now = Date.now();
+  const refreshAt = delegationExpiresAt - REFRESH_BUFFER_MS;
+  const delay = refreshAt - now;
+  if (delay <= 0) {
+    // Already within buffer — refresh immediately
+    requestSilentAuthProbe();
+    return;
+  }
+  refreshTimer = setTimeout(() => {
+    console.log('[portal-bridge] delegation expiring soon, requesting refresh');
+    requestSilentAuthProbe();
+  }, delay);
 }
 
 function requestDelegation(interactive = false) {
@@ -149,11 +185,13 @@ export function initPortalBridge() {
 
   markPortalEmbedded();
 
-  const onWindowMessage = (event) => {
+  const onWindowMessage = (event: MessageEvent) => {
     if (event.data?.type !== 'bridge:init' || !event.ports?.[0]) return;
     port?.close?.();
     port = event.ports[0];
-    port.onmessage = onPortMessage;
+    if (port) {
+      port.onmessage = onPortMessage;
+    }
     post({ type: 'bridge:ready', payload: { version: BRIDGE_VERSION } });
     requestDelegation(false); // silent probe: reuse an existing host session if any
     // Flush any navigation that fired before the MessagePort was ready
@@ -202,6 +240,10 @@ export function initPortalBridge() {
 
   return () => {
     clearInterval(helloTimer);
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
     window.removeEventListener('message', onWindowMessage);
     port = null;
   };
@@ -213,7 +255,7 @@ export function initPortalBridge() {
  * @param {{ replace?: boolean }} [opts]  replace=true uses history.replaceState
  *   (auth redirects / initial sync); default pushState for real navigations.
  */
-export function portalNavPush(path, { replace = false } = {}) {
+export function portalNavPush(path: string, { replace = false }: { replace?: boolean } = {}) {
   if (!isPortalEmbedded()) return false;
   const normalized = path.startsWith('/') ? path : `/${path || ''}`;
   if (!port) {
@@ -230,7 +272,7 @@ export function portalNavPush(path, { replace = false } = {}) {
  * Mirror document focus onto the portal host so RegistryAssistant can include it.
  * @param {{ source: string, uri: string, label?: string } | null} focus
  */
-export function portalFocusPush(focus) {
+export function portalFocusPush(focus: { source: string; uri: string; label?: string } | null) {
   if (!isPortalEmbedded()) return false;
   if (!port) {
     pendingFocusPush = focus;
@@ -256,7 +298,7 @@ export function portalAssistantOpen() {
   return true;
 }
 
-export function reportResize(height) {
+export function reportResize(height: number) {
   if (!port) return;
   post({ type: 'resize:report', payload: { height } });
 }
@@ -291,7 +333,7 @@ export function waitForPortalDelegation({ timeoutMs = 300_000 } = {}) {
 
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (value) => {
+    const finish = (value: DelegationIdentity | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -305,8 +347,9 @@ export function waitForPortalDelegation({ timeoutMs = 300_000 } = {}) {
       if (identity) finish(identity);
     };
 
-    const onAuthError = (event) => {
-      console.warn('[portal-bridge] host auth error:', event?.detail?.error);
+    const onAuthError = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.warn('[portal-bridge] host auth error:', customEvent?.detail?.error);
       finish(null);
     };
 

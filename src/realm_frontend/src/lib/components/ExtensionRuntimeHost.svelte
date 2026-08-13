@@ -40,7 +40,7 @@
 	import AccessDenied from '$lib/components/AccessDenied.svelte';
 	import MonacoEditor from '$lib/components/MonacoEditor.svelte';
 	import MonacoDiffEditor from '$lib/components/MonacoDiffEditor.svelte';
-	import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
+	import { parseAccessError, AccessDeniedError, formatDelegationExpiredError } from '$lib/utils/errors';
 	import { sidebarConfig } from '$lib/stores/sidebar';
 	import { extensionLoadingMessage } from '$lib/utils/breadcrumb';
 	import { createHostContext } from '$lib/host-bridge';
@@ -144,7 +144,14 @@
 		}
 
 		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
-			const raw = await extensionBackend.extension_sync_call(id, fn, JSON.stringify(args));
+			let raw: string;
+			try {
+				raw = await extensionBackend.extension_sync_call(id, fn, JSON.stringify(args));
+			} catch (e) {
+				const friendly = formatDelegationExpiredError(e);
+				if (friendly) throw new Error(friendly);
+				throw e;
+			}
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
 			if (res?.success === false) {
 				const denied = parseAccessError(res);
@@ -159,7 +166,14 @@
 			}
 		}
 		async function callAsync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
-			const raw = await extensionBackend.extension_async_call(id, fn, JSON.stringify(args));
+			let raw: string;
+			try {
+				raw = await extensionBackend.extension_async_call(id, fn, JSON.stringify(args));
+			} catch (e) {
+				const friendly = formatDelegationExpiredError(e);
+				if (friendly) throw new Error(friendly);
+				throw e;
+			}
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
 			if (res?.success === false) {
 				const denied = parseAccessError(res);

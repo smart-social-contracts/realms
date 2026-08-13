@@ -98,3 +98,20 @@ function extractOperation(text: string): string {
   const match = text.match(/permission '([^']+)'/);
   return match?.[1] || 'unknown';
 }
+
+/**
+ * Detects whether an error is an expired IC delegation (HTTP 400 from replica).
+ * Returns a user-friendly message if so, null otherwise.
+ */
+export function formatDelegationExpiredError(error: unknown): string | null {
+  if (!error) return null;
+  const msg = error instanceof Error ? error.message : String(error);
+  if (
+    msg.includes('Invalid delegation expiry') ||
+    msg.includes('delegation has expired') ||
+    msg.includes('Specified sender delegation has expired')
+  ) {
+    return 'Your session expired. Please refresh the page to continue.';
+  }
+  return null;
+}
