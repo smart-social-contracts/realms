@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Realms GOS">
+  <!-- Fills first (union of four cardinal circles), then all strokes on top
+       so every intersection arc stays visible (full Venn, not a pinwheel). -->
+  <g fill="#000" stroke="none">
+    <circle cx="64" cy="42" r="34"/>
+    <circle cx="86" cy="64" r="34"/>
+    <circle cx="64" cy="86" r="34"/>
+    <circle cx="42" cy="64" r="34"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-width="2.25">
+    <circle cx="64" cy="42" r="34"/>
+    <circle cx="86" cy="64" r="34"/>
+    <circle cx="64" cy="86" r="34"/>
+    <circle cx="42" cy="64" r="34"/>
+  </g>
+</svg>
