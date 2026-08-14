@@ -439,7 +439,7 @@ def test_unverified_address_is_not_queued(realm):
 
 
 def test_verified_address_is_queued(realm):
-    """Verified addresses with mention events are queued for delivery."""
+    """Verified addresses are queued when realm email is enabled."""
     _enable_realm_email()
     realm.alice.private_data = json.dumps({
         "email": "alice@example.com", "email_verified": True,
@@ -449,6 +449,21 @@ def test_verified_address_is_queued(realm):
     metadata = json.loads(note.metadata)
     assert metadata["email_status"] == "pending"
     assert metadata["force_email_to"] == "alice@example.com"
+
+
+def test_any_notification_is_queued_when_email_enabled(realm):
+    """Event-type checkboxes are gone; any notification can queue mail."""
+    _enable_realm_email()
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com", "email_verified": True,
+        "email_notifications_enabled": True,
+    })
+    call("alice")("notifications", "notification.create", {
+        "title": "Task", "message": "You have a task",
+        "subject": "alice", "event_type": "task_assigned",
+    })
+    metadata = json.loads(realm.notes[-1].metadata)
+    assert metadata["email_status"] == "pending"
 
 
 def test_request_email_verification_queues_force_email(realm):

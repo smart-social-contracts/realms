@@ -412,16 +412,11 @@ def queue_email(notification, event_type: str = "") -> None:
         if not config.get("enabled"):
             return
 
-        events = config.get("events")
-        events = events if isinstance(events, dict) else {}
-
         resolved = event_type or (
             getattr(notification, "topic", "") or ""
         )
         if not resolved or resolved == "general":
             resolved = "notification"
-        if not existing and not events.get(resolved, False):
-            return
 
         if _audience(notification) != "user":
             return
@@ -574,7 +569,7 @@ def v_request_email_verification(caller="", email="", **kwargs) -> dict:
     notification = Notification(
         topic="email_verification",
         title="Verify your email address",
-        message=f"Your Realms verification code is: {code}",
+        message=code,
         sender=caller,
         visibility="private",
         audience_type="user",
