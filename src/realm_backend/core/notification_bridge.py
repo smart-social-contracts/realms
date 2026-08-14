@@ -386,6 +386,7 @@ def _email_info(user) -> dict:
         "email_notifications_enabled": data.get(
             "email_notifications_enabled", True
         ),
+        "email_verified": bool(data.get("email_verified", False)),
     }
 
 
@@ -440,6 +441,12 @@ def queue_email(notification, event_type: str = "") -> None:
             return
         if not existing and not info.get("email"):
             return
+        # Only verified addresses receive notification mail. The
+        # ``force_email_to`` path (admin tests, the verification email
+        # itself) bypasses this so an unverified address can still be
+        # reached to prove ownership.
+        if not existing and not info.get("email_verified", False):
+            return
 
         metadata["email_status"] = "pending"
         metadata["event_type"] = resolved
@@ -467,16 +474,12 @@ def v_email_settings(caller="", **kwargs) -> dict:
 
 
 def v_set_email(caller="", email="", **kwargs) -> dict:
-    """Set the caller's own email address. Only ever their own."""
-    address = str(email or "").strip().lower()
-    if address and not _valid_email(address):
-        raise ValueError("Invalid email address")
+    """Set the caller's own email address. Only ever their own.
 
-    user = _caller_user(caller)
-    data = _private_data(user)
-    data["email"] = address
-    user.private_data = json.dumps(data)
-    return {"email": address}
+    Setting an address always marks it unverified; verification is a
+    separate step so the flag cannot be self-asserted.
+    """
+    return v_set_email_unverified(caller=caller, email=email)
 
 
 def v_set_email_preferences(caller="", email_notifications_enabled=True,
@@ -487,6 +490,139 @@ def v_set_email_preferences(caller="", email_notifications_enabled=True,
     data["email_notifications_enabled"] = enabled
     user.private_data = json.dumps(data)
     return {"email_notifications_enabled": enabled}
+
+
+# --- Email address verification -------------------------------------------
+
+VERIFY_CODE_TTL_SECONDS = 15 * 60
+VERIFY_MAX_ATTEMPTS = 5
+
+
+def _now_seconds() -> int:
+    """Current Unix time in whole seconds, canister-safe.
+
+    ``time.time()`` returns 0.0 under Kybra/WASM; the IC exposes a
+    nanosecond clock via ``ic.time()``. Falls back to ``time.time()`` for
+    local/test runs.
+    """
+    try:
+        from kybra import ic as _ic  # noqa: PLC0415
+
+        t = _ic.time()
+        if t and t > 0:
+            return int(t) // 1_000_000_000
+    except Exception:
+        pass
+    import time
+
+    t = time.time()
+    return int(t) if t and t > 0 else 0
+
+
+def _generate_verify_code() -> str:
+    """Six-digit numeric code, IC-safe (no ``secrets``/system entropy)."""
+    from core.random import generate_unique_id
+
+    return str(int(generate_unique_id(length=16), 16) % 1_000_000).zfill(6)
+
+
+def _clear_verify_state(data: dict) -> None:
+    for key in ("email_verify_code", "email_verify_expires",
+                "email_verify_attempts"):
+        data.pop(key, None)
+
+
+def v_set_email_unverified(caller="", email="", **kwargs) -> dict:
+    """Store the caller's address as unverified and clear any stale code."""
+    address = str(email or "").strip().lower()
+    if address and not _valid_email(address):
+        raise ValueError("Invalid email address")
+
+    user = _caller_user(caller)
+    data = _private_data(user)
+    data["email"] = address
+    data["email_verified"] = False
+    _clear_verify_state(data)
+    user.private_data = json.dumps(data)
+    return {"email": address, "email_verified": False}
+
+
+def v_request_email_verification(caller="", email="", **kwargs) -> dict:
+    """Store the address, mint a code, and queue the verification email.
+
+    The verification mail uses ``force_email_to`` so it reaches the
+    (not-yet-verified) address and bypasses the event-toggle gate.
+    """
+    from ggg import Notification
+
+    address = str(email or "").strip().lower()
+    if not address:
+        raise ValueError("email is required")
+    if not _valid_email(address):
+        raise ValueError("Invalid email address")
+
+    user = _caller_user(caller)
+    data = _private_data(user)
+    code = _generate_verify_code()
+    data["email"] = address
+    data["email_verified"] = False
+    data["email_verify_code"] = code
+    data["email_verify_expires"] = _now_seconds() + VERIFY_CODE_TTL_SECONDS
+    data["email_verify_attempts"] = 0
+    user.private_data = json.dumps(data)
+
+    notification = Notification(
+        topic="email_verification",
+        title="Verify your email address",
+        message=f"Your Realms verification code is: {code}",
+        sender=caller,
+        visibility="private",
+        audience_type="user",
+        user=user,
+        read=False,
+        read_by="",
+        icon="mail",
+        href="/settings",
+        color="blue",
+        metadata=json.dumps({
+            "email_status": "pending",
+            "event_type": "email_verification",
+            "force_email_to": address,
+        }),
+    )
+    return {"id": notification._id, "email": address}
+
+
+def v_verify_email_code(caller="", code="", **kwargs) -> dict:
+    """Confirm ownership of the stored address with the emailed code."""
+    user = _caller_user(caller)
+    data = _private_data(user)
+
+    expected = str(data.get("email_verify_code") or "")
+    if not expected:
+        raise ValueError("No verification in progress; request a code first")
+
+    attempts = int(data.get("email_verify_attempts", 0))
+    if attempts >= VERIFY_MAX_ATTEMPTS:
+        _clear_verify_state(data)
+        user.private_data = json.dumps(data)
+        raise ValueError("Too many attempts; request a new code")
+
+    expires = int(data.get("email_verify_expires", 0))
+    if expires and _now_seconds() > expires:
+        _clear_verify_state(data)
+        user.private_data = json.dumps(data)
+        raise ValueError("Verification code expired; request a new one")
+
+    if str(code or "").strip() != expected:
+        data["email_verify_attempts"] = attempts + 1
+        user.private_data = json.dumps(data)
+        raise ValueError("Incorrect verification code")
+
+    data["email_verified"] = True
+    _clear_verify_state(data)
+    user.private_data = json.dumps(data)
+    return {"email": data.get("email", ""), "email_verified": True}
 
 
 def _require_worker(caller: str, verb: str) -> None:
@@ -568,13 +704,16 @@ def v_send_test_email(caller="", to="", subject="Realms email test",
             f"'{ADMIN_OPERATION}' operation"
         )
 
+    user = _caller_user(caller)
     address = str(to or "").strip().lower()
     if not address:
-        raise ValueError("to address is required")
+        address = _email_info(user).get("email", "")
+        if not address:
+            raise ValueError(
+                "to address is required — set your email in Settings first"
+            )
     if not _valid_email(address):
         raise ValueError("Invalid to address")
-
-    user = _caller_user(caller)
     notification = Notification(
         topic="email_test",
         title=str(subject).strip(),
@@ -609,7 +748,10 @@ WRITES = {
     "notification.mark_read": v_mark_read,
     "notification.delete": v_delete,
     "notification.set_email": v_set_email,
+    "notification.set_email_unverified": v_set_email_unverified,
     "notification.set_email_preferences": v_set_email_preferences,
+    "notification.request_email_verification": v_request_email_verification,
+    "notification.verify_email_code": v_verify_email_code,
     "notification.mark_email_sent": v_mark_email_sent,
     "notification.send_test_email": v_send_test_email,
 }

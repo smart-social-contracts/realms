@@ -320,7 +320,9 @@ def test_email_settings_are_always_the_callers_own(realm):
 def test_setting_an_email_writes_only_the_callers_record(realm):
     call("alice")("notifications", "notification.set_email",
                   {"email": "Alice@Example.COM"})
-    assert json.loads(realm.alice.private_data)["email"] == "alice@example.com"
+    data = json.loads(realm.alice.private_data)
+    assert data["email"] == "alice@example.com"
+    assert data["email_verified"] is False
     assert json.loads(realm.bob.private_data) == {}
 
 
@@ -400,3 +402,146 @@ def test_test_email_validates_the_address(realm):
     with pytest.raises(ValueError, match="Invalid to address"):
         call("alice")("notifications", "notification.send_test_email",
                       {"to": "nope"})
+
+
+def test_test_email_defaults_to_callers_address(realm):
+    realm.granted.add("realm.admin")
+    realm.alice.private_data = json.dumps({"email": "alice@example.com"})
+    result = call("alice")("notifications", "notification.send_test_email", {})
+    assert result["to"] == "alice@example.com"
+
+
+def _enable_realm_email():
+    sys.modules["ggg"].Realm.load = lambda key: types.SimpleNamespace(
+        manifest_data=json.dumps({
+            "email": {"enabled": True, "events": {"mention": True}},
+        })
+    )
+
+
+def _create_mention(realm, subject="alice"):
+    call("alice")("notifications", "notification.create", {
+        "title": "Mention", "message": "You were mentioned",
+        "subject": subject, "event_type": "mention",
+    })
+    return realm.notes[-1]
+
+
+def test_unverified_address_is_not_queued(realm):
+    """Unverified addresses must not receive notification mail."""
+    _enable_realm_email()
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com", "email_verified": False,
+    })
+    note = _create_mention(realm)
+    metadata = json.loads(note.metadata)
+    assert metadata.get("email_status") != "pending"
+
+
+def test_verified_address_is_queued(realm):
+    """Verified addresses with mention events are queued for delivery."""
+    _enable_realm_email()
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com", "email_verified": True,
+        "email_notifications_enabled": True,
+    })
+    note = _create_mention(realm)
+    metadata = json.loads(note.metadata)
+    assert metadata["email_status"] == "pending"
+    assert metadata["force_email_to"] == "alice@example.com"
+
+
+def test_request_email_verification_queues_force_email(realm):
+    """Requesting verification stores state and queues a force-email."""
+    result = call("alice")(
+        "notifications", "notification.request_email_verification",
+        {"email": "Alice@Example.com"},
+    )
+    data = json.loads(realm.alice.private_data)
+    assert data["email"] == "alice@example.com"
+    assert data["email_verified"] is False
+    assert len(data["email_verify_code"]) == 6
+    assert data["email_verify_code"].isdigit()
+    assert data["email_verify_expires"] > 0
+
+    note = realm.Notification.load(result["id"])
+    metadata = json.loads(note.metadata)
+    assert metadata["email_status"] == "pending"
+    assert metadata["event_type"] == "email_verification"
+    assert metadata["force_email_to"] == "alice@example.com"
+
+
+def test_verify_email_code_success(realm):
+    """A correct code marks the address verified and clears state."""
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com",
+        "email_verify_code": "123456",
+        "email_verify_expires": 9999999999,
+        "email_verify_attempts": 0,
+    })
+    result = call("alice")(
+        "notifications", "notification.verify_email_code", {"code": "123456"},
+    )
+    assert result["email_verified"] is True
+    data = json.loads(realm.alice.private_data)
+    assert data["email_verified"] is True
+    assert "email_verify_code" not in data
+    assert "email_verify_expires" not in data
+    assert "email_verify_attempts" not in data
+
+
+def test_verify_email_code_wrong_code_increments_attempts(realm):
+    """A wrong code increments attempts without verifying."""
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com",
+        "email_verify_code": "123456",
+        "email_verify_expires": 9999999999,
+        "email_verify_attempts": 0,
+    })
+    with pytest.raises(ValueError, match="Incorrect verification code"):
+        call("alice")(
+            "notifications", "notification.verify_email_code",
+            {"code": "000000"},
+        )
+    data = json.loads(realm.alice.private_data)
+    assert data.get("email_verified") is not True
+    assert data["email_verify_attempts"] == 1
+    assert data["email_verify_code"] == "123456"
+
+
+def test_verify_email_code_expired(realm):
+    """An expired code is refused and verification state is cleared."""
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com",
+        "email_verify_code": "123456",
+        "email_verify_expires": 1,
+        "email_verify_attempts": 0,
+    })
+    with pytest.raises(ValueError, match="expired"):
+        call("alice")(
+            "notifications", "notification.verify_email_code",
+            {"code": "123456"},
+        )
+    data = json.loads(realm.alice.private_data)
+    assert "email_verify_code" not in data
+    assert "email_verify_expires" not in data
+    assert "email_verify_attempts" not in data
+
+
+def test_verify_too_many_attempts_locks(realm):
+    """Five failed attempts clear state and require a new code."""
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com",
+        "email_verify_code": "123456",
+        "email_verify_expires": 9999999999,
+        "email_verify_attempts": 5,
+    })
+    with pytest.raises(ValueError, match="Too many attempts"):
+        call("alice")(
+            "notifications", "notification.verify_email_code",
+            {"code": "123456"},
+        )
+    data = json.loads(realm.alice.private_data)
+    assert "email_verify_code" not in data
+    assert "email_verify_expires" not in data
+    assert "email_verify_attempts" not in data

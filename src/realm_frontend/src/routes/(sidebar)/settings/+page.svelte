@@ -28,12 +28,22 @@
 	let profiles = $state<string[]>([]);
 	let email = $state('');
 	let emailNotificationsEnabled = $state(true);
+	let emailVerified = $state(false);
+	let verificationPending = $state(false);
+	let verifyCode = $state('');
+	let sendingCode = $state(false);
+	let verifyingCode = $state(false);
 	let privateData: Record<string, any> = $state({});
 	let loadingUserStatus = $state(true);
 	let userStatusError = $state('');
 	let savingEmail = $state(false);
 	let emailSaveMessage = $state('');
 	let emailSaveError = $state('');
+
+	const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+	const normalizedEmail = $derived(email.trim().toLowerCase());
+	const emailIsValid = $derived(Boolean(normalizedEmail) && EMAIL_REGEX.test(normalizedEmail));
 
 	/** Federated membership probe (issue #156). */
 	let membershipHits = $state<MembershipHit[]>([]);
@@ -122,6 +132,8 @@
 			}
 			email = privateData.email || '';
 			emailNotificationsEnabled = privateData.email_notifications_enabled !== false;
+			emailVerified = privateData.email_verified === true;
+			verificationPending = Boolean(email) && !emailVerified;
 		} else {
 			throw new Error(
 				(response && !response.success && response.data?.error) ||
@@ -130,32 +142,109 @@
 		}
 	}
 
-	async function saveEmailPreferences() {
+	function parseExtensionResponse(result: any) {
+		if (!result) {
+			throw new Error('No response from server.');
+		}
+		if (result.success === false) {
+			const responseStr = result.response ?? '';
+			try {
+				const inner =
+					typeof responseStr === 'string' ? JSON.parse(responseStr) : responseStr;
+				throw new Error(inner?.error || inner?.message || 'Request failed.');
+			} catch (e: any) {
+				if (e instanceof Error && e.message !== 'Request failed.') {
+					throw e;
+				}
+				throw new Error(
+					typeof responseStr === 'string' && responseStr ? responseStr : 'Request failed.'
+				);
+			}
+		}
+		const responseStr = result.response ?? result;
+		const data = typeof responseStr === 'string' ? JSON.parse(responseStr) : responseStr;
+		if (data?.success === false) {
+			throw new Error(data.error || data.message || 'Request failed.');
+		}
+		return data?.data ?? data;
+	}
+
+	async function sendVerificationCode() {
+		emailSaveMessage = '';
+		emailSaveError = '';
+		sendingCode = true;
+		try {
+			if (!emailIsValid) {
+				throw new Error('Please enter a valid email address.');
+			}
+			const result = await quarterBackend.extension_sync_call(
+				'notifications',
+				'request_email_verification',
+				JSON.stringify({ email: normalizedEmail })
+			);
+			parseExtensionResponse(result);
+			verificationPending = true;
+			emailVerified = false;
+			emailSaveMessage = 'Check your inbox for a 6-digit code.';
+		} catch (e: any) {
+			emailSaveError = e.message || 'Failed to send verification code.';
+		} finally {
+			sendingCode = false;
+		}
+	}
+
+	async function verifyEmailCode() {
+		emailSaveMessage = '';
+		emailSaveError = '';
+		verifyingCode = true;
+		try {
+			const code = verifyCode.trim();
+			if (!code) {
+				throw new Error('Please enter the 6-digit code.');
+			}
+			const result = await quarterBackend.extension_sync_call(
+				'notifications',
+				'verify_email_code',
+				JSON.stringify({ code })
+			);
+			parseExtensionResponse(result);
+			emailVerified = true;
+			verificationPending = false;
+			verifyCode = '';
+			emailSaveMessage = 'Email address verified.';
+			try {
+				await loadUserStatus();
+			} catch (e: any) {
+				console.warn('User status refresh after verify failed:', e);
+			}
+		} catch (e: any) {
+			emailSaveError = e.message || 'Failed to verify code.';
+		} finally {
+			verifyingCode = false;
+		}
+	}
+
+	async function saveNotificationPreference() {
 		emailSaveMessage = '';
 		emailSaveError = '';
 		savingEmail = true;
 		try {
-			const normalizedEmail = email.trim().toLowerCase();
-			if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-				throw new Error('Please enter a valid email address.');
-			}
 			const updated = {
 				...privateData,
-				email: normalizedEmail,
 				email_notifications_enabled: emailNotificationsEnabled
 			};
 			const response = await quarterBackend.update_my_private_data(JSON.stringify(updated));
 			if (response && response.success) {
 				privateData = updated;
-				emailSaveMessage = 'Email preferences saved.';
+				emailSaveMessage = 'Notification preference saved.';
 			} else {
 				throw new Error(
 					(response && !response.success && response.data?.error) ||
-						'Could not save email preferences.'
+						'Could not save notification preference.'
 				);
 			}
 		} catch (e: any) {
-			emailSaveError = e.message || 'Failed to save email preferences.';
+			emailSaveError = e.message || 'Failed to save notification preference.';
 		} finally {
 			savingEmail = false;
 		}
@@ -328,7 +417,7 @@
 			</Heading>
 			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
 				<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-					Add an email address to receive realm notifications by email. You can turn email delivery off at any time.
+					Add a personal email address to receive realm notifications. We will send a 6-digit code to verify it. You can turn email delivery off at any time.
 				</p>
 
 				{#if emailSaveMessage}
@@ -343,14 +432,58 @@
 						<label for="user-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 							Email address
 						</label>
-						<input
-							id="user-email"
-							type="email"
-							bind:value={email}
-							placeholder="you@example.com"
-							class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-						/>
+						<div class="flex flex-wrap items-center gap-2">
+							<input
+								id="user-email"
+								type="email"
+								bind:value={email}
+								placeholder="you@example.com"
+								class="flex-1 min-w-[12rem] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+							/>
+							{#if emailVerified}
+								<span class="text-sm font-medium text-green-600 dark:text-green-400">Verified</span>
+							{/if}
+						</div>
 					</div>
+
+					{#if !emailVerified}
+						<button
+							type="button"
+							onclick={sendVerificationCode}
+							disabled={sendingCode || !emailIsValid}
+							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+						>
+							{sendingCode ? 'Sending…' : 'Send verification code'}
+						</button>
+					{/if}
+
+					{#if verificationPending && !emailVerified}
+						<div>
+							<label for="user-email-verify-code" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+								Verification code
+							</label>
+							<div class="flex flex-wrap items-center gap-2">
+								<input
+									id="user-email-verify-code"
+									type="text"
+									inputmode="numeric"
+									autocomplete="one-time-code"
+									maxlength="6"
+									bind:value={verifyCode}
+									placeholder="123456"
+									class="w-36 px-3 py-2 border border-gray-300 rounded-lg text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+								/>
+								<button
+									type="button"
+									onclick={verifyEmailCode}
+									disabled={verifyingCode || !verifyCode.trim()}
+									class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+								>
+									{verifyingCode ? 'Verifying…' : 'Verify'}
+								</button>
+							</div>
+						</div>
+					{/if}
 
 					<div class="flex items-center gap-3">
 						<label for="user-email-enabled" class="relative inline-flex items-center cursor-pointer">
@@ -370,11 +503,11 @@
 
 					<button
 						type="button"
-						onclick={saveEmailPreferences}
+						onclick={saveNotificationPreference}
 						disabled={savingEmail}
 						class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 					>
-						{savingEmail ? 'Saving…' : 'Save email preferences'}
+						{savingEmail ? 'Saving…' : 'Save notification preference'}
 					</button>
 				</div>
 			</div>

@@ -1133,6 +1133,19 @@ class _Notifications:
     def set_email(self, email):
         return _require_rpc("notification.set_email", {"email": email})
 
+    def set_email_unverified(self, email):
+        return _require_rpc("notification.set_email_unverified", {
+            "email": email,
+        })
+
+    def request_email_verification(self, email):
+        return _require_rpc("notification.request_email_verification", {
+            "email": email,
+        })
+
+    def verify_email_code(self, code):
+        return _require_rpc("notification.verify_email_code", {"code": code})
+
     def set_email_preferences(self, enabled):
         return _require_rpc("notification.set_email_preferences", {
             "email_notifications_enabled": enabled,

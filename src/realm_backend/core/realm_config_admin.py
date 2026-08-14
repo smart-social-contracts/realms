@@ -165,14 +165,12 @@ def apply_realm_config(config: dict) -> dict:
 
         # Validate shape: only non-sensitive, realm-level settings are stored
         # on-chain. SMTP credentials live in the off-chain worker env.
-        allowed_keys = {
-            "enabled",
-            "from_name",
-            "from_address",
-            "reply_to",
-            "events",
-            "templates",
-        }
+        # Sender identity is derived from the realm name; strip legacy keys
+        # silently so older UIs keep working.
+        allowed_keys = {"enabled", "events", "templates"}
+        legacy_identity_keys = {"from_name", "from_address", "reply_to"}
+        for key in legacy_identity_keys:
+            email_config.pop(key, None)
         if set(email_config.keys()) - allowed_keys:
             return {
                 "success": False,
@@ -189,6 +187,7 @@ def apply_realm_config(config: dict) -> dict:
             "vote_ended": True,
             "mention": True,
             "task_assigned": True,
+            "email_verification": True,
         }
         events = email_config.get("events") or {}
         if not isinstance(events, dict):

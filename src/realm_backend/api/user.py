@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from ggg import User
@@ -45,13 +46,38 @@ def user_update_public_profile(
     }
 
 
+# Email ownership is proven by notification.verify_email_code, not by
+# writing these keys through the generic private_data blob.
+_EMAIL_RESERVED_KEYS = (
+    "email",
+    "email_verified",
+    "email_verify_code",
+    "email_verify_expires",
+    "email_verify_attempts",
+)
+
+
+def _as_object(raw: str) -> dict:
+    try:
+        data = json.loads(raw or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def user_update_private_data(principal: str, private_data: str) -> dict[str, Any]:
     logger.info(f"Updating private data for user {principal}")
     user = User[principal]
     if not user:
         return {"success": False, "error": f"User with principal {principal} not found"}
 
-    user.private_data = private_data
+    incoming = _as_object(private_data)
+    existing = _as_object(getattr(user, "private_data", "") or "")
+    for key in _EMAIL_RESERVED_KEYS:
+        incoming.pop(key, None)
+        if key in existing:
+            incoming[key] = existing[key]
+    user.private_data = json.dumps(incoming)
     return {
         "success": True,
         "private_data": user.private_data or "",
