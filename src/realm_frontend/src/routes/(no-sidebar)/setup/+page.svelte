@@ -120,6 +120,9 @@
 	const summaryCodexPackage = $derived(
 		setupState?.draft?.codex?.package || setupState?.codex?.package || selectedCodexId || ''
 	);
+	const summaryCodexName = $derived(
+		codices.find((codex) => codex.id === summaryCodexPackage)?.name || summaryCodexPackage
+	);
 	const summaryCodexVersion = $derived(
 		setupState?.draft?.codex?.version ||
 			setupState?.codex?.version ||
@@ -853,7 +856,13 @@
 						</Button>
 					{:else if currentStep === 'review'}
 						{#if launchFailed}
-							<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleLaunch}>
+							<Button
+								color="none"
+								class={primaryButtonClass}
+								style={primaryColor ? `background:${primaryColor};border-color:${primaryColor}` : ''}
+								disabled={busy}
+								onclick={handleLaunch}
+							>
 								{busy ? 'Retrying…' : 'Retry launch'}
 							</Button>
 						{:else if launchCompleted}
@@ -864,6 +873,7 @@
 							<Button
 								color="none"
 								class={primaryButtonClass}
+								style={primaryColor ? `background:${primaryColor};border-color:${primaryColor}` : ''}
 								disabled={busy || !summaryCodexPackage}
 								onclick={handleLaunch}
 							>
@@ -1160,45 +1170,35 @@
 					</div>
 				</section>
 			{:else}
-				<section class="setup-wizard__panel">
-					<Heading tag="h2" class="text-xl font-semibold">Review & launch</Heading>
-					<P class="text-gray-600">Confirm your choices, then launch the realm into alpha.</P>
+				<section class="setup-wizard__panel setup-wizard__panel--review">
+					<div>
+						<Heading tag="h2" class="text-xl font-semibold">Ready to launch</Heading>
+						<P class="text-gray-600">
+							These choices will be installed together. You can still go back and change them.
+						</P>
 
-					<dl class="setup-wizard__summary">
-						<div>
-							<dt>Codex</dt>
-							<dd>{summaryCodexPackage || 'Not chosen'}</dd>
-						</div>
-						<div>
-							<dt>Codex version</dt>
-							<dd>{summaryCodexVersion || '—'}</dd>
-						</div>
-						<div>
-							<dt>Token</dt>
-							<dd>{summaryTokenSymbol || 'Skipped'}</dd>
-						</div>
-						<div>
-							<dt>Branding</dt>
-							<dd>
-								{#if hasBrandingDraft}
-									Logo {logoPreview ? '✓' : '—'}, background {backgroundPreview ? '✓' : '—'},
-									color {primaryColor}
-								{:else}
-									Skipped
+						<ul class="setup-wizard__review-list">
+							<li>
+								<span>Codex</span>
+								<strong>{summaryCodexName || 'Not chosen'}</strong>
+								{#if summaryCodexVersion}
+									<em>{summaryCodexVersion}</em>
 								{/if}
-							</dd>
-						</div>
-						<div>
-							<dt>Welcome message</dt>
-							<dd>{welcomeMessage.trim() || 'Default'}</dd>
-						</div>
-						<div>
-							<dt>Manifesto</dt>
-							<dd>{manifesto.trim() || 'Skipped'}</dd>
-						</div>
-					</dl>
+							</li>
+							<li>
+								<span>Token</span>
+								<strong>{summaryTokenSymbol || 'Skipped'}</strong>
+							</li>
+							<li>
+								<span>Color</span>
+								<strong class="setup-wizard__review-color">
+									<i style={`background:${primaryColor || '#0b1120'}`}></i>
+									{hasBrandingDraft || primaryColor ? primaryColor : 'Default'}
+								</strong>
+							</li>
+						</ul>
 
-					{#if launchState && !launchIdle}
+						{#if launchState && !launchIdle}
 						<ol class="setup-wizard__launch-steps" aria-label="Launch progress">
 							{#each LAUNCH_PHASES as phase (phase.name)}
 								{@const status = launchStepStatus(phase.name)}
@@ -1229,6 +1229,19 @@
 							{/each}
 						</ol>
 					{/if}
+					</div>
+
+					<div class="setup-wizard__preview-wrap">
+						<p class="setup-wizard__preview-label">How it will look</p>
+						<PublicDashboardPreview
+							logoPreview={logoPreview}
+							backgroundPreview={backgroundPreview}
+							welcomeMessage={welcomeMessage}
+							manifesto={manifesto}
+							realmName={$realmName || 'Your realm'}
+							primaryColor={primaryColor}
+						/>
+					</div>
 				</section>
 			{/if}
 			{/key}
@@ -1592,16 +1605,66 @@
 		gap: 1rem;
 	}
 
-	.setup-wizard__panel--branding {
+	.setup-wizard__panel--branding,
+	.setup-wizard__panel--review {
 		display: grid;
 		grid-template-columns: 1fr;
 		gap: 1.5rem;
 	}
 
 	@media (min-width: 900px) {
-		.setup-wizard__panel--branding {
+		.setup-wizard__panel--branding,
+		.setup-wizard__panel--review {
 			grid-template-columns: 1.1fr 0.9fr;
 		}
+	}
+
+	.setup-wizard__review-list {
+		list-style: none;
+		margin: 0.5rem 0 0;
+		padding: 0;
+		display: grid;
+		gap: 0.75rem;
+	}
+
+	.setup-wizard__review-list li {
+		display: grid;
+		gap: 0.15rem;
+		padding: 0.85rem 1rem;
+		border: 1px solid #e2e8f0;
+		border-radius: 0.75rem;
+		background: #f8fafc;
+	}
+
+	.setup-wizard__review-list span {
+		font-size: 0.75rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: #64748b;
+	}
+
+	.setup-wizard__review-list strong {
+		font-size: 1.05rem;
+		color: #0b1120;
+	}
+
+	.setup-wizard__review-list em {
+		font-style: normal;
+		font-size: 0.8125rem;
+		color: #64748b;
+	}
+
+	.setup-wizard__review-color {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.setup-wizard__review-color i {
+		width: 1rem;
+		height: 1rem;
+		border-radius: 999px;
+		border: 1px solid rgba(15, 23, 42, 0.12);
 	}
 
 	.setup-wizard__codex-list {
