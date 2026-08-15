@@ -155,7 +155,9 @@ def apply_self_report_to_quarter(quarter_entity: Any, self_block: Optional[Mappi
     return changed
 
 
-def classify_quarter_drift_state(*, aligned: bool, ballot_status: str) -> str:
+def classify_quarter_drift_state(
+    *, aligned: bool, has_report: bool, ballot_status: str
+) -> str:
     """Per-quarter drift state for the capital federation view."""
     status = (ballot_status or "").strip().lower()
     if aligned:
@@ -164,6 +166,9 @@ def classify_quarter_drift_state(*, aligned: bool, ballot_status: str) -> str:
         return "ballot_open"
     if status in NOT_ADOPTED_BALLOT_STATUSES:
         return "ballot_not_adopted"
+    if not has_report:
+        # Absence of gossip is not evidence of drift — only a confirmed report can show misalignment.
+        return "unknown"
     return "drifted"
 
 
@@ -186,7 +191,8 @@ def build_quarter_drift_entry(
         "codex_id": (capital_codex_id or "").strip(),
         "version": (capital_codex_version or "").strip() or None,
     }
-    aligned = codex_versions_match(reported, capital)
+    has_report = bool(reported["codex_id"])
+    aligned = has_report and codex_versions_match(reported, capital)
     return {
         "canister_id": canister_id or "",
         "name": name or "",
@@ -194,11 +200,12 @@ def build_quarter_drift_entry(
         "reported_codex_version": normalize_version(reported.get("version")),
         "capital_codex_id": capital["codex_id"],
         "capital_codex_version": normalize_version(capital.get("version")),
-        "drifted": not aligned,
+        "drifted": has_report and not aligned,
         "last_sync_ballot_id": (last_sync_ballot_id or "").strip(),
         "last_sync_ballot_status": (last_sync_ballot_status or "").strip(),
         "state": classify_quarter_drift_state(
             aligned=aligned,
+            has_report=has_report,
             ballot_status=last_sync_ballot_status,
         ),
     }

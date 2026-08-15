@@ -69,7 +69,7 @@ class TestCodexAlignment:
         assert entry["drifted"] is True
         assert entry["state"] == "drifted"
 
-    def test_never_reported_is_drifted_without_crashing(self):
+    def test_never_reported_is_unknown_not_drifted(self):
         entry = qd.build_quarter_drift_entry(
             canister_id="q-1",
             name="Quarter 1",
@@ -80,9 +80,37 @@ class TestCodexAlignment:
             last_sync_ballot_id="",
             last_sync_ballot_status="",
         )
-        assert entry["drifted"] is True
-        assert entry["state"] == "drifted"
+        assert entry["drifted"] is False
+        assert entry["state"] == "unknown"
         assert entry["reported_codex_id"] == ""
+
+    def test_never_reported_with_open_ballot_shows_ballot_open(self):
+        entry = qd.build_quarter_drift_entry(
+            canister_id="q-1",
+            name="Quarter 1",
+            reported_codex_id="",
+            reported_codex_version="",
+            capital_codex_id="agora",
+            capital_codex_version="1.0.0",
+            last_sync_ballot_id="prop-5",
+            last_sync_ballot_status="voting",
+        )
+        assert entry["drifted"] is False
+        assert entry["state"] == "ballot_open"
+
+    def test_never_reported_with_failed_ballot_shows_ballot_not_adopted(self):
+        entry = qd.build_quarter_drift_entry(
+            canister_id="q-1",
+            name="Quarter 1",
+            reported_codex_id="",
+            reported_codex_version="",
+            capital_codex_id="agora",
+            capital_codex_version="1.0.0",
+            last_sync_ballot_id="prop-6",
+            last_sync_ballot_status="failed",
+        )
+        assert entry["drifted"] is False
+        assert entry["state"] == "ballot_not_adopted"
 
 
 class TestBallotStates:
