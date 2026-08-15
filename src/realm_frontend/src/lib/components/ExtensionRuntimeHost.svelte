@@ -56,6 +56,7 @@
 	let accessDeniedOperation = '';
 	let mounted: MountResult | SandboxMountResult | void;
 	let sandboxed = false;
+	let runtimeDenied: { operation: string; message: string } | null = null;
 
 	function readHostTheme(): 'light' | 'dark' {
 		if (!browser) return 'light';
@@ -143,6 +144,29 @@
 			extensionBackend = marketplaceAdapter as unknown as typeof backend;
 		}
 
+		function unwrapCallResult(raw: unknown, label: string): unknown {
+			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+			if (res?.success === false) {
+				const denied = parseAccessError(res);
+				if (denied) {
+					runtimeDenied = denied;
+					throw new AccessDeniedError(denied);
+				}
+				throw new Error(res.response ?? `${label} failed`);
+			}
+			if (!res?.response) return res;
+			let inner: unknown;
+			try {
+				inner = JSON.parse(res.response);
+			} catch {
+				return res.response;
+			}
+			const denied = parseAccessError(inner);
+			if (denied) {
+				runtimeDenied = denied;
+			}
+			return inner;
+		}
 		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
 			let raw: string;
 			try {
@@ -152,18 +176,7 @@
 				if (friendly) throw new Error(friendly);
 				throw e;
 			}
-			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
-			if (res?.success === false) {
-				const denied = parseAccessError(res);
-				if (denied) throw new AccessDeniedError(denied);
-				throw new Error(res.response ?? 'extension_sync_call failed');
-			}
-			if (!res?.response) return res;
-			try {
-				return JSON.parse(res.response);
-			} catch {
-				return res.response;
-			}
+			return unwrapCallResult(raw, 'extension_sync_call');
 		}
 		async function callAsync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
 			let raw: string;
@@ -174,18 +187,7 @@
 				if (friendly) throw new Error(friendly);
 				throw e;
 			}
-			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
-			if (res?.success === false) {
-				const denied = parseAccessError(res);
-				if (denied) throw new AccessDeniedError(denied);
-				throw new Error(res.response ?? 'extension_async_call failed');
-			}
-			if (!res?.response) return res;
-			try {
-				return JSON.parse(res.response);
-			} catch {
-				return res.response;
-			}
+			return unwrapCallResult(raw, 'extension_async_call');
 		}
 
 		return {
@@ -289,6 +291,7 @@
 		status = 'loading';
 		errorMsg = '';
 		errorRetryable = false;
+		runtimeDenied = null;
 
 		try {
 			const [version, manifest] = await Promise.all([
@@ -423,6 +426,12 @@
 		</div>
 	{:else if status === 'access_denied'}
 		<AccessDenied operation={accessDeniedOperation} onRetry={() => loadRuntimeExtension(extensionId)} />
+	{:else if status === 'ready' && runtimeDenied}
+		<AccessDenied
+			operation={runtimeDenied.operation}
+			message={runtimeDenied.message}
+			onRetry={() => loadRuntimeExtension(extensionId)}
+		/>
 	{:else if status === 'sdk_mismatch'}
 		<Alert color="red" class="mb-4">
 			<div class="font-semibold">Extension SDK version mismatch</div>
@@ -448,7 +457,12 @@
 		</Alert>
 	{/if}
 
-	<div bind:this={mountPoint} data-extension-id={extensionId} class="extension-mount-point"></div>
+	<div
+		bind:this={mountPoint}
+		data-extension-id={extensionId}
+		class="extension-mount-point"
+		class:hidden={!!runtimeDenied}
+	></div>
 </div>
 
 {#if sandboxed && status === 'ready'}
@@ -472,6 +486,11 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+	}
+
+	.extension-mount-point.hidden,
+	.extension-host-fullbleed :global(.extension-mount-point.hidden) {
+		display: none !important;
 	}
 
 	:global(.extension-mount-point svg[role='status']),

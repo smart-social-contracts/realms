@@ -1,3 +1,6 @@
+export const ERROR_CODE_PERMISSION_DENIED = 'permission_denied';
+export const DEFAULT_PERMISSION_MESSAGE = "You don't have permission to view this.";
+
 export interface AccessError {
   isAccessDenied: boolean;
   operation: string;
@@ -17,8 +20,10 @@ export class AccessDeniedError extends Error {
  * Detects whether a backend extension_sync_call result (or a caught error)
  * represents a permission-denied response and extracts structured info.
  *
- * The backend returns permission errors in `result.response` as JSON:
- *   {"error":"Access denied: ...","denied_operation":"extension.sync_call"}
+ * Canonical inner/outer JSON:
+ *   {"success":false,"error_code":"permission_denied","error":"...","denied_operation":"..."}
+ *
+ * Legacy payloads with only ``denied_operation`` are still recognized.
  *
  * Returns null when the result is not a permission error.
  */
@@ -27,65 +32,45 @@ export function parseAccessError(
 ): AccessError | null {
   if (!resultOrError) return null;
 
-  // Case 1: raw backend result object with `response` containing JSON
   if (typeof resultOrError === 'object' && resultOrError !== null) {
     const obj = resultOrError as Record<string, unknown>;
+    const direct = accessErrorFromObject(obj);
+    if (direct) return direct;
 
-    // Direct denied_operation on result (e.g. update_realm_config pattern)
-    if (obj.denied_operation) {
-      return {
-        isAccessDenied: true,
-        operation: String(obj.denied_operation),
-        message: String(obj.error || 'Access denied'),
-      };
-    }
-
-    // response field containing JSON with denied_operation
     if (typeof obj.response === 'string') {
-      try {
-        const parsed = JSON.parse(obj.response);
-        if (parsed?.denied_operation) {
-          return {
-            isAccessDenied: true,
-            operation: String(parsed.denied_operation),
-            message: String(parsed.error || 'Access denied'),
-          };
-        }
-      } catch {
-        // not JSON — check for stringified access denied pattern
-        if (obj.response.includes('Access denied') || obj.response.includes('denied_operation')) {
-          return {
-            isAccessDenied: true,
-            operation: extractOperation(obj.response),
-            message: 'Access denied',
-          };
-        }
+      const nested = parseAccessError(obj.response);
+      if (nested) return nested;
+      if (
+        obj.response.includes('Access denied') ||
+        obj.response.includes('denied_operation')
+      ) {
+        return {
+          isAccessDenied: true,
+          operation: extractOperation(obj.response),
+          message: DEFAULT_PERMISSION_MESSAGE,
+        };
       }
     }
   }
 
-  // Case 2: Error object whose message contains access denied JSON
   if (resultOrError instanceof Error) {
     return parseAccessError({ response: resultOrError.message });
   }
 
-  // Case 3: plain string (e.g. directly assigned error text)
   if (typeof resultOrError === 'string') {
     try {
       const parsed = JSON.parse(resultOrError);
-      if (parsed?.denied_operation) {
-        return {
-          isAccessDenied: true,
-          operation: String(parsed.denied_operation),
-          message: String(parsed.error || 'Access denied'),
-        };
-      }
+      const fromJson = parseAccessError(parsed);
+      if (fromJson) return fromJson;
     } catch {
-      if (resultOrError.includes('Access denied') && resultOrError.includes('denied_operation')) {
+      if (
+        resultOrError.includes('Access denied') &&
+        resultOrError.includes('denied_operation')
+      ) {
         return {
           isAccessDenied: true,
           operation: extractOperation(resultOrError),
-          message: 'Access denied',
+          message: DEFAULT_PERMISSION_MESSAGE,
         };
       }
     }
@@ -94,9 +79,22 @@ export function parseAccessError(
   return null;
 }
 
+function accessErrorFromObject(obj: Record<string, unknown>): AccessError | null {
+  const deniedOp = obj.denied_operation;
+  if (obj.error_code === ERROR_CODE_PERMISSION_DENIED || deniedOp) {
+    const raw = String(obj.error || '');
+    return {
+      isAccessDenied: true,
+      operation: deniedOp ? String(deniedOp) : extractOperation(raw),
+      message: DEFAULT_PERMISSION_MESSAGE,
+    };
+  }
+  return null;
+}
+
 function extractOperation(text: string): string {
   const match = text.match(/permission '([^']+)'/);
-  return match?.[1] || 'unknown';
+  return match?.[1] || '';
 }
 
 /**

@@ -40,7 +40,7 @@ _INSTALLER_IDS = {
 
 
 def _dfx_call(canister_id: str, method: str, arg: str, network: str, *, query: bool = False) -> str:
-    cmd = ["dfx", "canister", "call", canister_id, method, arg, "--network", network, "--output", "json"]
+    cmd = ["dfx", "--run-deprecated", "canister", "call", canister_id, method, arg, "--network", network, "--output", "json"]
     if query:
         cmd.append("--query")
     project_root = get_project_root()
@@ -59,7 +59,7 @@ def _dfx_call_file(canister_id: str, method: str, arg: str, network: str,
         f.write(arg)
         f.flush()
         try:
-            cmd = ["dfx", "canister", "call", canister_id, method,
+            cmd = ["dfx", "--run-deprecated", "canister", "call", canister_id, method,
                    "--argument-file", f.name, "--network", network]
             if candid_file:
                 cmd += ["--candid", candid_file]
@@ -625,12 +625,78 @@ def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
         console.print(f"  [yellow]⚠ canister_ids.js store failed: {e}[/yellow]")
 
 
+def _should_resync_extension_frontends(canister_filter: str) -> bool:
+    """Frontend (re)installs wipe ``/ext/``; backend-only deploys do not."""
+    return canister_filter != "backend"
+
+
+def _resync_frontends_payload(frontend_id: str, registry_id: str = "") -> str:
+    payload: dict[str, str] = {"frontend_canister_id": frontend_id}
+    if registry_id:
+        payload["registry_canister_id"] = registry_id
+    return '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+
+def _resync_extension_frontends_after_deploy(
+    realm: dict, network: str, infra: dict | None = None,
+) -> None:
+    """Copy installed extension bundles back onto the realm frontend.
+
+    Frontend asset deploys replace certified assets and drop ``/ext/{id}/{ver}/...``.
+    Sandboxed extensions then 404 on ``index.html`` (plain "not found" in the iframe).
+    Casals rollout already resyncs; mundus must do the same.
+    """
+    from .extension import _dfx_call as _icp_call
+    from .files import _FILE_REGISTRY_IDS
+
+    backend_id = (realm.get("canister_id") or "").strip()
+    frontend_id = (realm.get("frontend_canister_id") or "").strip()
+    if not backend_id or not frontend_id:
+        return
+
+    registry = (
+        (infra or {}).get("file_registry_canister_id")
+        or _FILE_REGISTRY_IDS.get(network, "")
+        or ""
+    ).strip()
+
+    try:
+        _icp_call(
+            frontend_id,
+            "grant_permission",
+            f'(record {{ to_principal = principal "{backend_id}"; '
+            f"permission = variant {{ Commit }} }})",
+            network,
+            None,
+        )
+        console.print("  Granted Commit on frontend to realm backend")
+    except Exception as e:
+        console.print(f"  [yellow]⚠ grant_permission Commit (non-fatal): {e}[/yellow]")
+
+    candid = _resync_frontends_payload(frontend_id, registry)
+    console.print("  Resyncing extension frontends onto the new asset canister...")
+    raw = _icp_call(
+        backend_id, "resync_extension_frontends", candid, network, None, timeout=600,
+    )
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"resync_extension_frontends: unreadable response: {raw}") from e
+    if not result.get("success"):
+        errors = result.get("errors") or []
+        detail = result.get("error") or errors or raw
+        raise RuntimeError(f"resync_extension_frontends failed: {detail}")
+    synced = result.get("synced") or []
+    console.print(f"  ✓ Resynced {len(synced)} extension frontend bundle(s)")
+
+
 def _post_deploy_config(realm: dict, network: str, version: str, parameters: dict = None,
-                         infra: dict | None = None) -> None:
+                         infra: dict | None = None, resync_frontends: bool = False) -> None:
     """Call set_canister_config on a realm backend after successful deployment.
 
     Wires frontend_canister_id, installed_version, network, and test flags into
-    the realm's DB.
+    the realm's DB. After a frontend deploy, recopies ``/ext/`` bundles that the
+    asset canister reinstall wiped.
     """
     backend_id = realm.get("canister_id", "")
     frontend_id = realm.get("frontend_canister_id", "")
@@ -715,6 +781,9 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
                             portal_url=portal_url,
                             infra=infra,
                             parameters=parameters)
+
+        if resync_frontends:
+            _resync_extension_frontends_after_deploy(realm, network, infra)
 
 
 def _submit_and_poll(manifest: dict, network: str) -> bool:
@@ -1039,7 +1108,15 @@ def mundus_deploy_descriptor_command(
         )
         ok = _submit_and_poll(manifest, network)
         if ok:
-            _post_deploy_config(realm, network, deployed_version, parameters=parameters, infra=infra)
+            try:
+                _post_deploy_config(
+                    realm, network, deployed_version,
+                    parameters=parameters, infra=infra,
+                    resync_frontends=_should_resync_extension_frontends(canister_filter),
+                )
+            except Exception as e:
+                console.print(f"[red]  post-deploy failed: {e}[/red]")
+                ok = False
         results.append((name, ok))
         console.print()
 

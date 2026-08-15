@@ -163,8 +163,8 @@ def main():
         record = json.loads(
             call(
                 args.registry,
-                "get_namespace_approval_icc",
-                entry["namespace"],
+                "get_namespace_approval",
+                escaped({"namespace": entry["namespace"]}),
                 args.network,
                 query=True,
             )

@@ -448,7 +448,7 @@ export interface HttpResponseIncoming {
   'body' : Uint8Array | number[],
   'headers' : Array<Header>,
   'upgrade' : [] | [boolean],
-  'streaming_strategy' : [] | [string],
+  'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 }
 export interface HttpTransform {
@@ -745,6 +745,9 @@ export interface RealmRegistryService {
     [string, string, string, string, string],
     AddRealmResult
   >,
+}
+export interface RealmRegistrySetupService {
+  'realm_setup_completed' : ActorMethod<[string], string>,
 }
 export interface RealmRegistryUpgradeService {
   'get_credits' : ActorMethod<[string], GetCreditsResult>,

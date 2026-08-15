@@ -1883,7 +1883,7 @@ def extension_command(
     frontend_canister: Optional[str] = typer.Option(
         None,
         "--frontend-canister",
-        help="Realm frontend asset canister (runtime-install: upload frontend-rt bundle same-origin)",
+        help="Realm frontend asset canister (runtime-install / resync-frontends)",
     ),
 ) -> None:
     """Manage Realm extensions."""
@@ -1954,7 +1954,7 @@ def extension_command(
         if not canister:
             console.print("[red]Error: --canister is required for resync-frontends[/red]")
             raise typer.Exit(1)
-        resync_frontends_command(canister, registry, None, network, identity)
+        resync_frontends_command(canister, registry, frontend_canister, network, identity)
     elif action == "publish":
         if not registry:
             console.print("[red]Error: --registry is required for publish[/red]")

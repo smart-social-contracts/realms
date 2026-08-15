@@ -1,3 +1,4 @@
+import json
 import traceback
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
@@ -150,6 +151,11 @@ def call_extension_function(
         # Missing function is not an error - extensions may not implement all hooks
         logger.warning(f"Extension function not found: {e}")
         return None
+    except PermissionError as e:
+        from core.extension_errors import payload_from_permission_error
+
+        logger.warning(f"Extension function permission denied: {e}")
+        return json.dumps(payload_from_permission_error(e))
     except Exception as e:
         logger.error(f"Error calling extension function: {e}\n{traceback.format_exc()}")
         raise e

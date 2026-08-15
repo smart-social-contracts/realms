@@ -1215,6 +1215,70 @@ dfx --run-deprecated canister call <casals_id> canister_exec \
   --network ic --identity my_dev_identity_1
 ```
 
+**Casals relay signs as Casals**, not as the end user. Use it only when you need
+controller-level access to a stand you cannot call directly. To debug as a
+specific Internet Identity principal, use the section below — do not relay.
+
+### `__shell__` as a specific Internet Identity principal
+
+**Do this whenever you need to run Python as a given II user** (their `User`
+record, Cedar owner checks, per-principal REPL namespace). Do **not** build a
+REPL extension for it — `__shell__` already exists; the only requirement is
+signing the update as that principal.
+
+Prefer **`icp`** over dfx. Interactive wrapper: `basilisk shell`.
+
+Internet Identity is pairwise per frontend origin. Realms pins a canonical
+`derivationOrigin` (see [`docs/reference/IDENTITY_AND_ASSISTANT.md`](docs/reference/IDENTITY_AND_ASSISTANT.md)).
+`icp identity link web` must use `--app` matching that origin, or the linked
+principal will **not** match `User.id` in the realm.
+
+| Environment | `--app` (derivation origin) |
+|---|---|
+| staging | `https://staging.realmsgos.org` |
+| demo | `https://demo.realmsgos.org` |
+| test | `https://test.realmsgos.org` |
+
+```bash
+# 1. Link II (browser auth). Repeat if the session expired.
+icp identity link web alice --app https://staging.realmsgos.org
+
+# 2. Confirm the principal is the realm User, not a cli.id.ai pair
+icp identity principal --identity alice
+# Compare with User.id on chain (via __browse__ or a known UI login).
+
+# 3. Run Python as that principal
+basilisk shell --canister <canister_id> --network ic --identity alice \
+  -c 'from ggg import User; print(len(list(User.instances())))'
+
+# Same call without basilisk:
+icp canister call <canister_id> __shell__ \
+  '("from ggg import User; print(len(list(User.instances())))")' \
+  --identity alice
+```
+
+That principal still needs **`shell.execute`** (developer profile) **or** to be
+an IC controller of the canister. A deploy PEM (`my_dev_identity_1`, `deployer`)
+is a **different** principal from the II user — controller god-mode is fine for
+raw state, but Cedar ownership and the REPL namespace will not match that user.
+
+| Goal | Approach | Works? |
+|---|---|---|
+| `__shell__` as II user X | `icp identity link web` + `--app` + `--identity` | **Yes**, if X has `shell.execute` or is a controller |
+| `__shell__` as X via deploy PEM | `--identity my_dev_identity_1` | Different principal than X |
+| `__shell__` as X via Realms PoA (`on_behalf_of`) | `grant_delegation_json` | **No** — `__shell__` ignores PoA |
+| `__shell__` as X via Casals `canister_exec` | Casals relay | Runs as **Casals**, not X |
+| Default `link web` without `--app` | `cli.id.ai` derivation | **Wrong principal** vs realm `User.id` |
+
+`icp identity delegation request/sign/use` is IC-level session delegation (same
+as linking a key). It does **not** let you act as someone else's II without
+their signature, and it is not Realms PoA
+([`docs/reference/DELEGATION.md`](docs/reference/DELEGATION.md)).
+
+Do **not** add a REPL extension for CLI debugging or impersonation. An in-realm
+REPL UI would only be UX (browser session already has the correct II
+delegation); it would still be `ic.caller()` and could not impersonate.
+
 ### Quarter scaling and controllers
 
 Casals **inherits the stand commander's full IC controller list** when minting a
@@ -1256,6 +1320,10 @@ until updated manually or re-provisioned.
 - Prefer **`icp identity default <name>`** for identity selection. Realms still has
   unmigrated dfx paths: use **`dfx --run-deprecated identity use <name>`** there. The
   deployer identity is `deployer`.
+- To run `__shell__` as a **specific Internet Identity principal**, use
+  `icp identity link web` with `--app` matching the env derivation origin (see
+  **Debugging Python canisters**). Do not build a REPL extension for this;
+  Realms PoA and Casals `canister_exec` do not impersonate that user.
 - **Monitor every workflow you trigger.** After launching a workflow, watch it until it goes green. If it fails, diagnose the error, fix it, re-push, and re-trigger — repeat until the run succeeds. Never leave a red workflow behind.
 
 ---

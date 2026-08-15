@@ -165,14 +165,15 @@ def gate_extension_call(
             f"extension_access: denied {caller} -> "
             f"{extension_name}.{function_name} (level '{spec['level']}')"
         )
-        return {
-            "success": False,
-            "error": (
+        from core.extension_errors import permission_denied_payload
+
+        return permission_denied_payload(
+            (
                 f"Access denied: '{extension_name}.{function_name}' requires "
                 f"access level '{spec['level']}'"
             ),
-            "denied_operation": spec["level"],
-        }
+            spec["level"],
+        )
 
     # Layer 2 — org policy (governed functions).
     if not spec["governed"]:

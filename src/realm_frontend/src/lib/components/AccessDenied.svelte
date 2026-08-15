@@ -5,26 +5,23 @@
   import { setActiveQuarter } from '$lib/canisters';
   import { formatQuarterLabel } from '$lib/utils/quarterLabels';
 
-  export let operation = '';
-  // Optional reload callback from the host page; without it we fall back to a
-  // full reload so the extension re-runs against the newly-active backend.
-  export let onRetry = null;
+  let { operation = '', message = '', onRetry = null } = $props();
 
-  let switching = false;
+  let switching = $state(false);
 
-  // When the denial came from a quarter-routed call, the generic "need more
-  // permissions" text is misleading: the user simply has no account on the
-  // quarter this tab is connected to. Tell them which quarter it is and how
-  // to get back (switch home / join), instead of showing a raw Cedar error.
-  $: quarters = $realmInfo.quarters ?? [];
-  $: activeQuarter = $activeQuarterId
-    ? quarters.find((q) => q.canister_id === $activeQuarterId) ?? null
-    : null;
-  $: quarterLabel = $activeQuarterId
-    ? activeQuarter
-      ? formatQuarterLabel(activeQuarter)
-      : `quarter ${String($activeQuarterId).slice(0, 5)}…`
-    : '';
+  const quarters = $derived($realmInfo.quarters ?? []);
+  const activeQuarter = $derived(
+    $activeQuarterId
+      ? quarters.find((q) => q.canister_id === $activeQuarterId) ?? null
+      : null
+  );
+  const quarterLabel = $derived(
+    $activeQuarterId
+      ? activeQuarter
+        ? formatQuarterLabel(activeQuarter)
+        : `quarter ${String($activeQuarterId).slice(0, 5)}…`
+      : ''
+  );
 
   async function backToCapital() {
     switching = true;
@@ -60,7 +57,7 @@
         <button
           type="button"
           class="rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-          on:click={backToCapital}
+          onclick={backToCapital}
           disabled={switching}
         >
           {switching ? 'Switching…' : 'Back to capital'}
@@ -68,14 +65,14 @@
         <button
           type="button"
           class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-          on:click={joinQuarter}
+          onclick={joinQuarter}
         >
           Join a quarter
         </button>
       </div>
     {:else}
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Additional permissions needed</h3>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">You need additional permissions to view this page.</p>
+      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">You don't have permission</h3>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{message || "You don't have permission to view this."}</p>
     {/if}
     {#if operation}
       <p class="mt-2 text-xs text-gray-400 dark:text-gray-500 font-mono">{operation}</p>

@@ -64,6 +64,8 @@
   let testIdentities = listTestIdentities();
   let selectedTestIdentityIndex = 0;
   let customIdentityNumber = 3;
+  /** Quarters skipped this session after assignable join errors (e.g. still bootstrapping). */
+  let skippedJoinQuarters = [];
 
   $: customIdentityIndex = isValidCustomIdentityNumber(customIdentityNumber)
     ? identityNumberToIndex(customIdentityNumber)
@@ -342,6 +344,28 @@
     await selectQuarter(def);
   }
 
+  /** Pick least-populated joinable quarter, excluding skipped ids (issue #156). */
+  function pickJoinQuarterExcluding(directory, skipped) {
+    const skip = new Set(skipped || []);
+    const joinable = (directory || []).filter(
+      (q) => q.joinable !== false && q.canister_id && !skip.has(q.canister_id),
+    );
+    const subs = joinable.filter((q) => !q.is_capital);
+    if (subs.length === 0) {
+      const cap = joinable.find((q) => q.is_capital);
+      return cap?.canister_id || '';
+    }
+    return subs.reduce((best, q) => {
+      const pop = Number(q.population) || 0;
+      const idx = Number(q.index) || 0;
+      if (!best) return q;
+      const bestPop = Number(best.population) || 0;
+      const bestIdx = Number(best.index) || 0;
+      if (pop < bestPop || (pop === bestPop && idx > bestIdx)) return q;
+      return best;
+    }, null)?.canister_id || '';
+  }
+
   /** Re-fetch join targets and retarget after coordinator-only / full errors. */
   async function reassignJoinTarget() {
     try {
@@ -350,8 +374,8 @@
       capitalId = policy?.capital_id || capitalId;
       joinMode = policy?.mode || joinMode;
       quarterDirectory = policy?.quarters || quarterDirectory;
-      const def = policy?.default_quarter || capitalId || '';
-      if (def) {
+      const def = pickJoinQuarterExcluding(quarterDirectory, skippedJoinQuarters);
+      if (def && def !== targetQuarterId) {
         await selectQuarter(def);
       }
     } catch (e) {
@@ -368,7 +392,9 @@
       m.includes('quarter is full') ||
       m.includes('is full') ||
       m.includes('at capacity') ||
-      m.includes('no capacity')
+      m.includes('no capacity') ||
+      m.includes('still setting up') ||
+      m.includes('still installing')
     );
   }
 
@@ -583,8 +609,11 @@
       } else {
         const joinError = response.data?.error || 'Unknown error occurred';
         error = joinError;
-        // Coordinator-only / full quarter: re-resolve assignment, no free picker.
+        // Coordinator-only / full / bootstrapping: re-resolve assignment, no free picker.
         if (isAssignableJoinError(joinError)) {
+          if (targetQuarterId && !skippedJoinQuarters.includes(targetQuarterId)) {
+            skippedJoinQuarters = [...skippedJoinQuarters, targetQuarterId];
+          }
           await reassignJoinTarget();
         }
       }
@@ -592,6 +621,9 @@
       console.error('Error joining realm:', e);
       error = e.message || 'Failed to join the realm';
       if (isAssignableJoinError(error)) {
+        if (targetQuarterId && !skippedJoinQuarters.includes(targetQuarterId)) {
+          skippedJoinQuarters = [...skippedJoinQuarters, targetQuarterId];
+        }
         await reassignJoinTarget();
       }
     } finally {
