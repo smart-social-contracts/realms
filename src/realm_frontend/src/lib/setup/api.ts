@@ -4,6 +4,10 @@ import type {
 	AvailableCodex,
 	SetupActionResult,
 	SetupBackendActor,
+	SetupDraftPartial,
+	SetupDraftSaveResult,
+	SetupLaunchResult,
+	SetupLaunchState,
 	SetupState
 } from './types';
 
@@ -16,6 +20,7 @@ const RAW_INSTALL_CALL_GRACE_MS = 90_000;
 const RAW_COMPLETE_CALL_GRACE_MS = 60_000;
 const COMPLETE_SETUP_POLL_MS = 5_000;
 const COMPLETE_SETUP_TIMEOUT_MS = 5 * 60 * 1_000;
+const LAUNCH_STATUS_POLL_MS = 5_000;
 
 function parseJson<T>(raw: unknown): T {
 	if (typeof raw === 'string') return JSON.parse(raw) as T;
@@ -261,12 +266,50 @@ export async function setSetupBranding(payload: {
 	logo_data_url?: string;
 	background_data_url?: string;
 	colors?: { primary?: string };
+	manifesto?: string;
+	welcome_message?: string;
 }): Promise<SetupActionResult> {
 	const actor = await getActor();
 	return parseJson<SetupActionResult>(
 		await actor.setup_set_branding(JSON.stringify(payload))
 	);
 }
+
+export async function saveSetupDraft(partial: SetupDraftPartial): Promise<SetupDraftSaveResult> {
+	const actor = await getActor();
+	return parseJson<SetupDraftSaveResult>(
+		await actor.setup_save_draft(JSON.stringify(partial))
+	);
+}
+
+export async function fetchSetupDraftAsset(kind: 'logo' | 'background'): Promise<string | null> {
+	const actor = await getActor();
+	const parsed = parseJson<{ success?: boolean; data_url?: string; error?: string }>(
+		await actor.get_setup_draft_asset(kind)
+	);
+	if (!parsed.success || !parsed.data_url) {
+		return null;
+	}
+	return parsed.data_url;
+}
+
+export async function fetchSetupLaunchStatus(): Promise<SetupLaunchState> {
+	const actor = await getActor();
+	const parsed = parseJson<{ success?: boolean; launch?: SetupLaunchState; error?: string }>(
+		await actor.get_setup_launch_status()
+	);
+	if (!parsed.success || !parsed.launch) {
+		throw new Error(parsed.error || 'Unable to fetch launch status');
+	}
+	return parsed.launch;
+}
+
+export async function startSetupLaunch(): Promise<SetupLaunchResult> {
+	const actor = await getActor();
+	return parseJson<SetupLaunchResult>(await actor.setup_launch());
+}
+
+export { LAUNCH_STATUS_POLL_MS };
 
 export async function completeSetup(options?: {
 	rawCallGraceMs?: number;

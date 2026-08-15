@@ -8,7 +8,7 @@
 <header
 	class="sticky top-0 z-30 mx-auto w-full flex-none border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
 >
-	<Navbar />
+	<Navbar showMenu={false} showRealmControls={false} />
 </header>
 <div class="w-full">
 	<slot />

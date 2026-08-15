@@ -2,22 +2,34 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import re
 from typing import Any, Dict, Optional
 
 from _cdk import Async, CallResult, Principal, StableBTreeMap, ic
 from ic_python_logging import get_logger
 
-from api.file_registry import FileRegistryService, _unwrap_call_result
+from api.file_registry import AssetCanisterService, FileRegistryService, _unwrap_call_result
 from core.setup import (
+    SETUP_LAUNCH_STEP_CODE,
+    SETUP_LAUNCH_TASK_NAME,
+    SETUP_LAUNCH_TICK_SECONDS,
+    begin_setup_launch,
+    draft_for_response,
     get_realm_registry_canister_id,
     get_setup_config,
+    get_setup_draft,
     get_setup_state_payload,
+    get_launch_state,
     is_setup_stage,
+    launch_state_for_response,
+    merge_setup_draft,
     notify_registry_setup_completed,
     require_setup_authorized,
     update_setup_config,
     validate_branding_payload,
+    validate_identity_payload,
 )
 from ggg.governance.realm import RealmStatus
 
@@ -29,6 +41,17 @@ _SETUP_CATALOG_CACHE = StableBTreeMap[str, str](
     memory_id=2, max_key_size=64, max_value_size=262_144
 )
 _SETUP_CATALOG_CACHE_KEY = "catalog"
+
+# Draft wizard images (logo/background data URLs). memory_id=3 is unused elsewhere.
+_SETUP_DRAFT_ASSETS = StableBTreeMap[str, str](
+    memory_id=3, max_key_size=32, max_value_size=262_144
+)
+_DRAFT_ASSET_KEYS = frozenset({"logo", "background"})
+_DATA_URL_RE = re.compile(r"^data:([^;]+);base64,(.+)$", re.DOTALL)
+_BRANDING_ASSET_PATHS = {
+    "logo": "/custom/logo.png",
+    "background": "/custom/background.png",
+}
 
 
 def _read_catalog_cache() -> Optional[Dict[str, Any]]:
@@ -59,6 +82,365 @@ def get_setup_state() -> str:
     return json.dumps(get_setup_state_payload())
 
 
+def get_setup_launch_status() -> str:
+    realm = _load_realm()
+    if not realm:
+        return json.dumps({"success": False, "error": "Realm not found"})
+    return json.dumps({"success": True, "launch": launch_state_for_response(realm)})
+
+
+def _load_realm():
+    from ggg import Realm
+
+    return Realm.load("1")
+
+
+def _store_draft_asset(kind: str, data_url: str) -> int:
+    _SETUP_DRAFT_ASSETS.insert(kind, data_url)
+    return len(data_url.encode("utf-8"))
+
+
+def _get_draft_asset(kind: str) -> Optional[str]:
+    if kind not in _DRAFT_ASSET_KEYS:
+        return None
+    return _SETUP_DRAFT_ASSETS.get(kind)
+
+
+def get_setup_draft_asset(kind: str) -> str:
+    auth_err = require_setup_authorized()
+    if auth_err:
+        return json.dumps(auth_err)
+
+    kind = (kind or "").strip()
+    if kind not in _DRAFT_ASSET_KEYS:
+        return json.dumps({"success": False, "error": "kind must be logo or background"})
+
+    data_url = _get_draft_asset(kind)
+    if not data_url:
+        return json.dumps({"success": False, "error": f"no draft asset for {kind}"})
+    return json.dumps({"success": True, "kind": kind, "data_url": data_url})
+
+
+def setup_save_draft(args_json: str) -> str:
+    auth_err = require_setup_authorized()
+    if auth_err:
+        return json.dumps(auth_err)
+
+    try:
+        params = json.loads(args_json) if args_json else {}
+    except json.JSONDecodeError:
+        return json.dumps({"success": False, "error": "Invalid JSON"})
+
+    if not isinstance(params, dict):
+        return json.dumps({"success": False, "error": "payload must be an object"})
+
+    branding_in = params.get("branding")
+    if branding_in is not None:
+        if not isinstance(branding_in, dict):
+            return json.dumps({"success": False, "error": "branding must be an object"})
+        branding_err = validate_branding_payload(branding_in)
+        if branding_err:
+            return json.dumps({"success": False, "error": branding_err})
+
+    identity_in = params.get("identity")
+    if identity_in is not None:
+        if not isinstance(identity_in, dict):
+            return json.dumps({"success": False, "error": "identity must be an object"})
+        identity_err = validate_identity_payload(identity_in)
+        if identity_err:
+            return json.dumps({"success": False, "error": identity_err})
+
+    realm = _load_realm()
+    if not realm:
+        return json.dumps({"success": False, "error": "Realm not found"})
+
+    partial = {k: params[k] for k in ("step", "codex", "token", "identity") if k in params}
+    branding_markers: Dict[str, Any] = {}
+    if isinstance(branding_in, dict):
+        for asset_key, url_key in (
+            ("logo", "logo_data_url"),
+            ("background", "background_data_url"),
+        ):
+            data_url = branding_in.get(url_key)
+            if data_url is None:
+                continue
+            size = _store_draft_asset(asset_key, data_url)
+            branding_markers[asset_key] = True
+            branding_markers[f"{asset_key}_size"] = size
+        colors = branding_in.get("colors")
+        if isinstance(colors, dict):
+            branding_markers["colors"] = colors
+        if branding_markers:
+            partial["branding"] = branding_markers
+
+    try:
+        draft = merge_setup_draft(realm, partial)
+    except ValueError as exc:
+        return json.dumps({"success": False, "error": str(exc)})
+
+    return json.dumps({"success": True, "draft": draft_for_response(draft)})
+
+
+def setup_launch() -> str:
+    auth_err = require_setup_authorized()
+    if auth_err:
+        return json.dumps(auth_err)
+
+    realm = _load_realm()
+    if not realm:
+        return json.dumps({"success": False, "error": "Realm not found"})
+
+    err = begin_setup_launch(realm)
+    if err:
+        return json.dumps(err)
+
+    from core.quarter_bootstrap import seed_recurring_codex_task
+
+    seed_recurring_codex_task(
+        SETUP_LAUNCH_TASK_NAME,
+        SETUP_LAUNCH_STEP_CODE,
+        SETUP_LAUNCH_TICK_SECONDS,
+    )
+    launch = get_launch_state(realm)
+    return json.dumps({"success": True, "launch": launch})
+
+
+def _decode_data_url(data_url: str) -> tuple[bytes, str]:
+    match = _DATA_URL_RE.match((data_url or "").strip())
+    if not match:
+        raise ValueError("invalid data URL")
+    content_type, payload = match.groups()
+    return base64.b64decode(payload), content_type
+
+
+def run_setup_launch_phase(realm, phase_name: str) -> Async[dict]:
+    draft = get_setup_draft(realm)
+    if phase_name == "install_codex":
+        return (yield from _launch_phase_install_codex(realm, draft))
+    if phase_name == "configure_token":
+        return (yield from _launch_phase_configure_token(realm, draft))
+    if phase_name == "upload_branding":
+        return (yield from _launch_phase_upload_branding(realm, draft))
+    if phase_name == "apply_identity":
+        return _launch_phase_apply_identity(realm, draft)
+    if phase_name == "complete":
+        return (yield from _launch_phase_complete(realm, draft))
+    return {"success": False, "error": f"unknown launch phase: {phase_name}"}
+
+
+def _launch_phase_install_codex(realm, draft: dict) -> Async[dict]:
+    codex = draft.get("codex") or {}
+    package = (codex.get("package") or codex.get("codex_id") or "").strip()
+    version = codex.get("version")
+    if version is not None:
+        version = str(version).strip() or None
+    extra_params = codex.get("params")
+    if not package:
+        return {"success": False, "error": "draft codex package is required"}
+
+    existing = get_setup_config(realm).get("codex") or {}
+    if (
+        isinstance(existing, dict)
+        and (existing.get("package") or "").strip() == package
+        and (existing.get("version") or "").strip() == (version or "").strip()
+        and existing.get("version")
+    ):
+        return {"success": True, "skipped": True, "codex": existing}
+
+    registry_id = (getattr(realm, "file_registry_canister_id", "") or "").strip()
+    if not registry_id:
+        return {"success": False, "error": "file_registry_canister_id not configured"}
+
+    from api.file_registry import install_codex_from_registry as _install
+
+    frontend_id = (getattr(realm, "frontend_canister_id", "") or "").strip() or None
+    result_raw = yield from _install(
+        registry_id,
+        package,
+        version,
+        True,
+        frontend_canister_id=frontend_id,
+    )
+    try:
+        result = json.loads(result_raw) if isinstance(result_raw, str) else result_raw
+    except json.JSONDecodeError:
+        return {"success": False, "error": "Unexpected install response"}
+
+    if not result.get("success"):
+        return result
+
+    resolved_version = (result.get("version") or version or "").strip()
+    codex_record: Dict[str, Any] = {"package": package, "version": resolved_version}
+    if isinstance(extra_params, dict) and extra_params:
+        codex_record["params"] = extra_params
+    update_setup_config(realm, {"codex": codex_record})
+    return {"success": True, "codex": codex_record}
+
+
+def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
+    token = draft.get("token") or {}
+    if not isinstance(token, dict):
+        return {"success": True, "skipped": True}
+
+    token_canister_id = (token.get("token_canister_id") or "").strip()
+    if not token_canister_id:
+        return {"success": True, "skipped": True}
+
+    if (getattr(realm, "token_canister_id", "") or "").strip() == token_canister_id:
+        token_record = get_setup_config(realm).get("token")
+        if isinstance(token_record, dict) and token_record.get("token_canister_id") == token_canister_id:
+            return {"success": True, "skipped": True, "token": token_record}
+
+    result = json.loads(
+        setup_configure_token(
+            json.dumps(
+                {
+                    "token_canister_id": token_canister_id,
+                    "symbol": token.get("symbol"),
+                    "decimals": token.get("decimals"),
+                    "indexer_canister_id": token.get("indexer_canister_id"),
+                    "token_type": token.get("token_type"),
+                }
+            )
+        )
+    )
+    return result
+
+
+def _launch_phase_upload_branding(realm, draft: dict) -> Async[dict]:
+    branding = draft.get("branding") or {}
+    if not isinstance(branding, dict):
+        return {"success": True, "skipped": True}
+
+    frontend_id = (getattr(realm, "frontend_canister_id", "") or "").strip()
+    if not frontend_id:
+        return {"success": False, "error": "frontend_canister_id not configured"}
+
+    uploaded = []
+    errors: Dict[str, str] = {}
+    asset = AssetCanisterService(Principal.from_str(frontend_id))
+
+    for kind, asset_key in _BRANDING_ASSET_PATHS.items():
+        if not branding.get(kind):
+            continue
+        data_url = _get_draft_asset(kind)
+        if not data_url:
+            errors[kind] = "draft asset missing"
+            continue
+        try:
+            content, content_type = _decode_data_url(data_url)
+        except Exception as exc:
+            errors[kind] = f"decode failed: {exc}"
+            continue
+        if not content:
+            errors[kind] = "empty file"
+            continue
+        try:
+            store_res: CallResult = yield asset.store(
+                {
+                    "key": asset_key,
+                    "content_type": content_type,
+                    "content_encoding": "identity",
+                    "content": content,
+                    "sha256": None,
+                }
+            )
+            if isinstance(store_res, dict) and "Err" in store_res:
+                errors[kind] = f"store failed: {store_res['Err']}"
+            else:
+                uploaded.append(asset_key)
+        except Exception as exc:
+            errors[kind] = f"store exception: {exc}"
+
+    if errors and not uploaded:
+        return {"success": False, "error": "; ".join(f"{k}: {v}" for k, v in errors.items())}
+
+    colors = branding.get("colors")
+    branding_record: Dict[str, Any] = {}
+    if colors:
+        branding_record["colors"] = colors
+    for kind in _DRAFT_ASSET_KEYS:
+        if branding.get(kind):
+            branding_record[kind] = True
+            size_key = f"{kind}_size"
+            if branding.get(size_key) is not None:
+                branding_record[size_key] = branding[size_key]
+    if branding_record:
+        update_setup_config(realm, {"branding": branding_record})
+
+    return {
+        "success": len(errors) == 0,
+        "uploaded": uploaded,
+        "errors": errors or None,
+    }
+
+
+def _launch_phase_apply_identity(realm, draft: dict) -> dict:
+    identity = draft.get("identity") or {}
+    if not isinstance(identity, dict) or not identity:
+        return {"success": True, "skipped": True}
+
+    if "manifesto" in identity:
+        realm.manifesto = identity["manifesto"] or ""
+    if "welcome_message" in identity:
+        realm.welcome_message = identity["welcome_message"] or ""
+
+    existing_identity = get_setup_config(realm).get("identity") or {}
+    if isinstance(existing_identity, dict):
+        merged_identity = dict(existing_identity)
+        merged_identity.update(identity)
+    else:
+        merged_identity = identity
+    update_setup_config(realm, {"identity": merged_identity})
+    return {"success": True, "identity": merged_identity}
+
+
+def _launch_phase_complete(realm, draft: dict) -> Async[dict]:
+    from ggg.governance.realm import RealmStatus
+
+    if not is_setup_stage(realm):
+        return {"success": True, "skipped": True, "status": effective_realm_status(realm)}
+
+    setup = get_setup_config(realm)
+    codex = setup.get("codex") or draft.get("codex")
+    if not isinstance(codex, dict) or not (codex.get("package") or codex.get("version")):
+        return {"success": False, "error": "A codex must be installed before completing setup"}
+
+    identity = draft.get("identity")
+    if isinstance(identity, dict):
+        if "manifesto" in identity:
+            realm.manifesto = identity["manifesto"] or ""
+        if "welcome_message" in identity:
+            realm.welcome_message = identity["welcome_message"] or ""
+
+    completed_at = str(ic.time())
+    update_setup_config(
+        realm,
+        {
+            "setup_completed_at": completed_at,
+            "codex": codex,
+        },
+    )
+    realm.status = RealmStatus.ALPHA
+
+    registry_id = get_realm_registry_canister_id(realm)
+    if registry_id:
+        yield from notify_registry_setup_completed(registry_id)
+
+    return {
+        "success": True,
+        "status": RealmStatus.ALPHA,
+        "setup_completed_at": completed_at,
+        "registry_notified": bool(registry_id),
+    }
+
+
+def effective_realm_status(realm) -> str:
+    from core.setup import effective_realm_status as _effective
+
+    return _effective(realm)
+
+
 def list_available_codices() -> Async[str]:
     from ggg import Realm
 
@@ -85,6 +467,7 @@ def list_available_codices() -> Async[str]:
         versions = entry.get("versions") or []
         name = codex_id
         description = ""
+        repository = ""
         latest = entry.get("latest") or (versions[-1] if versions else "")
         if latest:
             try:
@@ -95,6 +478,7 @@ def list_available_codices() -> Async[str]:
                 if isinstance(manifest, dict) and not manifest.get("error"):
                     name = manifest.get("name") or name
                     description = manifest.get("description") or ""
+                    repository = manifest.get("repository") or ""
             except Exception as manifest_err:
                 logger.debug(
                     "Could not load manifest for codex %s@%s: %s",
@@ -108,6 +492,7 @@ def list_available_codices() -> Async[str]:
                 "versions": versions,
                 "name": name,
                 "description": description,
+                "repository": repository,
             }
         )
 
@@ -245,12 +630,23 @@ def setup_set_branding(args_json: str) -> str:
         for key in ("logo_data_url", "background_data_url", "colors")
         if key in params
     }
-    if not branding:
+    identity = {
+        key: params[key]
+        for key in ("manifesto", "welcome_message")
+        if key in params
+    }
+    if not branding and not identity:
         return json.dumps({"success": False, "error": "No branding fields provided"})
 
-    branding_err = validate_branding_payload(branding)
-    if branding_err:
-        return json.dumps({"success": False, "error": branding_err})
+    if branding:
+        branding_err = validate_branding_payload(branding)
+        if branding_err:
+            return json.dumps({"success": False, "error": branding_err})
+
+    if identity:
+        identity_err = validate_identity_payload(identity)
+        if identity_err:
+            return json.dumps({"success": False, "error": identity_err})
 
     from ggg import Realm
 
@@ -258,15 +654,52 @@ def setup_set_branding(args_json: str) -> str:
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
 
-    existing = get_setup_config(realm).get("branding") or {}
-    if isinstance(existing, dict):
-        merged = dict(existing)
-        merged.update(branding)
-    else:
-        merged = branding
+    response: Dict[str, Any] = {"success": True}
 
-    update_setup_config(realm, {"branding": merged})
-    return json.dumps({"success": True, "branding": merged})
+    if identity:
+        if "manifesto" in identity:
+            realm.manifesto = identity["manifesto"] or ""
+        if "welcome_message" in identity:
+            realm.welcome_message = identity["welcome_message"] or ""
+
+        existing_identity = get_setup_config(realm).get("identity") or {}
+        if isinstance(existing_identity, dict):
+            merged_identity = dict(existing_identity)
+            merged_identity.update(identity)
+        else:
+            merged_identity = identity
+
+        try:
+            update_setup_config(realm, {"identity": merged_identity})
+            response["identity"] = merged_identity
+        except ValueError as exc:
+            logger.warning(
+                "setup_set_branding: could not persist identity to manifest_data: %s",
+                exc,
+            )
+            response["identity"] = merged_identity
+
+    if branding:
+        existing = get_setup_config(realm).get("branding") or {}
+        if isinstance(existing, dict):
+            merged = dict(existing)
+            merged.update(branding)
+        else:
+            merged = branding
+
+        try:
+            update_setup_config(realm, {"branding": merged})
+            response["branding"] = merged
+        except ValueError as exc:
+            if identity:
+                logger.warning(
+                    "setup_set_branding: could not persist branding to manifest_data: %s",
+                    exc,
+                )
+            else:
+                return json.dumps({"success": False, "error": str(exc)})
+
+    return json.dumps(response)
 
 
 def complete_setup() -> Async[str]:
@@ -289,6 +722,13 @@ def complete_setup() -> Async[str]:
     codex = setup.get("codex")
     if not isinstance(codex, dict) or not (codex.get("package") or codex.get("version")):
         return json.dumps({"success": False, "error": "A codex must be installed before completing setup"})
+
+    identity = setup.get("identity")
+    if isinstance(identity, dict):
+        if "manifesto" in identity:
+            realm.manifesto = identity["manifesto"] or ""
+        if "welcome_message" in identity:
+            realm.welcome_message = identity["welcome_message"] or ""
 
     completed_at = str(ic.time())
     update_setup_config(

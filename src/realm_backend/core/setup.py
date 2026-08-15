@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from _cdk import Async, CallResult, Principal, Service, ic, service_update, text
 from ic_python_logging import get_logger
@@ -12,6 +12,24 @@ logger = get_logger("core.setup")
 
 SETUP_ERROR = "This realm is being set up and is not yet open to members."
 BRANDING_DATA_URL_MAX_BYTES = 1_572_864  # ~1.5 MiB per asset
+MANIFESTO_MAX_CHARS = 256
+WELCOME_MESSAGE_MAX_CHARS = 1024
+SETUP_LAUNCH_TASK_NAME = "setup_launch"
+SETUP_LAUNCH_TICK_SECONDS = 1
+SETUP_DRAFT_STEPS = frozenset({"welcome", "codex", "token", "branding", "review"})
+SETUP_LAUNCH_PHASES: List[tuple[str, str]] = [
+    ("install_codex", "Install codex"),
+    ("configure_token", "Configure token"),
+    ("upload_branding", "Upload branding"),
+    ("apply_identity", "Apply identity"),
+    ("complete", "Complete setup"),
+]
+SETUP_LAUNCH_STEP_CODE = (
+    "def async_task():\n"
+    "    from core.setup import advance_setup_launch\n"
+    "    res = yield from advance_setup_launch()\n"
+    "    return json.dumps(res)\n"
+)
 
 
 class RealmRegistrySetupService(Service):
@@ -132,6 +150,27 @@ def setup_gate_error(caller: str) -> Optional[str]:
     return SETUP_ERROR
 
 
+def validate_identity_payload(identity: dict) -> Optional[str]:
+    if not isinstance(identity, dict):
+        return "identity must be an object"
+    manifesto = identity.get("manifesto")
+    if manifesto is not None:
+        if not isinstance(manifesto, str):
+            return "manifesto must be a string"
+        if len(manifesto) > MANIFESTO_MAX_CHARS:
+            return f"manifesto exceeds maximum length ({MANIFESTO_MAX_CHARS} chars)"
+    welcome_message = identity.get("welcome_message")
+    if welcome_message is not None:
+        if not isinstance(welcome_message, str):
+            return "welcome_message must be a string"
+        if len(welcome_message) > WELCOME_MESSAGE_MAX_CHARS:
+            return (
+                f"welcome_message exceeds maximum length "
+                f"({WELCOME_MESSAGE_MAX_CHARS} chars)"
+            )
+    return None
+
+
 def validate_branding_payload(branding: dict) -> Optional[str]:
     if not isinstance(branding, dict):
         return "branding must be an object"
@@ -149,6 +188,269 @@ def validate_branding_payload(branding: dict) -> Optional[str]:
     return None
 
 
+def get_setup_draft(realm) -> dict:
+    setup = get_setup_config(realm)
+    draft = setup.get("draft")
+    return dict(draft) if isinstance(draft, dict) else {}
+
+
+def draft_branding_for_response(branding: Any) -> Optional[dict]:
+    if not isinstance(branding, dict):
+        return None
+    out: Dict[str, Any] = {}
+    if branding.get("logo"):
+        out["logo"] = True
+        if branding.get("logo_size") is not None:
+            out["logo_size"] = branding["logo_size"]
+    if branding.get("background"):
+        out["background"] = True
+        if branding.get("background_size") is not None:
+            out["background_size"] = branding["background_size"]
+    colors = branding.get("colors")
+    if isinstance(colors, dict) and colors:
+        out["colors"] = dict(colors)
+    return out or None
+
+
+def draft_for_response(draft: dict) -> dict:
+    if not isinstance(draft, dict):
+        return {}
+    out = dict(draft)
+    branding = draft_branding_for_response(draft.get("branding"))
+    if branding is not None:
+        out["branding"] = branding
+    elif "branding" in out:
+        out.pop("branding", None)
+    return out
+
+
+def merge_setup_draft(realm, partial: dict) -> dict:
+    draft = get_setup_draft(realm)
+    if "step" in partial:
+        step = (partial.get("step") or "").strip()
+        if step:
+            if step not in SETUP_DRAFT_STEPS:
+                raise ValueError(f"invalid draft step: {step}")
+            draft["step"] = step
+    for key in ("codex", "token", "identity"):
+        if key not in partial:
+            continue
+        value = partial[key]
+        if value is None:
+            draft.pop(key, None)
+            continue
+        if not isinstance(value, dict):
+            raise ValueError(f"{key} must be an object")
+        existing = draft.get(key)
+        merged = dict(existing) if isinstance(existing, dict) else {}
+        merged.update(value)
+        draft[key] = merged
+    if "branding" in partial:
+        branding = partial["branding"]
+        if branding is None:
+            draft.pop("branding", None)
+        elif not isinstance(branding, dict):
+            raise ValueError("branding must be an object")
+        else:
+            existing = draft.get("branding")
+            merged = dict(existing) if isinstance(existing, dict) else {}
+            for marker_key in ("logo", "background", "logo_size", "background_size"):
+                if marker_key in branding:
+                    merged[marker_key] = branding[marker_key]
+            colors = branding.get("colors")
+            if isinstance(colors, dict):
+                existing_colors = merged.get("colors")
+                if isinstance(existing_colors, dict):
+                    merged_colors = dict(existing_colors)
+                    merged_colors.update(colors)
+                    merged["colors"] = merged_colors
+                else:
+                    merged["colors"] = dict(colors)
+            draft["branding"] = merged
+    update_setup_config(realm, {"draft": draft})
+    return draft
+
+
+def default_launch_state() -> dict:
+    return {
+        "status": "idle",
+        "phase": None,
+        "steps": [
+            {"name": name, "status": "pending", "error": None}
+            for name, _label in SETUP_LAUNCH_PHASES
+        ],
+        "updated_at": None,
+    }
+
+
+def get_launch_state(realm) -> dict:
+    setup = get_setup_config(realm)
+    launch = setup.get("launch")
+    if not isinstance(launch, dict):
+        return default_launch_state()
+    steps = launch.get("steps")
+    if not isinstance(steps, list) or len(steps) != len(SETUP_LAUNCH_PHASES):
+        return default_launch_state()
+    return dict(launch)
+
+
+def save_launch_state(realm, launch: dict) -> dict:
+    update_setup_config(realm, {"launch": launch})
+    return launch
+
+
+def launch_state_for_response(realm) -> dict:
+    return get_launch_state(realm)
+
+
+def validate_draft_for_launch(draft: dict) -> Optional[str]:
+    codex = draft.get("codex")
+    if not isinstance(codex, dict) or not (codex.get("package") or "").strip():
+        return "A codex must be chosen in the draft before launch"
+    return None
+
+
+def begin_setup_launch(realm) -> Optional[dict]:
+    draft = get_setup_draft(realm)
+    err = validate_draft_for_launch(draft)
+    if err:
+        return {"success": False, "error": err}
+
+    launch = get_launch_state(realm)
+    status = (launch.get("status") or "idle").strip()
+
+    if status == "completed":
+        return {"success": False, "error": "setup launch already completed"}
+
+    if status == "running":
+        return None
+
+    if status == "failed":
+        resumed = False
+        for step in launch.get("steps") or []:
+            if step.get("status") == "failed":
+                step["status"] = "pending"
+                step["error"] = None
+                resumed = True
+                break
+        if not resumed:
+            launch = default_launch_state()
+    else:
+        launch = default_launch_state()
+
+    launch["status"] = "running"
+    launch["phase"] = None
+    launch["updated_at"] = str(ic.time())
+    save_launch_state(realm, launch)
+    return None
+
+
+def _find_launch_step(launch: dict, name: str) -> Optional[dict]:
+    for step in launch.get("steps") or []:
+        if step.get("name") == name:
+            return step
+    return None
+
+
+def _next_pending_launch_step(launch: dict) -> Optional[dict]:
+    for step in launch.get("steps") or []:
+        if step.get("status") in ("pending", "failed"):
+            return step
+    return None
+
+
+def _all_launch_steps_completed(launch: dict) -> bool:
+    for step in launch.get("steps") or []:
+        if step.get("status") != "completed":
+            return False
+    return True
+
+
+def advance_setup_launch() -> Async[dict]:
+    from core.quarter_bootstrap import disable_recurring_task
+
+    try:
+        from ggg import Realm
+    except ImportError:
+        from realm_backend.ggg import Realm
+
+    realm = Realm.load("1")
+    if not realm:
+        return {"success": False, "error": "Realm not found"}
+
+    launch = get_launch_state(realm)
+    status = (launch.get("status") or "idle").strip()
+    if status != "running":
+        if status in ("completed", "failed"):
+            disable_recurring_task(SETUP_LAUNCH_TASK_NAME)
+        return {"success": True, "status": status, "launch": launch}
+
+    step = _next_pending_launch_step(launch)
+    if step is None:
+        launch["status"] = "completed"
+        launch["phase"] = None
+        launch["updated_at"] = str(ic.time())
+        save_launch_state(realm, launch)
+        disable_recurring_task(SETUP_LAUNCH_TASK_NAME)
+        return {"success": True, "status": "completed", "launch": launch}
+
+    phase_name = step.get("name") or ""
+    launch["phase"] = phase_name
+    step["status"] = "running"
+    step["error"] = None
+    launch["updated_at"] = str(ic.time())
+    save_launch_state(realm, launch)
+
+    from api.setup import run_setup_launch_phase
+
+    try:
+        outcome = run_setup_launch_phase(realm, phase_name)
+        if hasattr(outcome, "send"):
+            result = yield from outcome
+        else:
+            result = outcome
+        ok = isinstance(result, dict) and result.get("success") is not False
+    except Exception as exc:
+        logger.error(f"setup launch phase {phase_name} failed: {exc}")
+        result = {"success": False, "error": str(exc)}
+        ok = False
+
+    realm = Realm.load("1")
+    launch = get_launch_state(realm)
+    step = _find_launch_step(launch, phase_name)
+    if step is None:
+        return {"success": False, "error": f"launch step {phase_name} missing"}
+
+    if ok:
+        step["status"] = "completed"
+        step["error"] = None
+        if _all_launch_steps_completed(launch):
+            launch["status"] = "completed"
+            launch["phase"] = None
+            disable_recurring_task(SETUP_LAUNCH_TASK_NAME)
+        else:
+            launch["status"] = "running"
+            launch["phase"] = None
+    else:
+        step["status"] = "failed"
+        step["error"] = (
+            (result or {}).get("error") if isinstance(result, dict) else str(result)
+        )
+        launch["status"] = "failed"
+        launch["phase"] = phase_name
+        disable_recurring_task(SETUP_LAUNCH_TASK_NAME)
+
+    launch["updated_at"] = str(ic.time())
+    save_launch_state(realm, launch)
+    return {
+        "success": ok,
+        "status": launch["status"],
+        "phase": phase_name,
+        "result": result,
+        "launch": launch,
+    }
+
+
 def get_setup_state_payload() -> dict:
     from ggg import Realm
 
@@ -161,6 +463,8 @@ def get_setup_state_payload() -> dict:
     codex = setup.get("codex")
     token = setup.get("token")
     branding = setup.get("branding")
+    identity = setup.get("identity")
+    draft = get_setup_draft(realm)
 
     return {
         "success": True,
@@ -170,6 +474,12 @@ def get_setup_state_payload() -> dict:
         "codex": codex if isinstance(codex, dict) else None,
         "token": token if isinstance(token, dict) else None,
         "branding": branding if isinstance(branding, dict) else None,
+        "identity": identity if isinstance(identity, dict) else None,
+        "draft": draft_for_response(draft) or None,
+        "launch": launch_state_for_response(realm),
+        "realm_name": getattr(realm, "name", None) or None,
+        "realm_manifesto": getattr(realm, "manifesto", None) or "",
+        "realm_welcome_message": getattr(realm, "welcome_message", None) or "",
         "setup_completed_at": setup.get("setup_completed_at"),
     }
 

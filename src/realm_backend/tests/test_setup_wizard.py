@@ -82,6 +82,9 @@ class _FakeRealm:
         file_registry_canister_id="file-reg-id",
         frontend_canister_id="frontend-id",
         token_canister_id="",
+        name="Test Realm",
+        manifesto="",
+        welcome_message="",
     ):
         self.status = status
         self.manifest_data = manifest_data
@@ -89,6 +92,9 @@ class _FakeRealm:
         self.frontend_canister_id = frontend_canister_id
         self.token_canister_id = token_canister_id
         self.principal_id = ""
+        self.name = name
+        self.manifesto = manifesto
+        self.welcome_message = welcome_message
         self.accounting_currency = "REALMS"
         self.accounting_currency_decimals = 8
 
@@ -154,14 +160,42 @@ def _import_setup_api():
     sys.modules["api"] = api_mod
     file_registry_mod = types.ModuleType("api.file_registry")
     file_registry_mod.FileRegistryService = MagicMock
+    file_registry_mod.AssetCanisterService = MagicMock
     file_registry_mod._unwrap_call_result = lambda result: result
+    file_registry_mod.install_codex_from_registry = MagicMock()
     sys.modules["api.file_registry"] = file_registry_mod
 
     path = "/srv/dev/realms/src/realm_backend/api/setup.py"
     spec = importlib.util.spec_from_file_location("setup_api_under_test", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    sys.modules["api.setup"] = module
+    api_mod.setup = module
     return module
+
+
+def _authorized_creator(realm):
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+    manifest = json.loads(realm.manifest_data or "{}")
+    setup = manifest.get("setup") or {}
+    setup["creator_principal"] = "creator-1"
+    manifest["setup"] = setup
+    realm.manifest_data = json.dumps(manifest)
+
+
+def _clear_draft_assets(setup_api):
+    if hasattr(setup_api, "_SETUP_DRAFT_ASSETS"):
+        setup_api._SETUP_DRAFT_ASSETS._data.clear()
+
+
+def _run_async(gen):
+    try:
+        value = next(gen)
+        while True:
+            value = gen.send(value)
+    except StopIteration as stop:
+        return stop.value
 
 
 def test_realm_status_default_is_setup():
@@ -386,3 +420,445 @@ def test_runtime_flags_default_stage_is_setup(monkeypatch):
     _FakeRealm.reset(realm)
     payload = runtime_flags.get_runtime_flags_payload()
     assert payload["realm_stage"] == "setup"
+
+
+def test_setup_set_branding_identity_applies_to_realm_and_stores():
+    setup_api = _import_setup_api()
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+    )
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+
+    result = json.loads(
+        setup_api.setup_set_branding(
+            json.dumps(
+                {
+                    "manifesto": "We build together.",
+                    "welcome_message": "Welcome to our realm!",
+                }
+            )
+        )
+    )
+
+    assert result["success"] is True
+    assert realm.manifesto == "We build together."
+    assert realm.welcome_message == "Welcome to our realm!"
+    setup_cfg = json.loads(realm.manifest_data)["setup"]
+    assert setup_cfg["identity"]["manifesto"] == "We build together."
+    assert setup_cfg["identity"]["welcome_message"] == "Welcome to our realm!"
+    assert result["identity"]["manifesto"] == "We build together."
+
+
+def test_setup_set_branding_rejects_identity_length_limits():
+    setup_api = _import_setup_api()
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+    )
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+
+    long_manifesto = "x" * (setup_core.MANIFESTO_MAX_CHARS + 1)
+    result = json.loads(
+        setup_api.setup_set_branding(json.dumps({"manifesto": long_manifesto}))
+    )
+    assert result["success"] is False
+    assert "manifesto" in result["error"]
+
+    long_welcome = "y" * (setup_core.WELCOME_MESSAGE_MAX_CHARS + 1)
+    result = json.loads(
+        setup_api.setup_set_branding(json.dumps({"welcome_message": long_welcome}))
+    )
+    assert result["success"] is False
+    assert "welcome_message" in result["error"]
+
+
+def test_complete_setup_applies_stored_identity(monkeypatch):
+    setup_api = _import_setup_api()
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "realm_registry_canister_id": "registry-canister",
+                    "codex": {"package": "syntropia", "version": "1.0.0"},
+                    "identity": {
+                        "manifesto": "Stored manifesto.",
+                        "welcome_message": "Stored welcome.",
+                    },
+                }
+            }
+        ),
+    )
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+    monkeypatch.setattr(setup_api, "notify_registry_setup_completed", lambda _id: (yield None))
+
+    gen = setup_api.complete_setup()
+    try:
+        while True:
+            next(gen)
+    except StopIteration as stop:
+        result = json.loads(stop.value)
+
+    assert result["success"] is True
+    assert realm.manifesto == "Stored manifesto."
+    assert realm.welcome_message == "Stored welcome."
+
+
+def test_get_setup_state_payload_includes_identity_and_realm_fields():
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        name="My Realm",
+        manifesto="Live manifesto",
+        welcome_message="Live welcome",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "identity": {
+                        "manifesto": "Config manifesto",
+                        "welcome_message": "Config welcome",
+                    },
+                }
+            }
+        ),
+    )
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+
+    payload = setup_core.get_setup_state_payload()
+
+    assert payload["success"] is True
+    assert payload["identity"]["manifesto"] == "Config manifesto"
+    assert payload["identity"]["welcome_message"] == "Config welcome"
+    assert payload["realm_name"] == "My Realm"
+    assert payload["realm_manifesto"] == "Live manifesto"
+    assert payload["realm_welcome_message"] == "Live welcome"
+
+
+def test_setup_save_draft_merges_partial_updates():
+    setup_api = _import_setup_api()
+    _clear_draft_assets(setup_api)
+
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _authorized_creator(realm)
+
+    first = json.loads(
+        setup_api.setup_save_draft(
+            json.dumps({"step": "codex", "codex": {"package": "agora", "version": "1.0.0"}})
+        )
+    )
+    assert first["success"] is True
+    assert first["draft"]["step"] == "codex"
+    assert first["draft"]["codex"]["package"] == "agora"
+
+    second = json.loads(
+        setup_api.setup_save_draft(
+            json.dumps({"step": "token", "token": {"symbol": "REALM", "decimals": 8}})
+        )
+    )
+    assert second["success"] is True
+    assert second["draft"]["step"] == "token"
+    assert second["draft"]["codex"]["package"] == "agora"
+    assert second["draft"]["token"]["symbol"] == "REALM"
+
+
+def test_setup_save_draft_stores_images_outside_manifest():
+    setup_api = _import_setup_api()
+    _clear_draft_assets(setup_api)
+
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _authorized_creator(realm)
+
+    logo = "data:image/png;base64,QUJD"
+    background = "data:image/png;base64,REVGRw=="
+    result = json.loads(
+        setup_api.setup_save_draft(
+            json.dumps(
+                {
+                    "branding": {
+                        "logo_data_url": logo,
+                        "background_data_url": background,
+                        "colors": {"primary": "#112233"},
+                    }
+                }
+            )
+        )
+    )
+    assert result["success"] is True
+    assert result["draft"]["branding"]["logo"] is True
+    assert result["draft"]["branding"]["background"] is True
+    assert "logo_data_url" not in json.dumps(json.loads(realm.manifest_data))
+    assert len(realm.manifest_data) < 4096
+
+    asset = json.loads(setup_api.get_setup_draft_asset("logo"))
+    assert asset["success"] is True
+    assert asset["data_url"] == logo
+
+
+def test_setup_save_draft_does_not_install_or_mutate_realm():
+    setup_api = _import_setup_api()
+    _clear_draft_assets(setup_api)
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data="{}",
+        manifesto="",
+        welcome_message="",
+        token_canister_id="",
+    )
+    _authorized_creator(realm)
+
+    result = json.loads(
+        setup_api.setup_save_draft(
+            json.dumps(
+                {
+                    "codex": {"package": "syntropia", "version": "2.0.0"},
+                    "token": {"token_canister_id": "token-abc", "symbol": "SYN"},
+                    "identity": {
+                        "manifesto": "Draft manifesto",
+                        "welcome_message": "Draft welcome",
+                    },
+                }
+            )
+        )
+    )
+    assert result["success"] is True
+    assert realm.status == RealmStatus.SETUP
+    assert realm.token_canister_id == ""
+    assert realm.manifesto == ""
+    assert realm.welcome_message == ""
+    assert "codex" not in (json.loads(realm.manifest_data).get("setup") or {})
+
+
+def test_setup_launch_requires_codex_in_draft():
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _authorized_creator(realm)
+
+    result = json.loads(setup_api.setup_launch())
+    assert result["success"] is False
+    assert "codex" in result["error"].lower()
+
+
+def test_setup_launch_runs_phases_in_order(monkeypatch):
+    setup_api = _import_setup_api()
+    _clear_draft_assets(setup_api)
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {"token_canister_id": "token-1", "symbol": "AG"},
+                        "identity": {
+                            "manifesto": "Our realm.",
+                            "welcome_message": "Welcome!",
+                        },
+                    },
+                    "launch": {
+                        "status": "running",
+                        "phase": None,
+                        "steps": [
+                            {"name": n, "status": "pending", "error": None}
+                            for n, _ in setup_core.SETUP_LAUNCH_PHASES
+                        ],
+                        "updated_at": "1",
+                    },
+                }
+            }
+        ),
+    )
+    _authorized_creator(realm)
+
+    order = []
+
+    def _fake_run(realm_obj, phase_name):
+        order.append(phase_name)
+        if phase_name == "install_codex":
+            setup_core.update_setup_config(
+                realm_obj, {"codex": {"package": "agora", "version": "1.0.0"}}
+            )
+            return {"success": True}
+        if phase_name == "configure_token":
+            realm_obj.token_canister_id = "token-1"
+            setup_core.update_setup_config(
+                realm_obj, {"token": {"token_canister_id": "token-1", "symbol": "AG"}}
+            )
+            return {"success": True}
+        if phase_name == "upload_branding":
+            return {"success": True, "skipped": True}
+        if phase_name == "apply_identity":
+            realm_obj.manifesto = "Our realm."
+            realm_obj.welcome_message = "Welcome!"
+            return {"success": True}
+        if phase_name == "complete":
+            realm_obj.status = RealmStatus.ALPHA
+            return {"success": True}
+        return {"success": False, "error": "unknown"}
+
+    monkeypatch.setattr(setup_api, "run_setup_launch_phase", _fake_run)
+    monkeypatch.setattr(
+        "core.quarter_bootstrap.disable_recurring_task", lambda _name: None
+    )
+
+    for _ in range(len(setup_core.SETUP_LAUNCH_PHASES)):
+        result = _run_async(setup_core.advance_setup_launch())
+        assert result["success"] is True
+
+    assert order == [name for name, _ in setup_core.SETUP_LAUNCH_PHASES]
+    assert realm.status == RealmStatus.ALPHA
+    launch = json.loads(realm.manifest_data)["setup"]["launch"]
+    assert launch["status"] == "completed"
+
+
+def test_setup_launch_failure_records_error_and_resume(monkeypatch):
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {"codex": {"package": "agora", "version": "1.0.0"}},
+                    "launch": {
+                        "status": "running",
+                        "phase": None,
+                        "steps": [
+                            {"name": "install_codex", "status": "pending", "error": None},
+                            {
+                                "name": "configure_token",
+                                "status": "pending",
+                                "error": None,
+                            },
+                            {
+                                "name": "upload_branding",
+                                "status": "pending",
+                                "error": None,
+                            },
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": "1",
+                    },
+                }
+            }
+        ),
+    )
+    _authorized_creator(realm)
+
+    calls = {"n": 0}
+
+    def _flaky_run(realm_obj, phase_name):
+        if phase_name == "configure_token":
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"success": False, "error": "token registry unavailable"}
+        if phase_name == "install_codex":
+            setup_core.update_setup_config(
+                realm_obj, {"codex": {"package": "agora", "version": "1.0.0"}}
+            )
+            return {"success": True}
+        if phase_name == "configure_token":
+            return {"success": True, "skipped": True}
+        if phase_name == "upload_branding":
+            return {"success": True, "skipped": True}
+        if phase_name == "apply_identity":
+            return {"success": True, "skipped": True}
+        if phase_name == "complete":
+            realm_obj.status = RealmStatus.ALPHA
+            return {"success": True}
+        return {"success": False, "error": "unexpected"}
+
+    monkeypatch.setattr(setup_api, "run_setup_launch_phase", _flaky_run)
+    monkeypatch.setattr(
+        "core.quarter_bootstrap.disable_recurring_task", lambda _name: None
+    )
+    seeded = []
+
+    def _fake_seed(name, code, interval):
+        seeded.append(name)
+
+    monkeypatch.setattr("core.quarter_bootstrap.seed_recurring_codex_task", _fake_seed)
+
+    first = _run_async(setup_core.advance_setup_launch())
+    assert first["success"] is True
+    second = _run_async(setup_core.advance_setup_launch())
+    assert second["success"] is False
+    launch = json.loads(realm.manifest_data)["setup"]["launch"]
+    assert launch["status"] == "failed"
+    token_step = next(s for s in launch["steps"] if s["name"] == "configure_token")
+    assert token_step["status"] == "failed"
+    assert "token registry" in token_step["error"]
+
+    setup_api.setup_launch()
+    assert seeded == [setup_core.SETUP_LAUNCH_TASK_NAME]
+    relaunch_launch = json.loads(realm.manifest_data)["setup"]["launch"]
+    assert relaunch_launch["status"] == "running"
+    token_step = next(
+        s for s in relaunch_launch["steps"] if s["name"] == "configure_token"
+    )
+    assert token_step["status"] == "pending"
+
+    third = _run_async(setup_core.advance_setup_launch())
+    assert third["success"] is True
+    for _ in range(10):
+        tick = _run_async(setup_core.advance_setup_launch())
+        if tick.get("status") == "completed":
+            break
+    assert realm.status == RealmStatus.ALPHA
+
+
+def test_list_available_codices_includes_repository(monkeypatch):
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(file_registry_canister_id="file-reg-id")
+    _FakeRealm.reset(realm)
+
+    class _Registry:
+        def list_codices(self):
+            return json.dumps(
+                [
+                    {
+                        "codex_id": "agora",
+                        "versions": ["1.0.0"],
+                        "latest": "1.0.0",
+                    }
+                ]
+            )
+
+        def get_extension_manifest(self, args_json):
+            return json.dumps(
+                {
+                    "name": "Agora",
+                    "description": "Governance codex",
+                    "repository": "https://github.com/example/agora",
+                }
+            )
+
+    monkeypatch_registry = _Registry()
+
+    def _service(_principal):
+        return monkeypatch_registry
+
+    monkeypatch.setattr(setup_api, "FileRegistryService", _service)
+    monkeypatch.setattr(
+        setup_api,
+        "Principal",
+        type("Principal", (), {"from_str": staticmethod(lambda value: value)}),
+    )
+
+    gen = setup_api.list_available_codices()
+    payload = json.loads(_run_async(gen))
+    assert payload["success"] is True
+    assert payload["codices"][0]["description"] == "Governance codex"
+    assert payload["codices"][0]["repository"] == "https://github.com/example/agora"

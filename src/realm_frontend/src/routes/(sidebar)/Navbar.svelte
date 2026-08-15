@@ -12,6 +12,8 @@
 
 	export let fluid = true;
 	export let drawerHidden = false;
+	export let showMenu = true;
+	export let showRealmControls = true;
 
 	onMount(() => {
 		realmInfo.fetch();
@@ -19,26 +21,28 @@
 </script>
 
 <Navbar {fluid} class="text-black relative z-50" color="default" let:NavContainer style="pointer-events: auto;">
-	<button
-		type="button"
-		on:click={() => (drawerHidden = !drawerHidden)}
-		class="relative m-0 inline-flex p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-600 hover:text-gray-900"
-		aria-label={$unreadCount > 0 ? 'Toggle navigation menu (unread messages)' : 'Toggle navigation menu'}
-		aria-expanded={!drawerHidden}
-	>
-		<IconMenu2 size={22} />
-		{#if $unreadCount > 0}
-			<span
-				class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
-				aria-hidden="true"
-			></span>
-		{/if}
-	</button>
+	{#if showMenu}
+		<button
+			type="button"
+			on:click={() => (drawerHidden = !drawerHidden)}
+			class="relative m-0 inline-flex p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-600 hover:text-gray-900"
+			aria-label={$unreadCount > 0 ? 'Toggle navigation menu (unread messages)' : 'Toggle navigation menu'}
+			aria-expanded={!drawerHidden}
+		>
+			<IconMenu2 size={22} />
+			{#if $unreadCount > 0}
+				<span
+					class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
+					aria-hidden="true"
+				></span>
+			{/if}
+		</button>
+	{/if}
 
 	<div class="absolute left-1/2 transform -translate-x-1/2">
 		<a href="/" class="flex items-center cursor-pointer">
 			<img
-				src={$realmInfo.logoUrl || '/custom/logo.png'}
+				src={$realmInfo.logoUrl || '/images/logo_sphere_only.svg'}
 				class="h-8 sm:h-10 pointer-events-none"
 				alt={$realmName || 'Realms Logo'}
 			/>
@@ -51,9 +55,11 @@
 	</div>
 
 	<div class="ms-auto flex items-center gap-2 text-gray-500">
-		<QuarterIndicator />
-		<QuarterSwitcher />
-		<DelegationSwitcher />
+		{#if showRealmControls}
+			<QuarterIndicator />
+			<QuarterSwitcher />
+			<DelegationSwitcher />
+		{/if}
 		<AuthButton />
 	</div>
 </Navbar>

@@ -6944,6 +6944,54 @@ def setup_set_branding(args: text) -> text:
 
 
 @update
+def setup_save_draft(args: text) -> text:
+    """Persist partial setup wizard draft without installing anything."""
+    try:
+        from api.setup import setup_save_draft as _save
+
+        return _save(args)
+    except Exception as e:
+        logger.error(f"setup_save_draft error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_setup_draft_asset(kind: text) -> text:
+    """Return a single draft branding image data URL for preview."""
+    try:
+        from api.setup import get_setup_draft_asset as _get_asset
+
+        return _get_asset(kind)
+    except Exception as e:
+        logger.error(f"get_setup_draft_asset error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_setup_launch_status() -> text:
+    """Return persisted setup launch progress."""
+    try:
+        from api.setup import get_setup_launch_status as _status
+
+        return _status()
+    except Exception as e:
+        logger.error(f"get_setup_launch_status error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def setup_launch() -> text:
+    """Validate draft and enqueue deferred multi-phase setup launch."""
+    try:
+        from api.setup import setup_launch as _launch
+
+        return _launch()
+    except Exception as e:
+        logger.error(f"setup_launch error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
 def complete_setup() -> Async[text]:
     """Finish setup: require codex, flip to alpha, notify registry."""
     try:

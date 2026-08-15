@@ -201,6 +201,14 @@ def files_publish_command(
                         network=network,
                         identity=identity,
                     )
+                    console.print(f"also publishing {cd.name}@main")
+                    publish_codex_command(
+                        registry=reg,
+                        source_dir=str(cd),
+                        network=network,
+                        identity=identity,
+                        version="main",
+                    )
                 except (typer.Exit, SystemExit):
                     console.print(f"[red]Failed to publish codex {cd.name}, continuing...[/red]")
         else:

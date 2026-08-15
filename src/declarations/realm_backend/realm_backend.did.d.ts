@@ -29,6 +29,8 @@ export interface Archive { 'canister_id' : Principal }
 export interface Archives { 'archives' : Array<Archive> }
 export interface Asset { 'class' : AssetClass, 'symbol' : string }
 export interface AssetCanisterService {
+  'delete_asset' : ActorMethod<[_DeleteAssetArg], undefined>,
+  'list' : ActorMethod<[_ListAssetsArg], string>,
   'store' : ActorMethod<[_AssetStoreArg], undefined>,
 }
 export type AssetClass = { 'Cryptocurrency' : null } |
@@ -698,7 +700,6 @@ export interface QuarterCodexSyncService {
 }
 export interface QuarterDirectoryService {
   'get_quarter_directory' : ActorMethod<[], string>,
-  'get_quarter_codex_drift' : ActorMethod<[], string>,
 }
 export interface QuarterInfoRecord {
   'status' : string,
@@ -1002,6 +1003,7 @@ export interface _AssetStoreArg {
   'content_type' : string,
   'content_encoding' : string,
 }
+export interface _DeleteAssetArg { 'key' : string }
 export interface _GetAccountTransactionsArgs {
   'max_results' : bigint,
   'start' : [] | [bigint],
@@ -1034,6 +1036,10 @@ export interface _IcrcTransactionWithId {
   'transaction' : _IcrcTransaction,
 }
 export interface _IcrcTransfer { 'to' : _IcrcAccount, 'amount' : bigint }
+export interface _ListAssetsArg {
+  'start' : [] | [bigint],
+  'length' : [] | [bigint],
+}
 export interface _SERVICE {
   '__browse__' : ActorMethod<[string], string>,
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
@@ -1041,7 +1047,6 @@ export interface _SERVICE {
   'accept_delegation_json' : ActorMethod<[string], string>,
   'approve_orchestration_action' : ActorMethod<[string], string>,
   'bootstrap_as_quarter' : ActorMethod<[string], string>,
-  'request_codex_sync' : ActorMethod<[string], string>,
   'change_quarter' : ActorMethod<[string], RealmResponse>,
   'complete_setup' : ActorMethod<[], string>,
   'create_multi_step_scheduled_task' : ActorMethod<
@@ -1125,14 +1130,16 @@ export interface _SERVICE {
     [string, bigint, bigint, string],
     RealmResponse
   >,
-  'get_quarter_directory' : ActorMethod<[], string>,
   'get_quarter_codex_drift' : ActorMethod<[], string>,
+  'get_quarter_directory' : ActorMethod<[], string>,
   'get_quarter_info' : ActorMethod<[], RealmResponse>,
   'get_realm_credits' : ActorMethod<[string], string>,
   'get_realm_registry_info' : ActorMethod<[], string>,
   'get_runtime_flags' : ActorMethod<[], string>,
   'get_sandbox_config' : ActorMethod<[], string>,
   'get_scale_status' : ActorMethod<[], string>,
+  'get_setup_draft_asset' : ActorMethod<[string], string>,
+  'get_setup_launch_status' : ActorMethod<[], string>,
   'get_setup_state' : ActorMethod<[], string>,
   'get_sharing_root_public_key' : ActorMethod<[], RealmResponse>,
   'get_sidebar' : ActorMethod<[string], string>,
@@ -1158,7 +1165,6 @@ export interface _SERVICE {
   'mint_land_nft_for_parcel' : ActorMethod<[string, string, string], string>,
   'policy_status' : ActorMethod<[], string>,
   'process_quarter_scaling' : ActorMethod<[], string>,
-  'request_quarter_codex_sync' : ActorMethod<[string], string>,
   'receive_realm_message' : ActorMethod<
     [string, string, string, string],
     string
@@ -1176,6 +1182,8 @@ export interface _SERVICE {
   'reload_codex' : ActorMethod<[string], string>,
   'reload_entity_method_overrides' : ActorMethod<[], string>,
   'report_quarter_population' : ActorMethod<[bigint], string>,
+  'request_codex_sync' : ActorMethod<[string], string>,
+  'request_quarter_codex_sync' : ActorMethod<[string], string>,
   'request_upgrade' : ActorMethod<[string], string>,
   'resolve_ref' : ActorMethod<[string], string>,
   'resolve_token_ledger' : ActorMethod<[string], string>,
@@ -1205,6 +1213,8 @@ export interface _SERVICE {
   'set_test_flags_json' : ActorMethod<[string], string>,
   'setup_configure_token' : ActorMethod<[string], string>,
   'setup_install_codex' : ActorMethod<[string], string>,
+  'setup_launch' : ActorMethod<[], string>,
+  'setup_save_draft' : ActorMethod<[string], string>,
   'setup_set_branding' : ActorMethod<[string], string>,
   'start_task_manager' : ActorMethod<[], string>,
   'status' : ActorMethod<[], RealmResponse>,
