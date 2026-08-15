@@ -675,6 +675,22 @@
 </svelte:head>
 
 <div class="setup-wizard" class:setup-wizard--welcome={isWelcomeStep}>
+	{#if isWelcomeStep}
+		<div class="setup-wizard__ambient" aria-hidden="true">
+			<span class="setup-wizard__ambient-glow"></span>
+			<span class="setup-wizard__ambient-grid"></span>
+			<svg class="setup-wizard__ambient-rings" viewBox="0 0 600 600">
+				<g class="setup-wizard__ambient-spin">
+					<polygon points="570,300 435,533.8 165,533.8 30,300 165,66.2 435,66.2" />
+					<circle cx="300" cy="300" r="248" />
+				</g>
+				<g class="setup-wizard__ambient-spin setup-wizard__ambient-spin--reverse">
+					<polygon points="473.2,400 300,500 126.8,400 126.8,200 300,100 473.2,200" />
+					<circle cx="300" cy="300" r="176" />
+				</g>
+			</svg>
+		</div>
+	{/if}
 	<div class="setup-wizard__shell" class:setup-wizard__shell--welcome={isWelcomeStep}>
 		{#if !isWelcomeStep}
 			<header class="setup-wizard__header">
@@ -723,9 +739,14 @@
 						{WELCOME_FOUNDING_LINE}
 					</p>
 					<div class="setup-wizard__actions setup-wizard__actions--welcome">
-						<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleWelcomeContinue}>
+						<button
+							type="button"
+							class="setup-wizard__hero-cta"
+							disabled={busy}
+							onclick={handleWelcomeContinue}
+						>
 							{busy ? 'Saving…' : 'Begin'}
-						</Button>
+						</button>
 					</div>
 				</section>
 			{:else if currentStep === 'codex'}
@@ -1071,6 +1092,112 @@
 		align-items: center;
 		justify-content: center;
 		padding: 2rem 1.25rem;
+		position: relative;
+		overflow: hidden;
+		background: #ffffff;
+	}
+
+	:global(.dark) .setup-wizard--welcome {
+		background: #080d1a;
+	}
+
+	.setup-wizard__ambient {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+		pointer-events: none;
+	}
+
+	.setup-wizard__ambient-glow {
+		position: absolute;
+		top: -12%;
+		left: 50%;
+		width: min(52rem, 125vw);
+		height: min(52rem, 125vw);
+		transform: translateX(-50%);
+		border-radius: 50%;
+		background: radial-gradient(
+			circle,
+			rgba(99, 102, 241, 0.13) 0%,
+			rgba(56, 189, 248, 0.07) 38%,
+			transparent 68%
+		);
+	}
+
+	/* Oversized and inset so the rotation never exposes an edge. */
+	.setup-wizard__ambient-grid {
+		position: absolute;
+		inset: -45%;
+		background-image:
+			linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+			linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+		background-size: 72px 72px;
+		animation: setup-ambient-drift 72s linear infinite;
+		-webkit-mask-image: radial-gradient(ellipse at 50% 45%, #000 0%, transparent 70%);
+		mask-image: radial-gradient(ellipse at 50% 45%, #000 0%, transparent 70%);
+	}
+
+	:global(.dark) .setup-wizard__ambient-grid {
+		background-image:
+			linear-gradient(to right, rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+			linear-gradient(to bottom, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+	}
+
+	.setup-wizard__ambient-rings {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: min(46rem, 118vw);
+		height: min(46rem, 118vw);
+		transform: translate(-50%, -50%);
+	}
+
+	.setup-wizard__ambient-rings polygon,
+	.setup-wizard__ambient-rings circle {
+		fill: none;
+		stroke: rgba(15, 23, 42, 0.055);
+		stroke-width: 1;
+	}
+
+	:global(.dark) .setup-wizard__ambient-rings polygon,
+	:global(.dark) .setup-wizard__ambient-rings circle {
+		stroke: rgba(148, 163, 184, 0.08);
+	}
+
+	.setup-wizard__ambient-spin {
+		transform-origin: 300px 300px;
+		animation: setup-ambient-rotate 160s linear infinite;
+	}
+
+	.setup-wizard__ambient-spin--reverse {
+		animation-duration: 220s;
+		animation-direction: reverse;
+	}
+
+	/* One full cell, so the loop has no visible seam. */
+	@keyframes setup-ambient-drift {
+		from {
+			transform: rotate(-12deg) translate3d(0, 0, 0);
+		}
+		to {
+			transform: rotate(-12deg) translate3d(72px, 72px, 0);
+		}
+	}
+
+	@keyframes setup-ambient-rotate {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.setup-wizard__ambient-grid,
+		.setup-wizard__ambient-spin {
+			animation: none;
+		}
 	}
 
 	.setup-wizard__shell {
@@ -1096,6 +1223,8 @@
 		box-shadow: none;
 		background: transparent;
 		padding: 0;
+		position: relative;
+		z-index: 1;
 	}
 
 	:global(.dark) .setup-wizard__shell--welcome {
@@ -1282,19 +1411,20 @@
 	}
 
 	.setup-wizard__hero-mark {
-		width: clamp(5rem, 18vw, 7.5rem);
-		height: clamp(5rem, 18vw, 7.5rem);
-		margin-bottom: 2rem;
+		width: clamp(6rem, 15vw, 9.75rem);
+		height: clamp(6rem, 15vw, 9.75rem);
+		margin-bottom: 3rem;
 		animation: setup-welcome-fade-in 0.6s ease-out both;
 	}
 
 	.setup-wizard__hero-title {
-		font-size: clamp(2rem, 6vw, 3rem);
-		font-weight: 600;
-		line-height: 1.15;
-		letter-spacing: -0.02em;
-		color: #0f172a;
-		margin: 0 0 1.25rem;
+		font-family: Fraunces, Georgia, 'Times New Roman', serif;
+		font-size: clamp(2.75rem, 8vw, 5rem);
+		font-weight: 400;
+		line-height: 1.05;
+		letter-spacing: -0.03em;
+		color: #0b1120;
+		margin: 0 0 1.5rem;
 		animation: setup-welcome-fade-in 0.6s ease-out 0.08s both;
 	}
 
@@ -1303,20 +1433,58 @@
 	}
 
 	.setup-wizard__hero-lead {
-		color: #64748b;
-		font-size: clamp(1rem, 2.5vw, 1.125rem);
-		line-height: 1.65;
-		max-width: 32rem;
+		color: #5b6478;
+		font-size: clamp(1rem, 2.4vw, 1.1875rem);
+		font-weight: 300;
+		line-height: 1.75;
+		max-width: 35rem;
 		margin: 0 auto;
 		animation: setup-welcome-fade-in 0.6s ease-out 0.16s both;
+	}
+
+	.setup-wizard__hero-cta {
+		display: inline-block;
+		padding: 1rem 3.5rem;
+		border-radius: 999px;
+		border: 1.5px solid #0b1120;
+		background: transparent;
+		color: #0b1120;
+		font-family: inherit;
+		font-size: 1rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition:
+			background-color 0.2s ease,
+			color 0.2s ease;
+	}
+
+	.setup-wizard__hero-cta:hover:not(:disabled) {
+		background: #0b1120;
+		color: #ffffff;
+	}
+
+	.setup-wizard__hero-cta:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+
+	:global(.dark) .setup-wizard__hero-cta {
+		border-color: #e2e8f0;
+		color: #e2e8f0;
+	}
+
+	:global(.dark) .setup-wizard__hero-cta:hover:not(:disabled) {
+		background: #e2e8f0;
+		color: #0b1120;
 	}
 
 	:global(.dark) .setup-wizard__hero-lead {
 		color: #94a3b8;
 	}
 
-	.setup-wizard__actions--welcome {
-		margin-top: 2.5rem;
+	/* Outranks the later, equally specific .setup-wizard__actions margin. */
+	.setup-wizard__hero .setup-wizard__actions--welcome {
+		margin-top: 3.25rem;
 		justify-content: center;
 		animation: setup-welcome-rise 0.55s ease-out 0.24s both;
 	}
