@@ -79,7 +79,12 @@ def fetch_peer_directory(peer_canister_id: str) -> Async[Dict]:
         except (json.JSONDecodeError, TypeError):
             return {"success": False, "error": f"Unparseable peer response: {raw[:200]}"}
         quarters = parsed.get("quarters", parsed) if isinstance(parsed, dict) else parsed
-        return {"success": True, "quarters": quarters or []}
+        self_block = parsed.get("self") if isinstance(parsed, dict) else None
+        return {
+            "success": True,
+            "quarters": quarters or [],
+            "self": self_block,
+        }
     except Exception as e:
         logger.error(f"Error fetching peer directory from {peer_canister_id}: {e}")
         return {"success": False, "error": str(e)}

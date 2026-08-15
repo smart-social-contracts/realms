@@ -21,6 +21,24 @@ _mod = importlib.util.module_from_spec(_spec)
 assert _spec.loader is not None
 _spec.loader.exec_module(_mod)
 pick_default_join_quarter = _mod.pick_default_join_quarter
+is_dashboard_installed = _mod.is_dashboard_installed
+JOIN_QUARTER_NOT_READY = _mod.JOIN_QUARTER_NOT_READY
+
+
+class TestIsDashboardInstalled:
+    def test_member_dashboard_present(self):
+        assert is_dashboard_installed(["voting", "member_dashboard"])
+
+    def test_codex_override_resolved_id(self):
+        assert is_dashboard_installed(["custom_dash"], resolved_id="custom_dash")
+
+    def test_not_installed(self):
+        assert not is_dashboard_installed(["voting", "realm_settings"])
+        assert not is_dashboard_installed([])
+        assert not is_dashboard_installed(None)
+
+    def test_join_quarter_not_ready_message(self):
+        assert "still setting up" in JOIN_QUARTER_NOT_READY.lower()
 
 
 class TestPickDefaultJoinQuarter:

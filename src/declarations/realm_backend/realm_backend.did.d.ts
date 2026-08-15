@@ -693,8 +693,12 @@ export interface PurchaseRecord {
 export interface QuarterBootstrapService {
   'bootstrap_as_quarter' : ActorMethod<[string], string>,
 }
+export interface QuarterCodexSyncService {
+  'request_codex_sync' : ActorMethod<[string], string>,
+}
 export interface QuarterDirectoryService {
   'get_quarter_directory' : ActorMethod<[], string>,
+  'get_quarter_codex_drift' : ActorMethod<[], string>,
 }
 export interface QuarterInfoRecord {
   'status' : string,
@@ -1037,6 +1041,7 @@ export interface _SERVICE {
   'accept_delegation_json' : ActorMethod<[string], string>,
   'approve_orchestration_action' : ActorMethod<[string], string>,
   'bootstrap_as_quarter' : ActorMethod<[string], string>,
+  'request_codex_sync' : ActorMethod<[string], string>,
   'change_quarter' : ActorMethod<[string], RealmResponse>,
   'complete_setup' : ActorMethod<[], string>,
   'create_multi_step_scheduled_task' : ActorMethod<
@@ -1121,6 +1126,7 @@ export interface _SERVICE {
     RealmResponse
   >,
   'get_quarter_directory' : ActorMethod<[], string>,
+  'get_quarter_codex_drift' : ActorMethod<[], string>,
   'get_quarter_info' : ActorMethod<[], RealmResponse>,
   'get_realm_credits' : ActorMethod<[string], string>,
   'get_realm_registry_info' : ActorMethod<[], string>,
@@ -1152,6 +1158,7 @@ export interface _SERVICE {
   'mint_land_nft_for_parcel' : ActorMethod<[string, string, string], string>,
   'policy_status' : ActorMethod<[], string>,
   'process_quarter_scaling' : ActorMethod<[], string>,
+  'request_quarter_codex_sync' : ActorMethod<[string], string>,
   'receive_realm_message' : ActorMethod<
     [string, string, string, string],
     string

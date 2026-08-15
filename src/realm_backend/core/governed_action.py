@@ -32,6 +32,10 @@ logger = get_logger("core.governed_action")
 # Depth counter: >0 while replaying an approved proposal's action.
 _replay_depth = 0
 
+# Yes-share of decisive votes needed by a realm-wide ballot. Matches the voting
+# extension's own default so a stored value and an unset one behave alike.
+REALM_WIDE_THRESHOLD = 0.6
+
 
 def in_replay() -> bool:
     """True while an approved governance proposal is replaying its action."""
@@ -156,12 +160,27 @@ def submit_replay_proposal(
     code_inline: str,
     proposer_principal: str,
     metadata_extra: Optional[Dict[str, Any]] = None,
+    description: Optional[str] = None,
+    allow_system_proposer: bool = False,
+    realm_wide: bool = False,
 ) -> Dict[str, Any]:
-    """Create an org-scoped Proposal that replays a governed action on approval."""
+    """Create a Proposal that replays a governed action on approval.
+
+    Org-scoped by default: only ``governing``'s members vote, tallied against
+    its M/N/quorum/veto policy. With ``realm_wide=True`` every member votes and
+    the ballot is settled by the realm-wide threshold plus the codex quorum —
+    used when the governing org cannot be the electorate (issue #295: a minted
+    quarter's root department has no members, so an org-scoped ballot would have
+    no eligible voters at all).
+    """
     from _cdk import ic
     from ggg import Proposal, User
 
+    on_behalf_of = None
     proposer = User[proposer_principal]
+    if not proposer and allow_system_proposer:
+        proposer = User["system"]
+        on_behalf_of = (proposer_principal or "").strip() or None
     if not proposer:
         return {
             "success": False,
@@ -173,46 +192,66 @@ def submit_replay_proposal(
 
     metadata = {
         "proposal_type": "governed_action",
-        "org_scope": governing.name,
         "code_inline": code_inline,
         "codex_name": f"governed_action_{proposal_id}",
     }
+    # A realm-wide ballot must carry no org scope in *either* place: the voting
+    # extension resolves scope from the field and falls back to this metadata
+    # key, so leaving it here would silently restrict voting to the org.
+    if not realm_wide:
+        metadata["org_scope"] = governing.name
     if metadata_extra:
         metadata.update(metadata_extra)
+    if on_behalf_of:
+        metadata["on_behalf_of"] = on_behalf_of
 
     deadline_s = ic.time() // 1_000_000_000 + _voting_window_seconds()
 
-    Proposal(
-        proposal_id=proposal_id,
-        title=summary,
-        description=(
-            f"Governed action under '{governing.name}' "
-            f"(policy {format_org_policy(governing)}). "
-            f"Proposed by {proposer.id}."
-        ),
-        code_url="",
-        code_checksum="",
-        proposer=proposer,
-        status="voting",
-        voting_deadline=str(deadline_s),
-        votes_yes=0.0,
-        votes_no=0.0,
-        votes_abstain=0.0,
-        total_voters=0.0,
-        required_threshold=1.0,
-        org_scope=governing.name,
-        metadata=json.dumps(metadata),
-    )
-    logger.info(
-        f"governed proposal {proposal_id} submitted for '{governing.name}': {summary}"
-    )
+    if description is None:
+        if realm_wide:
+            description = f"Realm-wide governed action. Proposed by {proposer.id}."
+        else:
+            description = (
+                f"Governed action under '{governing.name}' "
+                f"(policy {format_org_policy(governing)}). "
+                f"Proposed by {proposer.id}."
+            )
+        if on_behalf_of:
+            description += f" On behalf of capital {on_behalf_of}."
+
+    fields = {
+        "proposal_id": proposal_id,
+        "title": summary,
+        "description": description,
+        "code_url": "",
+        "code_checksum": "",
+        "proposer": proposer,
+        "status": "voting",
+        "voting_deadline": str(deadline_s),
+        "votes_yes": 0.0,
+        "votes_no": 0.0,
+        "votes_abstain": 0.0,
+        "total_voters": 0.0,
+        # Org-scoped ballots ignore this (department policy decides), so the
+        # historical 1.0 is inert there. A realm-wide ballot *is* settled by it,
+        # and 1.0 would demand unanimity among decisive votes.
+        "required_threshold": REALM_WIDE_THRESHOLD if realm_wide else 1.0,
+        "metadata": json.dumps(metadata),
+    }
+    # Left unset for realm-wide so those rows stay out of the org_scope index.
+    if not realm_wide:
+        fields["org_scope"] = governing.name
+    Proposal(**fields)
+
+    scope_label = "realm-wide" if realm_wide else f"'{governing.name}'"
+    logger.info(f"governed proposal {proposal_id} submitted for {scope_label}: {summary}")
     return {
         "success": True,
         "applied": "proposal",
         "proposal_id": proposal_id,
         "summary": summary,
-        "governed_by": governing.name,
-        "governed_policy": format_org_policy(governing),
+        "governed_by": "" if realm_wide else governing.name,
+        "governed_policy": "realm-wide" if realm_wide else format_org_policy(governing),
     }
 
 

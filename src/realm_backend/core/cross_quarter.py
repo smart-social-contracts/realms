@@ -135,7 +135,12 @@ def walk_chain(start_ref, local_canister_id, local_lookup, stub_lookup,
     return {"status": ResolutionStatus.TOO_DEEP, "final_ref": None, "hops": hops}
 
 
-def merge_quarter_directory(local_quarters, peer_quarters):
+def merge_quarter_directory(
+    local_quarters,
+    peer_quarters,
+    peer_self=None,
+    peer_canister_id=None,
+):
     """Merge a peer's coarse quarter directory into ours.
 
     Both arguments are lists of dicts with at least ``canister_id`` and
@@ -147,10 +152,16 @@ def merge_quarter_directory(local_quarters, peer_quarters):
       monotonic-ish; we take the freshest/largest count we've seen) and a
       non-empty peer ``name``/``status`` fills gaps.
     * Entries without a ``canister_id`` are ignored (coarse data only).
+    * When ``peer_self`` is present (issue #295), codex + sync-ballot fields
+      from the responding realm are merged onto the entry for
+      ``peer_canister_id``. Old peers omit ``self``; new capitals tolerate
+      missing drift fields.
 
     Returns ``(merged_list, changed)`` where ``changed`` is True if anything
     was added or updated — useful to decide whether to re-broadcast.
     """
+    from .quarter_drift import merge_self_report
+
     by_id = {}
     for q in local_quarters or []:
         cid = (q or {}).get("canister_id")
@@ -175,6 +186,11 @@ def merge_quarter_directory(local_quarters, peer_quarters):
             if not existing.get(field) and q.get(field):
                 existing[field] = q[field]
                 changed = True
+
+    peer_id = (peer_canister_id or "").strip()
+    if peer_self and peer_id and peer_id in by_id:
+        if merge_self_report(by_id[peer_id], peer_self):
+            changed = True
 
     return list(by_id.values()), changed
 

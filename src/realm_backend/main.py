@@ -717,6 +717,24 @@ def join_realm(
         if not (granted_profile or "").strip():
             granted_profile = _default_registration_profile(realm)
 
+        # --- Quarter bootstrap guard: reject new members until dashboard is ready ---
+        if realm and _is_quarter_realm and not is_controller:
+            already_member = False
+            try:
+                already_member = bool(User[caller])
+            except Exception:
+                already_member = False
+            if not already_member:
+                from core.join_targets import JOIN_QUARTER_NOT_READY, is_dashboard_installed
+                from core.runtime_extensions import list_installed, resolve_extension_id
+
+                dash = resolve_extension_id("member_dashboard")
+                if not is_dashboard_installed(list_installed(), dash):
+                    return RealmResponse(
+                        success=False,
+                        data=RealmResponseData(error=JOIN_QUARTER_NOT_READY),
+                    )
+
         # --- Register user and assign quarter ---
 
         was_new_user = False
@@ -1746,6 +1764,30 @@ def bootstrap_as_quarter(args: text) -> text:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@update
+@require(Operations.QUARTER_CONFIGURE)
+def request_codex_sync(args: text) -> text:
+    """Open a codex sync ballot on this quarter (issue #295).
+
+    Called by the capital via inter-canister transport. Always creates a
+    proposal — never applies inline, even though the capital is a controller
+    and trusted principal (Gap 1). Members approve before ``apply_sync_plan``
+    runs on the tick engine.
+    """
+    try:
+        from core.quarter_sync import request_sync
+
+        caller = ic.caller().to_str()
+        try:
+            params = json.loads(args or "{}")
+        except Exception as e:
+            return json.dumps({"success": False, "error": f"bad args: {e}"})
+        return json.dumps(request_sync(caller, params))
+    except Exception as e:
+        logger.error(f"request_codex_sync failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 @query
 def get_bootstrap_status() -> text:
     """Report this quarter's self-bootstrap progress (issue #156).
@@ -2067,11 +2109,21 @@ def record_migration(args_json: text) -> text:
 def get_quarter_directory() -> text:
     """Coarse quarter directory for gossip — containers only, never contents.
 
-    JSON: ``{"quarters": [{name, canister_id, population, status}, ...]}``.
+    JSON: ``{"quarters": [{name, canister_id, population, status}, ...],
+    "self": {canister_id, codex_id, codex_version, last_sync_ballot_id,
+    last_sync_ballot_status}}``.
+
+    The ``self`` block describes this realm's installed codex and most recent
+    codex-sync ballot (issue #295). Old callers ignore it; old peers omit it.
     Includes this canister plus every Quarter entity it knows about.
     """
     try:
-        from ggg import Quarter, Realm, User
+        from core.quarter_drift import (
+            build_directory_self,
+            find_latest_codex_sync_ballot,
+        )
+        from core.quarter_sync import derive_quarter_current_codex
+        from ggg import Proposal, Quarter, Realm, User
 
         self_id = ic.id().to_str()
         realm = Realm.load("1")
@@ -2103,7 +2155,20 @@ def get_quarter_directory() -> text:
                 "status": q.status or "active",
                 "index": int(q.index or 0),
             })
-        return json.dumps({"quarters": quarters})
+
+        # Peers depend on this directory; a failure to describe our own codex
+        # must not cost them the quarter list.
+        payload = {"quarters": quarters}
+        try:
+            from core.quarter_drift import recent_proposals
+
+            codex = derive_quarter_current_codex()
+            ballot = find_latest_codex_sync_ballot(recent_proposals(Proposal))
+            payload["self"] = build_directory_self(self_id, codex, ballot)
+        except Exception as e:
+            logger.warning(f"get_quarter_directory: self block unavailable: {e}")
+
+        return json.dumps(payload)
     except Exception as e:
         logger.error(f"Error in get_quarter_directory: {e}\n{traceback.format_exc()}")
         return json.dumps({"quarters": [], "error": str(e)})
@@ -2205,6 +2270,55 @@ def sync_quarters(peer_canister_id: text) -> Async[text]:
 
     res = yield from sync_one_peer(peer_canister_id)
     return json.dumps(res)
+
+
+@query
+@require(Operations.QUARTER_CONFIGURE)
+def get_quarter_codex_drift() -> text:
+    """Capital-side federation view of per-quarter codex drift (issue #295).
+
+    JSON ``{success, data: {capital_codex_id, capital_codex_version,
+    quarters: [{canister_id, name, reported_codex_id, reported_codex_version,
+    capital_codex_id, capital_codex_version, drifted, last_sync_ballot_id,
+    last_sync_ballot_status, state}, ...]}}``.
+
+    ``state`` is one of ``aligned``, ``drifted`` (no open ballot),
+    ``ballot_open``, or ``ballot_not_adopted`` (``failed`` / ``no_quorum`` /
+    ``rejected``). Drift fields are refreshed by the existing quarter-directory
+    gossip (``sync_quarters`` / population sync); this endpoint reads what is
+    already stored on ``Quarter`` entities.
+
+    Gated by ``QUARTER_CONFIGURE`` — same operation family as
+    ``request_quarter_codex_sync`` and quarter bootstrap configuration.
+    """
+    try:
+        from core.quarter_bootstrap import derive_capital_install_set
+        from core.quarter_drift import (
+            build_federation_drift_report,
+            derive_capital_target_codex,
+        )
+        from ggg import Quarter, Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return json.dumps({"success": False, "error": "Realm not found"})
+
+        default_registry = ""
+        try:
+            manifest = json.loads(getattr(realm, "manifest_data", "") or "{}")
+            cas = (manifest.get("casals") if isinstance(manifest, dict) else None) or {}
+            default_registry = (cas.get("registry_canister_id") or "").strip()
+        except Exception:
+            pass
+
+        capital_codex = derive_capital_target_codex(
+            derive_capital_install_set(default_registry)
+        )
+        report = build_federation_drift_report(Quarter.instances(), capital_codex)
+        return json.dumps({"success": True, "data": report})
+    except Exception as e:
+        logger.error(f"Error in get_quarter_codex_drift: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @update
@@ -2542,6 +2656,68 @@ def process_quarter_scaling() -> Async[text]:
 
     res = yield from run_quarter_scaling()
     return res
+
+
+@update
+@require(Operations.QUARTER_CONFIGURE)
+def request_quarter_codex_sync(args: text) -> Async[text]:
+    """Ask a quarter to open a codex sync ballot (issue #295).
+
+    Derives the capital's live codex target from ``derive_capital_install_set``,
+    then calls the quarter's ``request_codex_sync``. Wrapped in ``gate()`` so
+    whoever may trigger a sync on the capital side is whatever the capital
+    already configured — 1/1 admin, M/N department, or a capital vote.
+
+    Args (JSON)::
+
+        {
+          "quarter_canister_id": "ihbn6-...",   # required
+          "confirm": false                      # second step when policy != 1/1
+        }
+
+    Returns the quarter's reply (proposal created on the quarter) or a
+    ``requires_confirmation`` / capital-side proposal payload from ``gate()``.
+    """
+    try:
+        params = json.loads(args or "{}")
+    except Exception as e:
+        return json.dumps({"success": False, "error": f"bad args: {e}"})
+
+    quarter_id = (params.get("quarter_canister_id") or "").strip()
+    if not quarter_id:
+        return json.dumps({"success": False, "error": "quarter_canister_id is required"})
+
+    try:
+        from core.governed_action import build_backend_replay_code, gate as governed_gate
+        from core.quarter_sync import trigger_quarter_codex_sync
+
+        caller = ic.caller().to_str()
+        confirm = bool(params.get("confirm", False))
+        replay_payload = {"quarter_canister_id": quarter_id}
+        summary = f"Request codex sync for quarter {quarter_id}"
+
+        verdict = governed_gate(
+            caller=caller,
+            summary=summary,
+            replay_code=build_backend_replay_code(
+                "core.quarter_sync",
+                "trigger_quarter_codex_sync",
+                json.dumps(replay_payload),
+            ),
+            confirm=confirm,
+            metadata_extra={
+                "sync_type": "quarter_codex_sync",
+                "quarter_canister_id": quarter_id,
+            },
+        )
+        if verdict is not None:
+            return json.dumps(verdict)
+
+        result = yield from trigger_quarter_codex_sync(replay_payload)
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"request_quarter_codex_sync failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 def run_autoscale_tick() -> Async[text]:
@@ -4397,6 +4573,39 @@ def start_task_manager() -> text:
         return err
 
 
+def _extension_ok_response(extension_result) -> ExtensionCallResponse:
+    from core.extension_errors import normalize_extension_result_json
+
+    return ExtensionCallResponse(
+        success=True, response=normalize_extension_result_json(extension_result)
+    )
+
+
+def _extension_gate_response(verdict: dict) -> ExtensionCallResponse:
+    from core.extension_errors import normalize_extension_result_json
+
+    return ExtensionCallResponse(
+        success=bool(verdict.get("success")),
+        response=normalize_extension_result_json(verdict),
+    )
+
+
+def _extension_permission_response(exc: BaseException) -> ExtensionCallResponse:
+    from core.extension_errors import payload_from_permission_error
+
+    return ExtensionCallResponse(
+        success=False, response=json.dumps(payload_from_permission_error(exc))
+    )
+
+
+def _extension_denied_response(message: str, operation: str) -> ExtensionCallResponse:
+    from core.extension_errors import permission_denied_payload
+
+    return ExtensionCallResponse(
+        success=False, response=json.dumps(permission_denied_payload(message, operation))
+    )
+
+
 @query
 def extension_call(extension_name: text, function_name: text, args: text) -> ExtensionCallResponse:
     """Query version of extension call for read-only operations like get_entity_types."""
@@ -4408,9 +4617,7 @@ def extension_call(extension_name: text, function_name: text, args: text) -> Ext
             extension_name, function_name, args, caller, allow_governed=False
         )
         if verdict is not None:
-            return ExtensionCallResponse(
-                success=bool(verdict.get("success")), response=json.dumps(verdict)
-            )
+            return _extension_gate_response(verdict)
         logger.debug(
             f"Query calling extension '{extension_name}' function '{function_name}' with args {args}"
         )
@@ -4423,13 +4630,10 @@ def extension_call(extension_name: text, function_name: text, args: text) -> Ext
             f"Got extension result from {extension_name} function {function_name}: {extension_result}"
         )
 
-        response = (
-            extension_result
-            if isinstance(extension_result, str)
-            else json.dumps(extension_result)
-        )
-        return ExtensionCallResponse(success=True, response=response)
+        return _extension_ok_response(extension_result)
 
+    except PermissionError as e:
+        return _extension_permission_response(e)
     except Exception as e:
         logger.error(f"Error in extension_call: {str(e)}\n{traceback.format_exc()}")
         return ExtensionCallResponse(success=False, response=str(e))
@@ -4446,20 +4650,15 @@ def extension_sync_call(extension_name: text, function_name: text, args: text) -
                 response=json.dumps({"error": gate_err}),
             )
         if not _check_access(caller, Operations.EXTENSION_SYNC_CALL):
-            return ExtensionCallResponse(
-                success=False,
-                response=json.dumps({
-                    "error": f"Access denied: you lack permission '{Operations.EXTENSION_SYNC_CALL}'",
-                    "denied_operation": Operations.EXTENSION_SYNC_CALL,
-                }),
+            return _extension_denied_response(
+                f"Access denied: you lack permission '{Operations.EXTENSION_SYNC_CALL}'",
+                Operations.EXTENSION_SYNC_CALL,
             )
         from core.extension_access import gate_extension_call
 
         verdict = gate_extension_call(extension_name, function_name, args, caller)
         if verdict is not None:
-            return ExtensionCallResponse(
-                success=bool(verdict.get("success")), response=json.dumps(verdict)
-            )
+            return _extension_gate_response(verdict)
         logger.debug(
             f"Sync calling extension '{extension_name}' entry point '{function_name}' with args {args}"
         )
@@ -4472,13 +4671,10 @@ def extension_sync_call(extension_name: text, function_name: text, args: text) -
             f"Got extension result from {extension_name} function {function_name}: {extension_result}, type: {type(extension_result)}"
         )
 
-        response = (
-            extension_result
-            if isinstance(extension_result, str)
-            else json.dumps(extension_result)
-        )
-        return ExtensionCallResponse(success=True, response=response)
+        return _extension_ok_response(extension_result)
 
+    except PermissionError as e:
+        return _extension_permission_response(e)
     except Exception as e:
         logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
         return ExtensionCallResponse(success=False, response=str(e))
@@ -4495,20 +4691,15 @@ def extension_async_call(extension_name: text, function_name: text, args: text) 
                 response=json.dumps({"error": gate_err}),
             )
         if not _check_access(caller, Operations.EXTENSION_ASYNC_CALL):
-            return ExtensionCallResponse(
-                success=False,
-                response=json.dumps({
-                    "error": f"Access denied: you lack permission '{Operations.EXTENSION_ASYNC_CALL}'",
-                    "denied_operation": Operations.EXTENSION_ASYNC_CALL,
-                }),
+            return _extension_denied_response(
+                f"Access denied: you lack permission '{Operations.EXTENSION_ASYNC_CALL}'",
+                Operations.EXTENSION_ASYNC_CALL,
             )
         from core.extension_access import gate_extension_call
 
         verdict = gate_extension_call(extension_name, function_name, args, caller)
         if verdict is not None:
-            return ExtensionCallResponse(
-                success=bool(verdict.get("success")), response=json.dumps(verdict)
-            )
+            return _extension_gate_response(verdict)
         logger.debug(
             f"Async calling extension '{extension_name}' entry point '{function_name}' with args {args}"
         )
@@ -4537,13 +4728,10 @@ def extension_async_call(extension_name: text, function_name: text, args: text) 
             f"Got extension result from {extension_name} function {function_name}: {extension_result}, type: {type(extension_result)}"
         )
 
-        response = (
-            extension_result
-            if isinstance(extension_result, str)
-            else json.dumps(extension_result)
-        )
-        return ExtensionCallResponse(success=True, response=response)
+        return _extension_ok_response(extension_result)
 
+    except PermissionError as e:
+        return _extension_permission_response(e)
     except Exception as e:
         logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
         return ExtensionCallResponse(success=False, response=str(e))

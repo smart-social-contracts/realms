@@ -178,6 +178,7 @@ export const idlFactory = ({ IDL }) => {
     'accept_delegation_json' : IDL.Func([IDL.Text], [IDL.Text], []),
     'approve_orchestration_action' : IDL.Func([IDL.Text], [IDL.Text], []),
     'bootstrap_as_quarter' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'request_codex_sync' : IDL.Func([IDL.Text], [IDL.Text], []),
     'change_quarter' : IDL.Func([IDL.Text], [RealmResponse], []),
     'complete_setup' : IDL.Func([], [IDL.Text], []),
     'create_multi_step_scheduled_task' : IDL.Func(
@@ -325,6 +326,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_quarter_directory' : IDL.Func([], [IDL.Text], ['query']),
+    'get_quarter_codex_drift' : IDL.Func([], [IDL.Text], ['query']),
     'get_quarter_info' : IDL.Func([], [RealmResponse], ['query']),
     'get_realm_credits' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_realm_registry_info' : IDL.Func([], [IDL.Text], ['query']),
@@ -364,6 +366,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'policy_status' : IDL.Func([], [IDL.Text], ['query']),
     'process_quarter_scaling' : IDL.Func([], [IDL.Text], []),
+    'request_quarter_codex_sync' : IDL.Func([IDL.Text], [IDL.Text], []),
     'receive_realm_message' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
         [IDL.Text],

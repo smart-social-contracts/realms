@@ -219,13 +219,14 @@ type Ledger = service { transfer : (TransferArgs) -> (TransferResult); account_b
 type _ICRC1IndexerService = service { get_account_transactions : (_GetAccountTransactionsArgs) -> (_GetAccountTransactionsResult) query };
 type QuarterDirectoryService = service { get_quarter_directory : () -> (text) query };
 type CapitalPopulationService = service { report_quarter_population : (nat) -> (text) };
-type FileRegistryService = service { get_extension_manifest : (text) -> (text) query; latest_version : (text) -> (text) query; list_extensions : () -> (text) query; list_codices : () -> (text) query; list_files_icc : (text) -> (text) query; get_file_size_icc : (text, text) -> (text) query; get_file_chunk_icc : (text, text, text, text) -> (text) query; get_namespace_approval_icc : (text) -> (text) query };
+type FileRegistryService = service { get_extension_manifest : (text) -> (text) query; latest_version : (text) -> (text) query; list_extensions : () -> (text) query; list_codices : () -> (text) query; list_files_icc : (text) -> (text) query; get_file_size_icc : (text, text) -> (text) query; get_file_chunk_icc : (text, text, text, text) -> (text) query; get_namespace_approval_icc : (text) -> (text) };
 type AssetCanisterService = service { store : (_AssetStoreArg) -> () };
 type RealmMessagingService = service { receive_realm_message : (text, text, text, text) -> (text) };
 type NFTService = service { mint : (MintArg) -> (MintResult); force_transfer : (ForceTransferArg) -> (AuthorityResult); freeze_token : (FreezeArg) -> (AuthorityResult); unfreeze_token : (nat) -> (AuthorityResult) };
 type InstallerProvisionService = service { provision_quarter : (text) -> (text) };
 type CasalsProvisionService = service { create_canister : (text) -> (text) };
 type QuarterBootstrapService = service { bootstrap_as_quarter : (text) -> (text) };
+type QuarterCodexSyncService = service { request_codex_sync : (text) -> (text) };
 type RealmRegistryService = service { register_realm : (text, text, text, text, text) -> (AddRealmResult) };
 type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (GetCreditsResult) query; get_latest_version : () -> (UpgradeResult) query };
 type RealmRegistrySetupService = service { realm_setup_completed : (text) -> (text) };
@@ -260,6 +261,7 @@ service : {
   "deregister_quarter" : (text) -> (RealmResponse);
   "set_quarter_config" : (text) -> (RealmResponse);
   "bootstrap_as_quarter" : (text) -> (text);
+  "request_codex_sync" : (text) -> (text);
   "get_bootstrap_status" : () -> (text) query;
   "declare_independence" : () -> (RealmResponse);
   "join_federation" : (text, bool) -> (RealmResponse);
@@ -269,6 +271,7 @@ service : {
   "record_migration" : (text) -> (text);
   "get_quarter_directory" : () -> (text) query;
   "get_join_targets" : () -> (text) query;
+  "get_quarter_codex_drift" : () -> (text) query;
   "sync_quarters" : (text) -> (text);
   "report_quarter_population" : (nat) -> (text);
   "register_demo_citizens" : (text) -> (text);
@@ -277,6 +280,7 @@ service : {
   "set_quarter_provisioning_config" : (text) -> (text);
   "approve_orchestration_action" : (text) -> (text);
   "process_quarter_scaling" : () -> (text);
+  "request_quarter_codex_sync" : (text) -> (text);
   "get_zones" : (nat) -> (text) query;
   "get_my_user_status" : () -> (RealmResponse) query;
   "get_my_extensions" : () -> (text) query;

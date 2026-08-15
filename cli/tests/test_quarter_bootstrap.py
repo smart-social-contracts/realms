@@ -7,7 +7,10 @@ path — avoiding ``core/__init__.py`` and the canister-only lazy imports inside
 """
 
 import importlib.util
+import json
 import os
+import sys
+import types
 
 # Load core/quarter_bootstrap.py by path (no package __init__ side effects).
 _QB_PATH = os.path.join(
@@ -59,8 +62,8 @@ class TestBuildBootstrapPlan:
         kinds = [(i["kind"], i["id"]) for i in plan["items"]]
         assert kinds == [
             ("codex", "agora/gov"),
-            ("extension", "realm_settings"),
             ("extension", "public_dashboard"),
+            ("extension", "realm_settings"),
             ("extension", "voting"),
         ]
         assert plan["status"] == "pending"
@@ -94,6 +97,24 @@ class TestBuildBootstrapPlan:
         codex_items = [i for i in plan["items"] if i["kind"] == "codex"]
         assert codex_items[0]["run_init"] is True
         assert codex_items[1]["run_init"] is True
+
+    def test_extension_priority_member_dashboard_first(self):
+        plan = qb.build_bootstrap_plan({
+            "registry_canister_id": "reg-1",
+            "extensions": [
+                "voting",
+                "hello_world",
+                "member_dashboard",
+                "realm_settings",
+            ],
+        })
+        kinds = [(i["kind"], i["id"]) for i in plan["items"]]
+        assert kinds == [
+            ("extension", "member_dashboard"),
+            ("extension", "realm_settings"),
+            ("extension", "voting"),
+            ("extension", "hello_world"),
+        ]
 
     def test_codices_list_takes_precedence_over_single_codex(self):
         plan = qb.build_bootstrap_plan({
@@ -169,6 +190,55 @@ class TestApplyQuarterConfig:
         assert qb.apply_quarter_config(realm, {}) == []
         assert qb.apply_quarter_config(realm, None) == []
 
+    def test_copies_require_marketplace_approval(self):
+        realm = _FakeRealm()
+        realm.require_marketplace_approval = True
+        applied = qb.apply_quarter_config(realm, {"require_marketplace_approval": False})
+        assert realm.require_marketplace_approval is False
+        assert "require_marketplace_approval" in applied
+
+        realm.require_marketplace_approval = False
+        qb.apply_quarter_config(realm, {"require_marketplace_approval": True})
+        assert realm.require_marketplace_approval is True
+
+    def test_missing_governance_keys_leave_fields_untouched(self):
+        realm = _FakeRealm()
+        realm.require_marketplace_approval = False
+        realm.trusted_approvers = "abc-principal"
+        realm.status = "alpha"
+        applied = qb.apply_quarter_config(realm, {"name": "Agora"})
+        assert realm.require_marketplace_approval is False
+        assert realm.trusted_approvers == "abc-principal"
+        assert realm.status == "alpha"
+        assert "require_marketplace_approval" not in applied
+        assert "trusted_approvers" not in applied
+        assert "status" not in applied
+
+    def test_copies_trusted_approvers_including_empty_string(self):
+        realm = _FakeRealm()
+        realm.trusted_approvers = "keep-me"
+        applied = qb.apply_quarter_config(realm, {"trusted_approvers": ""})
+        assert realm.trusted_approvers == ""
+        assert "trusted_approvers" in applied
+
+        qb.apply_quarter_config(realm, {"trusted_approvers": "a,b,c"})
+        assert realm.trusted_approvers == "a,b,c"
+
+    def test_copies_status_and_rejects_invalid(self):
+        realm = _FakeRealm()
+        realm.status = "setup"
+        applied = qb.apply_quarter_config(realm, {"status": "alpha"})
+        assert realm.status == "alpha"
+        assert "status" in applied
+
+        realm.status = "setup"
+        qb.apply_quarter_config(realm, {"status": "not-a-real-status"})
+        assert realm.status == "setup"
+
+        realm.status = "alpha"
+        qb.apply_quarter_config(realm, {"status": ""})
+        assert realm.status == "alpha"
+
 
 # ---------------------------------------------------------------------------
 # step_plan — cursor / retry state machine
@@ -239,9 +309,271 @@ class TestStepPlan:
 
 
 # ---------------------------------------------------------------------------
+# Bounded bootstrap_state persistence (issue: overflow kills installer)
+# ---------------------------------------------------------------------------
+
+_REALISTIC_EXT_IDS = (
+    "member_dashboard",
+    "public_dashboard",
+    "realm_settings",
+    "voting",
+    "admin_dashboard",
+    "access_manager",
+    "role_manager",
+    "codex_viewer",
+    "task_monitor",
+    "import_export",
+    "vault",
+    "mundus_explorer",
+    "hello_world",
+    "member_profile",
+    "notifications",
+    "search",
+    "calendar",
+    "treasury_view",
+    "governance_proposals",
+    "land_registry",
+    "marketplace",
+    "analytics",
+    "audit_log",
+    "api_gateway",
+)
+
+
+def _state_that_forces_spilling():
+    """A plan whose failure list is too big to fit even as bare ids, so
+    ``_bounded_state`` has to reach its overflow-spilling stage."""
+    ids = [f"extension-with-a-very-long-descriptive-name-{i}" for i in range(200)]
+    return {
+        "parent": "cap-1",
+        "registry": "reg-1",
+        "frontend": "",
+        "items": [{"kind": "extension", "id": i, "version": None} for i in ids[:5]],
+        "cursor": 5,
+        "attempts": 0,
+        "done": [],
+        "failed": [{"id": i, "error": "e" * 400} for i in ids],
+        "status": "complete",
+    }
+
+
+class TestBoundedBootstrapState:
+    def test_step_plan_many_long_failures_stays_under_limit(self):
+        spec = {
+            "registry_canister_id": "reg-1",
+            "extensions": list(_REALISTIC_EXT_IDS),
+        }
+        st = qb.build_bootstrap_plan(spec)
+        long_err = "x" * 350
+        for _ in st["items"]:
+            for _ in range(qb.MAX_ATTEMPTS_PER_ITEM):
+                st = qb.step_plan(st, False, error=long_err)
+        assert len(st["failed"]) >= len(_REALISTIC_EXT_IDS)
+        assert st["status"] == "complete"
+        assert len(json.dumps(st)) <= qb.BOOTSTRAP_STATE_MAX_LENGTH
+
+    def test_save_state_bounds_oversized_state(self):
+        class _Realm:
+            bootstrap_state = ""
+
+        realm = _Realm()
+        huge_failed = [
+            {"id": f"ext{i}", "error": "e" * 500}
+            for i in range(40)
+        ]
+        state = {
+            "parent": "cap-1",
+            "registry": "reg-1",
+            "frontend": "",
+            "items": [{"kind": "extension", "id": f"ext{i}"} for i in range(24)],
+            "cursor": 24,
+            "attempts": 0,
+            "done": list(_REALISTIC_EXT_IDS),
+            "failed": huge_failed,
+            "status": "complete",
+        }
+        qb.save_state(realm, state)
+        assert len(realm.bootstrap_state) <= qb.BOOTSTRAP_STATE_MAX_LENGTH
+        persisted = json.loads(realm.bootstrap_state)
+        assert persisted["status"] == "complete"
+        assert persisted["cursor"] == 24
+
+    def test_rebounding_keeps_the_overflow_count(self):
+        """A tick bounds twice (step_plan then save_state); the second pass must
+        not erase the failures the first pass already spilled."""
+        state = _state_that_forces_spilling()
+        once = qb._bounded_state(state)
+        assert once.get("failed_overflow"), "expected the first pass to spill"
+        twice = qb._bounded_state(once)
+        assert twice.get("failed_overflow") == once["failed_overflow"]
+        assert len(twice.get("failed") or []) == len(once.get("failed") or [])
+        assert qb._state_json_len(twice) <= qb.BOOTSTRAP_STATE_MAX_LENGTH
+
+    def test_overflow_count_survives_shedding_ids(self):
+        """Trimming the id list to fit must not shrink the number of failures."""
+        state = _state_that_forces_spilling()
+        total = len(state["failed"])
+        bounded = qb._bounded_state(state)
+        assert qb._state_json_len(bounded) <= qb.BOOTSTRAP_STATE_MAX_LENGTH
+        accounted = bounded.get("failed_overflow", 0) + len(bounded.get("failed") or [])
+        assert accounted == total
+        assert len(bounded.get("failed_overflow_ids") or []) <= bounded["failed_overflow"]
+
+
+# ---------------------------------------------------------------------------
 # Recurring-task shims — a typo here means the task silently never runs, so
 # guard the constants + generated step code (issue #156).
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# derive_capital_install_set — live install-set mirroring (issue #156, #244)
+# ---------------------------------------------------------------------------
+
+def _install_core_stubs(
+    *,
+    ext_ids,
+    ext_sources=None,
+    ext_manifests=None,
+    codex_ids=None,
+    codex_manifests=None,
+    active_codex=None,
+):
+    """Inject minimal ``core.*`` stubs for derive_capital_install_set."""
+    ext_sources = ext_sources or {}
+    ext_manifests = ext_manifests or {}
+    codex_ids = codex_ids if codex_ids is not None else []
+    codex_manifests = codex_manifests or {}
+
+    runtime_ext = types.ModuleType("core.runtime_extensions")
+    runtime_ext.list_installed = lambda: list(ext_ids)
+    runtime_ext.get_extension_source = lambda ext_id: ext_sources.get(ext_id)
+    runtime_ext.get_all_extension_manifests = lambda: dict(ext_manifests)
+
+    runtime_codex = types.ModuleType("core.runtime_codex")
+    runtime_codex.list_installed = lambda: list(codex_ids)
+    runtime_codex.get_all_codex_manifests = lambda: dict(codex_manifests)
+
+    codex_hooks = types.ModuleType("core.codex_hooks")
+    codex_hooks.get_active_codex = lambda: active_codex
+
+    core_pkg = sys.modules.get("core")
+    if core_pkg is None:
+        core_pkg = types.ModuleType("core")
+        sys.modules["core"] = core_pkg
+
+    saved = {
+        "core": sys.modules.get("core"),
+        "core.runtime_extensions": sys.modules.get("core.runtime_extensions"),
+        "core.runtime_codex": sys.modules.get("core.runtime_codex"),
+        "core.codex_hooks": sys.modules.get("core.codex_hooks"),
+    }
+    sys.modules["core.runtime_extensions"] = runtime_ext
+    sys.modules["core.runtime_codex"] = runtime_codex
+    sys.modules["core.codex_hooks"] = codex_hooks
+    core_pkg.runtime_extensions = runtime_ext
+    core_pkg.runtime_codex = runtime_codex
+    core_pkg.codex_hooks = codex_hooks
+    return saved
+
+
+def _restore_core_stubs(saved):
+    for name, mod in saved.items():
+        if mod is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = mod
+
+
+class TestDeriveCapitalInstallSet:
+    def test_unified_codex_extension_emitted_as_codex_not_extension(self):
+        ext_ids = ["agora", "voting", "realm_settings"]
+        saved = _install_core_stubs(
+            ext_ids=ext_ids,
+            ext_sources={
+                "agora": {"version": "0.9.5", "registry_canister_id": "reg-live"},
+                "voting": {"version": "1.0.0", "registry_canister_id": "reg-live"},
+                "realm_settings": {"version": "2.0.0", "registry_canister_id": "reg-live"},
+            },
+            ext_manifests={"agora": {"kind": "codex", "version": "0.9.5"}},
+            codex_ids=[],
+            active_codex="agora",
+        )
+        try:
+            derived = qb.derive_capital_install_set("reg-default")
+        finally:
+            _restore_core_stubs(saved)
+
+        assert derived["registry_canister_id"] == "reg-live"
+        assert derived["codices"] == [
+            {"codex_id": "agora", "version": "0.9.5", "run_init": True},
+        ]
+        ext_ids_out = [e["ext_id"] for e in derived["extensions"]]
+        assert "agora" not in ext_ids_out
+        assert ext_ids_out == ["voting", "realm_settings"]
+
+    def test_unified_codex_plans_before_extensions(self):
+        ext_ids = ["agora", "voting", "member_dashboard"]
+        saved = _install_core_stubs(
+            ext_ids=ext_ids,
+            ext_sources={
+                "agora": {"version": "0.9.5", "registry_canister_id": "reg-1"},
+                "voting": {"version": None, "registry_canister_id": "reg-1"},
+                "member_dashboard": {"version": None, "registry_canister_id": "reg-1"},
+            },
+            ext_manifests={"agora": {"kind": "codex", "version": "0.9.5"}},
+            codex_ids=[],
+            active_codex="agora",
+        )
+        try:
+            derived = qb.derive_capital_install_set("reg-1")
+            plan = qb.build_bootstrap_plan({
+                "registry_canister_id": derived["registry_canister_id"],
+                "codices": derived["codices"],
+                "extensions": derived["extensions"],
+            })
+        finally:
+            _restore_core_stubs(saved)
+
+        assert plan["items"][0] == {
+            "kind": "codex",
+            "id": "agora",
+            "version": "0.9.5",
+            "run_init": True,
+        }
+        assert all(i["kind"] == "extension" for i in plan["items"][1:])
+
+    def test_no_codex_derives_empty_codices_list(self):
+        saved = _install_core_stubs(
+            ext_ids=["voting"],
+            ext_sources={"voting": {"version": "1.0.0", "registry_canister_id": "reg-1"}},
+            active_codex=None,
+        )
+        try:
+            derived = qb.derive_capital_install_set("")
+        finally:
+            _restore_core_stubs(saved)
+
+        assert derived["codices"] == []
+        assert derived["extensions"] == [{"ext_id": "voting", "version": "1.0.0"}]
+
+    def test_legacy_codex_not_double_emitted(self):
+        saved = _install_core_stubs(
+            ext_ids=["voting"],
+            ext_sources={"voting": {"version": "1.0.0", "registry_canister_id": "reg-1"}},
+            codex_ids=["agora/gov"],
+            codex_manifests={"agora/gov": {"version": "0.1.0"}},
+            active_codex=None,
+        )
+        try:
+            derived = qb.derive_capital_install_set("")
+        finally:
+            _restore_core_stubs(saved)
+
+        assert derived["codices"] == [
+            {"codex_id": "agora/gov", "version": "0.1.0", "run_init": True},
+        ]
+        assert derived["extensions"] == [{"ext_id": "voting", "version": "1.0.0"}]
+
 
 class TestRecurringTaskShims:
     def test_autoscale_shim_is_async_and_targets_right_fn(self):

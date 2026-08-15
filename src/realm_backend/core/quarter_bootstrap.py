@@ -31,6 +31,13 @@ BOOTSTRAP_TASK_NAME = "quarter_self_bootstrap"
 BOOTSTRAP_INTERVAL_S = 10  # tick cadence == per-item retry backoff
 MAX_ATTEMPTS_PER_ITEM = 3  # give up on an item after this many tries
 
+# Matches ``Realm.bootstrap_state`` String(max_length=...) in ggg/governance/realm.py.
+BOOTSTRAP_STATE_MAX_LENGTH = 8192
+# Failure records are the only unbounded growth vector; keep them small so a full
+# 24-extension plan (~1.8k chars of items) always fits with headroom.
+FAILED_ERROR_MAX_CHARS = 120
+FAILED_DETAIL_MAX_ENTRIES = 8
+
 # Stable codex shim run by the recurring TaskManager step. Kept intentionally
 # tiny: all real work is the native advance_bootstrap() generator below. The
 # presence of "yield"/"async_task" marks the step async for the framework.
@@ -53,6 +60,31 @@ AUTOSCALE_STEP_CODE = (
 )
 
 # ── Pure plan construction + state machine (unit-testable, no canister) ──────
+
+# Core extensions installed early on new quarters so joiners get a usable dashboard.
+_BOOTSTRAP_EXT_PRIORITY = (
+    "member_dashboard",
+    "public_dashboard",
+    "realm_settings",
+    "voting",
+    "admin_dashboard",
+    "access_manager",
+    "role_manager",
+    "codex_viewer",
+    "task_monitor",
+    "import_export",
+    "vault",
+    "mundus_explorer",
+)
+
+
+def _bootstrap_ext_sort_key(item):
+    ext_id = item.get("id") or ""
+    try:
+        prio = _BOOTSTRAP_EXT_PRIORITY.index(ext_id)
+    except ValueError:
+        prio = len(_BOOTSTRAP_EXT_PRIORITY)
+    return (prio, item.get("_orig_idx", 0))
 
 
 def build_bootstrap_plan(spec):
@@ -97,8 +129,9 @@ def build_bootstrap_plan(spec):
                         "run_init": codex.get("run_init", True),
                     }
                 )
+    ext_items = []
     if registry:
-        for ext in spec.get("extensions") or []:
+        for orig_idx, ext in enumerate(spec.get("extensions") or []):
             if isinstance(ext, dict):
                 ext_id = (ext.get("ext_id") or "").strip()
                 version = ext.get("version")
@@ -107,7 +140,18 @@ def build_bootstrap_plan(spec):
                 version = None
             if not ext_id:
                 continue
-            items.append({"kind": "extension", "id": ext_id, "version": version})
+            ext_items.append(
+                {
+                    "kind": "extension",
+                    "id": ext_id,
+                    "version": version,
+                    "_orig_idx": orig_idx,
+                }
+            )
+        ext_items.sort(key=_bootstrap_ext_sort_key)
+        for item in ext_items:
+            item.pop("_orig_idx", None)
+            items.append(item)
 
     return {
         "parent": parent,
@@ -125,7 +169,9 @@ def build_bootstrap_plan(spec):
 def step_plan(state, ok, error=None):
     """Advance the plan cursor given the outcome of installing the current item.
 
-    Pure: mutates and returns ``state``.
+    Mutates ``state`` and returns a *bounded* copy of it: callers that intend to
+    persist the result must use the return value, since the argument keeps the
+    full untruncated failure detail.
       * success      -> record done, advance cursor, reset attempts.
       * failure      -> bump attempts; once ``MAX_ATTEMPTS_PER_ITEM`` is reached,
                         record the failure and advance (so one bad item never
@@ -146,7 +192,7 @@ def step_plan(state, ok, error=None):
         state["attempts"] = 0
     elif attempts >= MAX_ATTEMPTS_PER_ITEM:
         state.setdefault("failed", []).append(
-            {"id": item.get("id"), "error": str(error)[:300]}
+            {"id": item.get("id"), "error": str(error)[:FAILED_ERROR_MAX_CHARS]}
         )
         state["cursor"] = cursor + 1
         state["attempts"] = 0
@@ -154,7 +200,7 @@ def step_plan(state, ok, error=None):
         state["attempts"] = attempts
 
     state["status"] = "complete" if int(state["cursor"]) >= len(items) else "pending"
-    return state
+    return _bounded_state(state)
 
 
 # ── Capital runtime config + branding mirroring (capital → quarter) ──────────
@@ -176,7 +222,11 @@ _QUARTER_CONFIG_STR_FIELDS = (
     "token_canister_id",
     "nft_canister_id",
 )
-_QUARTER_CONFIG_BOOL_FIELDS = ("open_registration", "ai_assistant_enabled")
+_QUARTER_CONFIG_BOOL_FIELDS = (
+    "open_registration",
+    "ai_assistant_enabled",
+    "require_marketplace_approval",
+)
 _QUARTER_CONFIG_INT_FIELDS = ("accounting_currency_decimals",)
 _QUARTER_TEST_FLAG_FIELDS = (
     "test_mode",
@@ -186,6 +236,16 @@ _QUARTER_TEST_FLAG_FIELDS = (
     "test_mode_skip_passport_zkproof",
     "test_mode_skip_authentication",
 )
+# RealmStatus values from ggg/governance/realm.py — duplicated here so this
+# module stays pure-stdlib and unit-testable without the canister.
+_QUARTER_VALID_STATUSES = frozenset({
+    "setup",
+    "alpha",
+    "beta",
+    "production",
+    "deprecation",
+    "terminated",
+})
 
 
 def apply_quarter_config(realm, config):
@@ -222,6 +282,17 @@ def apply_quarter_config(realm, config):
         if flags.get(f) is not None:
             setattr(realm, f, bool(flags[f]))
             applied.append(f)
+    # Empty string is meaningful ("trust only the configured marketplace"), so
+    # use an explicit None-check rather than the truthy skip used for branding.
+    if config.get("trusted_approvers") is not None:
+        setattr(realm, "trusted_approvers", str(config["trusted_approvers"]))
+        applied.append("trusted_approvers")
+    status = config.get("status")
+    if status:
+        status = str(status).strip()
+        if status in _QUARTER_VALID_STATUSES:
+            setattr(realm, "status", status)
+            applied.append("status")
     return applied
 
 
@@ -284,6 +355,29 @@ def derive_capital_install_set(default_registry=""):
     except Exception as e:
         logger.error(f"derive_capital_install_set: codices read failed — {e}")
 
+    # Unified ``kind: codex`` packages live under /extensions (issue #244); mirror
+    # the ``list_codex_packages`` fallback so the quarter gets a codex item, not an
+    # extension item that would install out of order.
+    try:
+        from core.codex_hooks import get_active_codex
+        from core.runtime_extensions import get_all_extension_manifests
+
+        active = get_active_codex()
+        if active:
+            installed_ids = {c["codex_id"] for c in codices}
+            if active not in installed_ids:
+                manifest = get_all_extension_manifests().get(active) or {}
+                version = (str(manifest.get("version") or "")).strip() or None
+                codices.append(
+                    {"codex_id": active, "version": version, "run_init": True}
+                )
+    except Exception as e:
+        logger.error(f"derive_capital_install_set: active codex fallback failed — {e}")
+
+    codex_ids = {c["codex_id"] for c in codices}
+    if codex_ids:
+        extensions = [e for e in extensions if e.get("ext_id") not in codex_ids]
+
     return {
         # Trust the registry the extensions actually came from (recorded at
         # install time) over the configured default: the casals-block value is
@@ -296,6 +390,96 @@ def derive_capital_install_set(default_registry=""):
 
 
 # ── Realm-persisted state helpers ───────────────────────────────────────────
+
+
+def _state_json_len(state):
+    return len(json.dumps(state, separators=(",", ":")))
+
+
+def _truncate_failed_errors(failed):
+    """Normalize failure records to short, fixed-width error strings."""
+    out = []
+    for entry in failed or []:
+        if not isinstance(entry, dict):
+            continue
+        rec = {"id": entry.get("id")}
+        if entry.get("error") is not None:
+            rec["error"] = str(entry["error"])[:FAILED_ERROR_MAX_CHARS]
+        out.append(rec)
+    return out
+
+
+def bound_state(state, max_length=BOOTSTRAP_STATE_MAX_LENGTH):
+    """Return ``state`` trimmed so its JSON serialization fits ``max_length``.
+
+    Degrades gracefully: shortens error text, then drops error detail, then
+    spills overflow failures into a count + bare-id list. Never raises.
+    """
+    if not isinstance(state, dict):
+        return state
+
+    bounded = dict(state)
+    bounded["failed"] = _truncate_failed_errors(bounded.get("failed"))
+    # Overflow spilled by an earlier pass has to survive re-bounding: a tick
+    # bounds once through step_plan and again through save_state, and the
+    # entries it counts are already gone from ``failed``.
+    if int(state.get("failed_overflow") or 0):
+        bounded["failed_overflow"] = int(state["failed_overflow"])
+        bounded["failed_overflow_ids"] = [
+            i for i in (state.get("failed_overflow_ids") or []) if i
+        ]
+    else:
+        bounded.pop("failed_overflow", None)
+        bounded.pop("failed_overflow_ids", None)
+
+    if _state_json_len(bounded) <= max_length:
+        return bounded
+
+    # Drop per-entry error text first — ids alone are enough to diagnose counts.
+    bounded["failed"] = [{"id": e.get("id")} for e in bounded["failed"]]
+    if _state_json_len(bounded) <= max_length:
+        return bounded
+
+    # Still too large: retain detailed head, spill the tail as bare ids + count.
+    failed = bounded["failed"]
+    keep = failed[:FAILED_DETAIL_MAX_ENTRIES]
+    overflow = failed[FAILED_DETAIL_MAX_ENTRIES:]
+    bounded["failed"] = keep
+    if overflow:
+        bounded["failed_overflow"] = int(bounded.get("failed_overflow") or 0) + len(
+            overflow
+        )
+        bounded["failed_overflow_ids"] = list(
+            bounded.get("failed_overflow_ids") or []
+        ) + [e.get("id") for e in overflow if e.get("id")]
+
+    while bounded["failed"] or bounded.get("failed_overflow"):
+        if _state_json_len(bounded) <= max_length:
+            return bounded
+        if len(bounded["failed"]) > 1:
+            spill = bounded["failed"].pop()
+            bounded["failed_overflow"] = int(bounded.get("failed_overflow") or 0) + 1
+            ids = list(bounded.get("failed_overflow_ids") or [])
+            if spill.get("id"):
+                ids.append(spill["id"])
+            bounded["failed_overflow_ids"] = ids
+        elif bounded.get("failed_overflow_ids"):
+            # Shed ids, never the count: the failures happened whether or not
+            # there is room left to name them.
+            bounded["failed_overflow_ids"] = bounded["failed_overflow_ids"][:-1]
+        else:
+            bounded["failed"] = []
+            break
+
+    if not bounded.get("failed_overflow_ids"):
+        bounded.pop("failed_overflow_ids", None)
+    if not bounded.get("failed_overflow"):
+        bounded.pop("failed_overflow", None)
+    return bounded
+
+
+def _bounded_state(state):
+    return bound_state(state, BOOTSTRAP_STATE_MAX_LENGTH)
 
 
 def load_state(realm):
@@ -311,7 +495,36 @@ def load_state(realm):
 
 def save_state(realm, state):
     """Persist the JSON bootstrap plan onto ``realm``."""
-    realm.bootstrap_state = json.dumps(state)
+    realm.bootstrap_state = json.dumps(
+        _bounded_state(state), separators=(",", ":")
+    )
+
+
+def _persist_state(realm, state):
+    """Best-effort save: a persistence failure must never kill the bootstrap tick."""
+    try:
+        save_state(realm, state)
+        return True
+    except Exception as e:
+        logger.error(f"save_state failed ({e}); retrying with minimal state")
+        try:
+            minimal = {
+                "parent": state.get("parent"),
+                "registry": state.get("registry"),
+                "frontend": state.get("frontend"),
+                "items": state.get("items"),
+                "cursor": state.get("cursor"),
+                "attempts": state.get("attempts"),
+                "done": state.get("done"),
+                "status": state.get("status"),
+                "failed": [],
+                "failed_overflow": len(state.get("failed") or []),
+            }
+            save_state(realm, minimal)
+            return True
+        except Exception as e2:
+            logger.error(f"save_state minimal retry also failed: {e2}")
+            return False
 
 
 # ── Canister runtime: install one item per tick ─────────────────────────────
@@ -396,7 +609,7 @@ def advance_bootstrap():
     cursor = int(state.get("cursor") or 0)
     if state.get("status") == "complete" or cursor >= len(items):
         state["status"] = "complete"
-        save_state(realm, state)
+        _persist_state(realm, state)
         disable_recurring_task(BOOTSTRAP_TASK_NAME)
         return {
             "success": True,
@@ -446,8 +659,8 @@ def advance_bootstrap():
         if ok
         else (result.get("error") if isinstance(result, dict) else str(result))
     )
-    step_plan(state, ok, error=error)
-    save_state(realm, state)
+    state = step_plan(state, ok, error=error)
+    _persist_state(realm, state)
 
     if state.get("status") == "complete":
         disable_recurring_task(BOOTSTRAP_TASK_NAME)
@@ -485,6 +698,7 @@ def sync_one_peer(peer_canister_id):
             return {"success": False, "error": fetched.get("error", "fetch failed")}
 
         peer_quarters = fetched.get("quarters", [])
+        peer_self = fetched.get("self")
         self_id = ic.id().to_str()
         realm = Realm.load("1")
 
@@ -499,19 +713,28 @@ def sync_one_peer(peer_canister_id):
                 }
             )
 
-        merged, changed = merge_quarter_directory(local, peer_quarters)
+        merged, changed = merge_quarter_directory(
+            local,
+            peer_quarters,
+            peer_self=peer_self,
+            peer_canister_id=peer_canister_id,
+        )
+
+        from core.quarter_drift import apply_self_report_to_quarter
 
         existing_ids = {q.canister_id for q in Quarter.instances()}
         added = 0
         for entry in merged:
             cid = entry.get("canister_id")
             if not cid or cid == self_id or cid in existing_ids:
-                # Update population on a known quarter.
+                # Update population and drift report on a known quarter.
                 for q in Quarter.instances():
                     if q.canister_id == cid:
                         new_pop = int(entry.get("population", 0) or 0)
                         if new_pop > int(q.population or 0):
                             q.population = new_pop
+                        if cid == peer_canister_id:
+                            apply_self_report_to_quarter(q, peer_self)
                         break
                 continue
             new_q = Quarter(

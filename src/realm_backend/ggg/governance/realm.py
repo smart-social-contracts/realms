@@ -16,7 +16,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 7
+    __version__ = 8
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -39,6 +39,8 @@ class Realm(Entity, TimestampedMixin):
             obj.setdefault("trusted_approvers", "")
         if from_version < 7:
             obj.setdefault("can_test_mode", False)
+        if from_version < 8:
+            obj.setdefault("sync_state", "")
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.SETUP)
@@ -75,6 +77,11 @@ class Realm(Entity, TimestampedMixin):
     # cursor persisted on a freshly minted quarter; the recurring TaskManager
     # task in core.quarter_bootstrap installs one item per tick from this state.
     bootstrap_state = String(max_length=8192, default="")
+    # Quarter-local codex-sync progress (issue #295). JSON install plan +
+    # cursor persisted separately from first-boot bootstrap so an approved sync
+    # ballot cannot clobber or be clobbered by bootstrap_state, and re-seeding
+    # the sync task does not reset the first-boot plan.
+    sync_state = String(max_length=8192, default="")
     # Canister id of the realm_installer broker used to provision new quarters
     # via Casals. Empty => auto-scale records intent but cannot self-provision.
     installer_canister_id = String(max_length=64, default="")

@@ -57,7 +57,7 @@ class FileRegistryService(Service):
         self, namespace: text, path: text, offset: text, length: text
     ) -> text: ...
 
-    @service_query
+    @service_update
     def get_namespace_approval_icc(self, namespace: text) -> text: ...
 
 

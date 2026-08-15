@@ -14,6 +14,17 @@ class QuarterStatus:
 
 class Quarter(Entity, TimestampedMixin):
     __alias__ = "name"
+    __version__ = 2
+
+    @classmethod
+    def migrate(cls, obj, from_version, to_version):
+        if from_version < 2:
+            obj.setdefault("reported_codex_id", "")
+            obj.setdefault("reported_codex_version", "")
+            obj.setdefault("last_sync_ballot_id", "")
+            obj.setdefault("last_sync_ballot_status", "")
+        return obj
+
     name = String(min_length=2, max_length=256)
     canister_id = String(max_length=64)  # backend canister principal
     federation = ManyToOne("Realm", "quarter_ids")
@@ -24,3 +35,9 @@ class Quarter(Entity, TimestampedMixin):
     # Lets users recover their home quarter by remembering a small integer
     # without any central per-user location index.
     index = Integer(default=0)
+    # Gossip-reported codex + last sync ballot (issue #295). Filled by the
+    # capital when merging a peer's ``get_quarter_directory`` ``self`` block.
+    reported_codex_id = String(max_length=128, default="")
+    reported_codex_version = String(max_length=64, default="")
+    last_sync_ballot_id = String(max_length=64, default="")
+    last_sync_ballot_status = String(max_length=32, default="")
