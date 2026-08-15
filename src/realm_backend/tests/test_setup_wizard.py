@@ -862,3 +862,52 @@ def test_list_available_codices_includes_repository(monkeypatch):
     assert payload["success"] is True
     assert payload["codices"][0]["description"] == "Governance codex"
     assert payload["codices"][0]["repository"] == "https://github.com/example/agora"
+
+
+# ---------------------------------------------------------------------------
+# Data URL decoding (must not rely on `re`, which is a stub in the canister)
+# ---------------------------------------------------------------------------
+
+
+def test_decode_data_url_accepts_base64_payload():
+    import base64 as _b64
+
+    setup_api = _import_setup_api()
+    raw = b"\x89PNG\r\n\x1a\n binary \x00\xff"
+    payload, content_type = setup_api._decode_data_url(
+        "  data:image/png;base64," + _b64.b64encode(raw).decode() + "  "
+    )
+    assert payload == raw
+    assert content_type == "image/png"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        None,
+        "data:image/png;base64,",
+        "data:image/png,QUJD",
+        "data:;base64,QUJD",
+        "data:image/png;charset=utf-8;base64,QUJD",
+        "notadata:image/png;base64,QUJD",
+    ],
+)
+def test_decode_data_url_rejects_malformed(value):
+    setup_api = _import_setup_api()
+    with pytest.raises(ValueError):
+        setup_api._decode_data_url(value)
+
+
+def test_setup_api_does_not_import_re_at_module_level():
+    """The canister's WASI CPython stubs out `re`, so a module-level
+    `re.compile` would break every `api.setup` import at runtime."""
+    import pathlib
+
+    setup_api = _import_setup_api()
+    source = pathlib.Path(setup_api.__file__).read_text()
+    code = "\n".join(
+        line for line in source.splitlines() if not line.strip().startswith("#")
+    )
+    assert "\nimport re\n" not in code
+    assert "re.compile(" not in code

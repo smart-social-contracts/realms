@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import json
-import re
 from typing import Any, Dict, Optional
 
 from _cdk import Async, CallResult, Principal, StableBTreeMap, ic
@@ -12,6 +11,7 @@ from ic_python_logging import get_logger
 
 from api.file_registry import AssetCanisterService, FileRegistryService, _unwrap_call_result
 from core.setup import (
+    BRANDING_DATA_URL_MAX_BYTES,
     SETUP_LAUNCH_STEP_CODE,
     SETUP_LAUNCH_TASK_NAME,
     SETUP_LAUNCH_TICK_SECONDS,
@@ -43,11 +43,11 @@ _SETUP_CATALOG_CACHE = StableBTreeMap[str, str](
 _SETUP_CATALOG_CACHE_KEY = "catalog"
 
 # Draft wizard images (logo/background data URLs). memory_id=3 is unused elsewhere.
+# The value is the data URL itself, so the bound must match what validation admits.
 _SETUP_DRAFT_ASSETS = StableBTreeMap[str, str](
-    memory_id=3, max_key_size=32, max_value_size=262_144
+    memory_id=3, max_key_size=32, max_value_size=BRANDING_DATA_URL_MAX_BYTES
 )
 _DRAFT_ASSET_KEYS = frozenset({"logo", "background"})
-_DATA_URL_RE = re.compile(r"^data:([^;]+);base64,(.+)$", re.DOTALL)
 _BRANDING_ASSET_PATHS = {
     "logo": "/custom/logo.png",
     "background": "/custom/background.png",
@@ -206,10 +206,20 @@ def setup_launch() -> str:
 
 
 def _decode_data_url(data_url: str) -> tuple[bytes, str]:
-    match = _DATA_URL_RE.match((data_url or "").strip())
-    if not match:
+    # Parsed by hand rather than with `re`: the canister's WASI CPython has no
+    # working `re`, and basilisk's preamble silently substitutes an empty stub
+    # for missing stdlib modules, so `re.compile` would fail at import time and
+    # take this whole module down.
+    raw = (data_url or "").strip()
+    header, sep, payload = raw.partition(",")
+    if not raw.startswith("data:") or not sep or not payload:
         raise ValueError("invalid data URL")
-    content_type, payload = match.groups()
+    meta = header[len("data:") :]
+    if not meta.endswith(";base64"):
+        raise ValueError("invalid data URL")
+    content_type = meta[: -len(";base64")]
+    if not content_type or ";" in content_type:
+        raise ValueError("invalid data URL")
     return base64.b64decode(payload), content_type
 
 
