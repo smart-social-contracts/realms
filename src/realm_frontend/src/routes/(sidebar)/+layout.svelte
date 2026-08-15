@@ -22,20 +22,58 @@
 	let drawerHidden = true;
 	let initialized = false;
 	let embeddedInPortal = false;
-	
-	function saveSidebarState(hidden) {
-		if (browser && initialized) {
-			try {
-				localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(hidden));
-			} catch {
-				// sandbox / private mode
+
+	function isDesktopViewport() {
+		return typeof window !== 'undefined' && window.innerWidth >= 1024;
+	}
+
+	function isPublicDashboardPath(pathname = get(page).url.pathname) {
+		return pathname.includes('/extensions/public_dashboard');
+	}
+
+	function applySidebarVisibility() {
+		if (!browser) return;
+
+		if (!isDesktopViewport()) {
+			drawerHidden = true;
+			return;
+		}
+
+		if (!get(isAuthenticated) && isPublicDashboardPath()) {
+			drawerHidden = true;
+			return;
+		}
+
+		try {
+			const savedSidebar = localStorage.getItem(SIDEBAR_STATE_KEY);
+			if (savedSidebar !== null) {
+				drawerHidden = JSON.parse(savedSidebar);
+			} else {
+				drawerHidden = false;
 			}
+		} catch {
+			drawerHidden = false;
 		}
 	}
 	
-	$: if (browser && initialized && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+	function saveSidebarState(hidden) {
+		if (!browser || !initialized || !isDesktopViewport()) return;
+		if (!get(isAuthenticated) && isPublicDashboardPath()) return;
+		try {
+			localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(hidden));
+		} catch {
+			// sandbox / private mode
+		}
+	}
+	
+	$: if (browser && initialized) {
 		saveSidebarState(drawerHidden);
 	}
+
+	$: isAnonymousLanding =
+		!$isAuthenticated && $page.url.pathname.includes('/extensions/public_dashboard');
+
+	$: hideDesktopSidebar = initialized ? drawerHidden : isAnonymousLanding;
 
 	onMount(() => {
 		if (browser) {
@@ -45,20 +83,8 @@
 			document.documentElement.classList.add('light');
 			document.body.classList.remove('overflow-hidden');
 
-			const isMobile = window.innerWidth < 1024;
-			try {
-				const savedSidebar = localStorage.getItem(SIDEBAR_STATE_KEY);
-				// Mobile drawer always starts closed — persisting "open" traps users when
-				// scroll-lock or backdrop stacking breaks touch on real devices.
-				if (!isMobile && savedSidebar !== null) {
-					drawerHidden = JSON.parse(savedSidebar);
-				} else {
-					drawerHidden = true;
-				}
-			} catch {
-				drawerHidden = true;
-			}
-			
+			applySidebarVisibility();
+
 			initialized = true;
 
 			// Only react when crossing the lg breakpoint — not on keyboard-open
@@ -67,8 +93,8 @@
 
 			const handleResize = () => {
 				const isDesktop = window.innerWidth >= 1024;
-				if (wasDesktop && !isDesktop) {
-					drawerHidden = true;
+				if (wasDesktop !== isDesktop) {
+					applySidebarVisibility();
 				}
 				wasDesktop = isDesktop;
 			};
@@ -90,6 +116,7 @@
 			
 			const unsubAuth = isAuthenticated.subscribe((auth) => {
 				if (auth) void loadNotifications();
+				applySidebarVisibility();
 			});
 
 			return () => {
@@ -104,15 +131,17 @@
 
 	afterNavigate(() => {
 		if (get(isAuthenticated)) void loadNotifications();
-		if (browser && typeof window !== 'undefined' && window.innerWidth < 1024) {
-			drawerHidden = true;
-		}
+		applySidebarVisibility();
 	});
 
 	$: isFullBleedExtension =
 		$page.url.pathname.includes('/extensions/codex_viewer') ||
 		$page.url.pathname.includes('/extensions/zone_selector') ||
 		$page.url.pathname.includes('/extensions/land_registry');
+
+	$: isPaneBleedExtension = $page.url.pathname.includes('/extensions/public_dashboard');
+
+	$: isEdgeToEdgeExtension = isFullBleedExtension || isPaneBleedExtension;
 
 	$: mobileDrawerOpen =
 		browser && !drawerHidden && typeof window !== 'undefined' && window.innerWidth < 1024;
@@ -126,7 +155,7 @@
 	</header>
 	<div class="flex min-h-0 flex-1 overflow-hidden bg-white">
 		<!-- Sidebar (left, in-flow on lg; mobile drawer is a separate overlay) -->
-		<Sidebar bind:drawerHidden />
+		<Sidebar bind:drawerHidden desktopHidden={hideDesktopSidebar} />
 
 		<!-- Main Content -->
 		<div
@@ -139,9 +168,11 @@
 			<div
 				class="{isFullBleedExtension
 					? 'flex min-h-0 flex-1 flex-col overflow-hidden px-0'
-					: 'px-4 lg:px-6'}"
+					: isPaneBleedExtension
+						? 'px-0'
+						: 'px-4 lg:px-6'}"
 			>
-				{#if !isFullBleedExtension}
+				{#if !isEdgeToEdgeExtension}
 					<PageBreadcrumb />
 				{/if}
 

@@ -19,6 +19,7 @@
 	import { backend, quarterBackendStore } from '$lib/canisters';
 
 	export let drawerHidden: boolean = false;
+	export let desktopHidden: boolean = false;
 	
 	let showScrollIndicator = true;
 	let sidebarContainer: HTMLElement;
@@ -399,12 +400,14 @@
 
 <!-- Desktop sidebar (in-flow beside main; do not pair fixed + ml-64) -->
 <aside
-	class="hidden lg:flex lg:shrink-0 flex-col w-64 min-h-0 h-full border-r border-gray-200 bg-white z-30"
+	class="hidden lg:flex lg:shrink-0 flex-col min-h-0 h-full bg-white z-30 transition-[width] duration-200 motion-reduce:transition-none {desktopHidden ? 'w-0 min-w-0 overflow-hidden border-r-0 pointer-events-none' : 'w-64 border-r border-gray-200'}"
+	aria-hidden={desktopHidden ? true : undefined}
+	inert={desktopHidden ? true : undefined}
 >
 	<h4 class="sr-only">Main menu</h4>
 	<div
 		bind:this={sidebarContainer}
-		class={cn(styles.sidebar.container(), 'overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain border-r-0')}
+		class={cn(styles.sidebar.container(), 'w-64 overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain border-r-0')}
 	>
 		<nav>
 			{#if !$isAuthenticated}

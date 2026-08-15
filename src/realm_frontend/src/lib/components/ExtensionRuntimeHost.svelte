@@ -48,6 +48,7 @@
 	export let extensionId: string;
 
 	const FULL_BLEED_EXTENSIONS = new Set(['codex_viewer', 'zone_selector', 'land_registry']);
+	const PANE_BLEED_EXTENSIONS = new Set(['public_dashboard']);
 
 	let mountPoint: HTMLDivElement | undefined;
 	let status: 'loading' | 'ready' | 'error' | 'access_denied' | 'sdk_mismatch' = 'loading';
@@ -381,6 +382,12 @@
 		? extensionLoadingMessage(extensionId, $sidebarConfig)
 		: 'Loading...';
 
+	$: extensionHostClass = FULL_BLEED_EXTENSIONS.has(extensionId)
+		? 'extension-host-fullbleed'
+		: PANE_BLEED_EXTENSIONS.has(extensionId)
+			? 'w-full min-w-0'
+			: 'p-4';
+
 	let lastLoadedId: string | undefined;
 	$: if (browser && extensionId && extensionId !== lastLoadedId && mountPoint) {
 		lastLoadedId = extensionId;
@@ -399,7 +406,7 @@
 	});
 </script>
 
-<div class={FULL_BLEED_EXTENSIONS.has(extensionId) ? 'extension-host-fullbleed' : 'p-4'}>
+<div class={extensionHostClass}>
 	{#if status === 'loading'}
 		<div class="flex items-center gap-2 text-gray-500">
 			<svg
