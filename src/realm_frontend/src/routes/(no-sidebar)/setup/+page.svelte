@@ -783,6 +783,62 @@
 					</button>
 				{/each}
 			</nav>
+			{#if !loading}
+				<div class="setup-wizard__actions setup-wizard__actions--toolbar">
+					{#if previousStep && !(currentStep === 'review' && launchRunning)}
+						<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
+							Back
+						</Button>
+					{/if}
+					{#if currentStep === 'token' || currentStep === 'branding'}
+						<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={skipStep}>
+							Skip
+						</Button>
+					{/if}
+					{#if currentStep === 'codex'}
+						<Button
+							color="none"
+							class={primaryButtonClass}
+							disabled={codexPrimaryDisabled}
+							onclick={handleCodexContinue}
+						>
+							{codexPrimaryLabel}
+						</Button>
+					{:else if currentStep === 'token'}
+						<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleTokenSave}>
+							{busy ? 'Continuing…' : 'Continue'}
+						</Button>
+					{:else if currentStep === 'branding'}
+						<Button
+							color="none"
+							class={primaryButtonClass}
+							disabled={busy || brandingTextInvalid}
+							onclick={handleBrandingSave}
+						>
+							{busy ? 'Continuing…' : 'Continue'}
+						</Button>
+					{:else if currentStep === 'review'}
+						{#if launchFailed}
+							<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleLaunch}>
+								{busy ? 'Retrying…' : 'Retry launch'}
+							</Button>
+						{:else if launchCompleted}
+							<Button color="none" class={primaryButtonClass} disabled>Launch complete</Button>
+						{:else if launchRunning}
+							<Button color="none" class={primaryButtonClass} disabled>Launching…</Button>
+						{:else}
+							<Button
+								color="none"
+								class={primaryButtonClass}
+								disabled={busy || !summaryCodexPackage}
+								onclick={handleLaunch}
+							>
+								{busy ? 'Starting…' : 'Launch realm'}
+							</Button>
+						{/if}
+					{/if}
+				</div>
+			{/if}
 		{/if}
 
 		{#if loading}
@@ -882,22 +938,6 @@
 							</label>
 						{/each}
 					</div>
-
-					<div class="setup-wizard__actions">
-						{#if previousStep}
-							<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
-								Back
-							</Button>
-						{/if}
-						<Button
-							color="none"
-							class={primaryButtonClass}
-							disabled={codexPrimaryDisabled}
-							onclick={handleCodexContinue}
-						>
-							{codexPrimaryLabel}
-						</Button>
-					</div>
 				</section>
 			{:else if currentStep === 'token'}
 				<section class="setup-wizard__panel">
@@ -914,19 +954,6 @@
 							bind:value={tokenCanisterId}
 							placeholder="Existing ledger canister principal"
 						/>
-					</div>
-					<div class="setup-wizard__actions">
-						{#if previousStep}
-							<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
-								Back
-							</Button>
-						{/if}
-						<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={skipStep}>
-							Skip
-						</Button>
-						<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleTokenSave}>
-							{busy ? 'Continuing…' : 'Continue'}
-						</Button>
 					</div>
 				</section>
 			{:else if currentStep === 'branding'}
@@ -1040,24 +1067,6 @@
 							<Input id="primary-color" type="color" bind:value={primaryColor} class="h-11 w-24 p-1" />
 						</div>
 
-						<div class="setup-wizard__actions">
-							{#if previousStep}
-								<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
-									Back
-								</Button>
-							{/if}
-							<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={skipStep}>
-								Skip
-							</Button>
-							<Button
-								color="none"
-								class={primaryButtonClass}
-								disabled={busy || brandingTextInvalid}
-								onclick={handleBrandingSave}
-							>
-								{busy ? 'Continuing…' : 'Continue'}
-							</Button>
-						</div>
 					</div>
 
 					<div class="setup-wizard__preview-wrap">
@@ -1142,36 +1151,6 @@
 							{/each}
 						</ol>
 					{/if}
-
-					<div class="setup-wizard__actions">
-						{#if previousStep && !launchRunning}
-							<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
-								Back
-							</Button>
-						{/if}
-						{#if launchFailed}
-							<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleLaunch}>
-								{busy ? 'Retrying…' : 'Retry launch'}
-							</Button>
-						{:else if launchCompleted}
-							<Button color="none" class={primaryButtonClass} disabled>
-								Launch complete
-							</Button>
-						{:else if launchRunning}
-							<Button color="none" class={primaryButtonClass} disabled>
-								Launching…
-							</Button>
-						{:else}
-							<Button
-								color="none"
-								class={primaryButtonClass}
-								disabled={busy || !summaryCodexPackage}
-								onclick={handleLaunch}
-							>
-								{busy ? 'Starting…' : 'Launch realm'}
-							</Button>
-						{/if}
-					</div>
 				</section>
 			{/if}
 			{/key}
@@ -1762,6 +1741,11 @@
 		flex-wrap: wrap;
 		gap: 0.75rem;
 		margin-top: 0.5rem;
+	}
+
+	.setup-wizard__actions--toolbar {
+		margin-top: 0;
+		margin-bottom: 1.5rem;
 	}
 
 	.setup-wizard__error {
