@@ -48,6 +48,21 @@ _SETUP_DRAFT_ASSETS = StableBTreeMap[str, str](
     memory_id=3, max_key_size=32, max_value_size=BRANDING_DATA_URL_MAX_BYTES
 )
 _DRAFT_ASSET_KEYS = frozenset({"logo", "background"})
+_SETUP_HIDDEN_CODICES = frozenset({"common", "westminster", "_common"})
+
+
+def _visible_setup_codices(codices: Any) -> list:
+    if not isinstance(codices, list):
+        return []
+    visible = []
+    for item in codices:
+        if not isinstance(item, dict):
+            continue
+        codex_id = str(item.get("id") or item.get("codex_id") or "")
+        if not codex_id or codex_id in _SETUP_HIDDEN_CODICES:
+            continue
+        visible.append(item)
+    return visible
 _BRANDING_ASSET_PATHS = {
     "logo": "/custom/logo.png",
     "background": "/custom/background.png",
@@ -75,7 +90,7 @@ def get_available_codices_cached() -> str:
     cached = _read_catalog_cache()
     if not cached or not cached.get("codices"):
         return json.dumps({"success": False, "error": "empty"})
-    return json.dumps({"success": True, "codices": cached.get("codices") or []})
+    return json.dumps({"success": True, "codices": _visible_setup_codices(cached.get("codices"))})
 
 
 def get_setup_state() -> str:
@@ -472,7 +487,7 @@ def list_available_codices() -> Async[str]:
     catalog = []
     for entry in entries:
         codex_id = entry.get("codex_id") or entry.get("id") or ""
-        if not codex_id:
+        if not codex_id or codex_id in _SETUP_HIDDEN_CODICES:
             continue
         versions = entry.get("versions") or []
         name = codex_id

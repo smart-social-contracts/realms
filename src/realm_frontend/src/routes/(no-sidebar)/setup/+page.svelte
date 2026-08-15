@@ -23,6 +23,7 @@
 		getPreviousWizardStep,
 		getWelcomeAdvanceStep,
 		isCodexPrimaryActionDisabled,
+		isSetupCatalogCodex,
 		reconcileCodexVersion,
 		resolveInitialWizardStep,
 		resolveSelectedCodexVersion,
@@ -30,6 +31,7 @@
 		stepToUrlToken,
 		type WizardStep
 	} from '$lib/setup/wizardLogic';
+	import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge';
 	import { fileToCompressedDataUrl } from '$lib/utils/imageDataUrl';
 	import { setupStateStore } from '$lib/stores/setupState';
 	import { realmManifesto, realmName, realmWelcomeMessage } from '$lib/stores/realmInfo';
@@ -85,7 +87,6 @@
 	let identityDraftTimer: ReturnType<typeof setTimeout> | null = null;
 	let launchPollTimer: ReturnType<typeof setInterval> | null = null;
 
-	const selectedCodex = $derived(codices.find((c) => c.id === selectedCodexId) ?? null);
 	const stepIndex = $derived(steps.findIndex((s) => s.id === currentStep));
 	const isWelcomeStep = $derived(currentStep === 'welcome');
 	const previousStep = $derived(getPreviousWizardStep(currentStep));
@@ -145,9 +146,19 @@
 		if (!browser || !urlSynced) return;
 		const token = stepToUrlToken(currentStep);
 		const url = new URL(page.url);
-		if (url.searchParams.get('step') === token) return;
-		url.searchParams.set('step', token);
-		replaceState(url, page.state);
+		if (url.searchParams.get('step') !== token) {
+			url.searchParams.set('step', token);
+			replaceState(url, page.state);
+		}
+		// replaceState does not fire afterNavigate, so the portal bar would
+		// stay at /setup unless we push the query ourselves.
+		if (isEmbeddedInPortal()) {
+			const params = new URLSearchParams(url.search);
+			params.delete('portal');
+			params.delete('slug');
+			const qs = params.toString();
+			portalNavPush(`${url.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+		}
 	}
 
 	function navigateToStep(step: WizardStep) {
@@ -370,7 +381,7 @@
 				await setupStateStore.refresh();
 				return;
 			}
-			codices = available;
+			codices = available.filter((codex) => isSetupCatalogCodex(codex.id));
 			applySetupState(state);
 			void loadCodexDescriptions(available);
 			if (!selectedCodexId && codices.length > 0) {
@@ -755,7 +766,7 @@
 							disabled={busy}
 							onclick={handleWelcomeContinue}
 						>
-							{busy ? 'Saving…' : 'Begin'}
+							{busy ? 'Continuing…' : 'Begin'}
 						</button>
 					</div>
 				</section>
@@ -779,7 +790,23 @@
 									}}
 								/>
 								<div class="setup-wizard__codex-card-body">
-									<strong>{codex.name || codex.id}</strong>
+									<div class="setup-wizard__codex-card-head">
+										<strong>{codex.name || codex.id}</strong>
+										{#if selectedCodexId === codex.id && codex.versions.length > 0}
+											<label class="setup-wizard__codex-version">
+												<span>Version</span>
+												<select
+													class="setup-wizard__version-select setup-wizard__version-select--inline"
+													bind:value={selectedVersion}
+													onclick={(event) => event.stopPropagation()}
+												>
+													{#each codex.versions as version (version)}
+														<option value={version}>{version}</option>
+													{/each}
+												</select>
+											</label>
+										{/if}
+									</div>
 									{#if description}
 										<p
 											class="setup-wizard__codex-description text-sm text-gray-600"
@@ -813,21 +840,6 @@
 							</label>
 						{/each}
 					</div>
-
-					{#if selectedCodex}
-						<div class="setup-wizard__field">
-							<Label for="codex-version">Version</Label>
-							<select
-								id="codex-version"
-								class="setup-wizard__version-select"
-								bind:value={selectedVersion}
-							>
-								{#each selectedCodex.versions as version (version)}
-									<option value={version}>{version}</option>
-								{/each}
-							</select>
-						</div>
-					{/if}
 
 					<div class="setup-wizard__actions">
 						{#if previousStep}
@@ -871,7 +883,7 @@
 							Skip
 						</Button>
 						<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleTokenSave}>
-							{busy ? 'Saving…' : 'Continue'}
+							{busy ? 'Continuing…' : 'Continue'}
 						</Button>
 					</div>
 				</section>
@@ -962,7 +974,7 @@
 								disabled={busy || brandingTextInvalid}
 								onclick={handleBrandingSave}
 							>
-								{busy ? 'Saving…' : 'Continue'}
+								{busy ? 'Continuing…' : 'Continue'}
 							</Button>
 						</div>
 					</div>
@@ -1388,6 +1400,29 @@
 		gap: 0.35rem;
 		flex: 1;
 		min-width: 0;
+	}
+
+	.setup-wizard__codex-card-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+
+	.setup-wizard__codex-version {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.75rem;
+		color: #64748b;
+		flex-shrink: 0;
+	}
+
+	.setup-wizard__version-select--inline {
+		width: auto;
+		min-width: 6.5rem;
+		padding: 0.35rem 0.5rem;
+		font-size: 0.8125rem;
 	}
 
 	.setup-wizard__codex-description {

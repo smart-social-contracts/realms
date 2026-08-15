@@ -864,6 +864,37 @@ def test_list_available_codices_includes_repository(monkeypatch):
     assert payload["codices"][0]["repository"] == "https://github.com/example/agora"
 
 
+def test_list_available_codices_hides_shared_packages(monkeypatch):
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(file_registry_canister_id="file-reg-id")
+    _FakeRealm.reset(realm)
+
+    class _Registry:
+        def list_codices(self):
+            return json.dumps(
+                [
+                    {"codex_id": "agora", "versions": ["1.0.0"], "latest": "1.0.0"},
+                    {"codex_id": "common", "versions": ["0.0.0"], "latest": "0.0.0"},
+                    {"codex_id": "westminster", "versions": ["0.0.0"], "latest": "0.0.0"},
+                ]
+            )
+
+        def get_extension_manifest(self, args_json):
+            params = json.loads(args_json)
+            return json.dumps({"name": params.get("ext_id"), "description": "", "repository": ""})
+
+    monkeypatch.setattr(setup_api, "FileRegistryService", lambda _principal: _Registry())
+    monkeypatch.setattr(
+        setup_api,
+        "Principal",
+        type("Principal", (), {"from_str": staticmethod(lambda value: value)}),
+    )
+
+    payload = json.loads(_run_async(setup_api.list_available_codices()))
+    assert payload["success"] is True
+    assert [item["id"] for item in payload["codices"]] == ["agora"]
+
+
 # ---------------------------------------------------------------------------
 # Data URL decoding (must not rely on `re`, which is a stub in the canister)
 # ---------------------------------------------------------------------------

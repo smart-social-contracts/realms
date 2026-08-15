@@ -14,6 +14,7 @@ import {
 	resolveInitialWizardStep,
 	resolveSelectedCodexVersion,
 	shouldClearCodexAdvanceError,
+	isSetupCatalogCodex,
 	stepToUrlToken,
 	urlTokenToStep
 } from './wizardLogic';
@@ -93,7 +94,7 @@ describe('wizardLogic', () => {
 		it('always labels continue when not busy', () => {
 			expect(getCodexStepPrimaryLabel(freshState, false)).toBe('Continue');
 			expect(getCodexStepPrimaryLabel(installedState, false)).toBe('Continue');
-			expect(getCodexStepPrimaryLabel(freshState, true)).toBe('Saving…');
+			expect(getCodexStepPrimaryLabel(freshState, true)).toBe('Continuing…');
 		});
 
 		it('requires codex and version selection on a fresh realm', () => {
@@ -216,6 +217,17 @@ describe('wizardLogic', () => {
 			expect(urlTokenToStep('review')).toBeNull();
 			expect(urlTokenToStep('')).toBeNull();
 			expect(urlTokenToStep('unknown')).toBeNull();
+		});
+	});
+
+	describe('setup catalog filter', () => {
+		it('hides shared and unfinished packages', () => {
+			expect(isSetupCatalogCodex('agora')).toBe(true);
+			expect(isSetupCatalogCodex('syntropia')).toBe(true);
+			expect(isSetupCatalogCodex('dominion')).toBe(true);
+			expect(isSetupCatalogCodex('common')).toBe(false);
+			expect(isSetupCatalogCodex('westminster')).toBe(false);
+			expect(isSetupCatalogCodex('_common')).toBe(false);
 		});
 	});
 });

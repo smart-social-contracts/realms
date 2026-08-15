@@ -14,6 +14,13 @@ export const WIZARD_STEP_URL_TOKENS: WizardStepUrlToken[] = [
 	'launch'
 ];
 
+/** Shared / unfinished packages that must not appear in the setup catalog. */
+export const HIDDEN_SETUP_CODICES = new Set(['common', 'westminster', '_common']);
+
+export function isSetupCatalogCodex(id: string): boolean {
+	return Boolean(id.trim()) && !HIDDEN_SETUP_CODICES.has(id.trim());
+}
+
 export const LAUNCH_PHASES = [
 	{ name: 'install_codex', label: 'Install codex' },
 	{ name: 'configure_token', label: 'Configure token' },
@@ -116,7 +123,7 @@ export function canAdvanceFromWelcomeStep(): boolean {
 }
 
 export function getCodexStepPrimaryLabel(_setupState: SetupState | null | undefined, busy: boolean): string {
-	if (busy) return 'Saving…';
+	if (busy) return 'Continuing…';
 	return 'Continue';
 }
 
