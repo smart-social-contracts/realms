@@ -7,7 +7,7 @@
     "start": "vite --port 3000",
     "dev": "vite dev",
     "dev-dummy": "VITE_DEV_DUMMY_MODE=true vite dev --port 3001",
-    "prebuild": "svelte-kit sync",
+    "prebuild": "node scripts/sync-declarations.mjs && svelte-kit sync",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\"",
