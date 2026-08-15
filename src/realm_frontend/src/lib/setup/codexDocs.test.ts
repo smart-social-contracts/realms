@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
 	CODEX_REPO_BASE,
+	REALMS_RAW_BASE,
 	__resetCodexDocsCache,
+	defaultCodexBranding,
 	fetchCodexDescription,
 	repositoryUrl,
 	shortDescriptionUrl,
@@ -13,6 +15,16 @@ describe('codexDocs URLs', () => {
 		expect(shortDescriptionUrl('agora')).toBe(
 			'https://raw.githubusercontent.com/smart-social-contracts/realms-codices/main/codices/agora/SHORT_DESCRIPTION.md'
 		);
+	});
+
+	it('maps official default logo and background URLs', () => {
+		expect(defaultCodexBranding('agora')).toEqual({
+			logo: `${REALMS_RAW_BASE}/examples/demo/realm2/logo.png`,
+			background: `${REALMS_RAW_BASE}/examples/demo/realm2/background.png`
+		});
+		expect(defaultCodexBranding('dominion')?.logo).toContain('realm1/logo.png');
+		expect(defaultCodexBranding('syntropia')?.background).toContain('realm3/background.png');
+		expect(defaultCodexBranding('unknown')).toBeNull();
 	});
 
 	it('builds the repository URL from the shared base', () => {

@@ -13,7 +13,7 @@
 		saveSetupDraft,
 		startSetupLaunch
 	} from '$lib/setup/api';
-	import { fetchCodexDescription, repositoryUrl } from '$lib/setup/codexDocs';
+	import { defaultCodexBranding, fetchCodexDescription, repositoryUrl } from '$lib/setup/codexDocs';
 	import type { AvailableCodex, SetupLaunchState, SetupState } from '$lib/setup/types';
 	import {
 		LAUNCH_PHASES,
@@ -39,7 +39,7 @@
 		matchSharedToken,
 		tokenDraftFromChoice
 	} from '$lib/setup/sharedTokens';
-	import { fileToCompressedDataUrl } from '$lib/utils/imageDataUrl';
+	import { fileToCompressedDataUrl, urlToCompressedDataUrl } from '$lib/utils/imageDataUrl';
 	import { setupStateStore } from '$lib/stores/setupState';
 	import { realmManifesto, realmName, realmWelcomeMessage } from '$lib/stores/realmInfo';
 	import PublicDashboardPreview from '$lib/setup/PublicDashboardPreview.svelte';
@@ -91,12 +91,15 @@
 	let leftSetup = $state(false);
 	let urlSynced = $state(false);
 	let codexDescriptions = $state<Record<string, string>>({});
-	let codexDescriptionExpanded = $state<Record<string, boolean>>({});
 	let draftAssetsLoading = $state(false);
 	let identityDraftTimer: ReturnType<typeof setTimeout> | null = null;
 	let launchPollTimer: ReturnType<typeof setInterval> | null = null;
 	let generatingBranding = $state(false);
 	let brandingSource = $state<'generate' | 'upload'>('upload');
+	let brandingBoundCodexId = $state('');
+	let brandingCustomized = $state(false);
+	let brandingApplyToken = 0;
+	let brandingApplyInFlight: Promise<void> | null = null;
 
 	const stepIndex = $derived(steps.findIndex((s) => s.id === currentStep));
 	const isWelcomeStep = $derived(currentStep === 'welcome');
@@ -136,6 +139,15 @@
 			(setupState?.token?.existing as string | undefined) ||
 			tokenSymbol ||
 			''
+	);
+	const selectedCodex = $derived(codices.find((codex) => codex.id === selectedCodexId) ?? null);
+	const selectedCodexDescription = $derived(
+		selectedCodex
+			? (codexDescriptions[selectedCodex.id] ?? selectedCodex.description ?? '')
+			: ''
+	);
+	const selectedCodexBranding = $derived(
+		selectedCodexId ? defaultCodexBranding(selectedCodexId) : null
 	);
 	const hasBrandingDraft = $derived(
 		Boolean(
@@ -275,6 +287,10 @@
 			if (typeof branding.background_data_url === 'string') {
 				backgroundPreview = branding.background_data_url;
 				backgroundDataUrl = branding.background_data_url;
+			}
+			if (logoDataUrl || backgroundDataUrl) {
+				brandingBoundCodexId = state.draft?.codex?.package || selectedCodexId;
+				brandingCustomized = true;
 			}
 		}
 
@@ -425,6 +441,9 @@
 				}
 			}
 			applyInitialStepFromState(state);
+			if (!logoDataUrl || !backgroundDataUrl) {
+				void applyCodexDefaultBranding(selectedCodexId);
+			}
 			if (state.launch?.status === 'running') {
 				startLaunchPolling();
 			}
@@ -451,6 +470,52 @@
 		}
 	}
 
+	function currentBrandingDraft() {
+		const branding: {
+			logo_data_url?: string;
+			background_data_url?: string;
+			colors?: { primary?: string };
+		} = {};
+		if (logoDataUrl) branding.logo_data_url = logoDataUrl;
+		if (backgroundDataUrl) branding.background_data_url = backgroundDataUrl;
+		if (primaryColor.trim()) branding.colors = { primary: primaryColor.trim() };
+		return branding;
+	}
+
+	async function applyCodexDefaultBranding(codexId: string) {
+		if (!codexId) return;
+		if (brandingCustomized && brandingBoundCodexId === codexId) return;
+		if (logoDataUrl && backgroundDataUrl && brandingBoundCodexId === codexId) return;
+
+		const urls = defaultCodexBranding(codexId);
+		if (!urls) return;
+
+		logoPreview = urls.logo;
+		backgroundPreview = urls.background;
+
+		const token = ++brandingApplyToken;
+		const work = (async () => {
+			try {
+				const [logo, background] = await Promise.all([
+					urlToCompressedDataUrl(urls.logo),
+					urlToCompressedDataUrl(urls.background)
+				]);
+				if (token !== brandingApplyToken || selectedCodexId !== codexId) return;
+				logoDataUrl = logo;
+				logoPreview = logo;
+				backgroundDataUrl = background;
+				backgroundPreview = background;
+				brandingBoundCodexId = codexId;
+				brandingCustomized = false;
+			} catch (e) {
+				if (token !== brandingApplyToken) return;
+				console.debug('codex default branding fetch failed:', e);
+			}
+		})();
+		brandingApplyInFlight = work;
+		await work;
+	}
+
 	async function handleCodexContinue() {
 		const versionToSave = resolveSelectedCodexVersion(selectedVersion, setupState);
 		if (!selectedCodexId || !versionToSave) {
@@ -459,23 +524,30 @@
 		}
 		selectedVersion = versionToSave;
 
-		if (canAdvanceFromCodexStep(setupState) && setupState?.draft?.codex?.package === selectedCodexId &&
-			setupState?.draft?.codex?.version === versionToSave &&
-			setupState?.draft?.step &&
-			['token', 'branding', 'review'].includes(setupState.draft.step)) {
-			navigateToStep('token');
-			return;
-		}
-
 		busy = true;
 		error = '';
 		try {
+			if (brandingApplyInFlight) await brandingApplyInFlight;
+			const branding = currentBrandingDraft();
+			if (canAdvanceFromCodexStep(setupState) && setupState?.draft?.codex?.package === selectedCodexId &&
+				setupState?.draft?.codex?.version === versionToSave &&
+				setupState?.draft?.step &&
+				['token', 'branding', 'review'].includes(setupState.draft.step)) {
+				if (branding.logo_data_url || branding.background_data_url) {
+					const ok = await persistDraft({ branding });
+					if (!ok) return;
+				}
+				navigateToStep('token');
+				return;
+			}
+
 			const ok = await persistDraft({
 				step: 'token',
 				codex: {
 					package: selectedCodexId,
 					version: versionToSave
-				}
+				},
+				branding
 			});
 			if (!ok) return;
 			resolvedCodexVersion = versionToSave;
@@ -545,18 +617,9 @@
 		busy = true;
 		error = '';
 		try {
-			const branding: {
-				logo_data_url?: string;
-				background_data_url?: string;
-				colors?: { primary?: string };
-			} = {};
-			if (logoDataUrl) branding.logo_data_url = logoDataUrl;
-			if (backgroundDataUrl) branding.background_data_url = backgroundDataUrl;
-			if (primaryColor.trim()) branding.colors = { primary: primaryColor.trim() };
-
 			const ok = await persistDraft({
 				step: 'review',
-				branding,
+				branding: currentBrandingDraft(),
 				identity: {
 					welcome_message: welcomeMessage.trim(),
 					manifesto: manifesto.trim()
@@ -577,6 +640,7 @@
 		try {
 			const ok = await persistDraft({
 				step: 'review',
+				branding: currentBrandingDraft(),
 				identity: {
 					welcome_message: welcomeMessage.trim(),
 					manifesto: manifesto.trim()
@@ -625,6 +689,8 @@
 			backgroundDataUrl = assets.backgroundDataUrl;
 			backgroundPreview = assets.backgroundDataUrl;
 			primaryColor = assets.primaryColor;
+			brandingCustomized = true;
+			brandingBoundCodexId = selectedCodexId;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not generate branding';
 		} finally {
@@ -636,6 +702,8 @@
 		try {
 			logoDataUrl = await fileToCompressedDataUrl(file);
 			logoPreview = logoDataUrl;
+			brandingCustomized = true;
+			brandingBoundCodexId = selectedCodexId;
 			error = '';
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not process logo';
@@ -646,6 +714,8 @@
 		try {
 			backgroundDataUrl = await fileToCompressedDataUrl(file);
 			backgroundPreview = backgroundDataUrl;
+			brandingCustomized = true;
+			brandingBoundCodexId = selectedCodexId;
 			error = '';
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not process background';
@@ -679,13 +749,6 @@
 		if (currentStep === 'branding') {
 			void handleBrandingSkip();
 		}
-	}
-
-	function toggleCodexDescription(codexId: string) {
-		codexDescriptionExpanded = {
-			...codexDescriptionExpanded,
-			[codexId]: !codexDescriptionExpanded[codexId]
-		};
 	}
 
 	function launchStepLabel(name: string): string {
@@ -917,71 +980,83 @@
 					<Heading tag="h2" class="text-xl font-semibold">Choose a codex</Heading>
 					<P class="text-gray-600">Pick the governance package that defines how this realm runs.</P>
 
-					<div class="setup-wizard__codex-list">
+					<div class="setup-wizard__codex-list setup-wizard__codex-list--gallery">
 						{#each codices as codex (codex.id)}
-							{@const description = codexDescriptions[codex.id] ?? codex.description ?? ''}
-							{@const expanded = codexDescriptionExpanded[codex.id] ?? false}
-							<label class="setup-wizard__codex-card" class:setup-wizard__codex-card--selected={selectedCodexId === codex.id}>
+							{@const branding = defaultCodexBranding(codex.id)}
+							<label
+								class="setup-wizard__codex-card setup-wizard__codex-card--picker"
+								class:setup-wizard__codex-card--selected={selectedCodexId === codex.id}
+							>
 								<input
+									class="setup-wizard__codex-radio"
 									type="radio"
 									name="codex"
 									value={codex.id}
 									bind:group={selectedCodexId}
 									onchange={() => {
 										selectedVersion = latestVersion(codex);
+										void applyCodexDefaultBranding(codex.id);
 									}}
 								/>
-								<div class="setup-wizard__codex-card-body">
-									<div class="setup-wizard__codex-card-head">
-										<strong>{codex.name || codex.id}</strong>
-										{#if selectedCodexId === codex.id && codex.versions.length > 0}
-											<label class="setup-wizard__codex-version">
-												<span>Version</span>
-												<select
-													class="setup-wizard__version-select setup-wizard__version-select--inline"
-													bind:value={selectedVersion}
-													onclick={(event) => event.stopPropagation()}
-												>
-													{#each codex.versions as version (version)}
-														<option value={version}>{version}</option>
-													{/each}
-												</select>
-											</label>
-										{/if}
-									</div>
-									{#if description}
-										<p
-											class="setup-wizard__codex-description text-sm text-gray-600"
-											class:setup-wizard__codex-description--expanded={expanded}
-										>
-											{description}
-										</p>
-										{#if description.length > 160}
-											<button
-												type="button"
-												class="setup-wizard__codex-description-toggle"
-												onclick={(event) => {
-													event.preventDefault();
-													toggleCodexDescription(codex.id);
-												}}
-											>
-												{expanded ? 'Show less' : 'Show more'}
-											</button>
-										{/if}
-									{/if}
-									<a
-										href={codexRepositoryHref(codex)}
-										class="setup-wizard__codex-repo"
-										target="_blank"
-										rel="noopener noreferrer"
-										onclick={(event) => event.stopPropagation()}
-									>
-										Official repository
-									</a>
-								</div>
+								{#if branding}
+									<img
+										class="setup-wizard__codex-mark-img"
+										src={branding.logo}
+										alt=""
+									/>
+								{:else}
+									<span class="setup-wizard__codex-mark" aria-hidden="true">
+										{(codex.name || codex.id).charAt(0)}
+									</span>
+								{/if}
+								<strong>{codex.name || codex.id}</strong>
 							</label>
 						{/each}
 					</div>
+
+					{#if selectedCodex}
+						<div
+							class="setup-wizard__codex-detail"
+							class:setup-wizard__codex-detail--has-bg={Boolean(selectedCodexBranding)}
+							style={selectedCodexBranding
+								? `--codex-bg: url(${selectedCodexBranding.background})`
+								: ''}
+						>
+							<div class="setup-wizard__codex-detail-copy">
+								<div class="setup-wizard__codex-card-head">
+									<h3 class="setup-wizard__codex-detail-title">
+										{selectedCodex.name || selectedCodex.id}
+									</h3>
+									{#if selectedCodex.versions.length > 0}
+										<label class="setup-wizard__codex-version">
+											<span>Version</span>
+											<select
+												class="setup-wizard__version-select setup-wizard__version-select--inline"
+												bind:value={selectedVersion}
+											>
+												{#each selectedCodex.versions as version (version)}
+													<option value={version}>{version}</option>
+												{/each}
+											</select>
+										</label>
+									{/if}
+								</div>
+								{#if selectedCodexDescription}
+									<p class="setup-wizard__codex-description setup-wizard__codex-description--full">
+										{selectedCodexDescription}
+									</p>
+								{/if}
+								<a
+									href={codexRepositoryHref(selectedCodex)}
+									class="setup-wizard__codex-repo"
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									Official repository
+								</a>
+							</div>
+						</div>
+					{/if}
 				</section>
 			{:else if currentStep === 'token'}
 				<section class="setup-wizard__panel">
@@ -1672,39 +1747,129 @@
 		gap: 0.75rem;
 	}
 
+	.setup-wizard__codex-list--gallery {
+		gap: 1rem;
+	}
+
+	@media (min-width: 900px) {
+		.setup-wizard__codex-list--gallery {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+
 	.setup-wizard__codex-card {
 		display: flex;
-		gap: 0.75rem;
-		align-items: flex-start;
+		flex-direction: column;
+		gap: 0.85rem;
+		align-items: stretch;
 		border: 1px solid #e2e8f0;
-		border-radius: 0.75rem;
-		padding: 0.85rem 1rem;
+		border-radius: 1rem;
+		padding: 1.15rem 1.2rem 1.1rem;
 		cursor: pointer;
-		min-height: 8.5rem;
+		min-height: 16rem;
+		background: #ffffff;
+		position: relative;
+		transition:
+			border-color 0.15s ease,
+			box-shadow 0.15s ease,
+			background-color 0.15s ease;
+	}
+
+	.setup-wizard__codex-card:hover {
+		border-color: #94a3b8;
+	}
+
+	.setup-wizard__codex-card:has(.setup-wizard__codex-radio:focus-visible) {
+		outline: 2px solid #2563eb;
+		outline-offset: 2px;
 	}
 
 	.setup-wizard__codex-card--selected {
-		border-color: #475569;
+		border-color: #0b1120;
 		background: #f8fafc;
+		box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
 	}
 
 	.setup-wizard__codex-card--compact {
 		min-height: 0;
+		flex-direction: row;
+		align-items: flex-start;
+		padding: 0.85rem 1rem;
+		border-radius: 0.75rem;
+	}
+
+	.setup-wizard__codex-card--picker {
+		min-height: 0;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		padding: 1.1rem 0.85rem 1rem;
+		gap: 0.7rem;
+	}
+
+	.setup-wizard__codex-card--picker strong {
+		font-size: 1rem;
+		letter-spacing: -0.02em;
+	}
+
+	.setup-wizard__codex-radio {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.setup-wizard__codex-mark {
+		display: inline-flex;
+		width: 2.5rem;
+		height: 2.5rem;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid #0b1120;
+		border-radius: 999px;
+		font-family: Fraunces, Georgia, 'Times New Roman', serif;
+		font-size: 1.2rem;
+		color: #0b1120;
+		flex-shrink: 0;
+	}
+
+	.setup-wizard__codex-card--selected .setup-wizard__codex-mark {
+		background: #0b1120;
+		color: #ffffff;
+	}
+
+	.setup-wizard__codex-mark-img {
+		width: 2.75rem;
+		height: 2.75rem;
+		object-fit: contain;
+		border-radius: 0.45rem;
 	}
 
 	.setup-wizard__codex-card-body {
 		display: flex;
 		flex-direction: column;
-		gap: 0.35rem;
+		gap: 0.55rem;
 		flex: 1;
 		min-width: 0;
 	}
 
 	.setup-wizard__codex-card-head {
 		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+
+	.setup-wizard__codex-card-head strong {
+		font-size: 1.15rem;
+		letter-spacing: -0.02em;
+	}
+
+	.setup-wizard__codex-foot {
+		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.75rem;
+		margin-top: auto;
 	}
 
 	.setup-wizard__codex-version {
@@ -1726,33 +1891,92 @@
 	.setup-wizard__codex-description {
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
-		-webkit-line-clamp: 3;
+		-webkit-line-clamp: 4;
 		overflow: hidden;
 		margin: 0;
+		font-size: 0.9rem;
+		line-height: 1.6;
+		color: #475569;
 	}
 
-	.setup-wizard__codex-description--expanded {
+	.setup-wizard__codex-description--expanded,
+	.setup-wizard__codex-description--full {
 		display: block;
 		-webkit-line-clamp: unset;
 		overflow: visible;
 	}
 
-	.setup-wizard__codex-description-toggle {
-		align-self: flex-start;
-		border: none;
-		background: none;
-		color: #475569;
-		font-size: 0.8125rem;
-		padding: 0;
-		cursor: pointer;
-		text-decoration: underline;
+	.setup-wizard__codex-detail {
+		position: relative;
+		isolation: isolate;
+		overflow: hidden;
+		border: 1px solid #e2e8f0;
+		border-radius: 1rem;
+		padding: 1.35rem 1.4rem 1.4rem;
+		background: #f8fafc;
+	}
+
+	.setup-wizard__codex-detail--has-bg {
+		background-image: var(--codex-bg);
+		background-size: cover;
+		background-position: center;
+		border-color: transparent;
+	}
+
+	.setup-wizard__codex-detail--has-bg::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: rgba(15, 23, 42, 0.7);
+		z-index: 0;
+	}
+
+	.setup-wizard__codex-detail-copy {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		min-width: 0;
+	}
+
+	.setup-wizard__codex-detail-title {
+		margin: 0;
+		font-size: 1.35rem;
+		font-weight: 650;
+		letter-spacing: -0.02em;
+		color: #0b1120;
+	}
+
+	.setup-wizard__codex-detail--has-bg .setup-wizard__codex-detail-title,
+	.setup-wizard__codex-detail--has-bg .setup-wizard__codex-version,
+	.setup-wizard__codex-detail--has-bg .setup-wizard__codex-description {
+		color: #f8fafc;
+	}
+
+	.setup-wizard__codex-detail--has-bg .setup-wizard__version-select--inline {
+		color: #f8fafc;
+		background: rgba(15, 23, 42, 0.35);
+		border-color: rgba(248, 250, 252, 0.35);
 	}
 
 	.setup-wizard__codex-repo {
-		margin-top: auto;
 		font-size: 0.8125rem;
-		color: #2563eb;
+		color: #64748b;
+		text-decoration: none;
+	}
+
+	.setup-wizard__codex-repo:hover {
+		color: #0b1120;
 		text-decoration: underline;
+	}
+
+	.setup-wizard__codex-detail--has-bg .setup-wizard__codex-repo {
+		color: #e2e8f0;
+	}
+
+	.setup-wizard__codex-detail--has-bg .setup-wizard__codex-repo:hover {
+		color: #ffffff;
 	}
 
 	.setup-wizard__panel--welcome {

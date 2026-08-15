@@ -79,7 +79,7 @@ export async function fileToCompressedDataUrl(
 		throw new Error('Please choose an image file');
 	}
 
-	if (file.size <= maxBytes && file.type === 'image/jpeg') {
+	if (file.size <= maxBytes && (file.type === 'image/jpeg' || file.type === 'image/png')) {
 		return blobToDataUrl(file);
 	}
 
@@ -94,6 +94,28 @@ export async function fileToCompressedDataUrl(
 	ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
 	const { dataUrl } = await encodeCanvas(canvas, maxBytes);
+	return dataUrl;
+}
+
+const urlCache = new Map<string, string>();
+
+/** Fetch a remote image and encode it as a compressed data URL. */
+export async function urlToCompressedDataUrl(
+	url: string,
+	maxBytes: number = DEFAULT_MAX_BYTES
+): Promise<string> {
+	const cached = urlCache.get(url);
+	if (cached) return cached;
+
+	const res = await fetch(url);
+	if (!res.ok) {
+		throw new Error(`Could not load image (${res.status})`);
+	}
+	const blob = await res.blob();
+	const type = blob.type.startsWith('image/') ? blob.type : 'image/png';
+	const file = new File([blob], 'image', { type });
+	const dataUrl = await fileToCompressedDataUrl(file, maxBytes);
+	urlCache.set(url, dataUrl);
 	return dataUrl;
 }
 

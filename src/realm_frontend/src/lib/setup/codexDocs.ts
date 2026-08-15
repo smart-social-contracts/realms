@@ -1,6 +1,27 @@
 export const CODEX_REPO_BASE =
 	'https://github.com/smart-social-contracts/realms-codices/tree/main/codices';
 
+export const REALMS_RAW_BASE =
+	'https://raw.githubusercontent.com/smart-social-contracts/realms/main';
+
+/** Demo-realm folders that hold the official default logo and background. */
+const CODEX_DEMO_DIR: Record<string, string> = {
+	agora: 'examples/demo/realm2',
+	dominion: 'examples/demo/realm1',
+	syntropia: 'examples/demo/realm3'
+};
+
+export function defaultCodexBranding(
+	codexId: string
+): { logo: string; background: string } | null {
+	const dir = CODEX_DEMO_DIR[codexId];
+	if (!dir) return null;
+	return {
+		logo: `${REALMS_RAW_BASE}/${dir}/logo.png`,
+		background: `${REALMS_RAW_BASE}/${dir}/background.png`
+	};
+}
+
 const DEFAULT_TIMEOUT_MS = 4_000;
 const descriptionCache = new Map<string, string>();
 
