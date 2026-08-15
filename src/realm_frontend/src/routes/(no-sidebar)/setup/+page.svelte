@@ -32,6 +32,7 @@
 		type WizardStep
 	} from '$lib/setup/wizardLogic';
 	import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge';
+	import { generateBrandingAssets } from '$lib/setup/brandingGenerate';
 	import { fileToCompressedDataUrl } from '$lib/utils/imageDataUrl';
 	import { setupStateStore } from '$lib/stores/setupState';
 	import { realmManifesto, realmName, realmWelcomeMessage } from '$lib/stores/realmInfo';
@@ -86,6 +87,7 @@
 	let draftAssetsLoading = $state(false);
 	let identityDraftTimer: ReturnType<typeof setTimeout> | null = null;
 	let launchPollTimer: ReturnType<typeof setInterval> | null = null;
+	let generatingBranding = $state(false);
 
 	const stepIndex = $derived(steps.findIndex((s) => s.id === currentStep));
 	const isWelcomeStep = $derived(currentStep === 'welcome');
@@ -576,6 +578,26 @@
 		}
 	}
 
+	function generateBrandingFromIdentity() {
+		generatingBranding = true;
+		error = '';
+		try {
+			const assets = generateBrandingAssets({
+				realmName: $realmName || 'Realm',
+				manifesto
+			});
+			logoDataUrl = assets.logoDataUrl;
+			logoPreview = assets.logoDataUrl;
+			backgroundDataUrl = assets.backgroundDataUrl;
+			backgroundPreview = assets.backgroundDataUrl;
+			primaryColor = assets.primaryColor;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Could not generate branding';
+		} finally {
+			generatingBranding = false;
+		}
+	}
+
 	async function onLogoChange(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
@@ -729,14 +751,38 @@
 
 			<nav class="setup-wizard__steps" aria-label="Setup steps">
 				{#each steps as step, index (step.id)}
+					{#if index > 0}
+						<span
+							class="setup-wizard__step-rail"
+							class:setup-wizard__step-rail--done={index <= stepIndex}
+							aria-hidden="true"
+						></span>
+					{/if}
 					<button
 						type="button"
 						class="setup-wizard__step"
 						class:setup-wizard__step--active={step.id === currentStep}
 						class:setup-wizard__step--done={index < stepIndex}
+						class:setup-wizard__step--pending={index > stepIndex}
+						aria-current={step.id === currentStep ? 'step' : undefined}
 						onclick={() => goToStep(step.id)}
 					>
-						<span class="setup-wizard__step-index">{index + 1}</span>
+						<span class="setup-wizard__step-index">
+							{#if index < stepIndex}
+								<svg viewBox="0 0 16 16" aria-hidden="true">
+									<path
+										d="M3.5 8.5 6.5 11.5 12.5 4.5"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.8"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									/>
+								</svg>
+							{:else}
+								{index + 1}
+							{/if}
+						</span>
 						{step.label}
 					</button>
 				{/each}
@@ -891,20 +937,10 @@
 				<section class="setup-wizard__panel setup-wizard__panel--branding">
 					<div>
 						<Heading tag="h2" class="text-xl font-semibold">Branding</Heading>
-						<P class="text-gray-600">Optional logo, background, color, welcome message, and manifesto.</P>
+						<P class="text-gray-600">
+							Write the realm's voice first. Then generate a mark and backdrop from that text, or upload your own.
+						</P>
 
-						<div class="setup-wizard__field">
-							<Label for="logo-file">Logo</Label>
-							<input id="logo-file" type="file" accept="image/*" onchange={onLogoChange} />
-						</div>
-						<div class="setup-wizard__field">
-							<Label for="background-file">Background</Label>
-							<input id="background-file" type="file" accept="image/*" onchange={onBackgroundChange} />
-						</div>
-						<div class="setup-wizard__field">
-							<Label for="primary-color">Primary color</Label>
-							<Input id="primary-color" type="color" bind:value={primaryColor} class="h-11 w-24 p-1" />
-						</div>
 						<div class="setup-wizard__field">
 							<Label for="welcome-message">Welcome message</Label>
 							<textarea
@@ -958,6 +994,33 @@
 								{/if}
 							</p>
 						{/if}
+
+						<div class="setup-wizard__generate">
+							<button
+								type="button"
+								class="setup-wizard__hero-cta setup-wizard__generate-btn"
+								disabled={busy || generatingBranding}
+								onclick={generateBrandingFromIdentity}
+							>
+								{generatingBranding ? 'Composing…' : 'Generate mark & backdrop'}
+							</button>
+							<p class="setup-wizard__generate-hint">
+								Drawn from the realm name and manifesto. You can still upload your own files below.
+							</p>
+						</div>
+
+						<div class="setup-wizard__field">
+							<Label for="logo-file">Logo</Label>
+							<input id="logo-file" type="file" accept="image/*" onchange={onLogoChange} />
+						</div>
+						<div class="setup-wizard__field">
+							<Label for="background-file">Background</Label>
+							<input id="background-file" type="file" accept="image/*" onchange={onBackgroundChange} />
+						</div>
+						<div class="setup-wizard__field">
+							<Label for="primary-color">Primary color</Label>
+							<Input id="primary-color" type="color" bind:value={primaryColor} class="h-11 w-24 p-1" />
+						</div>
 
 						<div class="setup-wizard__actions">
 							{#if previousStep}
@@ -1297,62 +1360,125 @@
 
 	.setup-wizard__steps {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		margin-bottom: 1.5rem;
+		align-items: center;
+		margin-bottom: 1.75rem;
+	}
+
+	.setup-wizard__step-rail {
+		flex: 1 1 1.25rem;
+		height: 1px;
+		min-width: 0.75rem;
+		background: #e2e8f0;
+	}
+
+	.setup-wizard__step-rail--done {
+		background: #0b1120;
+	}
+
+	:global(.dark) .setup-wizard__step-rail {
+		background: #334155;
+	}
+
+	:global(.dark) .setup-wizard__step-rail--done {
+		background: #e2e8f0;
 	}
 
 	.setup-wizard__step {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.5rem;
-		border: 1px solid #e2e8f0;
-		background: #f8fafc;
-		color: #334155;
-		border-radius: 999px;
-		padding: 0.35rem 0.85rem;
-		font-size: 0.875rem;
-	}
-
-	:global(.dark) .setup-wizard__step {
-		border-color: #475569;
-		background: #1e293b;
-		color: #cbd5e1;
-	}
-
-	.setup-wizard__step--active {
-		border-color: #475569;
-		background: #f1f5f9;
-		color: #0f172a;
-	}
-
-	:global(.dark) .setup-wizard__step--active {
-		border-color: #94a3b8;
-		background: #334155;
-		color: #f8fafc;
+		gap: 0.45rem;
+		border: none;
+		background: transparent;
+		color: #94a3b8;
+		padding: 0.15rem 0.15rem;
+		font-size: 0.8125rem;
+		white-space: nowrap;
+		cursor: pointer;
 	}
 
 	.setup-wizard__step--done {
-		border-color: #cbd5e1;
-		background: #f8fafc;
-		color: #334155;
+		color: #0b1120;
 	}
 
-	:global(.dark) .setup-wizard__step--done {
-		border-color: #475569;
-		background: #1e293b;
+	.setup-wizard__step--active {
+		color: #0b1120;
+		font-weight: 600;
+	}
+
+	.setup-wizard__step--pending {
 		color: #94a3b8;
+	}
+
+	:global(.dark) .setup-wizard__step--done,
+	:global(.dark) .setup-wizard__step--active {
+		color: #f8fafc;
 	}
 
 	.setup-wizard__step-index {
 		display: inline-flex;
-		width: 1.25rem;
-		height: 1.25rem;
+		width: 1.5rem;
+		height: 1.5rem;
 		align-items: center;
 		justify-content: center;
 		border-radius: 999px;
-		background: rgba(15, 23, 42, 0.08);
-		font-size: 0.75rem;
+		border: 1px solid #cbd5e1;
+		background: #ffffff;
+		font-size: 0.6875rem;
+		flex-shrink: 0;
+	}
+
+	.setup-wizard__step-index svg {
+		width: 0.8rem;
+		height: 0.8rem;
+	}
+
+	.setup-wizard__step--done .setup-wizard__step-index {
+		background: #0b1120;
+		border-color: #0b1120;
+		color: #ffffff;
+	}
+
+	.setup-wizard__step--active .setup-wizard__step-index {
+		background: #ffffff;
+		border-color: #0b1120;
+		border-width: 2px;
+		color: #0b1120;
+	}
+
+	:global(.dark) .setup-wizard__step-index {
+		background: #0f172a;
+		border-color: #475569;
+		color: #94a3b8;
+	}
+
+	:global(.dark) .setup-wizard__step--done .setup-wizard__step-index {
+		background: #e2e8f0;
+		border-color: #e2e8f0;
+		color: #0b1120;
+	}
+
+	:global(.dark) .setup-wizard__step--active .setup-wizard__step-index {
+		background: #0f172a;
+		border-color: #f8fafc;
+		color: #f8fafc;
+	}
+
+	.setup-wizard__generate {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin: 0.5rem 0 0.25rem;
+	}
+
+	.setup-wizard__generate-btn {
+		align-self: flex-start;
+		padding: 0.7rem 1.4rem;
+	}
+
+	.setup-wizard__generate-hint {
+		margin: 0;
+		font-size: 0.8125rem;
+		color: #64748b;
 	}
 
 	.setup-wizard__panel {
