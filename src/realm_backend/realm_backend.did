@@ -226,12 +226,12 @@ type NFTService = service { mint : (MintArg) -> (MintResult); force_transfer : (
 type InstallerProvisionService = service { provision_quarter : (text) -> (text) };
 type CasalsProvisionService = service { create_canister : (text) -> (text) };
 type QuarterBootstrapService = service { bootstrap_as_quarter : (text) -> (text) };
-type QuarterCodexSyncService = service { request_codex_sync : (text) -> (text) };
 type RealmRegistryService = service { register_realm : (text, text, text, text, text) -> (AddRealmResult) };
 type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (GetCreditsResult) query; get_latest_version : () -> (UpgradeResult) query };
 type RealmRegistrySetupService = service { realm_setup_completed : (text) -> (text) };
 type DemoRegistrationService = service { register_demo_citizens : (text) -> (text) };
 type FederationService = service { federation_message : (text) -> (text) };
+type QuarterCodexSyncService = service { request_codex_sync : (text) -> (text) };
 type TokenAuthorityService = service { forced_transfer : (ForcedTransferArgs) -> (TokenAuthorityResult); freeze_account : (FreezeAccountArgs) -> (TokenAuthorityResult); unfreeze_account : (TokenAccount) -> (TokenAuthorityResult) };
 type Icrc1MetadataService = service { icrc1_symbol : () -> (text) query; icrc1_name : () -> (text) query; icrc1_decimals : () -> (nat8) query };
 type TimerId = nat64;
@@ -271,8 +271,8 @@ service : {
   "record_migration" : (text) -> (text);
   "get_quarter_directory" : () -> (text) query;
   "get_join_targets" : () -> (text) query;
-  "get_quarter_codex_drift" : () -> (text) query;
   "sync_quarters" : (text) -> (text);
+  "get_quarter_codex_drift" : () -> (text) query;
   "report_quarter_population" : (nat) -> (text);
   "register_demo_citizens" : (text) -> (text);
   "federation_message" : (text) -> (text);
