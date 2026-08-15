@@ -37,7 +37,7 @@
 	import { get } from 'svelte/store';
 
 	const WELCOME_FOUNDING_LINE =
-		'You are founding a digital polity. Choose how it governs, what it values, and how it looks — then bring it to life.';
+		'You are founding a realm — a digital polity whose rules and processes are verifiable and tamper-proof. Choose how it governs, what it values, and how it looks — then bring it to life.';
 
 	const WELCOME_MESSAGE_MAX = 1024;
 	const MANIFESTO_MAX = 256;
@@ -683,10 +683,25 @@
 				<g class="setup-wizard__ambient-spin">
 					<polygon points="570,300 435,533.8 165,533.8 30,300 165,66.2 435,66.2" />
 					<circle cx="300" cy="300" r="248" />
+					<line x1="30" y1="300" x2="570" y2="300" />
+					<line x1="165" y1="66.2" x2="435" y2="533.8" />
 				</g>
 				<g class="setup-wizard__ambient-spin setup-wizard__ambient-spin--reverse">
 					<polygon points="473.2,400 300,500 126.8,400 126.8,200 300,100 473.2,200" />
 					<circle cx="300" cy="300" r="176" />
+					<line x1="300" y1="30" x2="300" y2="570" />
+					<line x1="165" y1="533.8" x2="435" y2="66.2" />
+				</g>
+				<g class="setup-wizard__ambient-spin setup-wizard__ambient-spin--slow">
+					<rect x="148" y="148" width="304" height="304" />
+					<circle cx="300" cy="300" r="118" />
+					<polygon points="300,62 538,300 300,538 62,300" />
+				</g>
+				<g class="setup-wizard__ambient-spin setup-wizard__ambient-spin--slow-reverse">
+					<polygon points="512,212 388,512 88,388 212,88" />
+					<circle cx="300" cy="300" r="300" />
+					<line x1="88" y1="88" x2="512" y2="512" />
+					<line x1="512" y1="88" x2="88" y2="512" />
 				</g>
 			</svg>
 		</div>
@@ -727,11 +742,6 @@
 			{#key currentStep}
 			{#if currentStep === 'welcome'}
 				<section class="setup-wizard__panel setup-wizard__panel--welcome setup-wizard__hero">
-					<img
-						src="/images/logo_sphere_only.svg"
-						alt=""
-						class="setup-wizard__hero-mark"
-					/>
 					<h1 class="setup-wizard__hero-title">
 						{$realmName || 'Your realm'}
 					</h1>
@@ -1132,7 +1142,7 @@
 			linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
 			linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
 		background-size: 72px 72px;
-		animation: setup-ambient-drift 72s linear infinite;
+		animation: setup-ambient-drift 36s linear infinite;
 		-webkit-mask-image: radial-gradient(ellipse at 50% 45%, #000 0%, transparent 70%);
 		mask-image: radial-gradient(ellipse at 50% 45%, #000 0%, transparent 70%);
 	}
@@ -1153,24 +1163,37 @@
 	}
 
 	.setup-wizard__ambient-rings polygon,
-	.setup-wizard__ambient-rings circle {
+	.setup-wizard__ambient-rings circle,
+	.setup-wizard__ambient-rings rect,
+	.setup-wizard__ambient-rings line {
 		fill: none;
 		stroke: rgba(15, 23, 42, 0.055);
 		stroke-width: 1;
 	}
 
 	:global(.dark) .setup-wizard__ambient-rings polygon,
-	:global(.dark) .setup-wizard__ambient-rings circle {
+	:global(.dark) .setup-wizard__ambient-rings circle,
+	:global(.dark) .setup-wizard__ambient-rings rect,
+	:global(.dark) .setup-wizard__ambient-rings line {
 		stroke: rgba(148, 163, 184, 0.08);
 	}
 
 	.setup-wizard__ambient-spin {
 		transform-origin: 300px 300px;
-		animation: setup-ambient-rotate 160s linear infinite;
+		animation: setup-ambient-rotate 80s linear infinite;
 	}
 
 	.setup-wizard__ambient-spin--reverse {
-		animation-duration: 220s;
+		animation-duration: 110s;
+		animation-direction: reverse;
+	}
+
+	.setup-wizard__ambient-spin--slow {
+		animation-duration: 130s;
+	}
+
+	.setup-wizard__ambient-spin--slow-reverse {
+		animation-duration: 150s;
 		animation-direction: reverse;
 	}
 
@@ -1408,13 +1431,6 @@
 
 	.setup-wizard__hero {
 		gap: 0;
-	}
-
-	.setup-wizard__hero-mark {
-		width: clamp(6rem, 15vw, 9.75rem);
-		height: clamp(6rem, 15vw, 9.75rem);
-		margin-bottom: 3rem;
-		animation: setup-welcome-fade-in 0.6s ease-out both;
 	}
 
 	.setup-wizard__hero-title {
