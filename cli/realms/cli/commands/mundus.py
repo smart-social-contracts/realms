@@ -690,6 +690,18 @@ def _resync_extension_frontends_after_deploy(
     console.print(f"  ✓ Resynced {len(synced)} extension frontend bundle(s)")
 
 
+_PINNED_FRONTEND_PREFIXES = ("/custom/", "/ext/")
+
+
+def _pin_frontend_directories(frontend_id: str, network: str) -> None:
+    for prefix in _PINNED_FRONTEND_PREFIXES:
+        try:
+            _dfx_call(frontend_id, "pin_directory", f'(record {{ prefix = "{prefix}" }})', network)
+            console.print(f"  📌 Pinned {prefix} on frontend canister")
+        except Exception as e:
+            console.print(f"  [yellow]⚠ pin_directory {prefix} failed (non-fatal): {e}[/yellow]")
+
+
 def _post_deploy_config(realm: dict, network: str, version: str, parameters: dict = None,
                          infra: dict | None = None, resync_frontends: bool = False) -> None:
     """Call set_canister_config on a realm backend after successful deployment.
@@ -755,11 +767,7 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
             manifest_dir = get_project_root() / Path(manifest_path).parent
             _upload_branding_to_canister(frontend_id, manifest_dir, network)
 
-        try:
-            _dfx_call(frontend_id, "pin_directory", '(record { prefix = "/custom/" })', network)
-            console.print("  📌 Pinned /custom/ on frontend canister")
-        except Exception as e:
-            console.print(f"  [yellow]⚠ pin_directory failed (non-fatal): {e}[/yellow]")
+        _pin_frontend_directories(frontend_id, network)
 
         # Final step: re-assert /canister_ids.js so the SPA can always resolve its
         # backend id, even though the asset bundle commit doesn't carry it.

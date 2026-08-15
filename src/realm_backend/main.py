@@ -5867,7 +5867,7 @@ def install_extension(args: text) -> text:
 
 @update
 @require(Operations.EXTENSION_UNINSTALL)
-def uninstall_extension(args: text) -> text:
+def uninstall_extension(args: text) -> Async[text]:
     """Uninstall a runtime extension.
 
     Args (JSON): {"extension_id": str}
@@ -5919,10 +5919,22 @@ def uninstall_extension(args: text) -> text:
         except Exception:
             pass
 
-        from core.runtime_extensions import uninstall_extension as _uninstall
+        from core.runtime_extensions import (
+            get_extension_source,
+            uninstall_extension as _uninstall,
+        )
+        from api.file_registry import cleanup_extension_frontend_on_uninstall
+
+        src = get_extension_source(ext_id) or {}
+        version = str(src.get("version") or "")
 
         ok = _uninstall(ext_id)
         if ok:
+            frontend_id = _get_frontend_canister_id()
+            if frontend_id:
+                yield from cleanup_extension_frontend_on_uninstall(
+                    ext_id, version, frontend_id
+                )
             return json.dumps({"success": True, "extension_id": ext_id})
         else:
             return json.dumps({"success": False, "error": f"Extension '{ext_id}' not found"})

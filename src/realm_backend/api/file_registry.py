@@ -23,6 +23,7 @@ from _cdk import (
     Service,
     blob,
     ic,
+    nat,
     service_query,
     service_update,
     text,
@@ -69,11 +70,26 @@ class _AssetStoreArg(Record):
     sha256: Opt[blob]
 
 
+class _ListAssetsArg(Record):
+    start: Opt[nat]
+    length: Opt[nat]
+
+
+class _DeleteAssetArg(Record):
+    key: text
+
+
 class AssetCanisterService(Service):
     """Minimal client for the DFINITY certified-assets canister `store`."""
 
     @service_update
     def store(self, arg: _AssetStoreArg) -> void: ...
+
+    @service_query
+    def list(self, arg: _ListAssetsArg) -> list: ...
+
+    @service_update
+    def delete_asset(self, arg: _DeleteAssetArg) -> void: ...
 
 
 def _entity_method_override_error(codex_id: str, manifest: dict) -> str:
@@ -1079,6 +1095,116 @@ def _guess_content_type(path: str) -> str:
     return "application/octet-stream"
 
 
+def _pin_frontend_prefix(frontend_principal: Principal, prefix: str) -> Async[None]:
+    """Pin a directory prefix on the frontend asset canister. Non-fatal on failure."""
+    pin_arg = f'(record {{ prefix = "{prefix}" }})'
+    try:
+        pin_result: CallResult = yield ic.call_raw(
+            frontend_principal,
+            "pin_directory",
+            ic.candid_encode(pin_arg),
+            0,
+        )
+        if isinstance(pin_result, dict) and pin_result.get("Err") is not None:
+            logger.warning(f"pin_directory {prefix!r} failed: {pin_result['Err']}")
+        elif hasattr(pin_result, "Err") and pin_result.Err is not None:
+            logger.warning(f"pin_directory {prefix!r} failed: {pin_result.Err}")
+    except Exception as e:
+        logger.warning(f"pin_directory {prefix!r} exception: {e}")
+
+
+def _unpin_frontend_prefix(frontend_principal: Principal, prefix: str) -> Async[None]:
+    """Unpin a directory prefix on the frontend asset canister. Non-fatal on failure."""
+    unpin_arg = f'(record {{ prefix = "{prefix}" }})'
+    try:
+        unpin_result: CallResult = yield ic.call_raw(
+            frontend_principal,
+            "unpin_directory",
+            ic.candid_encode(unpin_arg),
+            0,
+        )
+        if isinstance(unpin_result, dict) and unpin_result.get("Err") is not None:
+            logger.warning(f"unpin_directory {prefix!r} failed: {unpin_result['Err']}")
+        elif hasattr(unpin_result, "Err") and unpin_result.Err is not None:
+            logger.warning(f"unpin_directory {prefix!r} failed: {unpin_result.Err}")
+    except Exception as e:
+        logger.warning(f"unpin_directory {prefix!r} exception: {e}")
+
+
+def _extract_asset_key(entry) -> str:
+    if isinstance(entry, dict):
+        return str(entry.get("key") or "")
+    if hasattr(entry, "key"):
+        return str(getattr(entry, "key") or "")
+    return ""
+
+
+def _list_frontend_asset_keys(frontend_principal: Principal) -> Async[list]:
+    """Return all asset keys from the frontend canister."""
+    asset = AssetCanisterService(frontend_principal)
+    list_res: CallResult = yield asset.list({"start": None, "length": None})
+    entries = _unwrap_call_result(list_res)
+    if not isinstance(entries, list):
+        return []
+    return [k for k in (_extract_asset_key(e) for e in entries) if k]
+
+
+def _delete_frontend_asset_key(frontend_principal: Principal, key: str) -> Async[None]:
+    """Delete a single asset key. Non-fatal on failure."""
+    escaped = key.replace("\\", "\\\\").replace('"', '\\"')
+    delete_arg = f'(record {{ key = "{escaped}" }})'
+    try:
+        delete_result: CallResult = yield ic.call_raw(
+            frontend_principal,
+            "delete_asset",
+            ic.candid_encode(delete_arg),
+            0,
+        )
+        if isinstance(delete_result, dict) and delete_result.get("Err") is not None:
+            logger.warning(f"delete_asset {key!r} failed: {delete_result['Err']}")
+        elif hasattr(delete_result, "Err") and delete_result.Err is not None:
+            logger.warning(f"delete_asset {key!r} failed: {delete_result.Err}")
+    except Exception as e:
+        logger.warning(f"delete_asset {key!r} exception: {e}")
+
+
+def cleanup_extension_frontend_on_uninstall(
+    ext_id: str,
+    version: str,
+    frontend_canister_id: str,
+) -> Async[None]:
+    """Best-effort removal of ``/ext/{ext_id}/`` assets after extension uninstall."""
+    frontend_id = (frontend_canister_id or "").strip()
+    if not frontend_id:
+        return
+
+    frontend_principal = Principal.from_str(frontend_id)
+    prefix = "/ext/"
+    ext_prefix = f"/ext/{ext_id}/"
+
+    try:
+        yield from _unpin_frontend_prefix(frontend_principal, prefix)
+
+        keys_to_delete = []
+        try:
+            all_keys = yield from _list_frontend_asset_keys(frontend_principal)
+            keys_to_delete = [k for k in all_keys if k.startswith(ext_prefix)]
+        except Exception as e:
+            logger.warning(
+                f"Extension '{ext_id}' uninstall: frontend list failed ({e}); "
+                f"falling back to index.js delete"
+            )
+            if version:
+                keys_to_delete = [
+                    f"/ext/{ext_id}/{version}/frontend/dist/index.js"
+                ]
+
+        for key in keys_to_delete:
+            yield from _delete_frontend_asset_key(frontend_principal, key)
+    finally:
+        yield from _pin_frontend_prefix(frontend_principal, prefix)
+
+
 def _copy_frontend_to_asset_canister(
     registry_canister_id: str,
     ext_id: str,
@@ -1165,6 +1291,8 @@ def _copy_frontend_to_asset_canister(
             f"Failed to copy frontend files for '{ext_id}@{resolved_version}' "
             f"({copied}/{len(files)} succeeded): {preview}"
         )
+    if copied > 0:
+        yield from _pin_frontend_prefix(frontend_principal, "/ext/")
     return None
 
 
@@ -1196,6 +1324,8 @@ def resync_extension_frontends(
                 "error": "no frontend_canister_id configured on this realm",
             }
         )
+
+    yield from _pin_frontend_prefix(Principal.from_str(fe_canister), "/ext/")
 
     default_registry = (registry_canister_id or "").strip()
     if not default_registry:

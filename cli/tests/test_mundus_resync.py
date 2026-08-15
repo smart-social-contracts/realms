@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from realms.cli.commands.mundus import (
+    _pin_frontend_directories,
     _resync_extension_frontends_after_deploy,
     _resync_frontends_payload,
     _should_resync_extension_frontends,
@@ -30,6 +31,17 @@ def test_resync_payload_includes_frontend_and_registry():
 def test_resync_payload_omits_empty_registry():
     raw = _resync_frontends_payload("fe-id")
     assert "registry_canister_id" not in raw
+
+
+@patch("realms.cli.commands.mundus._dfx_call")
+def test_pin_frontend_directories_pins_custom_and_ext(mock_call):
+    _pin_frontend_directories("frontend-id", "test")
+    assert mock_call.call_count == 2
+    methods = [c.args[1] for c in mock_call.call_args_list]
+    assert methods == ["pin_directory", "pin_directory"]
+    args = [c.args[2] for c in mock_call.call_args_list]
+    assert '(record { prefix = "/custom/" })' in args
+    assert '(record { prefix = "/ext/" })' in args
 
 
 @patch("realms.cli.commands.extension._dfx_call")

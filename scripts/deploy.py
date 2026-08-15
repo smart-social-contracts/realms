@@ -669,7 +669,7 @@ def deploy_frontend(
 
     print(f"   ✅ Frontend deployed to {frontend_id}")
 
-    # Pin /custom/ so branding survives future asset-sync upgrades
+    # Pin /custom/ and /ext/ so branding and extension bundles survive future asset-sync upgrades
     if manifest_path:
         static_custom = frontend_dir / "static" / "custom"
         has_branding = any(
@@ -677,16 +677,17 @@ def deploy_frontend(
             for name in ("logo.png", "background.png")
         )
         if has_branding:
-            try:
-                subprocess.run(
-                    ["dfx", "canister", "call", frontend_id,
-                     "pin_directory", '(record { prefix = "/custom/" })',
-                     "--network", network],
-                    env=env, check=True,
-                )
-                print("   📌 Pinned /custom/ directory on frontend canister")
-            except Exception as e:
-                print(f"   ⚠️  pin_directory failed (non-fatal): {e}")
+            for prefix in ("/custom/", "/ext/"):
+                try:
+                    subprocess.run(
+                        ["dfx", "canister", "call", frontend_id,
+                         "pin_directory", f'(record {{ prefix = "{prefix}" }})',
+                         "--network", network],
+                        env=env, check=True,
+                    )
+                    print(f"   📌 Pinned {prefix} directory on frontend canister")
+                except Exception as e:
+                    print(f"   ⚠️  pin_directory {prefix} failed (non-fatal): {e}")
 
 
 # ── Layered install strategy (Issue #168) ─────────────────────────────────────
