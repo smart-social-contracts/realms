@@ -89,7 +89,7 @@
 	let identityDraftTimer: ReturnType<typeof setTimeout> | null = null;
 	let launchPollTimer: ReturnType<typeof setInterval> | null = null;
 	let generatingBranding = $state(false);
-	let brandingSource = $state<'generate' | 'upload'>('generate');
+	let brandingSource = $state<'generate' | 'upload'>('upload');
 
 	const stepIndex = $derived(steps.findIndex((s) => s.id === currentStep));
 	const isWelcomeStep = $derived(currentStep === 'welcome');
@@ -995,18 +995,18 @@
 							<button
 								type="button"
 								class="setup-wizard__source-btn"
-								class:setup-wizard__source-btn--active={brandingSource === 'generate'}
-								onclick={() => (brandingSource = 'generate')}
-							>
-								Generate
-							</button>
-							<button
-								type="button"
-								class="setup-wizard__source-btn"
 								class:setup-wizard__source-btn--active={brandingSource === 'upload'}
 								onclick={() => (brandingSource = 'upload')}
 							>
 								Upload
+							</button>
+							<button
+								type="button"
+								class="setup-wizard__source-btn"
+								class:setup-wizard__source-btn--active={brandingSource === 'generate'}
+								onclick={() => (brandingSource = 'generate')}
+							>
+								Random
 							</button>
 						</div>
 
@@ -1018,7 +1018,7 @@
 									disabled={busy || generatingBranding}
 									onclick={generateBrandingFromIdentity}
 								>
-									{generatingBranding ? 'Composing…' : 'Generate'}
+									{generatingBranding ? 'Composing…' : 'Random'}
 								</button>
 								<p class="setup-wizard__generate-hint">
 									Each press draws a new random mark and backdrop from the realm name and manifesto.
@@ -1068,6 +1068,7 @@
 							welcomeMessage={welcomeMessage}
 							manifesto={manifesto}
 							realmName={$realmName || 'Your realm'}
+							primaryColor={primaryColor}
 						/>
 					</div>
 				</section>

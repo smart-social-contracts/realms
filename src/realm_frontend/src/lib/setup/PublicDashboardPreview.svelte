@@ -4,13 +4,15 @@
 		backgroundPreview = '',
 		welcomeMessage = '',
 		manifesto = '',
-		realmName = 'Your realm'
+		realmName = 'Your realm',
+		primaryColor = '#111827'
 	}: {
 		logoPreview?: string;
 		backgroundPreview?: string;
 		welcomeMessage?: string;
 		manifesto?: string;
 		realmName?: string;
+		primaryColor?: string;
 	} = $props();
 
 	const defaultLogo = '/images/logo_sphere_only.svg';
@@ -48,7 +50,12 @@
 	{/if}
 
 	<div class="dashboard-preview__join-row">
-		<button type="button" class="dashboard-preview__join-btn" disabled>
+		<button
+			type="button"
+			class="dashboard-preview__join-btn"
+			style={`background:${primaryColor || '#111827'}`}
+			disabled
+		>
 			Join this Realm
 			<svg
 				class="dashboard-preview__join-icon"
