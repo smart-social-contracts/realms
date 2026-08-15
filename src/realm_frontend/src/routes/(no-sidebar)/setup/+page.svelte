@@ -37,6 +37,7 @@
 	import { setupStateStore } from '$lib/stores/setupState';
 	import { realmManifesto, realmName, realmWelcomeMessage } from '$lib/stores/realmInfo';
 	import PublicDashboardPreview from '$lib/setup/PublicDashboardPreview.svelte';
+	import BrandingDropzone from '$lib/setup/BrandingDropzone.svelte';
 	import { get } from 'svelte/store';
 
 	const WELCOME_FOUNDING_LINE =
@@ -88,6 +89,7 @@
 	let identityDraftTimer: ReturnType<typeof setTimeout> | null = null;
 	let launchPollTimer: ReturnType<typeof setInterval> | null = null;
 	let generatingBranding = $state(false);
+	let brandingSource = $state<'generate' | 'upload'>('generate');
 
 	const stepIndex = $derived(steps.findIndex((s) => s.id === currentStep));
 	const isWelcomeStep = $derived(currentStep === 'welcome');
@@ -598,10 +600,7 @@
 		}
 	}
 
-	async function onLogoChange(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
+	async function onLogoFile(file: File) {
 		try {
 			logoDataUrl = await fileToCompressedDataUrl(file);
 			logoPreview = logoDataUrl;
@@ -611,10 +610,7 @@
 		}
 	}
 
-	async function onBackgroundChange(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
+	async function onBackgroundFile(file: File) {
 		try {
 			backgroundDataUrl = await fileToCompressedDataUrl(file);
 			backgroundPreview = backgroundDataUrl;
@@ -938,7 +934,7 @@
 					<div>
 						<Heading tag="h2" class="text-xl font-semibold">Branding</Heading>
 						<P class="text-gray-600">
-							Write the realm's voice first. Then generate a mark and backdrop from that text, or upload your own.
+							Write the realm's voice first. Then generate a mark, or upload your own.
 						</P>
 
 						<div class="setup-wizard__field">
@@ -995,28 +991,50 @@
 							</p>
 						{/if}
 
-						<div class="setup-wizard__generate">
+						<div class="setup-wizard__source" role="tablist" aria-label="Branding source">
 							<button
 								type="button"
-								class="setup-wizard__hero-cta setup-wizard__generate-btn"
-								disabled={busy || generatingBranding}
-								onclick={generateBrandingFromIdentity}
+								class="setup-wizard__source-btn"
+								class:setup-wizard__source-btn--active={brandingSource === 'generate'}
+								onclick={() => (brandingSource = 'generate')}
 							>
-								{generatingBranding ? 'Composing…' : 'Generate mark & backdrop'}
+								Generate
 							</button>
-							<p class="setup-wizard__generate-hint">
-								Drawn from the realm name and manifesto. You can still upload your own files below.
-							</p>
+							<button
+								type="button"
+								class="setup-wizard__source-btn"
+								class:setup-wizard__source-btn--active={brandingSource === 'upload'}
+								onclick={() => (brandingSource = 'upload')}
+							>
+								Upload
+							</button>
 						</div>
 
-						<div class="setup-wizard__field">
-							<Label for="logo-file">Logo</Label>
-							<input id="logo-file" type="file" accept="image/*" onchange={onLogoChange} />
-						</div>
-						<div class="setup-wizard__field">
-							<Label for="background-file">Background</Label>
-							<input id="background-file" type="file" accept="image/*" onchange={onBackgroundChange} />
-						</div>
+						{#if brandingSource === 'generate'}
+							<div class="setup-wizard__generate">
+								<button
+									type="button"
+									class="setup-wizard__hero-cta setup-wizard__generate-btn"
+									disabled={busy || generatingBranding}
+									onclick={generateBrandingFromIdentity}
+								>
+									{generatingBranding ? 'Composing…' : 'Generate'}
+								</button>
+								<p class="setup-wizard__generate-hint">
+									Each press draws a new random mark and backdrop from the realm name and manifesto.
+								</p>
+							</div>
+						{:else}
+							<div class="setup-wizard__uploads">
+								<BrandingDropzone label="Logo" preview={logoPreview} onFile={onLogoFile} />
+								<BrandingDropzone
+									label="Background"
+									preview={backgroundPreview}
+									onFile={onBackgroundFile}
+								/>
+							</div>
+						{/if}
+
 						<div class="setup-wizard__field">
 							<Label for="primary-color">Primary color</Label>
 							<Input id="primary-color" type="color" bind:value={primaryColor} class="h-11 w-24 p-1" />
@@ -1461,6 +1479,35 @@
 		background: #0f172a;
 		border-color: #f8fafc;
 		color: #f8fafc;
+	}
+
+	.setup-wizard__source {
+		display: inline-flex;
+		border: 1px solid #e2e8f0;
+		border-radius: 999px;
+		padding: 0.2rem;
+		margin: 0.25rem 0 0.5rem;
+	}
+
+	.setup-wizard__source-btn {
+		border: none;
+		background: transparent;
+		color: #64748b;
+		border-radius: 999px;
+		padding: 0.4rem 1rem;
+		font: inherit;
+		font-size: 0.875rem;
+		cursor: pointer;
+	}
+
+	.setup-wizard__source-btn--active {
+		background: #0b1120;
+		color: #ffffff;
+	}
+
+	.setup-wizard__uploads {
+		display: grid;
+		gap: 0.85rem;
 	}
 
 	.setup-wizard__generate {
