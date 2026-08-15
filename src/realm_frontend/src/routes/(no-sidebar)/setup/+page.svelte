@@ -33,6 +33,12 @@
 	} from '$lib/setup/wizardLogic';
 	import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge';
 	import { generateBrandingAssets } from '$lib/setup/brandingGenerate';
+	import {
+		CUSTOM_TOKEN_ID,
+		SHARED_TOKEN_CATALOG,
+		matchSharedToken,
+		tokenDraftFromChoice
+	} from '$lib/setup/sharedTokens';
 	import { fileToCompressedDataUrl } from '$lib/utils/imageDataUrl';
 	import { setupStateStore } from '$lib/stores/setupState';
 	import { realmManifesto, realmName, realmWelcomeMessage } from '$lib/stores/realmInfo';
@@ -72,6 +78,7 @@
 	let resolvedCodexVersion = $state('');
 	let tokenSymbol = $state('REALMS');
 	let tokenCanisterId = $state('');
+	let tokenChoice = $state('REALMS');
 	let primaryColor = $state('#3b82f6');
 	let logoPreview = $state('');
 	let backgroundPreview = $state('');
@@ -105,6 +112,11 @@
 	const launchFailed = $derived(launchState?.status === 'failed');
 	const launchCompleted = $derived(launchState?.status === 'completed');
 	const launchIdle = $derived(!launchState || launchState.status === 'idle');
+	const tokenContinueDisabled = $derived(
+		busy ||
+			(tokenChoice === CUSTOM_TOKEN_ID &&
+				(!tokenSymbol.trim() || !tokenCanisterId.trim()))
+	);
 	const summaryCodexPackage = $derived(
 		setupState?.draft?.codex?.package || setupState?.codex?.package || selectedCodexId || ''
 	);
@@ -242,6 +254,11 @@
 			if (typeof token.existing === 'string') {
 				tokenSymbol = token.existing;
 			}
+			const matched = matchSharedToken({
+				symbol: tokenSymbol,
+				token_canister_id: tokenCanisterId
+			});
+			tokenChoice = matched?.id ?? (tokenSymbol || tokenCanisterId ? CUSTOM_TOKEN_ID : 'REALMS');
 		}
 
 		const branding = state.draft?.branding ?? state.branding;
@@ -468,24 +485,36 @@
 	}
 
 	async function handleTokenSave() {
+		const token = tokenDraftFromChoice(tokenChoice, {
+			symbol: tokenSymbol,
+			token_canister_id: tokenCanisterId
+		});
+		if (!token) {
+			error = 'Choose a token, or enter a custom symbol and ledger canister';
+			return;
+		}
 		busy = true;
 		error = '';
 		try {
-			const token: Record<string, string> = {
-				symbol: tokenSymbol.trim() || 'REALMS'
-			};
-			const canisterId = tokenCanisterId.trim();
-			if (canisterId) {
-				token.token_canister_id = canisterId;
-			}
 			const ok = await persistDraft({ step: 'branding', token });
 			if (!ok) return;
+			tokenSymbol = String(token.symbol);
+			tokenCanisterId = String(token.token_canister_id || '');
 			navigateToStep('branding');
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not save token draft';
 		} finally {
 			busy = false;
 		}
+	}
+
+	function selectTokenChoice(id: string) {
+		tokenChoice = id;
+		if (id === CUSTOM_TOKEN_ID) return;
+		const token = tokenDraftFromChoice(id, { symbol: '', token_canister_id: '' });
+		if (!token) return;
+		tokenSymbol = String(token.symbol);
+		tokenCanisterId = String(token.token_canister_id || '');
 	}
 
 	async function handleTokenSkip() {
@@ -805,7 +834,12 @@
 							{codexPrimaryLabel}
 						</Button>
 					{:else if currentStep === 'token'}
-						<Button color="none" class={primaryButtonClass} disabled={busy} onclick={handleTokenSave}>
+						<Button
+							color="none"
+							class={primaryButtonClass}
+							disabled={tokenContinueDisabled}
+							onclick={handleTokenSave}
+						>
 							{busy ? 'Continuing…' : 'Continue'}
 						</Button>
 					{:else if currentStep === 'branding'}
@@ -942,19 +976,63 @@
 			{:else if currentStep === 'token'}
 				<section class="setup-wizard__panel">
 					<Heading tag="h2" class="text-xl font-semibold">Token</Heading>
-					<P class="text-gray-600">Select an existing token symbol for this realm (v1).</P>
-					<div class="setup-wizard__field">
-						<Label for="token-symbol">Existing token symbol</Label>
-						<Input id="token-symbol" bind:value={tokenSymbol} placeholder="REALMS" />
+					<P class="text-gray-600">
+						Use a shared token already on the network, or point at your own ICRC-1 ledger.
+					</P>
+					<div class="setup-wizard__codex-list">
+						{#each SHARED_TOKEN_CATALOG as token (token.id)}
+							<label
+								class="setup-wizard__codex-card setup-wizard__codex-card--compact"
+								class:setup-wizard__codex-card--selected={tokenChoice === token.id}
+							>
+								<input
+									type="radio"
+									name="token"
+									value={token.id}
+									checked={tokenChoice === token.id}
+									onchange={() => selectTokenChoice(token.id)}
+								/>
+								<div class="setup-wizard__codex-card-body">
+									<strong>{token.name}</strong>
+									<p class="setup-wizard__codex-description text-sm text-gray-600">
+										{token.description}
+									</p>
+								</div>
+							</label>
+						{/each}
+						<label
+							class="setup-wizard__codex-card setup-wizard__codex-card--compact"
+							class:setup-wizard__codex-card--selected={tokenChoice === CUSTOM_TOKEN_ID}
+						>
+							<input
+								type="radio"
+								name="token"
+								value={CUSTOM_TOKEN_ID}
+								checked={tokenChoice === CUSTOM_TOKEN_ID}
+								onchange={() => selectTokenChoice(CUSTOM_TOKEN_ID)}
+							/>
+							<div class="setup-wizard__codex-card-body">
+								<strong>Custom token</strong>
+								<p class="setup-wizard__codex-description text-sm text-gray-600">
+									Your own ICRC-1 ledger canister.
+								</p>
+							</div>
+						</label>
 					</div>
-					<div class="setup-wizard__field">
-						<Label for="token-canister">Token canister ID (optional)</Label>
-						<Input
-							id="token-canister"
-							bind:value={tokenCanisterId}
-							placeholder="Existing ledger canister principal"
-						/>
-					</div>
+					{#if tokenChoice === CUSTOM_TOKEN_ID}
+						<div class="setup-wizard__field">
+							<Label for="token-symbol">Token symbol</Label>
+							<Input id="token-symbol" bind:value={tokenSymbol} placeholder="MYTOKEN" />
+						</div>
+						<div class="setup-wizard__field">
+							<Label for="token-canister">Ledger canister ID</Label>
+							<Input
+								id="token-canister"
+								bind:value={tokenCanisterId}
+								placeholder="Existing ledger canister principal"
+							/>
+						</div>
+					{/if}
 				</section>
 			{:else if currentStep === 'branding'}
 				<section class="setup-wizard__panel setup-wizard__panel--branding">
@@ -1545,6 +1623,10 @@
 	.setup-wizard__codex-card--selected {
 		border-color: #475569;
 		background: #f8fafc;
+	}
+
+	.setup-wizard__codex-card--compact {
+		min-height: 0;
 	}
 
 	.setup-wizard__codex-card-body {
