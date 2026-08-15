@@ -1,3 +1,5 @@
+export const MAX_UNKNOWN_SETUP_ATTEMPTS = 3;
+
 export type SetupGateVariant = 'anonymous' | 'unauthorized';
 
 export type SetupGateDecision =
@@ -10,6 +12,8 @@ export type SetupGateDecision =
 export interface ResolveSetupGateInput {
 	loading: boolean;
 	status: string | null;
+	/** Consecutive failures to read setup state; unknown status fails open past the cap. */
+	unknownStatusFailures: number;
 	isAuthenticated: boolean;
 	isCallerAuthorized: boolean;
 	/** Portal / II auth channel has finished its initial bootstrap. */
@@ -36,6 +40,9 @@ function isSetupPath(pathname: string): boolean {
  */
 export function shouldShowSetupLoading(input: ResolveSetupGateInput): boolean {
 	if (input.loading) return true;
+	if (input.status === null && input.unknownStatusFailures < MAX_UNKNOWN_SETUP_ATTEMPTS) {
+		return true;
+	}
 	if (input.status !== 'setup') return false;
 	if (!input.authChannelSettled) return true;
 	if (!input.setupStateLoaded) return true;
@@ -72,5 +79,5 @@ export function resolveSetupGate(input: ResolveSetupGateInput): SetupGateDecisio
 }
 
 export function shouldPollSetupState(status: string | null): boolean {
-	return status === 'setup';
+	return status === null || status === 'setup';
 }

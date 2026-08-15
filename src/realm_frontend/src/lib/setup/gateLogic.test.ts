@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSetupGate, shouldPollSetupState, shouldShowSetupLoading } from './gateLogic';
+import {
+	MAX_UNKNOWN_SETUP_ATTEMPTS,
+	resolveSetupGate,
+	shouldPollSetupState,
+	shouldShowSetupLoading
+} from './gateLogic';
 
 const settledAuthorized = {
 	loading: false,
 	status: 'setup' as const,
+	unknownStatusFailures: 0,
 	isAuthenticated: true,
 	isCallerAuthorized: true,
 	authChannelSettled: true,
@@ -16,6 +22,7 @@ describe('shouldShowSetupLoading', () => {
 			shouldShowSetupLoading({
 				loading: true,
 				status: 'setup',
+				unknownStatusFailures: 0,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
 				authChannelSettled: false,
@@ -30,6 +37,7 @@ describe('shouldShowSetupLoading', () => {
 			shouldShowSetupLoading({
 				loading: false,
 				status: 'setup',
+				unknownStatusFailures: 0,
 				isAuthenticated: true,
 				isCallerAuthorized: false,
 				authChannelSettled: false,
@@ -44,6 +52,7 @@ describe('shouldShowSetupLoading', () => {
 			shouldShowSetupLoading({
 				loading: false,
 				status: 'setup',
+				unknownStatusFailures: 0,
 				isAuthenticated: true,
 				isCallerAuthorized: false,
 				authChannelSettled: true,
@@ -70,6 +79,7 @@ describe('resolveSetupGate', () => {
 			resolveSetupGate({
 				loading: true,
 				status: null,
+				unknownStatusFailures: 0,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
 				authChannelSettled: false,
@@ -84,6 +94,7 @@ describe('resolveSetupGate', () => {
 			resolveSetupGate({
 				loading: false,
 				status: null,
+				unknownStatusFailures: MAX_UNKNOWN_SETUP_ATTEMPTS,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
 				authChannelSettled: true,
@@ -98,6 +109,7 @@ describe('resolveSetupGate', () => {
 			resolveSetupGate({
 				loading: false,
 				status: 'alpha',
+				unknownStatusFailures: 0,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
 				authChannelSettled: true,
@@ -112,6 +124,7 @@ describe('resolveSetupGate', () => {
 			resolveSetupGate({
 				loading: false,
 				status: 'setup',
+				unknownStatusFailures: 0,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
 				authChannelSettled: true,
@@ -126,6 +139,7 @@ describe('resolveSetupGate', () => {
 			resolveSetupGate({
 				loading: false,
 				status: 'setup',
+				unknownStatusFailures: 0,
 				isAuthenticated: true,
 				isCallerAuthorized: false,
 				authChannelSettled: true,
@@ -140,6 +154,7 @@ describe('resolveSetupGate', () => {
 			resolveSetupGate({
 				loading: false,
 				status: 'setup',
+				unknownStatusFailures: 0,
 				isAuthenticated: true,
 				isCallerAuthorized: false,
 				authChannelSettled: false,
@@ -154,6 +169,7 @@ describe('resolveSetupGate', () => {
 			resolveSetupGate({
 				loading: false,
 				status: 'setup',
+				unknownStatusFailures: 0,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
 				authChannelSettled: true,
@@ -180,12 +196,93 @@ describe('resolveSetupGate', () => {
 			})
 		).toEqual({ kind: 'setup_wizard' });
 	});
+
+	it('shows loading for unknown status with no failures yet', () => {
+		expect(
+			resolveSetupGate({
+				loading: false,
+				status: null,
+				unknownStatusFailures: 0,
+				isAuthenticated: true,
+				isCallerAuthorized: true,
+				authChannelSettled: true,
+				setupStateLoaded: true,
+				pathname: '/'
+			})
+		).toEqual({ kind: 'loading' });
+	});
+
+	it('shows loading for unknown status with one failure', () => {
+		expect(
+			resolveSetupGate({
+				loading: false,
+				status: null,
+				unknownStatusFailures: 1,
+				isAuthenticated: true,
+				isCallerAuthorized: true,
+				authChannelSettled: true,
+				setupStateLoaded: true,
+				pathname: '/'
+			})
+		).toEqual({ kind: 'loading' });
+	});
+
+	it('shows loading for unknown status with two failures', () => {
+		expect(
+			resolveSetupGate({
+				loading: false,
+				status: null,
+				unknownStatusFailures: 2,
+				isAuthenticated: true,
+				isCallerAuthorized: true,
+				authChannelSettled: true,
+				setupStateLoaded: true,
+				pathname: '/'
+			})
+		).toEqual({ kind: 'loading' });
+	});
+
+	it('fails open after max unknown status failures', () => {
+		expect(
+			resolveSetupGate({
+				loading: false,
+				status: null,
+				unknownStatusFailures: MAX_UNKNOWN_SETUP_ATTEMPTS,
+				isAuthenticated: true,
+				isCallerAuthorized: true,
+				authChannelSettled: true,
+				setupStateLoaded: true,
+				pathname: '/'
+			})
+		).toEqual({ kind: 'normal' });
+	});
+
+	it('redirects authorized creators during setup from non-setup pathname', () => {
+		expect(
+			resolveSetupGate({
+				loading: false,
+				status: 'setup',
+				unknownStatusFailures: 0,
+				isAuthenticated: true,
+				isCallerAuthorized: true,
+				authChannelSettled: true,
+				setupStateLoaded: true,
+				pathname: '/dashboard'
+			})
+		).toEqual({ kind: 'redirect', to: '/setup' });
+	});
 });
 
 describe('shouldPollSetupState', () => {
-	it('polls only while realm is in setup', () => {
+	it('polls while realm is in setup', () => {
 		expect(shouldPollSetupState('setup')).toBe(true);
+	});
+
+	it('polls while setup status is unknown', () => {
+		expect(shouldPollSetupState(null)).toBe(true);
+	});
+
+	it('does not poll when not in setup', () => {
 		expect(shouldPollSetupState('alpha')).toBe(false);
-		expect(shouldPollSetupState(null)).toBe(false);
 	});
 });

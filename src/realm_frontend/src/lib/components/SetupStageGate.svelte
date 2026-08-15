@@ -9,7 +9,11 @@
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { realmName, realmInfo } from '$lib/stores/realmInfo';
 	import { setupStateStore } from '$lib/stores/setupState';
-	import { resolveSetupGate, shouldPollSetupState } from '$lib/setup/gateLogic';
+	import {
+		MAX_UNKNOWN_SETUP_ATTEMPTS,
+		resolveSetupGate,
+		shouldPollSetupState
+	} from '$lib/setup/gateLogic';
 	import SetupGatePage from '$lib/components/SetupGatePage.svelte';
 
 	interface Props {
@@ -23,10 +27,12 @@
 	let pollTimer: ReturnType<typeof setInterval> | undefined;
 	let probeTimer: ReturnType<typeof setInterval> | undefined;
 	let redirectedToSetup = $state(false);
+	let unknownStatusFailures = $state(0);
 
 	const gateInput = $derived({
 		loading: $setupStateStore.loading,
 		status: $setupStateStore.state?.status ?? null,
+		unknownStatusFailures,
 		isAuthenticated: $isAuthenticated,
 		isCallerAuthorized: $setupStateStore.state?.is_caller_authorized ?? false,
 		authChannelSettled,
@@ -45,6 +51,7 @@
 		try {
 			const state = await setupStateStore.refresh();
 			setupStateLoaded = true;
+			unknownStatusFailures = 0;
 			if (state.status !== 'setup' && browser) {
 				const path = get(page).url.pathname;
 				if (path === '/setup' || path.startsWith('/setup/')) {
@@ -54,6 +61,7 @@
 			return state;
 		} catch {
 			setupStateLoaded = true;
+			unknownStatusFailures += 1;
 			return null;
 		}
 	}
@@ -86,6 +94,18 @@
 			if (cancelled) return;
 			void realmInfo.fetch();
 			await refreshSetupState();
+			if (cancelled) return;
+
+			while (
+				!cancelled &&
+				get(setupStateStore).state === null &&
+				unknownStatusFailures > 0 &&
+				unknownStatusFailures < MAX_UNKNOWN_SETUP_ATTEMPTS
+			) {
+				await new Promise((r) => setTimeout(r, 1_500));
+				if (cancelled) return;
+				await refreshSetupState();
+			}
 			if (cancelled) return;
 
 			pollTimer = setInterval(() => {
