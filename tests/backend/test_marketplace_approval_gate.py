@@ -327,6 +327,31 @@ def test_approval_is_refused_when_the_realm_trusts_nobody():
     assert "trusts no approver" in verdict
 
 
+def test_setup_allows_approved_content_when_no_marketplace_is_configured():
+    set_policy(marketplace_canister_id="")
+    FakeRealm._rows[0].status = "setup"
+    verdict, _ = check(responses=[approval()])
+    assert verdict == ""
+    assert FakeRealm._rows[0].trusted_approvers == MARKETPLACE
+
+
+def test_setup_still_refuses_unapproved_content_without_a_marketplace():
+    set_policy(marketplace_canister_id="")
+    FakeRealm._rows[0].status = "setup"
+    verdict, _ = check(
+        responses=[
+            json.dumps(
+                {
+                    "namespace": "ext/voting/1.0.0",
+                    "approved": False,
+                    "status": "unapproved",
+                }
+            )
+        ]
+    )
+    assert "has not been approved" in verdict
+
+
 def test_registry_without_approval_support_is_refused():
     # An older registry rejects the call; basilisk hands back an Err variant,
     # which is not the JSON the gate expects.

@@ -399,6 +399,41 @@ def _trust_policy() -> tuple:
         return True, []
 
 
+def _is_founding_setup() -> bool:
+    """True while the realm is still in the creator-only setup stage."""
+    try:
+        from ggg import Realm
+
+        realms = Realm.instances()
+        if not realms:
+            return False
+        return str(getattr(realms[0], "status", "") or "") == "setup"
+    except Exception:
+        return False
+
+
+def _remember_trusted_approver(approver: str) -> None:
+    """Seed trusted_approvers so later installs keep working after setup."""
+    if not approver:
+        return
+    try:
+        from ggg import Realm
+
+        realms = Realm.instances()
+        if not realms:
+            return
+        realm = realms[0]
+        raw = (getattr(realm, "trusted_approvers", "") or "").strip()
+        existing = [p.strip() for p in raw.split(",") if p.strip()]
+        if approver in existing:
+            return
+        existing.append(approver)
+        realm.trusted_approvers = ",".join(existing)
+        logger.info(f"setup: trusting approver {approver}")
+    except Exception as e:
+        logger.warning(f"could not persist trusted approver: {e}")
+
+
 def _check_marketplace_approval(
     registry: "FileRegistryService",
     namespace: str,
@@ -452,6 +487,13 @@ def _check_marketplace_approval(
 
     approver = (approval.get("approver") or "").strip()
     if not trusted:
+        if _is_founding_setup():
+            _remember_trusted_approver(approver)
+            logger.info(
+                f"'{namespace}' approved by {approver}; accepted during setup "
+                f"because this realm has no marketplace yet"
+            )
+            return ""
         return (
             f"'{namespace}' is approved by {approver}, but this realm trusts no "
             f"approver (no marketplace configured). {hint}"
