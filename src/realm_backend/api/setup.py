@@ -238,19 +238,33 @@ def _decode_data_url(data_url: str) -> tuple[bytes, str]:
     return base64.b64decode(payload), content_type
 
 
+def _drive_phase_outcome(outcome):
+    """Drive a phase that may be a generator or a plain dict.
+
+    ``yield from`` on a dict iterates its keys and raises TypeError
+    (``dict_keyiterator``) — configure_token is sync and must not be
+    yielded from directly.
+    """
+    if hasattr(outcome, "send"):
+        return (yield from outcome)
+    return outcome
+
+
 def run_setup_launch_phase(realm, phase_name: str) -> Async[dict]:
     draft = get_setup_draft(realm)
     if phase_name == "install_codex":
-        return (yield from _launch_phase_install_codex(realm, draft))
-    if phase_name == "configure_token":
-        return (yield from _launch_phase_configure_token(realm, draft))
-    if phase_name == "upload_branding":
-        return (yield from _launch_phase_upload_branding(realm, draft))
-    if phase_name == "apply_identity":
-        return _launch_phase_apply_identity(realm, draft)
-    if phase_name == "complete":
-        return (yield from _launch_phase_complete(realm, draft))
-    return {"success": False, "error": f"unknown launch phase: {phase_name}"}
+        outcome = _launch_phase_install_codex(realm, draft)
+    elif phase_name == "configure_token":
+        outcome = _launch_phase_configure_token(realm, draft)
+    elif phase_name == "upload_branding":
+        outcome = _launch_phase_upload_branding(realm, draft)
+    elif phase_name == "apply_identity":
+        outcome = _launch_phase_apply_identity(realm, draft)
+    elif phase_name == "complete":
+        outcome = _launch_phase_complete(realm, draft)
+    else:
+        return {"success": False, "error": f"unknown launch phase: {phase_name}"}
+    return (yield from _drive_phase_outcome(outcome))
 
 
 def _launch_phase_install_codex(realm, draft: dict) -> Async[dict]:

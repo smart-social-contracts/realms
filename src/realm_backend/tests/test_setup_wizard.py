@@ -638,6 +638,25 @@ def test_setup_save_draft_does_not_install_or_mutate_realm():
     assert "codex" not in (json.loads(realm.manifest_data).get("setup") or {})
 
 
+def test_drive_phase_outcome_accepts_plain_dict():
+    setup_api = _import_setup_api()
+    gen = setup_api._drive_phase_outcome({"success": True, "skipped": True})
+    with pytest.raises(StopIteration) as caught:
+        next(gen)
+    assert caught.value.value == {"success": True, "skipped": True}
+
+
+def test_setup_launch_step_code_does_not_need_json():
+    """TaskManager execs this shim with a bare namespace; `json` is not imported."""
+    _import_setup_api()
+    from core.setup import SETUP_LAUNCH_STEP_CODE
+
+    assert "json.dumps" not in SETUP_LAUNCH_STEP_CODE
+    ns = {}
+    exec(SETUP_LAUNCH_STEP_CODE, ns)
+    assert callable(ns.get("async_task"))
+
+
 def test_setup_launch_requires_codex_in_draft():
     setup_api = _import_setup_api()
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")

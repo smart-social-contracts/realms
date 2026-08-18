@@ -28,7 +28,7 @@ SETUP_LAUNCH_STEP_CODE = (
     "def async_task():\n"
     "    from core.setup import advance_setup_launch\n"
     "    res = yield from advance_setup_launch()\n"
-    "    return json.dumps(res)\n"
+    "    return res\n"
 )
 
 
