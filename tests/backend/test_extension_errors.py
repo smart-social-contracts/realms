@@ -1,4 +1,4 @@
-"""``core.extension_errors`` — stamp permission_denied on inner extension JSON."""
+"""``core.extension_errors`` — structured codes set at the source."""
 
 import json
 import sys
@@ -9,10 +9,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src" / "realm_back
 sys.modules.setdefault("_cdk", MagicMock())
 
 from core.extension_errors import (  # noqa: E402
+    ERROR_CODE_NOT_FOUND,
     ERROR_CODE_PERMISSION_DENIED,
+    ERROR_CODE_UNAUTHENTICATED,
+    ERROR_CODE_VALIDATION,
+    PermissionDenied,
+    Unauthenticated,
     normalize_extension_result_json,
+    not_found_payload,
     payload_from_permission_error,
     permission_denied_payload,
+    validation_payload,
 )
 
 
@@ -20,7 +27,18 @@ def _load(result):
     return json.loads(normalize_extension_result_json(result))
 
 
-def test_stamps_caught_permission_error_json():
+def test_serializes_coded_payload():
+    payload = permission_denied_payload(
+        "Access denied: user abc lacks permission 'permission.view'",
+        operation="permission.view",
+    )
+    out = _load(payload)
+    assert out["error_code"] == ERROR_CODE_PERMISSION_DENIED
+    assert out["denied_operation"] == "permission.view"
+    assert out["success"] is False
+
+
+def test_does_not_infer_code_from_english():
     raw = json.dumps(
         {
             "success": False,
@@ -28,16 +46,14 @@ def test_stamps_caught_permission_error_json():
         }
     )
     out = _load(raw)
-    assert out["error_code"] == ERROR_CODE_PERMISSION_DENIED
-    assert out["denied_operation"] == "permission.view"
-    assert out["success"] is False
+    assert "error_code" not in out
+    assert out["error"].startswith("Access denied")
 
 
-def test_stamps_user_not_found():
+def test_does_not_treat_user_not_found_as_permission():
     raw = json.dumps({"success": False, "error": "User xyz not found"})
     out = _load(raw)
-    assert out["error_code"] == ERROR_CODE_PERMISSION_DENIED
-    assert out["denied_operation"] == "authenticated"
+    assert "error_code" not in out
 
 
 def test_leaves_validation_errors_alone():
@@ -47,25 +63,32 @@ def test_leaves_validation_errors_alone():
     assert out["error"] == "Department name is required"
 
 
-def test_stamps_legacy_denied_operation():
-    raw = {
-        "success": False,
-        "error": "Access denied: 'access_manager.list_departments' requires access level 'admin'",
-        "denied_operation": "admin",
-    }
-    out = _load(raw)
-    assert out["error_code"] == ERROR_CODE_PERMISSION_DENIED
-    assert out["denied_operation"] == "admin"
-
-
-def test_payload_from_permission_error():
+def test_payload_from_permission_denied():
     payload = payload_from_permission_error(
-        PermissionError("Access denied: user abc lacks permission 'role.assign'")
+        PermissionDenied(
+            "Access denied: user abc lacks permission 'role.assign'",
+            operation="role.assign",
+        )
     )
     assert payload == permission_denied_payload(
-        "Access denied: user abc lacks permission 'role.assign'"
+        "Access denied: user abc lacks permission 'role.assign'",
+        operation="role.assign",
     )
     assert payload["denied_operation"] == "role.assign"
+
+
+def test_payload_from_unauthenticated():
+    payload = payload_from_permission_error(Unauthenticated("User xyz not found"))
+    assert payload["error_code"] == ERROR_CODE_UNAUTHENTICATED
+    assert "denied_operation" not in payload
+
+
+def test_not_found_and_validation_helpers():
+    missing = not_found_payload("No realm member with principal 'xyz'", entity="user")
+    assert missing["error_code"] == ERROR_CODE_NOT_FOUND
+    assert missing["entity"] == "user"
+    bad = validation_payload("department is required")
+    assert bad["error_code"] == ERROR_CODE_VALIDATION
 
 
 def test_successful_payload_unchanged():
@@ -73,7 +96,8 @@ def test_successful_payload_unchanged():
     assert normalize_extension_result_json(raw) == raw
 
 
-def test_plain_permission_string():
-    out = _load("Access denied: you lack permission 'extension.sync_call'")
-    assert out["error_code"] == ERROR_CODE_PERMISSION_DENIED
-    assert out["denied_operation"] == "extension.sync_call"
+def test_plain_permission_string_not_stamped():
+    out = normalize_extension_result_json(
+        "Access denied: you lack permission 'extension.sync_call'"
+    )
+    assert out == "Access denied: you lack permission 'extension.sync_call'"

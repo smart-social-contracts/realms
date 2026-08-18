@@ -7,6 +7,7 @@ code calls the same :func:`apply_member_action` after the vote passes.
 
 import json
 
+from core.extension_errors import not_found_payload, validation_payload
 from ic_python_logging import get_logger
 
 logger = get_logger("core.org_member_admin")
@@ -38,20 +39,25 @@ def apply_member_action(action: dict) -> dict:
 
         kind = (action.get("action") or "").strip()
         if kind not in ACTIONS:
-            return {"success": False, "error": f"Unknown action '{kind}'"}
+            return validation_payload(f"Unknown action '{kind}'")
 
         dept_name = (action.get("department") or "").strip()
         principal = (action.get("user_principal") or action.get("principal") or "").strip()
         if not dept_name or not principal:
-            return {"success": False, "error": "department and user_principal are required"}
+            return validation_payload("department and user_principal are required")
 
         dept = Department[dept_name]
         if not dept:
-            return {"success": False, "error": f"Department '{dept_name}' not found"}
+            return not_found_payload(
+                f"Department '{dept_name}' not found", entity="department"
+            )
 
         user = User[principal]
         if not user:
-            return {"success": False, "error": f"User '{principal}' not found"}
+            return not_found_payload(
+                f"No realm member with principal '{principal}'. They must join the realm first.",
+                entity="user",
+            )
 
         from core.membership import (
             add_department_member,
@@ -79,10 +85,10 @@ def apply_member_action(action: dict) -> dict:
             logger.info(f"User {principal} removed from department '{dept_name}'")
             return {"success": True, "data": {"message": f"User removed from '{dept_name}'"}}
 
-        return {"success": False, "error": f"Unhandled action '{kind}'"}
+        return validation_payload(f"Unhandled action '{kind}'")
     except Exception as e:
         logger.error(f"apply_member_action failed: {e}")
-        return {"success": False, "error": str(e)}
+        return validation_payload(str(e))
 
 
 def build_proposal_code(action: dict) -> str:

@@ -9,7 +9,7 @@ describe('parseAccessError', () => {
     const denied = parseAccessError({
       success: false,
       error_code: 'permission_denied',
-      error: 'User xyz not found',
+      error: 'Access denied',
     });
     expect(denied).toEqual({
       isAccessDenied: true,
@@ -29,6 +29,16 @@ describe('parseAccessError', () => {
     expect(denied?.message).toBe(DEFAULT_PERMISSION_MESSAGE);
   });
 
+  it('recognizes unauthenticated as an access error', () => {
+    const denied = parseAccessError({
+      success: false,
+      error_code: 'unauthenticated',
+      error: 'Not authenticated',
+    });
+    expect(denied?.isAccessDenied).toBe(true);
+    expect(denied?.operation).toBe('');
+  });
+
   it('unwraps outer envelope response JSON', () => {
     const denied = parseAccessError({
       success: true,
@@ -42,17 +52,38 @@ describe('parseAccessError', () => {
     expect(denied?.operation).toBe('permission.view');
   });
 
-  it('still recognizes legacy denied_operation-only payloads', () => {
-    const denied = parseAccessError({
-      error: 'Access denied',
-      denied_operation: 'extension.sync_call',
-    });
-    expect(denied?.operation).toBe('extension.sync_call');
+  it('ignores not_found even when the message mentions a user', () => {
+    expect(
+      parseAccessError({
+        success: false,
+        error_code: 'not_found',
+        error: "No realm member with principal 'xyz'. They must join the realm first.",
+        entity: 'user',
+      }),
+    ).toBeNull();
   });
 
   it('ignores ordinary validation failures', () => {
     expect(
       parseAccessError({ success: false, error: 'Department name is required' }),
+    ).toBeNull();
+  });
+
+  it('ignores English-only access-denied text without error_code', () => {
+    expect(
+      parseAccessError({
+        success: false,
+        error: "Access denied: user abc lacks permission 'permission.view'",
+      }),
+    ).toBeNull();
+  });
+
+  it('ignores denied_operation without error_code', () => {
+    expect(
+      parseAccessError({
+        error: 'Access denied',
+        denied_operation: 'extension.sync_call',
+      }),
     ).toBeNull();
   });
 });

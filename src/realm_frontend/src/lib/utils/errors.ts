@@ -1,4 +1,5 @@
 export const ERROR_CODE_PERMISSION_DENIED = 'permission_denied';
+export const ERROR_CODE_UNAUTHENTICATED = 'unauthenticated';
 export const DEFAULT_PERMISSION_MESSAGE = "You don't have permission to view this.";
 
 export interface AccessError {
@@ -20,10 +21,8 @@ export class AccessDeniedError extends Error {
  * Detects whether a backend extension_sync_call result (or a caught error)
  * represents a permission-denied response and extracts structured info.
  *
- * Canonical inner/outer JSON:
+ * Canonical JSON:
  *   {"success":false,"error_code":"permission_denied","error":"...","denied_operation":"..."}
- *
- * Legacy payloads with only ``denied_operation`` are still recognized.
  *
  * Returns null when the result is not a permission error.
  */
@@ -38,18 +37,7 @@ export function parseAccessError(
     if (direct) return direct;
 
     if (typeof obj.response === 'string') {
-      const nested = parseAccessError(obj.response);
-      if (nested) return nested;
-      if (
-        obj.response.includes('Access denied') ||
-        obj.response.includes('denied_operation')
-      ) {
-        return {
-          isAccessDenied: true,
-          operation: extractOperation(obj.response),
-          message: DEFAULT_PERMISSION_MESSAGE,
-        };
-      }
+      return parseAccessError(obj.response);
     }
   }
 
@@ -59,20 +47,9 @@ export function parseAccessError(
 
   if (typeof resultOrError === 'string') {
     try {
-      const parsed = JSON.parse(resultOrError);
-      const fromJson = parseAccessError(parsed);
-      if (fromJson) return fromJson;
+      return parseAccessError(JSON.parse(resultOrError));
     } catch {
-      if (
-        resultOrError.includes('Access denied') &&
-        resultOrError.includes('denied_operation')
-      ) {
-        return {
-          isAccessDenied: true,
-          operation: extractOperation(resultOrError),
-          message: DEFAULT_PERMISSION_MESSAGE,
-        };
-      }
+      return null;
     }
   }
 
@@ -80,21 +57,16 @@ export function parseAccessError(
 }
 
 function accessErrorFromObject(obj: Record<string, unknown>): AccessError | null {
-  const deniedOp = obj.denied_operation;
-  if (obj.error_code === ERROR_CODE_PERMISSION_DENIED || deniedOp) {
-    const raw = String(obj.error || '');
-    return {
-      isAccessDenied: true,
-      operation: deniedOp ? String(deniedOp) : extractOperation(raw),
-      message: DEFAULT_PERMISSION_MESSAGE,
-    };
+  const code = obj.error_code;
+  if (code !== ERROR_CODE_PERMISSION_DENIED && code !== ERROR_CODE_UNAUTHENTICATED) {
+    return null;
   }
-  return null;
-}
-
-function extractOperation(text: string): string {
-  const match = text.match(/permission '([^']+)'/);
-  return match?.[1] || '';
+  const deniedOp = obj.denied_operation;
+  return {
+    isAccessDenied: true,
+    operation: deniedOp ? String(deniedOp) : '',
+    message: DEFAULT_PERMISSION_MESSAGE,
+  };
 }
 
 /**

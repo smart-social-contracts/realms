@@ -162,10 +162,6 @@
 			} catch {
 				return res.response;
 			}
-			const denied = parseAccessError(inner);
-			if (denied) {
-				runtimeDenied = denied;
-			}
 			return inner;
 		}
 		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {

@@ -1,9 +1,13 @@
 """Structured error envelopes for extension call results.
 
-Inner handlers historically return ``{"success": false, "error": str}`` with no
-machine-readable code. The host used to treat that as a successful call and
-show empty lists. This module stamps ``error_code: permission_denied`` so the
-frontend can handle denials once.
+Handlers should set ``error_code`` at the source. ``error`` is display-only
+and is never parsed to choose a code.
+
+Known codes:
+  permission_denied  — caller lacks an operation (see denied_operation)
+  unauthenticated    — caller is not a registered realm member
+  not_found          — a referenced entity is missing
+  validation_error   — bad or incomplete arguments
 
 Do not use the ``re`` module here: Basilisk ships only a stub without
 ``re.compile``.
@@ -12,103 +16,68 @@ Do not use the ``re`` module here: Basilisk ships only a stub without
 import json
 
 ERROR_CODE_PERMISSION_DENIED = "permission_denied"
+ERROR_CODE_UNAUTHENTICATED = "unauthenticated"
+ERROR_CODE_NOT_FOUND = "not_found"
+ERROR_CODE_VALIDATION = "validation_error"
 
 
-def extract_denied_operation(message: str) -> str:
-    if not message:
-        return ""
-    marker = "permission '"
-    start = message.find(marker)
-    if start >= 0:
-        start += len(marker)
-        end = message.find("'", start)
-        if end > start:
-            return message[start:end]
-    lower = message.lower()
-    if "user" in lower and "not found" in lower:
-        return "authenticated"
-    return ""
+class Unauthenticated(PermissionError):
+    """Caller is not a registered realm member."""
+
+    def __init__(self, message: str = "Not authenticated"):
+        super().__init__(message)
 
 
-def is_permission_error_text(message: str) -> bool:
-    if not message:
-        return False
-    lower = message.lower()
-    if "access denied" in lower or "lacks permission" in lower:
-        return True
-    if "permission denied" in lower:
-        return True
-    if "user" in lower and "not found" in lower:
-        return True
-    return False
+class PermissionDenied(PermissionError):
+    """Caller lacks a named operation."""
+
+    def __init__(self, message: str, operation: str = ""):
+        super().__init__(message)
+        self.operation = operation
 
 
-def permission_denied_payload(message: str, operation: str = "") -> dict:
+def error_payload(error_code: str, message: str, **extra) -> dict:
     payload = {
         "success": False,
-        "error_code": ERROR_CODE_PERMISSION_DENIED,
-        "error": message or "Access denied",
+        "error_code": error_code,
+        "error": message,
     }
-    op = operation or extract_denied_operation(message)
-    if op:
-        payload["denied_operation"] = op
+    payload.update({k: v for k, v in extra.items() if v is not None and v != ""})
     return payload
 
 
+def permission_denied_payload(message: str, operation: str = "") -> dict:
+    return error_payload(
+        ERROR_CODE_PERMISSION_DENIED,
+        message or "Access denied",
+        denied_operation=operation or None,
+    )
+
+
+def not_found_payload(message: str, entity: str = "") -> dict:
+    return error_payload(ERROR_CODE_NOT_FOUND, message, entity=entity or None)
+
+
+def validation_payload(message: str) -> dict:
+    return error_payload(ERROR_CODE_VALIDATION, message)
+
+
 def payload_from_permission_error(exc: BaseException) -> dict:
-    return permission_denied_payload(str(exc))
-
-
-def _stamp_permission_denied(obj: dict) -> dict:
-    err = str(obj.get("error") or "")
-    stamped = dict(obj)
-    stamped["success"] = False
-    stamped["error_code"] = ERROR_CODE_PERMISSION_DENIED
-    if not stamped.get("error"):
-        stamped["error"] = err or "Access denied"
-    if not stamped.get("denied_operation"):
-        op = extract_denied_operation(err)
-        if op:
-            stamped["denied_operation"] = op
-    return stamped
+    if isinstance(exc, Unauthenticated):
+        return error_payload(ERROR_CODE_UNAUTHENTICATED, str(exc) or "Not authenticated")
+    operation = getattr(exc, "operation", "") or ""
+    return permission_denied_payload(str(exc), operation)
 
 
 def normalize_extension_result_json(result) -> str:
-    """Return a JSON string, injecting permission_denied when the payload is a denial."""
+    """Serialize a handler result. Does not infer error_code from English text."""
     if result is None:
         return "null"
-
-    text = None
     if isinstance(result, dict):
-        obj = result
-    elif isinstance(result, str):
-        text = result
-        try:
-            obj = json.loads(text)
-        except json.JSONDecodeError:
-            if is_permission_error_text(text):
-                return json.dumps(permission_denied_payload(text))
-            return text
-    else:
-        try:
-            text = json.dumps(result)
-        except TypeError:
-            return json.dumps({"success": False, "error": str(result)})
-        try:
-            obj = json.loads(text)
-        except json.JSONDecodeError:
-            return text
-
-    if not isinstance(obj, dict):
-        return text if text is not None else json.dumps(obj)
-
-    if obj.get("error_code") == ERROR_CODE_PERMISSION_DENIED or (
-        obj.get("success") is False
-        and (
-            obj.get("denied_operation")
-            or is_permission_error_text(str(obj.get("error") or ""))
-        )
-    ):
-        return json.dumps(_stamp_permission_denied(obj))
-
-    return text if text is not None else json.dumps(obj)
+        return json.dumps(result)
+    if isinstance(result, str):
+        return result
+    try:
+        return json.dumps(result)
+    except TypeError:
+        return json.dumps({"success": False, "error": str(result)})
