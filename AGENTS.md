@@ -57,7 +57,7 @@ realms/
 ├── .github/workflows/
 │   ├── publish-build.yml            # Build + publish artifacts into file_registry + Casals
 │   ├── rollout.yml                   # Upgrade/reinstall realm+infra canisters via Casals
-│   ├── deploy-mundus.yml             # Off-chain realm deploy (fast path; test/demo/staging)
+│   ├── deploy-mundus.yml             # Sheet-realm mundus deploy (still queues realm_installer)
 │   ├── casals-upgrade.yml            # Upgrade the Casals orchestrator itself
 │   └── deploy-files.yml              # Publish extensions/codices into file_registry
 ├── (casals is NOT a submodule — clone smart-social-contracts/casals separately if you need its source/CLI; platform provisioner of gos-as-a-service)
@@ -79,16 +79,28 @@ Visual overview (decision tree): [`.AGENTS/realms-deployment-paths.svg`](.AGENTS
 
 ### Choose your path first
 
-**Default for agents:** if you changed code under a realm canister (`src/realm_frontend/`,
-`src/realm_backend/`) and need to see it live on test/demo/staging, use **`realms mundus
-deploy`** (~90s). Do **not** start with Casals for routine UI/backend iteration — the
-Casals frontend rollout copies ~109 asset files in small batches and takes several minutes
-per realm.
+**"Fast off-chain" is two different things.** Do not treat them as synonyms:
+
+| Phrase | What it actually does | Use when |
+|---|---|---|
+| **`realms mundus deploy`** | Builds locally, then **queues the registry installer** and polls | Agora / Dominion / Syntropia **and** the installer is healthy (~90s) |
+| **Direct dfx / `runtime-install` / `registry-install`** | Talks to the realm canisters only — **no installer job** | A wizard realm (`https://*.gos.earth/r/<slug>/`), the installer is slow/stuck, or the user said **fast off-chain** / **skip the installer** |
+
+If the target is a portal slug that is **not** in `deployment-descriptors/*-mundus-layered.yml`,
+**do not invent a one-off mundus YAML.** Resolve the canister IDs and use the
+[direct path](#direct-runtime-install-no-file-registry-no-casals-installer). A pending
+mundus frontend job can later wipe `/ext/` and 404 every extension.
+
+**Default for sheet realms only** (Agora, Dominion, Syntropia): `realms mundus deploy`
+(~90s) when the installer is healthy. Do **not** start with Casals for routine
+UI/backend iteration — the Casals frontend rollout copies ~109 asset files in small
+batches and takes several minutes per realm.
 
 | Goal | Path | Typical time |
 |---|---|---|
+| **Wizard / portal realm** (`/r/<slug>/` on test/demo/staging) | [Direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer) — never mundus | ~25–90s |
 | **Realm UI or backend change** (Agora, Dominion, Syntropia) | `realms mundus deploy` with `--version build` | ~90s |
-| **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install, **or** [direct runtime install](#direct-runtime-install-no-file-registry) | ~26s via registry; direct path skips registry |
+| **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install, **or** [direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer) | ~26s via registry; direct path skips the installer |
 | **Registry / installer / other infra** during dev | fetch GOS artifacts + `dfx --run-deprecated deploy` (registry/installer) or `scripts/infra_dev_deploy.sh` (file_registry, …) or `realms env deploy` (full product stack) | ~2–5 min |
 | **Pre-merge / make Casals authoritative** | `publish-build` → `rollout` | several min |
 
@@ -96,9 +108,9 @@ per realm.
 
 | What changed | Dev iteration (use this) | Authoritative (pre-merge only) |
 |---|---|---|
-| **Frontend** (`src/realm_frontend/`) | `mundus deploy --canister frontend --version build` | `publish-build` (`component=frontend`) → `rollout` (`scope=frontend`) |
-| **Backend** (`src/realm_backend/`) | `mundus deploy --canister backend --version build` | `publish-build` (`component=both`) → `rollout` (`scope=backend`) |
-| **Extension** (`extensions/`) | `deploy-files` → re-install the extension | `deploy-files` → rollout (or re-install) |
+| **Frontend** (`src/realm_frontend/`) | Sheet realm: `mundus deploy --canister frontend --version build`. Wizard `/r/<slug>/`: [direct path](#direct-runtime-install-no-file-registry-no-casals-installer) | `publish-build` (`component=frontend`) → `rollout` (`scope=frontend`) |
+| **Backend** (`src/realm_backend/`) | Sheet realm: `mundus deploy --canister backend --version build`. Wizard `/r/<slug>/`: `dfx --run-deprecated canister install --mode upgrade` | `publish-build` (`component=both`) → `rollout` (`scope=backend`) |
+| **Extension** (`extensions/`) | `files publish` → `registry-install` (or `runtime-install` if it has `entry.py`) | `deploy-files` → rollout (or re-install) |
 | **Registry / wizard UI** (GOS platform — live at `staging.gos.earth`) | develop in [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service); Realms pins prebuilt artifacts | fetch → upload → authorize + `realms rollout -t realm-registry` |
 
 ### Registry / wizard UI (staging)
@@ -120,7 +132,7 @@ Realms' pin in `scripts/fetch_gos_artifacts.py` (`GOS_RELEASE`).
 **What Realms agents still do here:**
 
 - Interact with the **live staging registry** (list realms, credits, enqueue deploys).
-- Top up registry credits via [`deploy-mundus`](#fast-realm-deploy-mundus--default) /
+- Top up registry credits via [`deploy-mundus`](#fast-realm-deploy-mundus--sheet-realms-only) /
   `realms mundus deploy` when testing realm provisioning.
 - **Publish + roll out** prebuilt GOS artifacts into test/demo/staging Casals (see
   [Fast infra deploy](#fast-infra-deploy-dev-only) and
@@ -168,10 +180,32 @@ URL when available), hard-refresh, and confirm layout, sidebar, and the changed 
 as expected. Technical checks alone miss visual regressions (e.g. sidebar overlapping main
 content, wrong active highlight, clipped headings).
 
-### Fast realm deploy (mundus) — default
+### Fast realm deploy (mundus) — sheet realms only
 
 Builds from your **local checkout**, uploads artifacts, and upgrades the target realm
-canister(s) via the registry installer. No git push required.
+canister(s) **via the registry installer** (not a direct canister install). No git push
+required. The CLI calls `request_deployment` on the **realm registry**, then polls
+`get_deployment_job_status` on the **realm installer** (`fltjm-…` on test) — not
+Casals, and not a direct `canister install`.
+
+If the job stays `pending` for ~2 minutes, **cancel it** and switch to the
+[direct path](#direct-runtime-install-no-file-registry-no-casals-installer). Do not
+leave a pending job — a later frontend install wipes `/ext/` and extensions 404.
+
+```bash
+# test installer
+dfx --run-deprecated canister call fltjm-tyaaa-aaaap-qunhq-cai cancel_deployment \
+  '("<job_id>")' --network test
+```
+
+| Env | Realm installer (cancel / poll) |
+|---|---|
+| Test | `fltjm-tyaaa-aaaap-qunhq-cai` |
+| Demo | `2s4td-daaaa-aaaao-bazmq-cai` |
+| Staging | `lusjm-wqaaa-aaaau-ago7q-cai` |
+
+Mundus descriptors list **only** Agora, Dominion, and Syntropia. **Never** add a
+temp YAML for a wizard realm such as `realmtest6`.
 
 ```bash
 export TERM=xterm
@@ -339,9 +373,14 @@ Takes ~5 minutes. The version file determines the current version; the workflow 
 
 ## Casals — On-Chain Deploy & Upgrade (preferred path)
 
-> **Two deploy paths on non-production:** authoritative Casals (`publish-build.yml` +
-> `rollout.yml`) and fast off-chain (`deploy-mundus.yml` or `realms mundus deploy`).
-> `deploy-files.yml` publishes extension/codex bundles into `file_registry` for either path.
+> **Three deploy paths on non-production:**
+> 1. **Direct canister install** — `dfx --run-deprecated canister install` /
+>    `registry-install` / `runtime-install`. No installer job. Use for wizard
+>    `/r/<slug>/` realms and whenever someone says **fast off-chain**.
+> 2. **Mundus** (`deploy-mundus.yml` / `realms mundus deploy`) — local build, then
+>    a **realm_installer** job. Sheet realms (Agora/Dominion/Syntropia) only.
+> 3. **Casals** (`publish-build.yml` + `rollout.yml`) — authoritative / pre-merge.
+> `deploy-files.yml` publishes extension/codex bundles into `file_registry`.
 
 [Casals](https://github.com/smart-social-contracts/casals) is the **GaaS platform
 provisioner** — an on-chain canister lifecycle orchestrator from its own repo,
@@ -392,7 +431,9 @@ upgraded. That is expected: the footer is the **GOS registry frontend** (release
 not the realm apps. Bump Realms' `GOS_RELEASE` pin when a new gos-as-a-service release
 lands; realm semver releases and GOS releases are versioned independently.
 
-| Component | Off-chain (`deploy-mundus` / `realms mundus deploy`) | Casals (`publish-build` → `rollout`) |
+Mundus below is the **sheet-realm** off-chain path (still a realm_installer job). Wizard `/r/<slug>/` realms use the [direct path](#direct-runtime-install-no-file-registry-no-casals-installer), not this table.
+
+| Component | Off-chain mundus (`deploy-mundus` / `realms mundus deploy`) | Casals (`publish-build` → `rollout`) |
 |---|---|---|
 | Realm backends + frontends (Dominion, Agora, Syntropia) | Yes | Yes |
 | Extensions/codices on realms | Yes (manifest + `file_registry`) | Yes (arrangement) |
@@ -518,7 +559,8 @@ Config: `environments/{demo,staging,test}.json`. See
 
 | Situation | Path |
 |---|---|
-| Realm UI/backend change (Agora, Dominion, …) | `realms mundus deploy` with `--version build` |
+| Wizard / portal realm (`/r/<slug>/`) or **fast off-chain** | [Direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer) |
+| Realm UI/backend change (Agora, Dominion, Syntropia; installer healthy) | `realms mundus deploy` with `--version build` |
 | Registry/wizard/installer change | Develop in **gos-as-a-service** → release → bump `GOS_RELEASE` → fetch + publish + rollout |
 | Iterating on file_registry / marketplace / dashboard | `scripts/infra_dev_deploy.sh` or `publish_build.py` |
 | Full product stack to demo/staging/test (`*.realmsgos.org`) | `realms env deploy --env <name>` |
@@ -931,6 +973,16 @@ realms files build --extensions public_dashboard \
 
 The `install_extension_from_registry` call goes directly to the realm backend, bypassing the installer service. It fetches the bundle from the file_registry and copies the frontend files to the asset canister in one call.
 
+Same thing via CLI: `realms extension registry-install --canister <backend> --registry <file_registry> --extension-id <ext_id> --version <ver> --network test`.
+Use this (not `runtime-install`) for **frontend-only** extensions such as `public_dashboard` — they have no `entry.py`.
+
+For a wizard realm, look up IDs first (do not use the Agora/Dominion/Syntropia rows below):
+
+```bash
+# test registry backend
+dfx --run-deprecated canister call yhw3g-fyaaa-aaaas-qgorq-cai resolve_slug '("<slug>")' --network test --output json
+```
+
 **Canister IDs for the install call** (from the Known Canister IDs table and the descriptor):
 
 | Realm | Backend canister (call target) | File registry (test) |
@@ -940,9 +992,10 @@ The `install_extension_from_registry` call goes directly to the realm backend, b
 | Syntropia | `m2wv3-uaaaa-aaaah-quoiq-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
 
 **Realm frontend/backend redeploy** (changes to `src/realm_frontend/` or
-`src/realm_backend/`, not just a runtime extension bundle): use
-[`mundus deploy`](#fast-realm-deploy-mundus--default) with `--version build` (~90s).
-See the top of this doc — do not default to Casals for iteration.
+`src/realm_backend/`, not just a runtime extension bundle): sheet realms use
+[`mundus deploy`](#fast-realm-deploy-mundus--sheet-realms-only) with `--version build`
+(~90s). Wizard `/r/<slug>/` realms use the [direct path](#direct-runtime-install-no-file-registry-no-casals-installer).
+Do not default to Casals for iteration.
 
 ```bash
 realms mundus deploy deployment-descriptors/staging-mundus-layered.yml \
@@ -961,21 +1014,22 @@ artifact, not local edits.
 
 ### Direct runtime install (no file registry, no Casals installer)
 
-When iterating on **one specific realm** and the file registry is unavailable,
-out of cycles, or the Casals installer is slow/stuck, push packages straight to
-the realm canister with deprecated dfx (`dfx --run-deprecated`). No publish step, no ICP for the registry, no
-installer polling.
+Push packages straight to the realm canisters with deprecated dfx
+(`dfx --run-deprecated`). **No `request_deployment` job, no realm-installer polling.**
+Use this for wizard `/r/<slug>/` realms, when the installer is slow/stuck, or when
+the user said **fast off-chain**.
 
 | What changed | Direct command | Notes |
 |---|---|---|
 | **Realm backend** (`src/realm_backend/`) | Build WASM locally → `dfx --run-deprecated canister install --mode upgrade` | ~25s; preserves canister state |
-| **Extension** (backend + frontend bundle) | `realms extension runtime-install` | Backend via `install_extension`; frontend via asset-canister `store` |
+| **Extension** (has `backend/entry.py`) | `realms extension runtime-install` | Backend via `install_extension`; frontend via asset-canister `store` |
+| **Extension** (frontend-only, e.g. `public_dashboard`) | `realms extension registry-install` (or `install_extension_from_registry`) | `runtime-install` errors: `entry.py not found` |
 | **Codex** (`kind: codex` packages) | `realms codex runtime-install --run-init` | Backend via `install_extension`; runs codex `init` hook |
 
 > **Not the same as `mundus deploy`.** `realms mundus deploy --version build`
-> builds locally but still submits to the Casals installer canister (artifact
-> upload + verify polling). Use that when the installer is healthy (~90s). Use
-> the pure deprecated dfx path below when you need to skip the installer entirely.
+> builds locally, then calls `request_deployment` on the **realm registry** and
+> polls the **realm installer** (`fltjm-…` on test) — that is GOS `realm_installer`,
+> not Casals. Use mundus only for sheet realms when that installer is healthy (~90s).
 
 **Setup (once per session):**
 
@@ -985,6 +1039,31 @@ export PATH="$PWD/.venv-basilisk/bin:$PATH"   # basilisk refuses to build outsid
 export CANISTER_CANDID_PATH=src/realm_backend/realm_backend.did
 dfx --run-deprecated identity use deployer   # or my_dev_identity_1 on test
 ```
+
+**Wizard / portal realm on test** (e.g. `https://test.gos.earth/r/realmtest6/`):
+
+```bash
+# 1. Resolve canister IDs (test registry)
+dfx --run-deprecated canister call yhw3g-fyaaa-aaaas-qgorq-cai resolve_slug \
+  '("realmtest6")' --network test --output json
+# → backend_canister_id, frontend_canister_id
+
+# 2. Backend WASM — build locally, upgrade directly (~25s)
+python -m basilisk realm_backend src/realm_backend/main.py
+gzip -c .basilisk/realm_backend/realm_backend.wasm > /tmp/realm_backend.wasm.gz
+dfx --run-deprecated canister install <backend-id> \
+  --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network test
+
+# 3. Extensions (one at a time; full resync-frontends can IC0506)
+realms files build --extensions <ext_id>
+realms files publish --network test --extensions-only --extensions <ext_id>
+realms extension registry-install \
+  --canister <backend-id> \
+  --registry uq2mu-kaaaa-aaaah-avqcq-cai \
+  --extension-id <ext_id> --version <ver> --network test
+```
+
+Do **not** wrap those IDs in a homemade mundus YAML.
 
 **Staging canister IDs:**
 
@@ -1037,10 +1116,13 @@ from the table above (same `--source-dir codices/codices/syntropia`).
 
 | Situation | Use |
 |---|---|
+| Wizard / portal realm (`/r/<slug>/`), or user said **fast off-chain** | **Direct runtime install** (this section) — look up IDs with `resolve_slug` |
 | Single-realm dev iteration, registry or installer down | **Direct runtime install** (this section) |
-| Normal fast iteration when installer is healthy | [`mundus deploy`](#fast-realm-deploy-mundus--default) (~90s) |
+| Sheet realm (Agora/Dominion/Syntropia) and installer is healthy | [`mundus deploy`](#fast-realm-deploy-mundus--sheet-realms-only) (~90s) |
 | Extension-only change, registry healthy | [Fast Remote Extension Deploy](#fast-remote-extension-deploy-26s) above |
 | Quarters / multi-realm / pre-merge authoritative deploy | `deploy-files` → registry install → Casals rollout |
+
+`realms extension resync-frontends` can hit `IC0506` (no reply) when many bundles copy at once. Restore the missing extension with `registry-install` instead.
 
 Direct install only affects the canister you target. It does **not** update
 the file registry catalog — run `deploy-files` before merge so other realms and
@@ -1298,13 +1380,19 @@ until updated manually or re-provisioned.
 3. **Agora is prone to timeouts.** Retry a single failed realm: `-f targets=agora`.
 4. **`reinstall` wipes all state.** Use `upgrade` unless you want a clean slate.
 5. **Frontend bundles are built by CI.** The `deploy-files` workflow runs `realms files build` to compile `frontend-rt/` sources before publishing. No need to commit `dist/index.js`.
+6. **Mundus is not “skip the installer.”** It calls `request_deployment` on the realm registry and waits on **realm_installer**. If you meant the direct dfx path, do not write a temp mundus descriptor for a wizard slug.
+7. **A frontend (re)install wipes `/ext/`.** A pending mundus job that later runs will 404 every extension until you `registry-install` / resync them one by one.
+8. **`runtime-install` needs `entry.py`.** Frontend-only extensions (`public_dashboard`) use `registry-install`.
 
 ---
 
 ## Rules
 
-- **Default deploy path for realm changes:** `realms mundus deploy` with
-  `--version build` (~90s). Casals (`publish-build.yml` + `rollout.yml`) is for
+- **Default deploy path for sheet realms** (Agora, Dominion, Syntropia): `realms
+  mundus deploy` with `--version build` (~90s) **only if the installer is healthy**.
+  For a wizard/portal realm (`/r/<slug>/`) or when the user says **fast off-chain**,
+  use [direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer)
+  — never a homemade mundus YAML. Casals (`publish-build.yml` + `rollout.yml`) is for
   **pre-merge / authoritative** rollouts only — frontend rollout there is slow
   (several minutes per realm). **Registry/installer:** fetch prebuilt artifacts from
   gos-as-a-service (`scripts/fetch_gos_artifacts.py`) — **building registry from
