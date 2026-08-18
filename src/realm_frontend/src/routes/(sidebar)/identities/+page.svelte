@@ -4,10 +4,10 @@
 	import { imagesPath } from '../../utils/variables';
 	import { Avatar, Button, Card, Heading, Input, Label, P, Spinner, Toggle } from 'flowbite-svelte';
 	import { FingerprintOutline } from 'flowbite-svelte-icons';
-	import { backend } from '$lib/canisters';
+	import { backend, backendReady } from '$lib/canisters';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
-	import { principal } from '$lib/stores/auth';
+	import { isAuthenticated, principal } from '$lib/stores/auth';
 	import { decryptPrivateData } from '$lib/crypto/vetkeys';
 	import {
 		buildSharePlan,
@@ -47,8 +47,10 @@
 	let privateData: Record<string, string> = {};
 	let privateSaving = false;
 	let privateMessage = '';
-	let encryptionAvailable = false;
+	/** null = not probed yet; do not treat that as "unavailable". */
+	let encryptionAvailable: boolean | null = null;
 	let encryptionError = '';
+	const ANON_PRINCIPAL = '2vxsx-fae';
 
 	// Data sharing (consent-based, via vetKey crypto groups — issue #215)
 	interface ShareAudience {
@@ -76,16 +78,88 @@
 
 	$: displayAvatar = avatarUrl?.trim() || `https://api.dicebear.com/9.x/glass/svg?seed=${$principal}`;
 
+	function signedInPrincipal(): string {
+		const p = (get(principal) as string) || '';
+		return p && p !== ANON_PRINCIPAL ? p : '';
+	}
+
+	async function waitForSignedInActor(timeoutMs = 15000): Promise<string> {
+		await backendReady;
+		const existing = signedInPrincipal();
+		if (existing) return existing;
+
+		return new Promise((resolve) => {
+			const deadline = Date.now() + timeoutMs;
+			let settled = false;
+			let timer: ReturnType<typeof setInterval> | undefined;
+			const finish = (value: string) => {
+				if (settled) return;
+				settled = true;
+				if (timer) clearInterval(timer);
+				unsubAuth();
+				unsubPrincipal();
+				resolve(value);
+			};
+			const unsubAuth = isAuthenticated.subscribe(() => {
+				const p = signedInPrincipal();
+				if (p) finish(p);
+			});
+			const unsubPrincipal = principal.subscribe(() => {
+				const p = signedInPrincipal();
+				if (p) finish(p);
+			});
+			timer = setInterval(() => {
+				const p = signedInPrincipal();
+				if (p) finish(p);
+				else if (Date.now() >= deadline) finish('');
+			}, 200);
+		});
+	}
+
 	onMount(() => {
-		loadPublicData();
-		loadPrivateData();
-		loadIdentityProviders();
-		loadSharingStatus();
+		let cancelled = false;
+		let loadedFor = '';
+
+		async function loadForCurrentUser() {
+			const owner = signedInPrincipal();
+			if (!owner || owner === loadedFor) return;
+			loadedFor = owner;
+			publicDataLoaded = false;
+			privateDataLoaded = false;
+			sharingLoaded = false;
+			encryptionAvailable = null;
+			encryptionError = '';
+			await Promise.all([
+				loadPublicData(),
+				loadPrivateData(),
+				loadIdentityProviders(),
+				loadSharingStatus()
+			]);
+		}
+
+		void (async () => {
+			await waitForSignedInActor();
+			if (!cancelled) await loadForCurrentUser();
+		})();
+
+		const unsub = isAuthenticated.subscribe((auth) => {
+			if (auth && signedInPrincipal()) void loadForCurrentUser();
+		});
+
+		return () => {
+			cancelled = true;
+			unsub();
+		};
 	});
 
 	async function probeEncryption(): Promise<boolean> {
+		const owner = signedInPrincipal();
+		if (!owner) {
+			encryptionError = 'Not signed in';
+			return false;
+		}
 		try {
-			await deriveMySharingVetKey(backend, get(principal) as string);
+			await deriveMySharingVetKey(backend, owner);
 			return true;
 		} catch (e) {
 			console.warn('Encryption probe failed:', e);
@@ -110,11 +184,18 @@
 	}
 
 	async function loadPrivateData() {
+		encryptionAvailable = null;
+		encryptionError = '';
 		try {
+			const owner = signedInPrincipal();
+			if (!owner) {
+				encryptionAvailable = false;
+				encryptionError = 'Not signed in';
+				return;
+			}
 			const statusResponse = await backend.get_my_user_status();
 			if (statusResponse?.success && statusResponse.data?.userGet) {
 				const u = statusResponse.data.userGet;
-				const owner = get(principal) as string;
 				if (u.private_data) {
 					// 1. Preferred: DEK + envelope model (supports sharing).
 					const decrypted = await decryptScopeData<Record<string, string>>(
@@ -144,15 +225,18 @@
 							} catch {
 								privateData = {};
 							}
-							encryptionAvailable = await probeEncryption();
 						}
 					}
-				} else {
-					encryptionAvailable = await probeEncryption();
 				}
+			}
+			if (encryptionAvailable !== true) {
+				encryptionAvailable = await probeEncryption();
 			}
 		} catch (err) {
 			console.error('Error loading private data:', err);
+			if (encryptionAvailable !== true) {
+				encryptionAvailable = await probeEncryption();
+			}
 		} finally {
 			privateDataLoaded = true;
 		}
@@ -160,7 +244,8 @@
 
 	async function loadSharingStatus() {
 		try {
-			const owner = get(principal) as string;
+			const owner = signedInPrincipal();
+			if (!owner) return;
 			const scope = userScope(owner);
 
 			const envResp = await backend.crypto_list_scope_envelopes(scope);
@@ -275,7 +360,11 @@
 		privateSaving = true;
 		privateMessage = '';
 		try {
-			if (!encryptionAvailable) {
+			if (encryptionAvailable !== true) {
+				if (encryptionAvailable === null) {
+					privateMessage = 'Still checking encryption. Try again in a moment.';
+					return;
+				}
 				const response = await backend.update_my_private_data(JSON.stringify(privateData));
 				privateMessage = response?.success
 					? 'Private data saved (unencrypted).'
@@ -283,7 +372,11 @@
 				return;
 			}
 
-			const owner = get(principal) as string;
+			const owner = signedInPrincipal();
+			if (!owner) {
+				privateMessage = 'Not signed in';
+				return;
+			}
 			const scope = userScope(owner);
 			const recipients = selectedRecipients(owner);
 
@@ -318,7 +411,7 @@
 	}
 
 	async function saveSharingSettings() {
-		if (!encryptionAvailable) return;
+		if (encryptionAvailable !== true) return;
 		sharingSaving = true;
 		sharingMessage = '';
 		try {
@@ -381,13 +474,13 @@
 				<span class="ml-3 text-sm text-gray-500">Decrypting private data...</span>
 			</div>
 		{:else}
-			{#if encryptionAvailable}
+			{#if encryptionAvailable === true}
 				<div class="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
 					<p class="text-sm text-green-800 dark:text-green-200">
 						&#x1f512; Your private data is <strong>end-to-end encrypted</strong> using IC vetKeys. Only you can decrypt it.
 					</p>
 				</div>
-			{:else}
+			{:else if encryptionAvailable === false}
 				<div class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
 					<p class="text-sm text-yellow-800 dark:text-yellow-200">
 						Encryption is not available{encryptionError ? `: ${encryptionError}` : ''}. Data will be stored unencrypted.
@@ -418,7 +511,7 @@
 				<p class="mt-3 text-sm {privateMessage.includes('success') ? 'text-green-600' : 'text-red-600'}">{privateMessage}</p>
 			{/if}
 			<div class="mt-4">
-				<Button size="sm" color="alternative" on:click={savePrivateData} disabled={privateSaving}>
+				<Button size="sm" color="alternative" on:click={savePrivateData} disabled={privateSaving || encryptionAvailable === null}>
 					{privateSaving ? 'Saving...' : 'Save'}
 				</Button>
 			</div>
@@ -489,7 +582,11 @@
 			<div class="flex justify-center items-center py-6">
 				<Spinner size="6" />
 			</div>
-		{:else if !encryptionAvailable}
+		{:else if encryptionAvailable === null}
+			<div class="flex justify-center items-center py-6">
+				<Spinner size="6" />
+			</div>
+		{:else if encryptionAvailable === false}
 			<div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
 				<p class="text-sm text-yellow-800 dark:text-yellow-200">
 					Sharing requires encryption, which is not available on this subnet.
