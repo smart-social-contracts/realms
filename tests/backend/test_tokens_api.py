@@ -2,68 +2,19 @@
 
 import importlib.util
 import sys
-import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.backend._cdk_stub import ensure_cdk_stub
+
 # Load api/tokens.py directly — avoids pulling in the full api package graph.
 _tokens_path = (
     Path(__file__).resolve().parents[2] / "src" / "realm_backend" / "api" / "tokens.py"
 )
-_mock_logging = MagicMock()
-_mock_logging.get_logger = lambda name: MagicMock()
-sys.modules.setdefault("ic_python_logging", _mock_logging)
 
-def _ensure_tokens_cdk_stub():
-    import typing
-
-    class Variant(dict):
-        def __init_subclass__(cls, **kwargs):
-            super().__init_subclass__()
-
-    class Record(dict):
-        def __init_subclass__(cls, **kwargs):
-            super().__init_subclass__()
-
-    class _FakeStableMap:
-        def __class_getitem__(cls, _item):
-            return cls
-
-        def __init__(self, *args, **kwargs):
-            self._data = {}
-
-        def insert(self, key, value):
-            self._data[key] = value
-
-        def get(self, key):
-            return self._data.get(key)
-
-    _cdk = sys.modules.get("_cdk")
-    if _cdk is None:
-        _cdk = types.ModuleType("_cdk")
-        sys.modules["_cdk"] = _cdk
-
-    _cdk.Async = getattr(_cdk, "Async", typing.Iterator)
-    _cdk.CallResult = getattr(_cdk, "CallResult", dict)
-    _cdk.Opt = typing.Optional
-    _cdk.Principal = getattr(_cdk, "Principal", MagicMock)
-    _cdk.Record = Record
-    _cdk.Service = getattr(_cdk, "Service", type("Service", (), {}))
-    _cdk.Variant = Variant
-    _cdk.StableBTreeMap = getattr(_cdk, "StableBTreeMap", _FakeStableMap)
-    _cdk.blob = getattr(_cdk, "blob", bytes)
-    _cdk.nat = getattr(_cdk, "nat", int)
-    _cdk.nat8 = getattr(_cdk, "nat8", int)
-    _cdk.null = getattr(_cdk, "null", None)
-    _cdk.service_query = getattr(_cdk, "service_query", lambda fn: fn)
-    _cdk.service_update = getattr(_cdk, "service_update", lambda fn: fn)
-    _cdk.text = getattr(_cdk, "text", str)
-    _cdk.ic = getattr(_cdk, "ic", MagicMock())
-
-
-_ensure_tokens_cdk_stub()
+ensure_cdk_stub()
 
 _spec = importlib.util.spec_from_file_location("realm_api_tokens", _tokens_path)
 tokens = importlib.util.module_from_spec(_spec)
