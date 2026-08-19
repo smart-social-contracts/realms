@@ -409,7 +409,7 @@ def queue_email(notification, event_type: str = "") -> None:
         existing = str(metadata.get("force_email_to", "")).strip()
 
         config = _realm_email_config()
-        if not config.get("enabled"):
+        if config.get("enabled") is False:
             return
 
         resolved = event_type or (

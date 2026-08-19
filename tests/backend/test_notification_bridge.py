@@ -466,6 +466,34 @@ def test_any_notification_is_queued_when_email_enabled(realm):
     assert metadata["email_status"] == "pending"
 
 
+def test_notification_email_defaults_on_without_manifest_config(realm):
+    """Realm email is enabled when manifest has no email.enabled key."""
+    sys.modules["ggg"].Realm.load = lambda key: types.SimpleNamespace(
+        manifest_data=json.dumps({})
+    )
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com", "email_verified": True,
+        "email_notifications_enabled": True,
+    })
+    note = _create_mention(realm)
+    metadata = json.loads(note.metadata)
+    assert metadata["email_status"] == "pending"
+
+
+def test_notification_email_respects_explicit_disable(realm):
+    """Explicit manifest email.enabled=false must block delivery."""
+    sys.modules["ggg"].Realm.load = lambda key: types.SimpleNamespace(
+        manifest_data=json.dumps({"email": {"enabled": False}})
+    )
+    realm.alice.private_data = json.dumps({
+        "email": "alice@example.com", "email_verified": True,
+        "email_notifications_enabled": True,
+    })
+    note = _create_mention(realm)
+    metadata = json.loads(note.metadata)
+    assert metadata.get("email_status") != "pending"
+
+
 def test_request_email_verification_queues_force_email(realm):
     """Requesting verification stores state and queues a force-email."""
     result = call("alice")(
