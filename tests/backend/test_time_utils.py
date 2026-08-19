@@ -10,12 +10,20 @@ import calendar
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src" / "realm_backend"))
+sys.modules["_cdk"] = MagicMock()
 
-from core.time_utils import days_from_epoch, is_leap, parse_timestamp_ms  # noqa: E402
+from core.time_utils import (  # noqa: E402
+    civil_from_days,
+    days_from_epoch,
+    format_timestamp_ms,
+    is_leap,
+    parse_timestamp_ms,
+)
 
 
 def reference_ms(text: str) -> int:
@@ -66,3 +74,41 @@ def test_date_only_is_midnight():
 def test_unparseable_is_zero(bad):
     """Zero rather than an exception: one bad row must not sink a listing."""
     assert parse_timestamp_ms(bad) == 0
+
+
+@pytest.mark.parametrize("ms", [0, -1, -1000])
+def test_format_non_positive_is_empty(ms):
+    assert format_timestamp_ms(ms) == ""
+
+
+@pytest.mark.parametrize("ms", [
+    1,
+    1000,
+    86_400_000,
+    reference_ms("1970-01-01 00:00:00.001"),
+    reference_ms("1999-12-31 23:59:59"),
+    reference_ms("2000-02-29 12:00:00"),
+    reference_ms("2024-02-29 23:59:59.999"),
+    reference_ms("2100-01-01 00:00:00"),
+])
+def test_format_parse_round_trip(ms):
+    assert parse_timestamp_ms(format_timestamp_ms(ms)) == ms
+
+
+@pytest.mark.parametrize("text", [
+    "2000-02-29 12:00:00",
+    "2024-02-29 23:59:59.999",
+    "2025-07-04 08:30:15.500",
+])
+def test_format_matches_stdlib(text):
+    ms = reference_ms(text)
+    expected = text if "." in text else f"{text}.000"
+    assert format_timestamp_ms(ms) == expected
+
+
+@pytest.mark.parametrize("date", [
+    (1970, 1, 1), (1972, 3, 1), (2000, 12, 31), (2024, 2, 29), (2026, 7, 29),
+])
+def test_civil_from_days_matches_days_from_epoch(date):
+    year, month, day = date
+    assert civil_from_days(days_from_epoch(year, month, day)) == (year, month, day)
