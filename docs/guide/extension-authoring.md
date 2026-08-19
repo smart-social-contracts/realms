@@ -192,6 +192,7 @@ These fields apply to all extensions (in-process and sandboxed):
 | `path` | No | Custom route prefix. `null` hides from default routing. Default: `/extensions/{id}`. |
 | `entry_access.default` | No | Default access level for backend functions not listed in `entry_access.functions`. |
 | `entry_points` | No | Backend only — list of Python entry functions in `backend/entry.py`. Not used by the sandboxed frontend directly. |
+| `screenshots` | No | Package-relative image paths for the marketplace listing, e.g. `["screenshots/01-overview.png", "screenshots/02-detail.png"]`. Files live under `screenshots/` in the extension repo. The first entry is the marketplace card thumbnail; the rest form the detail-page gallery. On release, CI captures these automatically via Playwright — authors normally do not hand-place them. Recommended: PNG, 16:9, 1280×720. |
 
 ---
 

@@ -83,23 +83,66 @@ it is easy to unit-test with a fake context.
 const { id, scope } = (await ctx.callSync('create_thing', {...})).data;
 const recipients = [me, ...others];
 const { ciphertext, wrappedDeks } = await ctx.crypto.encryptForRecipients(recipients, data);
-await ctx.callSync('set_ciphertext', { id, ciphertext });
+await ctx.callSync('update_thing', { id, ciphertext });
 await ctx.crypto.grantScope(scope, wrappedDeks);
 
 // Read → decrypt (null if you have no key)
 const plain = await ctx.crypto.decryptScope(scope, ciphertext);
 ```
 
+`encryptForRecipients` always picks a **fresh DEK**. Any time you change the
+ciphertext you must call `grantScope` again with the new `wrappedDeks` — the
+host's `crypto_grant_to_scope_batch` upserts envelopes, replacing each
+recipient's stored `wrapped_dek`. Skipping that step leaves existing recipients
+with a key for the old blob.
+
 Extensions never bundle `@dfinity/vetkeys` — `ctx.crypto` uses the host's copy.
 
 ## Worked examples
 
-- **`department_docs`** — documents shared with a department (`dept:` scope).
-- **`justice_litigation`** — private litigations shared only with the submitter
-  and the justice department (its own `litigation:` scope kind).
+### `department_docs`
 
-Both are fully self-contained: they define their own entity and (for litigation)
-their own scope kind, with zero host edits.
+Documents shared with a department (`dept:` scope). The extension is a thin
+RPC wrapper; access decisions live in `core.dept_docs_bridge`.
+
+**Capabilities** (declared in `manifest.json`):
+
+- `dept_doc.create` — reserve an empty row; returns `id` and `scope`
+- `dept_doc.update` — attach ciphertext and/or retitle (see below)
+- `dept_doc.list` / `dept_doc.get` — read metadata; `get` includes ciphertext
+- `dept_doc.delete` — remove the row; returns the scope for envelope cleanup
+
+**`dept_doc.update`** takes `id` plus optional `title` and/or `ciphertext`. It
+is gated on **manage** (department head or realm admin — the same policy as
+`dept:` scope grants). The response is the document projection **without**
+`ciphertext`; callers that need the blob use `dept_doc.get`.
+
+The extension exposes this as `update_document` in `backend/entry.py`.
+
+```javascript
+// After create_document returns { id, scope }:
+const { ciphertext, wrappedDeks } = await ctx.crypto.encryptForRecipients(recipients, payload);
+await ctx.callSync('update_document', { id, ciphertext });
+await ctx.crypto.grantScope(scope, wrappedDeks);
+
+// Editing: re-encrypt (fresh DEK), persist, then re-grant — same scope, new wraps.
+const { ciphertext, wrappedDeks } = await ctx.crypto.encryptForRecipients(recipients, payload);
+await ctx.callSync('update_document', { id, title, ciphertext });
+await ctx.crypto.grantScope(scope, wrappedDeks);
+```
+
+**Entry access:** `manifest.json` sets `entry_access.default` to
+`document.manage` and overrides `delete_document` to `document.manage` as well
+(so the canister entry gate matches the bridge: heads and admins may delete,
+not only realm admins). The bridge remains authoritative — a member who passes
+the entry gate but is not a department head still gets `PermissionError` from
+`dept_doc.update` / `dept_doc.delete`.
+
+### `justice_litigation`
+
+Private litigations shared only with the submitter and the justice department
+(its own `litigation:` scope kind). Fully self-contained: own entity and scope
+kind, with zero host edits.
 
 ## Notes
 
