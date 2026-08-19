@@ -42,3 +42,25 @@ export function dismissBridgeModal(): void {
 		return null;
 	});
 }
+
+function showCloseModal(
+	title: string,
+	body: string,
+	tone: BridgeModalAction['tone']
+): Promise<void> {
+	return requestBridgeModal({
+		title,
+		body,
+		actions: [{ id: 'close', label: 'Close', tone }],
+	})
+		.then(() => {})
+		.catch(() => {});
+}
+
+export function showBridgeAlert(payload: { title?: string; body: string }): Promise<void> {
+	return showCloseModal(payload.title ?? 'Something went wrong', payload.body, 'secondary');
+}
+
+export function showBridgeNotice(payload: { title?: string; body: string }): Promise<void> {
+	return showCloseModal(payload.title ?? 'Done', payload.body, 'primary');
+}

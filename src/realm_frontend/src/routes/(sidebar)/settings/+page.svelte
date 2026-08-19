@@ -16,6 +16,7 @@
 		type MembershipHit
 	} from '$lib/utils/federatedMembership';
 	import { formatQuarterLabel } from '$lib/utils/quarterLabels';
+	import { showBridgeAlert, showBridgeNotice } from '$lib/stores/bridge-modal';
 
 	const path: string = '/settings';
 	const description: string = 'Settings example - Smart Social Contracts';
@@ -37,8 +38,6 @@
 	let loadingUserStatus = $state(true);
 	let userStatusError = $state('');
 	let savingEmail = $state(false);
-	let emailSaveMessage = $state('');
-	let emailSaveError = $state('');
 
 	const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -51,11 +50,7 @@
 	let loadingMembership = $state(true);
 	let membershipError = $state('');
 	let activatingCanisterId = $state('');
-	let activateError = $state('');
-	let activateSuccess = $state('');
 	let registeringCanisterId = $state('');
-	let registerError = $state('');
-	let registerSuccess = $state('');
 
 	const displayAvatar = $derived(
 		avatarUrl?.trim() || `https://api.dicebear.com/9.x/glass/svg?seed=${principal}`
@@ -170,8 +165,6 @@
 	}
 
 	async function sendVerificationCode() {
-		emailSaveMessage = '';
-		emailSaveError = '';
 		sendingCode = true;
 		try {
 			if (!emailIsValid) {
@@ -185,17 +178,18 @@
 			parseExtensionResponse(result);
 			verificationPending = true;
 			emailVerified = false;
-			emailSaveMessage = 'Check your inbox for a 6-digit code.';
+			void showBridgeNotice({
+				title: 'Verification code sent',
+				body: 'Check your inbox for a 6-digit code.',
+			});
 		} catch (e: any) {
-			emailSaveError = e.message || 'Failed to send verification code.';
+			void showBridgeAlert({ body: e.message || 'Failed to send verification code.' });
 		} finally {
 			sendingCode = false;
 		}
 	}
 
 	async function verifyEmailCode() {
-		emailSaveMessage = '';
-		emailSaveError = '';
 		verifyingCode = true;
 		try {
 			const code = verifyCode.trim();
@@ -211,22 +205,23 @@
 			emailVerified = true;
 			verificationPending = false;
 			verifyCode = '';
-			emailSaveMessage = 'Email address verified.';
+			void showBridgeNotice({
+				title: 'Email verified',
+				body: 'Email address verified.',
+			});
 			try {
 				await loadUserStatus();
 			} catch (e: any) {
 				console.warn('User status refresh after verify failed:', e);
 			}
 		} catch (e: any) {
-			emailSaveError = e.message || 'Failed to verify code.';
+			void showBridgeAlert({ body: e.message || 'Failed to verify code.' });
 		} finally {
 			verifyingCode = false;
 		}
 	}
 
 	async function saveNotificationPreference() {
-		emailSaveMessage = '';
-		emailSaveError = '';
 		savingEmail = true;
 		try {
 			const updated = {
@@ -236,7 +231,10 @@
 			const response = await quarterBackend.update_my_private_data(JSON.stringify(updated));
 			if (response && response.success) {
 				privateData = updated;
-				emailSaveMessage = 'Notification preference saved.';
+				void showBridgeNotice({
+					title: 'Saved',
+					body: 'Notification preference saved.',
+				});
 			} else {
 				throw new Error(
 					(response && !response.success && response.data?.error) ||
@@ -244,7 +242,7 @@
 				);
 			}
 		} catch (e: any) {
-			emailSaveError = e.message || 'Failed to save notification preference.';
+			void showBridgeAlert({ body: e.message || 'Failed to save notification preference.' });
 		} finally {
 			savingEmail = false;
 		}
@@ -260,13 +258,12 @@
 	async function handleActivate(hit: MembershipHit) {
 		if (isSessionActive(hit) || activatingCanisterId) return;
 		activatingCanisterId = hit.canisterId;
-		activateError = '';
-		activateSuccess = '';
-		registerError = '';
-		registerSuccess = '';
 		try {
 			await activateMembership(hit, capitalId, { cache: true });
-			activateSuccess = `Now using ${labelForCanister(hit.canisterId)} for this session.`;
+			void showBridgeNotice({
+				title: 'Quarter switched',
+				body: `Now using ${labelForCanister(hit.canisterId)} for this session.`,
+			});
 			try {
 				await loadUserStatus();
 			} catch (e: any) {
@@ -274,7 +271,7 @@
 				console.warn('User status refresh after activate failed:', e);
 			}
 		} catch (e: any) {
-			activateError = e.message || 'Failed to switch active quarter.';
+			void showBridgeAlert({ body: e.message || 'Failed to switch active quarter.' });
 		} finally {
 			activatingCanisterId = '';
 		}
@@ -283,10 +280,6 @@
 	async function handleRegister(canisterId: string) {
 		if (!canisterId || registeringCanisterId) return;
 		registeringCanisterId = canisterId;
-		registerError = '';
-		registerSuccess = '';
-		activateError = '';
-		activateSuccess = '';
 		try {
 			const profile = primaryJoinProfile();
 			const actor = await createQuarterActor(canisterId);
@@ -294,10 +287,12 @@
 			if (!response?.success) {
 				const err = response?.data?.error || 'Failed to register in this quarter.';
 				if (isInviteRequiredError(err)) {
-					registerError =
-						'This quarter requires an invitation code. Use an invite link to register there, then return here to activate it.';
+					void showBridgeAlert({
+						title: 'Invitation required',
+						body: 'This quarter requires an invitation code. Use an invite link to register there, then return here to activate it.',
+					});
 				} else {
-					registerError = err;
+					void showBridgeAlert({ body: err });
 				}
 				return;
 			}
@@ -313,7 +308,10 @@
 				} as MembershipHit);
 
 			await activateMembership(hit, result.capitalId || capitalId, { cache: true });
-			registerSuccess = `Registered in ${labelForCanister(canisterId)} and set it as the active quarter.`;
+			void showBridgeNotice({
+				title: 'Registered',
+				body: `Registered in ${labelForCanister(canisterId)} and set it as the active quarter.`,
+			});
 			try {
 				await loadUserStatus();
 			} catch (e: any) {
@@ -322,10 +320,12 @@
 		} catch (e: any) {
 			const msg = e.message || 'Failed to register in this quarter.';
 			if (isInviteRequiredError(msg)) {
-				registerError =
-					'This quarter requires an invitation code. Use an invite link to register there, then return here to activate it.';
+				void showBridgeAlert({
+					title: 'Invitation required',
+					body: 'This quarter requires an invitation code. Use an invite link to register there, then return here to activate it.',
+				});
 			} else {
-				registerError = msg;
+				void showBridgeAlert({ body: msg });
 			}
 		} finally {
 			registeringCanisterId = '';
@@ -419,13 +419,6 @@
 				<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
 					Add a personal email address to receive realm notifications. We will send a 6-digit code to verify it. You can turn email delivery off at any time.
 				</p>
-
-				{#if emailSaveMessage}
-					<div class="mb-4 text-sm text-green-600 dark:text-green-400">{emailSaveMessage}</div>
-				{/if}
-				{#if emailSaveError}
-					<div class="mb-4 text-sm text-red-600 dark:text-red-400">{emailSaveError}</div>
-				{/if}
 
 				<div class="space-y-4">
 					<div>
@@ -569,12 +562,6 @@
 					</ul>
 				{/if}
 
-				{#if activateError}
-					<div class="mt-2 text-sm text-red-600 dark:text-red-400">{activateError}</div>
-				{/if}
-				{#if activateSuccess}
-					<div class="mt-2 text-sm text-green-600 dark:text-green-400">{activateSuccess}</div>
-				{/if}
 			</div>
 
 			<!-- 2. Deliberate register in another quarter -->
@@ -620,12 +607,6 @@
 					</ul>
 				{/if}
 
-				{#if registerError}
-					<div class="mt-2 text-sm text-red-600 dark:text-red-400">{registerError}</div>
-				{/if}
-				{#if registerSuccess}
-					<div class="mt-2 text-sm text-green-600 dark:text-green-400">{registerSuccess}</div>
-				{/if}
 			</div>
 		</div>
 		{:else if $realmInfo.quarters.length === 1}

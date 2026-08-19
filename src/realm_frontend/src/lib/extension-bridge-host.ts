@@ -12,7 +12,11 @@ import {
 	type TaskResultPayload,
 } from '@realmsgos/extension-bridge';
 import { showBridgeToast } from '$lib/stores/bridge-toast';
-import { requestBridgeModal, type BridgeModalAction } from '$lib/stores/bridge-modal';
+import {
+	requestBridgeModal,
+	showBridgeAlert,
+	type BridgeModalAction,
+} from '$lib/stores/bridge-modal';
 import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
 
 const NAVIGATE_SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
@@ -140,7 +144,13 @@ export class SandboxBridgeService {
 				}
 				return deps.navigate(path);
 			},
-			onNotify: (level, message) => showBridgeToast(level, message),
+			onNotify: (level, message) => {
+				if (level === 'error') {
+					void showBridgeAlert({ body: message });
+				} else {
+					showBridgeToast(level, message);
+				}
+			},
 			onOpenModal: (payload) =>
 				requestBridgeModal({
 					title: payload.title,

@@ -126,6 +126,19 @@ export interface RealmExtensionContext {
 	/** Navigate to a path within the realm SPA (wraps SvelteKit's goto). */
 	navigate: (path: string) => Promise<void>;
 
+	/** Show a host toast (success/info/warning) or error modal. */
+	notify: (
+		level: 'success' | 'info' | 'warning' | 'error',
+		message: string,
+	) => void;
+
+	/** Open a host confirmation modal; resolves with the chosen action id. */
+	openModal: (payload: {
+		title: string;
+		body: string;
+		actions: { id: string; label: string; tone?: 'primary' | 'secondary' | 'danger' }[];
+	}) => Promise<{ actionId: string }>;
+
 	/** The i18n translate function as a reactive store. Usage: $t('key', { values }). */
 	t: Readable<(key: string, vars?: Record<string, unknown>) => string>;
 	/** The current locale code (e.g. "en", "de"). */

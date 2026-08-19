@@ -26,9 +26,9 @@
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
 	import { getExtensionManifestWithRetry } from '$lib/utils/extension-manifest';
 	import { resolveExtensionMountMode } from '$lib/utils/extension-runtime-mode';
-	import BridgeModalHost from '$lib/components/BridgeModalHost.svelte';
+	import { requestBridgeModal, showBridgeAlert } from '$lib/stores/bridge-modal';
+	import { showBridgeToast } from '$lib/stores/bridge-toast';
 	import type { HostRealmInfo, HostState } from '@realmsgos/extension-bridge';
-	import BridgeToastHost from '$lib/components/BridgeToastHost.svelte';
 	import {
 		deriveMySharingVetKey,
 		unwrapDek,
@@ -206,6 +206,19 @@
 				...infraConfig
 			},
 			navigate: goto,
+			notify: (level, message) => {
+				if (level === 'error') {
+					void showBridgeAlert({ body: message });
+				} else {
+					showBridgeToast(level, message);
+				}
+			},
+			openModal: (payload) =>
+				requestBridgeModal({
+					title: payload.title,
+					body: payload.body,
+					actions: payload.actions,
+				}),
 			t: _,
 			locale,
 			notifications: {
@@ -468,10 +481,6 @@
 	></div>
 </div>
 
-{#if sandboxed && status === 'ready'}
-	<BridgeModalHost />
-	<BridgeToastHost />
-{/if}
 
 <style>
 	.extension-host-fullbleed {
