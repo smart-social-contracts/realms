@@ -131,6 +131,7 @@
     "realm_badge": "realm: {value}",
     "model_badge": "modelo: {value}",
     "no_description": "No se proporcionó descripción.",
+    "screenshots": "Capturas de pantalla",
     "categories": "Categorías",
     "no_namespace": "No hay un espacio de nombres de file_registry asociado a esta publicación.",
     "files_load_error": "No se pudieron cargar los archivos del registro: {error}",

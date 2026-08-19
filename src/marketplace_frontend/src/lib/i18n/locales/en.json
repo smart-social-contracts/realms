@@ -131,6 +131,7 @@
     "realm_badge": "realm: {value}",
     "model_badge": "model: {value}",
     "no_description": "No description provided.",
+    "screenshots": "Screenshots",
     "categories": "Categories",
     "no_namespace": "No file_registry namespace attached to this listing.",
     "files_load_error": "Could not load files from registry: {error}",

@@ -36,6 +36,7 @@ let uploadProgress = {};
 let uploading = false;
 let uploadError = "";
 let listingHref = "";
+let manifestScreenshots = "";
 $: if (kind === "ext" && id.includes("/")) id = id.replace(/\//g, "_");
 const dirInputAttrs = { webkitdirectory: "", directory: "" };
 onMount(async () => {
@@ -113,9 +114,26 @@ function onFiles(e) {
   const input = e.target;
   const list = Array.from(input.files ?? []);
   pickedFiles = list;
+  manifestScreenshots = "";
   if (list.length > 0) {
     const first = list[0].webkitRelativePath;
     baseFolder = first?.split("/")?.[0] ?? "";
+  }
+  if (kind === "ext") void readManifestScreenshots(list);
+}
+async function readManifestScreenshots(list) {
+  const manifestFile = list.find((f) => relativePath(f) === "manifest.json");
+  if (!manifestFile) return;
+  try {
+    const manifest = JSON.parse(await manifestFile.text());
+    if (Array.isArray(manifest.screenshots)) {
+      manifestScreenshots = manifest.screenshots
+        .map((p) => (typeof p === "string" ? p.trim() : ""))
+        .filter(Boolean)
+        .join(",");
+    }
+  } catch {
+    manifestScreenshots = "";
   }
 }
 function relativePath(f) {
@@ -157,6 +175,7 @@ async function startUpload() {
         icon,
         categories: categoriesStr,
         languages: extLanguages,
+        screenshots: manifestScreenshots,
         file_registry_canister_id: registryCanisterId,
         file_registry_namespace: ns,
         download_url: ""
@@ -215,6 +234,7 @@ function reset() {
   listingHref = "";
   showComingSoon = false;
   extLanguages = "en";
+  manifestScreenshots = "";
 }
 </script>
 

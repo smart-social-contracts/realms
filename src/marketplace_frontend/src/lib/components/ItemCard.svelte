@@ -17,9 +17,14 @@ export let categoriesStr = "";
 export let verificationStatus = "unverified";
 export let liked = false;
 export let href;
+export let thumbnail = "";
 </script>
 
-<a class="card" {href}>
+<a class="card" class:has-thumbnail={!!thumbnail} {href}>
+  {#if thumbnail}
+    <img class="thumbnail" src={thumbnail} alt={name} loading="lazy" />
+  {/if}
+  <div class="inner">
   <div class="row top">
     <div class="icon"><ItemIcon {icon} {kind} /></div>
     <div class="title-block">
@@ -54,6 +59,7 @@ export let href;
     </div>
     <LikeButton {kind} itemId={id} {liked} count={likes} />
   </div>
+  </div>
 </a>
 
 <style>
@@ -69,6 +75,25 @@ export let href;
     padding: 1.1rem 1.2rem;
     transition: all 0.15s ease;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+  .card.has-thumbnail {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+  .card:not(.has-thumbnail) .inner { display: contents; }
+  .card.has-thumbnail .inner {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1.1rem 1.2rem;
+  }
+  .thumbnail {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 0.85rem 0.85rem 0 0;
+    display: block;
   }
   .card:hover {
     border-color: var(--border-strong);

@@ -120,6 +120,7 @@ function guessContentType(path: string, fileType: string | undefined): string {
   if (lower.endsWith('.svg')) return 'image/svg+xml';
   if (lower.endsWith('.png')) return 'image/png';
   if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
   if (lower.endsWith('.wasm')) return 'application/wasm';
   if (lower.endsWith('.md') || lower.endsWith('.txt')) return 'text/plain';
   return 'application/octet-stream';

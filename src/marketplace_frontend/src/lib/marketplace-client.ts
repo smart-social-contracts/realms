@@ -44,6 +44,7 @@ export interface ExtensionListing {
   price_e8s: number;
   icon: string;
   categories: string;
+  screenshots: string;
   file_registry_canister_id: string;
   file_registry_namespace: string;
   download_url: string;
@@ -86,6 +87,7 @@ export interface ExtensionInput {
   price_e8s: bigint;
   icon: string;
   categories: string;
+  screenshots: string;
   file_registry_canister_id: string;
   file_registry_namespace: string;
   download_url: string;
@@ -227,6 +229,7 @@ function normExt(raw: any): ExtensionListing {
     price_e8s: toNumber(raw.price_e8s),
     icon: String(raw.icon ?? ''),
     categories: String(raw.categories ?? ''),
+    screenshots: String(raw.screenshots ?? ''),
     file_registry_canister_id: String(raw.file_registry_canister_id ?? ''),
     file_registry_namespace: String(raw.file_registry_namespace ?? ''),
     download_url: String(raw.download_url ?? ''),

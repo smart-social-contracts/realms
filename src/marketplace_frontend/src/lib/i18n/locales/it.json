@@ -131,6 +131,7 @@
     "realm_badge": "realm: {value}",
     "model_badge": "modello: {value}",
     "no_description": "Nessuna descrizione fornita.",
+    "screenshots": "Screenshot",
     "categories": "Categorie",
     "no_namespace": "Nessuno spazio dei nomi file_registry associato a questo annuncio.",
     "files_load_error": "Impossibile caricare i file dal registro: {error}",

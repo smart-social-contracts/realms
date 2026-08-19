@@ -14,7 +14,7 @@ import {
 import {
   marketplaceClient
 } from "$lib/marketplace-client";
-import { categories, formatCount, formatPrice, formatTimeAgo, shortPrincipal } from "$lib/format";
+import { categories, formatCount, formatPrice, formatTimeAgo, screenshots as parseScreenshots, shortPrincipal } from "$lib/format";
 let item = null;
 let loading = true;
 let error = "";
@@ -31,6 +31,11 @@ $: id = decodeURIComponent($page.params.id);
 $: void load(id);
 $: void refreshLikes($isAuthenticated, id);
 $: void refreshPurchased($isAuthenticated, $principalStore?.toText() ?? null, id);
+$: screenshotUrls = item && item.file_registry_canister_id && item.file_registry_namespace
+  ? parseScreenshots(item.screenshots ?? "").map((p) =>
+      fileUrl(item.file_registry_canister_id, item.file_registry_namespace, p),
+    )
+  : [];
 async function load(extId) {
   loading = true;
   error = "";
@@ -172,6 +177,21 @@ function isOwner() {
     {#if activeTab === 'overview'}
       <section class="block" role="tabpanel">
         <p class="description">{item.description || $_('detail.no_description')}</p>
+
+        {#if screenshotUrls.length > 0}
+          <h3>{$_('detail.screenshots')}</h3>
+          <div class="screenshot-gallery">
+            {#each screenshotUrls as url, i}
+              <a class="screenshot-link" href={url} target="_blank" rel="noreferrer">
+                <img
+                  src={url}
+                  alt="{item.name} — {i + 1} / {screenshotUrls.length}"
+                  loading="lazy"
+                />
+              </a>
+            {/each}
+          </div>
+        {/if}
 
         <div class="install-guide">
           <button class="install-toggle" on:click={() => (showInstallGuide = !showInstallGuide)} aria-expanded={showInstallGuide}>
@@ -317,6 +337,26 @@ function isOwner() {
   .block h3 { font-size: 0.85rem; margin: 1.25rem 0 0.5rem; color: var(--text-faint); font-weight: 500; }
   .block p { color: var(--text-muted); margin: 0; line-height: 1.7; }
   .block .description { color: var(--text); }
+  .screenshot-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+  .screenshot-link {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    transition: border-color 0.15s ease;
+  }
+  .screenshot-link:hover { border-color: var(--border-strong); }
+  .screenshot-link img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+  }
   .files {
     width: 100%; border-collapse: collapse;
   }

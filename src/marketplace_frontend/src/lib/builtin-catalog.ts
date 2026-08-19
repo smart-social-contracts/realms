@@ -24,6 +24,7 @@ function ext(
     price_e8s: 0,
     icon,
     categories: cats,
+    screenshots: '',
     file_registry_canister_id: '',
     file_registry_namespace: `ext/${id}/${version}`,
     download_url: `https://github.com/smart-social-contracts/realms/tree/main/extensions/extensions/${id}`,

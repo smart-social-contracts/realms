@@ -131,6 +131,7 @@
     "realm_badge": "realm：{value}",
     "model_badge": "模型：{value}",
     "no_description": "未提供描述。",
+    "screenshots": "截图",
     "categories": "类别",
     "no_namespace": "此条目未关联 file_registry 命名空间。",
     "files_load_error": "无法从注册表加载文件：{error}",

@@ -131,6 +131,7 @@
     "realm_badge": "Realm: {value}",
     "model_badge": "Modell: {value}",
     "no_description": "Keine Beschreibung angegeben.",
+    "screenshots": "Screenshots",
     "categories": "Kategorien",
     "no_namespace": "Dieser Eintrag hat keinen file_registry-Namespace.",
     "files_load_error": "Dateien konnten nicht aus der Registry geladen werden: {error}",

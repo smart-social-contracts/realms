@@ -42,6 +42,14 @@ export function categories(s: string): string[] {
     .filter(Boolean);
 }
 
+export function screenshots(s: string): string[] {
+  if (!s) return [];
+  return s
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
 export function shortPrincipal(p: string): string {
   if (!p || p.length < 16) return p;
   return `${p.slice(0, 5)}…${p.slice(-3)}`;

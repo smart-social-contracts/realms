@@ -6,7 +6,8 @@ import { _ } from "svelte-i18n";
 import ItemCard from "$lib/components/ItemCard.svelte";
 import SkeletonCard from "$lib/components/SkeletonCard.svelte";
 import InfoTip from "$lib/components/InfoTip.svelte";
-import { categories as parseCategories } from "$lib/format";
+import { categories as parseCategories, screenshots as parseScreenshots } from "$lib/format";
+import { fileUrl } from "$lib/file-registry-client";
 import {
   marketplaceClient
 } from "$lib/marketplace-client";
@@ -167,6 +168,11 @@ function categoriesFor(it) {
   if (it.domains) return it.domains;
   return "";
 }
+function extensionThumbnail(ext) {
+  const paths = parseScreenshots(ext.screenshots ?? "");
+  if (!paths.length || !ext.file_registry_canister_id || !ext.file_registry_namespace) return "";
+  return fileUrl(ext.file_registry_canister_id, ext.file_registry_namespace, paths[0]);
+}
 </script>
 
 <section class="landing-hero" aria-labelledby="landing-title">
@@ -299,6 +305,7 @@ function categoriesFor(it) {
         verificationStatus={it.verification_status}
         liked={likedSet.has(`${kind}|${idOf(it)}`)}
         href={hrefOf(kind, it)}
+        thumbnail={kind === "ext" ? extensionThumbnail(it) : ""}
       />
     {/each}
   </div>
