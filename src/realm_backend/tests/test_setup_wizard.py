@@ -85,6 +85,8 @@ class _FakeRealm:
         name="Test Realm",
         manifesto="",
         welcome_message="",
+        accounting_currency="REALMS",
+        accounting_currency_decimals=8,
     ):
         self.status = status
         self.manifest_data = manifest_data
@@ -95,8 +97,8 @@ class _FakeRealm:
         self.name = name
         self.manifesto = manifesto
         self.welcome_message = welcome_message
-        self.accounting_currency = "REALMS"
-        self.accounting_currency_decimals = 8
+        self.accounting_currency = accounting_currency
+        self.accounting_currency_decimals = accounting_currency_decimals
 
     @classmethod
     def load(cls, _realm_id):
@@ -692,6 +694,138 @@ def test_setup_configure_token_returns_ledger_unresolvable(monkeypatch):
     assert result["success"] is False
     assert result["error_code"] == "ledger_unresolvable"
     assert realm.token_canister_id == ""
+
+
+def test_launch_configure_token_refused_without_treasury_ledger():
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {"codex": {"package": "agora", "version": "1.0.0"}},
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _FakeRealm.reset(realm)
+    _authorized_creator(realm)
+
+    result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert result["success"] is False
+    assert result["error_code"] == "no_treasury_token"
+
+
+def test_launch_configure_token_refused_when_ledger_unresolvable(monkeypatch):
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {"token_canister_id": "token-abc"},
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _FakeRealm.reset(realm)
+    _authorized_creator(realm)
+
+    def _unresolved(_ledger, _network):
+        result = {"success": False, "error": "offline"}
+        yield result
+        return result
+
+    tokens_mod = types.ModuleType("api.tokens")
+    tokens_mod.resolve_ledger_token_info = _unresolved
+    tokens_mod.register_treasury_token = lambda *_args, **_kwargs: None
+    monkeypatch.setitem(sys.modules, "api.tokens", tokens_mod)
+
+    result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert result["success"] is False
+    assert result["error_code"] == "no_treasury_token"
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
+
+
+def test_launch_configure_token_proceeds_when_ledger_resolves(monkeypatch):
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {"token_canister_id": "token-abc"},
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _FakeRealm.reset(realm)
+    _authorized_creator(realm)
+
+    def _resolved(_ledger, _network):
+        result = {
+            "success": True,
+            "symbol": "AG",
+            "decimals": 8,
+            "indexer_canister_id": "token-abc",
+        }
+        yield result
+        return result
+
+    tokens_mod = types.ModuleType("api.tokens")
+    tokens_mod.resolve_ledger_token_info = _resolved
+    tokens_mod.register_treasury_token = lambda *_args, **_kwargs: None
+    monkeypatch.setitem(sys.modules, "api.tokens", tokens_mod)
+
+    result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert result["success"] is True
+    assert realm.token_canister_id == "token-abc"
+    assert realm.accounting_currency == "AG"
+    setup_cfg = json.loads(realm.manifest_data)["setup"]
+    assert setup_cfg["token"]["symbol"] == "AG"
+
+
+def test_draft_realm_saveable_without_treasury_ledger():
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data="{}",
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+
+    result = json.loads(
+        setup_api.setup_save_draft(
+            json.dumps(
+                {
+                    "step": "token",
+                    "codex": {"package": "agora", "version": "1.0.0"},
+                }
+            )
+        )
+    )
+    assert result["success"] is True
+    assert realm.status == RealmStatus.SETUP
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
+    assert "token" not in result["draft"]
 
 
 def test_setup_launch_runs_phases_in_order(monkeypatch):

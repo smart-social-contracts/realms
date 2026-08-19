@@ -145,13 +145,19 @@ def readiness_checklist(realm) -> list:
         }
     )
 
-    token_id = (getattr(realm, "token_canister_id", "") or "").strip()
+    currency = ""
+    try:
+        from core.realm_currency import realm_currency
+
+        currency = realm_currency()
+    except Exception:
+        currency = (getattr(realm, "accounting_currency", "") or "").strip()
     items.append(
         {
             "id": "treasury_configured",
             "label": "Currency / treasury configured",
-            "done": bool(token_id),
-            "detail": f"token canister: {token_id or 'not set'}",
+            "done": bool(currency),
+            "detail": f"treasury token: {currency or 'not resolved'}",
         }
     )
 
@@ -318,6 +324,18 @@ def beta_to_production_ready(realm):
     missing = []
     config = _manifest(realm)
     lifecycle = config.get("lifecycle", {}) or {}
+
+    try:
+        from core.realm_currency import realm_currency
+
+        if not realm_currency():
+            missing.append(
+                "Treasury currency not resolved — configure the treasury ledger"
+            )
+    except Exception:
+        missing.append(
+            "Treasury currency not resolved — configure the treasury ledger"
+        )
 
     proving_days = float(lifecycle.get("beta_proving_days") or 0)
     if proving_days > 0:

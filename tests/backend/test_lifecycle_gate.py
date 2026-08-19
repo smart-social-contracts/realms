@@ -57,9 +57,16 @@ class _FakeDept:
 
 
 class _FakeRealm:
-    def __init__(self, manifest):
+    _instance = None
+
+    def __init__(self, manifest, accounting_currency="ckTEST"):
         self.manifest_data = json.dumps(manifest)
         self.status = "beta"
+        self.accounting_currency = accounting_currency
+
+    @classmethod
+    def load(cls, _realm_id):
+        return cls._instance
 
     @classmethod
     def instances(cls):
@@ -69,6 +76,7 @@ class _FakeRealm:
 _ggg = types.ModuleType("ggg")
 _ggg.User = _FakeUser
 _ggg.Department = _FakeDept
+_ggg.Realm = _FakeRealm
 _ggg.ROOT_ORG_NAME = "root"
 
 # The canister CDK is unavailable off-chain; core/__init__ pulls it in via
@@ -123,11 +131,13 @@ def _stub_modules(monkeypatch):
     yield
 
 
-def _realm_with(lifecycle, users=0, root_members=0):
+def _realm_with(lifecycle, users=0, root_members=0, accounting_currency="ckTEST"):
     _FakeUser._users = [_FakeUser(f"principal-{i}") for i in range(users)]
     root = _FakeDept("root", is_root=True, member_count=root_members)
     _FakeDept._depts = [root]
-    return _FakeRealm({"lifecycle": lifecycle}), root
+    realm = _FakeRealm({"lifecycle": lifecycle}, accounting_currency=accounting_currency)
+    _FakeRealm._instance = realm
+    return realm, root
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +198,16 @@ def test_production_blocked_without_root_handover():
     ready, missing = beta_to_production_ready(realm)
     assert not ready
     assert any("Root not handed" in m for m in missing)
+
+
+def test_production_blocked_without_resolved_treasury():
+    realm, root = _realm_with({}, users=5, root_members=2, accounting_currency="")
+    _FakeUser._users[0].departments = [root]
+    _FakeUser._users[1].departments = [root]
+
+    ready, missing = beta_to_production_ready(realm)
+    assert not ready
+    assert any("Treasury currency not resolved" in m for m in missing)
 
 
 def test_production_ready_after_root_handover():

@@ -316,20 +316,42 @@ def _launch_phase_install_codex(realm, draft: dict) -> Async[dict]:
     return {"success": True, "codex": codex_record}
 
 
-def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
+def _treasury_token_refused() -> dict:
+    from core.realm_currency import no_treasury_token_error
+
+    return {"success": False, **no_treasury_token_error()}
+
+
+def _configured_token_canister_id(realm, draft: dict) -> str:
     token = draft.get("token") or {}
-    if not isinstance(token, dict):
-        return {"success": True, "skipped": True}
+    if isinstance(token, dict):
+        token_canister_id = (token.get("token_canister_id") or "").strip()
+        if token_canister_id:
+            return token_canister_id
+    token_canister_id = (getattr(realm, "token_canister_id", "") or "").strip()
+    if token_canister_id:
+        return token_canister_id
+    setup_token = get_setup_config(realm).get("token")
+    if isinstance(setup_token, dict):
+        return (setup_token.get("token_canister_id") or "").strip()
+    return ""
 
-    token_canister_id = (token.get("token_canister_id") or "").strip()
+
+def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
+    from core.realm_currency import realm_currency
+
+    token_canister_id = _configured_token_canister_id(realm, draft)
     if not token_canister_id:
-        return {"success": True, "skipped": True}
+        return _treasury_token_refused()
 
-    if (getattr(realm, "token_canister_id", "") or "").strip() == token_canister_id:
+    if realm_currency() and (getattr(realm, "token_canister_id", "") or "").strip() == token_canister_id:
         token_record = get_setup_config(realm).get("token")
         if isinstance(token_record, dict) and token_record.get("token_canister_id") == token_canister_id:
             return {"success": True, "skipped": True, "token": token_record}
 
+    token = draft.get("token") or {}
+    if not isinstance(token, dict):
+        token = {}
     result = json.loads(
         (yield from setup_configure_token(
             json.dumps(
@@ -343,6 +365,8 @@ def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
             )
         ))
     )
+    if not result.get("success"):
+        return _treasury_token_refused()
     return result
 
 
@@ -435,6 +459,7 @@ def _launch_phase_apply_identity(realm, draft: dict) -> dict:
 
 
 def _launch_phase_complete(realm, draft: dict) -> Async[dict]:
+    from core.realm_currency import realm_currency
     from ggg.governance.realm import RealmStatus
 
     if not is_setup_stage(realm):
@@ -444,6 +469,9 @@ def _launch_phase_complete(realm, draft: dict) -> Async[dict]:
     codex = setup.get("codex") or draft.get("codex")
     if not isinstance(codex, dict) or not (codex.get("package") or codex.get("version")):
         return {"success": False, "error": "A codex must be installed before completing setup"}
+
+    if not realm_currency():
+        return _treasury_token_refused()
 
     identity = draft.get("identity")
     if isinstance(identity, dict):
@@ -651,6 +679,8 @@ def setup_configure_token(args_json: str) -> Async[str]:
     token_record["indexer_canister_id"] = indexer
 
     realm.token_canister_id = token_canister_id
+    realm.accounting_currency = sym[:16]
+    realm.accounting_currency_decimals = decimals
     update_setup_config(realm, {"token": token_record})
 
     try:
@@ -774,6 +804,11 @@ def complete_setup() -> Async[str]:
     codex = setup.get("codex")
     if not isinstance(codex, dict) or not (codex.get("package") or codex.get("version")):
         return json.dumps({"success": False, "error": "A codex must be installed before completing setup"})
+
+    from core.realm_currency import no_treasury_token_error, realm_currency
+
+    if not realm_currency():
+        return json.dumps({"success": False, **no_treasury_token_error()})
 
     identity = setup.get("identity")
     if isinstance(identity, dict):
