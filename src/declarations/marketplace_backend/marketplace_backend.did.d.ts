@@ -29,6 +29,8 @@ export interface Archive { 'canister_id' : Principal }
 export interface Archives { 'archives' : Array<Archive> }
 export interface Asset { 'class' : AssetClass, 'symbol' : string }
 export interface AssetCanisterService {
+  'delete_asset' : ActorMethod<[_DeleteAssetArg], undefined>,
+  'list' : ActorMethod<[_ListAssetsArg], string>,
   'store' : ActorMethod<[_AssetStoreArg], undefined>,
 }
 export type AssetClass = { 'Cryptocurrency' : null } |
@@ -317,6 +319,7 @@ export interface ExtensionInput {
   'download_url' : string,
   'description' : string,
   'version' : string,
+  'screenshots' : string,
   'file_registry_canister_id' : string,
   'price_e8s' : bigint,
   'file_registry_namespace' : string,
@@ -341,6 +344,7 @@ export interface ExtensionListing {
   'verification_status' : string,
   'likes' : bigint,
   'version' : string,
+  'screenshots' : string,
   'is_active' : boolean,
   'file_registry_canister_id' : string,
   'price_e8s' : bigint,
@@ -696,6 +700,9 @@ export interface PurchaseRecord {
 export interface QuarterBootstrapService {
   'bootstrap_as_quarter' : ActorMethod<[string], string>,
 }
+export interface QuarterCodexSyncService {
+  'request_codex_sync' : ActorMethod<[string], string>,
+}
 export interface QuarterDirectoryService {
   'get_quarter_directory' : ActorMethod<[], string>,
 }
@@ -958,6 +965,7 @@ export interface _AssetStoreArg {
   'content_type' : string,
   'content_encoding' : string,
 }
+export interface _DeleteAssetArg { 'key' : string }
 export interface _GetAccountTransactionsArgs {
   'max_results' : bigint,
   'start' : [] | [bigint],
@@ -990,6 +998,10 @@ export interface _IcrcTransactionWithId {
   'transaction' : _IcrcTransaction,
 }
 export interface _IcrcTransfer { 'to' : _IcrcAccount, 'amount' : bigint }
+export interface _ListAssetsArg {
+  'start' : [] | [bigint],
+  'length' : [] | [bigint],
+}
 export interface _SERVICE {
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
   'add_reviewer' : ActorMethod<[string], GenericResult>,

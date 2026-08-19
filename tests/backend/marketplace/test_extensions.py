@@ -15,6 +15,7 @@ def _create(**overrides):
         price_e8s=0,
         icon="🗳️",
         categories="public_services",
+        screenshots="",
         file_registry_canister_id="fr-1",
         file_registry_namespace="ext/voting/0.1.0",
         download_url="",
@@ -56,6 +57,7 @@ def test_update_requires_owner(as_caller):
         price_e8s=0,
         icon="",
         categories="other",
+        screenshots="",
         file_registry_canister_id="fr-1",
         file_registry_namespace="ext/voting/0.2.0",
     )

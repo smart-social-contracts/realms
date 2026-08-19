@@ -35,6 +35,13 @@ class ExtensionListingEntity(Entity, TimestampedMixin):
     ``ext/{extension_id}/{version}``; we only store the pointer + metadata.
     """
     __alias__ = "extension_id"
+    __version__ = 2
+
+    @classmethod
+    def migrate(cls, obj, from_version, to_version):
+        if from_version < 2:
+            obj.setdefault("screenshots", "")
+        return obj
 
     extension_id              = String(max_length=128)
     developer                 = String(max_length=128)   # principal text
@@ -44,6 +51,7 @@ class ExtensionListingEntity(Entity, TimestampedMixin):
     price_e8s                 = Integer()                 # display only — no on-chain transfer
     icon                      = String(max_length=64)     # short emoji / lucide name
     categories                = String(max_length=256)    # comma-separated
+    screenshots               = String(max_length=1024)   # comma-separated registry-relative paths; first is the card thumbnail
     file_registry_canister_id = String(max_length=64)
     file_registry_namespace   = String(max_length=256)
     download_url              = String(max_length=512)    # legacy / fallback

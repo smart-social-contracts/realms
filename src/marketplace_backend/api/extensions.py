@@ -47,6 +47,7 @@ def _to_dict(ext: ExtensionListingEntity) -> Dict[str, Any]:
         "price_e8s": int(ext.price_e8s or 0),
         "icon": str(ext.icon or ""),
         "categories": str(ext.categories or ""),
+        "screenshots": str(ext.screenshots or ""),
         "file_registry_canister_id": str(ext.file_registry_canister_id or ""),
         "file_registry_namespace": str(ext.file_registry_namespace or ""),
         "download_url": str(ext.download_url or ""),
@@ -80,6 +81,7 @@ def create_extension(
     price_e8s: int,
     icon: str,
     categories: str,
+    screenshots: str,
     file_registry_canister_id: str,
     file_registry_namespace: str,
     download_url: str = "",
@@ -116,6 +118,7 @@ def create_extension(
         existing.price_e8s = int(price_e8s)
         existing.icon = icon
         existing.categories = categories
+        existing.screenshots = screenshots
         existing.file_registry_canister_id = file_registry_canister_id
         existing.file_registry_namespace = file_registry_namespace
         existing.download_url = download_url
@@ -145,6 +148,7 @@ def create_extension(
         price_e8s=int(price_e8s),
         icon=icon,
         categories=categories,
+        screenshots=screenshots,
         file_registry_canister_id=file_registry_canister_id,
         file_registry_namespace=file_registry_namespace,
         download_url=download_url,

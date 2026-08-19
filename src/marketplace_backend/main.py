@@ -399,6 +399,7 @@ class ExtensionInput(Record):
     price_e8s: nat64
     icon: text
     categories: text
+    screenshots: text
     file_registry_canister_id: text
     file_registry_namespace: text
     download_url: text
@@ -413,6 +414,7 @@ class ExtensionListing(Record):
     price_e8s: nat64
     icon: text
     categories: text
+    screenshots: text
     file_registry_canister_id: text
     file_registry_namespace: text
     download_url: text
@@ -631,6 +633,7 @@ def _ext_listing_record(d: dict) -> "ExtensionListing":
         price_e8s=int(d["price_e8s"]),
         icon=d["icon"],
         categories=d["categories"],
+        screenshots=d["screenshots"],
         file_registry_canister_id=d["file_registry_canister_id"],
         file_registry_namespace=d["file_registry_namespace"],
         download_url=d.get("download_url", ""),
@@ -929,6 +932,7 @@ def _ext_input_to_kwargs(ext: ExtensionInput) -> dict:
         "price_e8s": int(ext["price_e8s"]),
         "icon": ext["icon"],
         "categories": ext["categories"],
+        "screenshots": ext["screenshots"],
         "file_registry_canister_id": ext["file_registry_canister_id"],
         "file_registry_namespace": ext["file_registry_namespace"],
         "download_url": ext.get("download_url", ""),
