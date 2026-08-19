@@ -667,6 +667,33 @@ def test_setup_launch_requires_codex_in_draft():
     assert "codex" in result["error"].lower()
 
 
+def test_setup_configure_token_returns_ledger_unresolvable(monkeypatch):
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _authorized_creator(realm)
+
+    def _unresolved(_ledger, _network):
+        result = {"success": False, "error": "offline"}
+        yield result
+        return result
+
+    tokens_mod = types.ModuleType("api.tokens")
+    tokens_mod.resolve_ledger_token_info = _unresolved
+    tokens_mod.register_treasury_token = lambda *_args, **_kwargs: None
+    monkeypatch.setitem(sys.modules, "api.tokens", tokens_mod)
+
+    result = json.loads(
+        _run_async(
+            setup_api.setup_configure_token(
+                json.dumps({"token_canister_id": "2rqin-xaaaa-aaaah-qunsq-cai"})
+            )
+        )
+    )
+    assert result["success"] is False
+    assert result["error_code"] == "ledger_unresolvable"
+    assert realm.token_canister_id == ""
+
+
 def test_setup_launch_runs_phases_in_order(monkeypatch):
     setup_api = _import_setup_api()
     _clear_draft_assets(setup_api)

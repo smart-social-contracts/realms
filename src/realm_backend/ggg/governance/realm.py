@@ -49,7 +49,7 @@ class Realm(Entity, TimestampedMixin):
     treasury = OneToOne("Treasury", "realm")
     funds = OneToMany("Fund", "realm")
     justice_systems = OneToMany("JusticeSystem", "realm")
-    accounting_currency = String(max_length=16, default="ckBTC")
+    accounting_currency = String(max_length=16, default="")
     accounting_currency_decimals = Integer(default=8)
     principal_id = String(max_length=64)
     # Canister IDs for this realm (set post-deployment via set_canister_config)

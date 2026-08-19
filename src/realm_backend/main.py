@@ -1233,7 +1233,6 @@ def _set_canister_config_impl(
     can_test_mode=None,
     accounting_currency=None,
     accounting_currency_decimals=None,
-    treasury_token_symbol=None,
     treasury_token_indexer_id=None,
     treasury_token_type=None,
 ) -> RealmResponse:
@@ -1334,23 +1333,24 @@ def _set_canister_config_impl(
         if token_canister_id:
             from api.tokens import register_treasury_token
 
-            sym = (
-                str(treasury_token_symbol or "").strip()
-                or getattr(realm, "accounting_currency", "")
-                or "REALMS"
-            )
-            indexer = (
-                str(treasury_token_indexer_id or "").strip() or str(token_canister_id)
-            )
-            decimals = int(getattr(realm, "accounting_currency_decimals", 8) or 8)
-            token_type = str(treasury_token_type or "realm").strip() or "realm"
-            register_treasury_token(
-                symbol=sym,
-                ledger_canister_id=str(token_canister_id),
-                indexer_canister_id=indexer,
-                decimals=decimals,
-                token_type=token_type,
-            )
+            sym = str(getattr(realm, "accounting_currency", "") or "").strip()
+            if sym:
+                indexer = (
+                    str(treasury_token_indexer_id or "").strip() or str(token_canister_id)
+                )
+                decimals = int(getattr(realm, "accounting_currency_decimals", 8) or 8)
+                token_type = str(treasury_token_type or "realm").strip() or "realm"
+                register_treasury_token(
+                    symbol=sym,
+                    ledger_canister_id=str(token_canister_id),
+                    indexer_canister_id=indexer,
+                    decimals=decimals,
+                    token_type=token_type,
+                )
+            else:
+                logger.warning(
+                    "Treasury token was not registered because ledger symbol is unknown"
+                )
 
         logger.info(
             f"Updated canister config: frontend={frontend_canister_id}, "
@@ -1398,7 +1398,7 @@ def set_canister_config(
 
 @update
 @require(Operations.REALM_ADMIN)
-def set_canister_config_json(args: text) -> text:
+def set_canister_config_json(args: text) -> Async[text]:
     """JSON text-in / text-out variant of set_canister_config.
 
     Lets a single declarative call configure a realm post-deploy — e.g. a Casals
@@ -1408,11 +1408,11 @@ def set_canister_config_json(args: text) -> text:
 
     Args (JSON, all optional): {frontend_canister_id, token_canister_id,
     nft_canister_id, file_registry_canister_id, marketplace_canister_id,
-    installed_version, network, accounting_currency, accounting_currency_decimals,
-    treasury_token_symbol, treasury_token_indexer_id, treasury_token_type,
+    installed_version, network, treasury_token_indexer_id, treasury_token_type,
     can_test_mode (bool), and either test_flags_json (a JSON string) or
     test_flags (a JSON object, e.g. {"test_mode":true,"demo_data":true})}.
     can_test_mode may also appear inside test_flags (non-flag); top-level wins.
+    Treasury symbol/decimals are resolved from token_canister_id via ICRC-1.
 
     Returns: {"success": bool, "message"?: str, "error"?: str}.
     """
@@ -1431,6 +1431,34 @@ def set_canister_config_json(args: text) -> text:
                 if can_test_mode is None and "can_test_mode" in parsed_flags:
                     can_test_mode = parsed_flags.pop("can_test_mode")
                 flags = json.dumps(parsed_flags)
+
+        accounting_currency = None
+        accounting_currency_decimals = None
+        treasury_token_indexer_id = None
+        token_canister_id = params.get("token_canister_id")
+        if token_canister_id and str(token_canister_id).strip():
+            from ggg import Realm
+            from api.tokens import resolve_ledger_token_info
+
+            network = ""
+            realm = Realm.load("1")
+            if realm:
+                network = getattr(realm, "network", "") or ""
+            resolved = yield from resolve_ledger_token_info(
+                str(token_canister_id).strip(), network
+            )
+            if not resolved.get("success"):
+                return json.dumps(
+                    {
+                        "success": False,
+                        "error": resolved.get("error", "Could not resolve ledger"),
+                        "error_code": "ledger_unresolvable",
+                    }
+                )
+            accounting_currency = resolved["symbol"]
+            accounting_currency_decimals = resolved["decimals"]
+            treasury_token_indexer_id = resolved.get("indexer_canister_id")
+
         resp = _set_canister_config_impl(
             frontend_canister_id=params.get("frontend_canister_id"),
             token_canister_id=params.get("token_canister_id"),
@@ -1441,10 +1469,9 @@ def set_canister_config_json(args: text) -> text:
             network=params.get("network"),
             test_flags_json=flags,
             can_test_mode=can_test_mode,
-            accounting_currency=params.get("accounting_currency"),
-            accounting_currency_decimals=params.get("accounting_currency_decimals"),
-            treasury_token_symbol=params.get("treasury_token_symbol"),
-            treasury_token_indexer_id=params.get("treasury_token_indexer_id"),
+            accounting_currency=accounting_currency,
+            accounting_currency_decimals=accounting_currency_decimals,
+            treasury_token_indexer_id=treasury_token_indexer_id,
             treasury_token_type=params.get("treasury_token_type"),
         )
         out = _realm_response_to_json_dict(resp)
@@ -4027,7 +4054,7 @@ def create_foundational_objects() -> void:
             name=realm_name,
             manifesto=realm_manifesto,
             welcome_message=realm_welcome_message,
-            accounting_currency=acct_currency_config.get("symbol", "ckBTC"),
+            accounting_currency=acct_currency_config.get("symbol", ""),
             accounting_currency_decimals=acct_currency_config.get("decimals", 8),
             principal_id="",
             manifest_data=manifest_json_str,
@@ -4083,9 +4110,14 @@ def create_foundational_objects() -> void:
         try:
             from ic_basilisk_toolkit.wallet import Wallet
             wallet = Wallet()
-            acct_currency = getattr(realm, "accounting_currency", "ckBTC") or "ckBTC"
-            wallet.register_well_known_tokens(acct_currency)
-            logger.info(f"Registered accounting currency token: {acct_currency}")
+            acct_currency = getattr(realm, "accounting_currency", "") or ""
+            if acct_currency:
+                wallet.register_well_known_tokens(acct_currency)
+                logger.info(f"Registered accounting currency token: {acct_currency}")
+            else:
+                logger.info(
+                    "Skipped accounting currency token registration (no symbol configured)"
+                )
         except Exception as tok_err:
             logger.warning(f"Could not register accounting currency token: {tok_err}")
 
@@ -4178,13 +4210,14 @@ def initialize() -> void:
         from ggg import Realm
         wallet = Wallet()
         realm = Realm.load("1")
-        acct_currency = (
-            getattr(realm, "accounting_currency", "ckBTC") or "ckBTC"
-            if realm
-            else "ckBTC"
-        )
-        wallet.register_well_known_tokens(acct_currency)
-        logger.info(f"Ensured accounting currency token is registered: {acct_currency}")
+        acct_currency = getattr(realm, "accounting_currency", "") or "" if realm else ""
+        if acct_currency:
+            wallet.register_well_known_tokens(acct_currency)
+            logger.info(f"Ensured accounting currency token is registered: {acct_currency}")
+        else:
+            logger.info(
+                "Skipped accounting currency token registration (no symbol configured)"
+            )
     except Exception as e:
         logger.warning(f"Could not register accounting currency token: {e}")
 
@@ -5631,7 +5664,7 @@ def resolve_token_ledger(ledger_canister_id: text) -> Async[text]:
 
 
 @update
-def update_realm_config(config_json: str) -> str:
+def update_realm_config(config_json: str) -> Async[text]:
     """
     Update the realm configuration (name, manifesto, welcome_message,
     branding, registration, and infrastructure settings).
@@ -5694,6 +5727,34 @@ def update_realm_config(config_json: str) -> str:
                 "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE_TRUST_POLICY}'",
                 "denied_operation": Operations.REALM_CONFIGURE_TRUST_POLICY,
             })
+
+        config.pop("accounting_currency", None)
+        config.pop("accounting_currency_decimals", None)
+
+        token_canister_id = str(config.get("token_canister_id") or "").strip()
+        if token_canister_id:
+            from api.tokens import resolve_ledger_token_info
+
+            network = ""
+            realm = Realm.load("1")
+            if realm:
+                network = getattr(realm, "network", "") or ""
+            resolved = yield from resolve_ledger_token_info(token_canister_id, network)
+            if not resolved.get("success"):
+                return json.dumps(
+                    {
+                        "success": False,
+                        "error": resolved.get("error", "Could not resolve ledger"),
+                        "error_code": "ledger_unresolvable",
+                    }
+                )
+            config["accounting_currency"] = resolved["symbol"]
+            config["accounting_currency_decimals"] = resolved["decimals"]
+            client_indexer = str(config.get("token_indexer_canister_id") or "").strip()
+            if not client_indexer:
+                config["token_indexer_canister_id"] = resolved.get(
+                    "indexer_canister_id"
+                )
 
         # Layer 2 — org policy (issue #262). Realm configuration is a
         # constitutional change: when the root policy is not 1/1, it must go
@@ -6920,12 +6981,12 @@ def setup_install_codex(args: text) -> Async[text]:
 
 
 @update
-def setup_configure_token(args: text) -> text:
+def setup_configure_token(args: text) -> Async[text]:
     """Record token configuration during setup (existing ledger only in v1)."""
     try:
         from api.setup import setup_configure_token as _configure
 
-        return _configure(args)
+        return (yield from _configure(args))
     except Exception as e:
         logger.error(f"setup_configure_token error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})

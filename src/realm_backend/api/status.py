@@ -215,15 +215,13 @@ def get_status() -> "dict[str, Any]":
         logger.warning(f"Could not load registries: {e}")
 
     # Accounting currency
-    accounting_currency = "ckBTC"
+    accounting_currency = ""
     accounting_currency_decimals = 8
     token_indexer_canister_id = ""
     try:
         first_realm = Realm.load("1")
         if first_realm:
-            accounting_currency = (
-                getattr(first_realm, "accounting_currency", None) or "ckBTC"
-            )
+            accounting_currency = getattr(first_realm, "accounting_currency", "") or ""
             accounting_currency_decimals = (
                 getattr(first_realm, "accounting_currency_decimals", None) or 8
             )

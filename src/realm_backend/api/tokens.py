@@ -468,13 +468,13 @@ def resolve_ledger_token_info(ledger_canister_id: str, network: str = "") -> "As
         logger.warning(f"ICRC-1 metadata query failed for {ledger}: {e}")
 
     shared = resolve_shared_token_by_ledger(ledger, network)
-    if shared:
-        symbol = (shared.get("symbol") or shared.get("name") or "TOKEN")[:16]
+    symbol = str((shared or {}).get("symbol") or (shared or {}).get("name") or "").strip()
+    if symbol:
         decimals = int(shared.get("decimals", 8))
         return {
             "success": True,
             "ledger_canister_id": ledger,
-            "symbol": symbol,
+            "symbol": symbol[:16],
             "decimals": decimals,
             "indexer_canister_id": (shared.get("indexer") or ledger).strip(),
             "source": "shared_registry_fallback",
@@ -484,34 +484,6 @@ def resolve_ledger_token_info(ledger_canister_id: str, network: str = "") -> "As
     return {
         "success": False,
         "error": ledger_error or "Could not resolve ledger metadata",
-    }
-
-
-def resolve_ledger_token_info_sync(ledger_canister_id: str, network: str = "") -> dict:
-    """Legacy sync resolver — shared registry only (no inter-canister query)."""
-    ledger = (ledger_canister_id or "").strip()
-    if not ledger:
-        return {"success": False, "error": "ledger_canister_id is required"}
-    if not _valid_canister_id(ledger):
-        return {"success": False, "error": "Invalid ledger canister ID format"}
-
-    shared = resolve_shared_token_by_ledger(ledger, network)
-    if not shared:
-        return {
-            "success": False,
-            "error": "Unknown ledger — not in shared token registry for this network",
-        }
-
-    symbol = (shared.get("symbol") or shared.get("name") or "TOKEN")[:16]
-    decimals = int(shared.get("decimals", 8))
-    indexer = (shared.get("indexer") or ledger).strip()
-    return {
-        "success": True,
-        "ledger_canister_id": ledger,
-        "symbol": symbol,
-        "decimals": decimals,
-        "indexer_canister_id": indexer,
-        "source": "shared_registry",
     }
 
 
@@ -540,17 +512,17 @@ def register_treasury_token(
             existing.token_type = token_type
             existing.enabled = "true"
             logger.info(f"Updated treasury token {sym} -> {ledger}")
-            return
-        token = Token(
-            name=sym,
-            ledger=ledger,
-            indexer=indexer,
-            decimals=int(decimals),
-        )
-        token.symbol = sym
-        token.token_type = token_type
-        token.enabled = "true"
-        logger.info(f"Registered treasury token {sym} -> {ledger}")
+        else:
+            token = Token(
+                name=sym,
+                ledger=ledger,
+                indexer=indexer,
+                decimals=int(decimals),
+            )
+            token.symbol = sym
+            token.token_type = token_type
+            token.enabled = "true"
+            logger.info(f"Registered treasury token {sym} -> {ledger}")
 
         # The vault focuses on the realm's treasury currency; disable other
         # registered tokens so they are not refreshed by default.

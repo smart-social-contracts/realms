@@ -232,7 +232,7 @@ def apply_realm_config(config: dict) -> dict:
         if not symbol:
             return {
                 "success": False,
-                "error": "accounting_currency must be a non-empty symbol (e.g. ckBTC)",
+                "error": "accounting_currency must be a non-empty symbol",
             }
         if len(symbol) > 16:
             return {
@@ -278,20 +278,23 @@ def apply_realm_config(config: dict) -> dict:
     ):
         from api.tokens import register_treasury_token
 
-        sym = str(getattr(realm, "accounting_currency", "") or "").strip() or "REALMS"
-        indexer = str(config.get("token_indexer_canister_id") or "").strip()
-        if not indexer:
-            from api.tokens import get_treasury_token_indexer
+        sym = str(getattr(realm, "accounting_currency", "") or "").strip()
+        if sym:
+            indexer = str(config.get("token_indexer_canister_id") or "").strip()
+            if not indexer:
+                from api.tokens import get_treasury_token_indexer
 
-            indexer = get_treasury_token_indexer(sym, token_ledger)
-        decimals = int(getattr(realm, "accounting_currency_decimals", 8) or 8)
-        register_treasury_token(
-            symbol=sym,
-            ledger_canister_id=token_ledger,
-            indexer_canister_id=indexer,
-            decimals=decimals,
-        )
-        updated_fields.append(f"treasury_token={sym}@{token_ledger}")
+                indexer = get_treasury_token_indexer(sym, token_ledger)
+            decimals = int(getattr(realm, "accounting_currency_decimals", 8) or 8)
+            register_treasury_token(
+                symbol=sym,
+                ledger_canister_id=token_ledger,
+                indexer_canister_id=indexer,
+                decimals=decimals,
+            )
+            updated_fields.append(f"treasury_token={sym}@{token_ledger}")
+        else:
+            updated_fields.append("treasury_token=skipped(no symbol)")
 
     logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
     return {"success": True, "updated_fields": updated_fields}
