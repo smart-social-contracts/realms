@@ -439,3 +439,29 @@ def test_find_executed_is_denied_without_the_capability():
         handler("codex-x", "proposal.find_executed", {
             "target_principal": "u1", "profile_name": "admin",
         })
+
+
+# ---------------------------------------------------------------------------
+# currency.get
+# ---------------------------------------------------------------------------
+
+
+def test_currency_get_prefers_config_pin(monkeypatch):
+    monkeypatch.setattr(
+        "core.codex_hooks.get_config",
+        lambda: {"currency": {"symbol": "DOM"}},
+    )
+    monkeypatch.setattr("core.realm_currency.realm_currency", lambda: "ckUSDC")
+    assert codex_bridge._v_currency_get() == "DOM"
+
+
+def test_currency_get_uses_realm_when_config_unpinned(monkeypatch):
+    monkeypatch.setattr("core.codex_hooks.get_config", lambda: {})
+    monkeypatch.setattr("core.realm_currency.realm_currency", lambda: "ckUSDC")
+    assert codex_bridge._v_currency_get() == "ckUSDC"
+
+
+def test_currency_get_returns_empty_when_unresolved(monkeypatch):
+    monkeypatch.setattr("core.codex_hooks.get_config", lambda: {})
+    monkeypatch.setattr("core.realm_currency.realm_currency", lambda: "")
+    assert codex_bridge._v_currency_get() == ""

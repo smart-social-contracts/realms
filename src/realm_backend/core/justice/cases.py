@@ -337,6 +337,7 @@ def _penalty_specs(penalties: Optional[list]) -> List[Dict[str, Any]]:
     particular is not settable: a penalty starts pending and gets executed or
     waived through the verbs that check ``fine.apply``.
     """
+    from core.realm_currency import no_treasury_token_error, realm_currency
     from ggg import PenaltyType, User
 
     allowed = {"type", "penalty_type", "amount", "currency", "description",
@@ -359,11 +360,24 @@ def _penalty_specs(penalties: Optional[list]) -> List[Dict[str, Any]]:
             amount = float(raw.get("amount", 0) or 0)
         except (TypeError, ValueError):
             raise ValueError("penalty amount must be a number")
+        penalty_type = (
+            raw.get("type") or raw.get("penalty_type") or PenaltyType.FINE
+        )
+        raw_currency = raw.get("currency")
+        if raw_currency is not None and str(raw_currency).strip():
+            currency = str(raw_currency).strip()
+        else:
+            currency = realm_currency()
+        if (
+            penalty_type in (PenaltyType.FINE, PenaltyType.RESTITUTION)
+            and amount > 0
+            and not currency
+        ):
+            raise ValueError(no_treasury_token_error()["error"])
         specs.append({
-            "penalty_type": raw.get("type") or raw.get("penalty_type")
-                            or PenaltyType.FINE,
+            "penalty_type": penalty_type,
             "amount": amount,
-            "currency": str(raw.get("currency") or "ckBTC"),
+            "currency": currency,
             "description": str(raw.get("description") or ""),
             "target_user": target,
         })
@@ -400,11 +414,12 @@ def issue_verdict(
 
     _warn_cross_quarter(case, "issue_verdict")
 
+    penalty_specs = _penalty_specs(penalties)
     verdict = case_issue_verdict(
         case=case,
         decision=str(decision),
         reasoning=str(reasoning or ""),
-        penalties=_penalty_specs(penalties),
+        penalties=penalty_specs,
     )
     logger.info(
         f"Verdict issued on case {case.case_number} by {caller}"

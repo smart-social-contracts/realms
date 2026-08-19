@@ -43,7 +43,7 @@ class Penalty(Entity, TimestampedMixin):
     id = String(max_length=64)
     penalty_type = String(max_length=32)  # fine, restitution, community_service, etc.
     amount = Float()  # For financial penalties (in native currency/token)
-    currency = String(max_length=16, default="ckBTC")
+    currency = String(max_length=16, default="")
     description = String(max_length=1024)
     status = String(max_length=STATUS_MAX_LENGTH)  # pending, executed, waived, appealed
     due_date = String(max_length=64)  # ISO format

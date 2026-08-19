@@ -43,9 +43,14 @@ class Balance(Entity, TimestampedMixin):
         Returns:
             dict with the updated balance amount or error info.
         """
+        from core.realm_currency import no_treasury_token_wallet_error
         from ic_basilisk_toolkit.wallet import Wallet
 
-        token_name = self.instrument or "ckBTC"
+        token_name = (self.instrument or "").strip()
+        if not token_name:
+            result = no_treasury_token_wallet_error()
+            logger.error(f"Balance.refresh: refused — {result['err']}")
+            return result
 
         # Pre-refresh hook (overridable via Codex)
         pre_result = self.pre_refresh_hook()

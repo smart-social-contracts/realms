@@ -180,13 +180,13 @@ class TestPenaltyEntity:
 
     def test_penalty_creation(self):
         """Test creating a Penalty entity."""
-        from ggg.penalty import Penalty, PenaltyType
+        from ggg import Penalty, PenaltyType
 
         penalty = Penalty(
             id="PEN-001",
             penalty_type=PenaltyType.FINE,
             amount=5000.0,
-            currency="ckBTC",
+            currency="REALMS",
             description="Fine for breach of contract",
             status="pending"
         )
@@ -195,6 +195,19 @@ class TestPenaltyEntity:
         assert penalty.penalty_type == PenaltyType.FINE
         assert penalty.is_financial() is True
         assert penalty.is_pending() is True
+
+    def test_penalty_default_currency_is_empty(self):
+        """A new Penalty has no fabricated treasury token default."""
+        from ggg import Penalty, PenaltyType
+
+        penalty = Penalty(
+            id="PEN-DEF",
+            penalty_type=PenaltyType.FINE,
+            amount=100.0,
+            status="pending",
+        )
+
+        assert (penalty.currency or "") == ""
 
     def test_penalty_types(self):
         """Test PenaltyType constants."""
@@ -494,6 +507,61 @@ class TestJusticeSystemIntegration:
         # 7. Issue verdict (simplified - normally would use case_issue_verdict)
         case.status = CaseStatus.VERDICT_ISSUED
         assert case.can_appeal() is True
+
+
+class TestPenaltySpecsCurrency:
+    """Verdict penalty specs resolve treasury currency without ckBTC fallback."""
+
+    def test_penalty_specs_refuse_when_no_currency_and_no_realm_token(
+        self, monkeypatch,
+    ):
+        from core.justice.cases import _penalty_specs
+
+        monkeypatch.setattr(
+            "core.realm_currency.realm_currency", lambda: ""
+        )
+        with pytest.raises(ValueError, match="No treasury currency"):
+            _penalty_specs([{"type": "fine", "amount": 100}])
+
+    def test_penalty_specs_use_realm_currency_when_unspecified(
+        self, monkeypatch,
+    ):
+        from core.justice.cases import _penalty_specs
+
+        monkeypatch.setattr(
+            "core.realm_currency.realm_currency", lambda: "REALMS"
+        )
+        specs = _penalty_specs([{"type": "fine", "amount": 100}])
+
+        assert specs == [{
+            "penalty_type": "fine",
+            "amount": 100.0,
+            "currency": "REALMS",
+            "description": "",
+            "target_user": None,
+        }]
+
+    def test_issue_verdict_refuses_fine_without_treasury_token(
+        self, monkeypatch,
+    ):
+        from core.justice import cases
+
+        case = MagicMock()
+        case.case_number = "CASE-1"
+        monkeypatch.setattr(cases, "require_case", lambda _id: case)
+        monkeypatch.setattr(cases, "judge_for_caller", lambda _case, _caller: object())
+        monkeypatch.setattr(cases, "_warn_cross_quarter", lambda *_args: None)
+        monkeypatch.setattr(
+            "core.realm_currency.realm_currency", lambda: ""
+        )
+
+        with pytest.raises(ValueError, match="No treasury currency"):
+            cases.issue_verdict(
+                caller="judge1",
+                case_id="1",
+                decision="liable",
+                penalties=[{"type": "fine", "amount": 50}],
+            )
 
 
 if __name__ == "__main__":

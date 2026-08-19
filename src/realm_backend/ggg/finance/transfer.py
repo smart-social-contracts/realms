@@ -52,9 +52,16 @@ class Transfer(Entity, TimestampedMixin):
         Returns:
             dict with {"ok": tx_id} on success or {"err": ...} on failure.
         """
+        from core.realm_currency import no_treasury_token_wallet_error
         from ic_basilisk_toolkit.wallet import Wallet
 
-        token_name = self.instrument or "ckBTC"
+        token_name = (self.instrument or "").strip()
+        if not token_name:
+            result = no_treasury_token_wallet_error()
+            logger.error(f"Transfer.execute: refused — {result['err']}")
+            self.status = "failed"
+            return result
+
         logger.info(
             f"Transfer.execute: {self.amount} {token_name} "
             f"from {self.principal_from} to {self.principal_to}"

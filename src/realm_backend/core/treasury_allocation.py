@@ -197,18 +197,10 @@ def _period_end_passed(end_incl: str, cfg) -> bool:
 
 
 def treasury_currency() -> str:
-    """The realm's accounting currency (fallback: ckBTC)."""
-    try:
-        from ggg import Realm
+    """The realm's accounting currency, empty until a treasury ledger resolves."""
+    from core.realm_currency import realm_currency
 
-        realm = Realm.load("1")
-        if realm:
-            currency = str(getattr(realm, "accounting_currency", "") or "").strip()
-            if currency:
-                return currency
-    except Exception:
-        pass
-    return "ckBTC"
+    return realm_currency()
 
 
 def get_treasury_config():
@@ -464,6 +456,10 @@ def sweep_deposits():
     from ic_basilisk_toolkit.wallet import Wallet
 
     currency = treasury_currency()
+    if not currency:
+        from core.realm_currency import no_treasury_token_error
+
+        return no_treasury_token_error()
     token = Token[currency]
     if token is None:
         return {"error": f"No registered token for accounting currency '{currency}'"}
@@ -742,6 +738,10 @@ def run_allocation(period_id: str = None, triggered_by: str = "") -> dict:
         seq += 1
 
     currency = treasury_currency()
+    if not currency:
+        from core.realm_currency import no_treasury_token_error
+
+        return no_treasury_token_error()
     today_iso = _iso(_today())
     allocations = []
     allocated_now = 0

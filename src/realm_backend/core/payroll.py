@@ -87,18 +87,10 @@ def current_day_of_month() -> int:
 
 
 def payroll_currency() -> str:
-    """The realm's accounting currency (fallback: ckBTC)."""
-    try:
-        from ggg import Realm
+    """The realm's accounting currency, empty until a treasury ledger resolves."""
+    from core.realm_currency import realm_currency
 
-        realm = Realm.load("1")
-        if realm:
-            currency = str(getattr(realm, "accounting_currency", "") or "").strip()
-            if currency:
-                return currency
-    except Exception:
-        pass
-    return "ckBTC"
+    return realm_currency()
 
 
 def salary_transfer_id(position_key: str, principal: str, period: str) -> str:
@@ -175,6 +167,10 @@ def start_department_payroll(
         return {"error": f"No filled salaried positions in '{department_name}'"}
 
     currency = payroll_currency()
+    if not currency:
+        from core.realm_currency import no_treasury_token_error
+
+        return no_treasury_token_error()
     fund_code = fund.code or "treasury"
     scheduled = 0
     already_settled = 0

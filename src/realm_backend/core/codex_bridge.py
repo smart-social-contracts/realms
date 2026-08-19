@@ -129,15 +129,15 @@ def _v_realm_get(**kwargs: Any) -> Optional[dict]:
     }
 
 
-def _v_currency_get(default: str = "REALMS", **kwargs: Any) -> str:
+def _v_currency_get(**kwargs: Any) -> str:
     """Resolve the invoice/treasury currency symbol.
 
     Mirrors the codices' ``invoice_currency`` helper: codex-pinned
-    ``currency.symbol`` from config, else ``Realm.accounting_currency``, else
-    *default*. Lets a sandboxed codex resolve currency without importing host
-    modules or replicating the fallback logic.
+    ``currency.symbol`` from config, else the realm treasury symbol from
+    ``realm_currency()``. Returns empty when neither has resolved.
     """
     from core import codex_hooks
+    from core.realm_currency import realm_currency
 
     config = codex_hooks.get_config() or {}
     block = config.get("currency")
@@ -145,17 +145,10 @@ def _v_currency_get(default: str = "REALMS", **kwargs: Any) -> str:
         symbol = str(block.get("symbol") or "").strip()
         if symbol:
             return symbol[:16]
-    try:
-        from ggg import Realm
-
-        realms = Realm.instances()
-        if realms:
-            acct = str(getattr(realms[0], "accounting_currency", "") or "").strip()
-            if acct:
-                return acct[:16]
-    except Exception:
-        pass
-    return (str(default) or "REALMS")[:16]
+    acct = realm_currency()
+    if acct:
+        return acct[:16]
+    return ""
 
 
 # Member attributes a codex may set through ``member.activate`` (the codex
@@ -240,7 +233,7 @@ def _v_invoice_create(
     return {
         "id": getattr(invoice, "id", None),
         "amount": amount,
-        "currency": currency,
+        "currency": getattr(invoice, "currency", currency) or "",
         "status": status,
         "due_date": due_date,
     }

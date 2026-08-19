@@ -194,7 +194,7 @@ class Invoice(Entity, TimestampedMixin):
     __alias__ = "id"
     id = String(max_length=32)  # Max 32 chars to fit in subaccount
     amount = Float()            # Amount in accounting currency (e.g. 10.00 ckUSDC)
-    currency = String(max_length=16, default="ckBTC")
+    currency = String(max_length=16, default="")
     due_date = String(max_length=64)
     status = String(max_length=32)   # Pending | Paid | Overdue | Expired
     user = ManyToOne("User", "invoices")
@@ -216,15 +216,11 @@ class Invoice(Entity, TimestampedMixin):
             kwargs["id"] = generate_unique_id("inv_")
         if not kwargs.get("currency"):
             try:
-                from ggg import Realm
+                from core.realm_currency import realm_currency
 
-                realms = Realm.instances()
-                if realms:
-                    acct = str(
-                        getattr(realms[0], "accounting_currency", "") or ""
-                    ).strip()
-                    if acct:
-                        kwargs["currency"] = acct[:16]
+                acct = realm_currency()
+                if acct:
+                    kwargs["currency"] = acct[:16]
             except Exception:
                 pass
         super().__init__(**kwargs)
@@ -331,11 +327,15 @@ class Invoice(Entity, TimestampedMixin):
             candidate = raw % span + NONCE_MIN
 
         # Avoid collisions with other pending invoices for the same currency.
+        # An unresolved currency has no pool of its own, so it avoids every
+        # pending nonce: the invoice must stay unambiguous if its currency is
+        # filled in later.
+        my_currency = (self.currency or "").strip()
         used = {
             inv.payment_nonce
             for inv in Invoice.instances()
             if inv.status == "Pending"
-            and (inv.currency or "ckBTC") == (self.currency or "ckBTC")
+            and (not my_currency or (inv.currency or "").strip() == my_currency)
             and inv.payment_nonce
             and inv.id != self.id
         }
@@ -344,7 +344,7 @@ class Invoice(Entity, TimestampedMixin):
             if probe not in used:
                 return probe
         raise RuntimeError(
-            f"All {span} nonce slots for currency '{self.currency or 'ckBTC'}' "
+            f"All {span} nonce slots for currency '{my_currency or '(unresolved)'}' "
             f"are occupied by pending invoices. Expire or pay existing invoices "
             f"before creating new ones."
         )
@@ -364,10 +364,14 @@ class Invoice(Entity, TimestampedMixin):
         Useful when processing an incoming transfer event to identify which
         invoice it belongs to.
         """
+        currency = (currency or "").strip()
+        if not currency:
+            return None
         for inv in Invoice.instances():
             if inv.status != "Pending":
                 continue
-            if (inv.currency or "ckBTC") != currency:
+            inv_currency = (inv.currency or "").strip()
+            if not inv_currency or inv_currency != currency:
                 continue
             token = inv._find_token()
             decimals = (token.decimals if token else None) or DEFAULT_DECIMALS
@@ -402,10 +406,10 @@ class Invoice(Entity, TimestampedMixin):
                 # No subaccount — send to main account only.
                 "amount_raw": nonce_raw,
                 "amount_human": nonce_human,
-                "currency": self.currency or "ckBTC",
+                "currency": self.currency,
                 "nonce": self.payment_nonce,
                 "note": (
-                    f"Send EXACTLY {nonce_human} {self.currency or 'ckBTC'} "
+                    f"Send EXACTLY {nonce_human} {self.currency} "
                     "to the principal above (no subaccount). "
                     "The unique last digits identify your invoice."
                 ),
@@ -419,7 +423,9 @@ class Invoice(Entity, TimestampedMixin):
         """Find the registered Token entity matching this invoice's currency."""
         from .token import Token
 
-        invoice_currency = self.currency or "ckBTC"
+        invoice_currency = (self.currency or "").strip()
+        if not invoice_currency:
+            return None
         for token in Token.instances():
             if not token.indexer:
                 continue
@@ -473,7 +479,11 @@ class Invoice(Entity, TimestampedMixin):
         transaction_id = f"TXN-INV-{self.id}"
         entry_date = self.paid_at if self.paid_at and not self.paid_at.startswith("1970-01-01T00:00:00") else _now_iso()
         desc = description or f"Invoice {self.id}"
-        currency = self.currency or "ckBTC"
+        currency = (self.currency or "").strip()
+        if not currency:
+            from core.realm_currency import no_treasury_token_error
+
+            raise ValueError(no_treasury_token_error()["error"])
         amount_raw = self.get_amount_raw(self._get_token_decimals())
 
         entries = [
@@ -546,7 +556,11 @@ class Invoice(Entity, TimestampedMixin):
         entry_date = self.paid_at if self.paid_at and not self.paid_at.startswith("1970-01-01T00:00:00") else _now_iso()
         desc = description or f"Invoice {self.id} payment"
         rev_cat = revenue_category or Category.FEE
-        currency = self.currency or "ckBTC"
+        currency = (self.currency or "").strip()
+        if not currency:
+            from core.realm_currency import no_treasury_token_error
+
+            raise ValueError(no_treasury_token_error()["error"])
         amount_raw = self.get_amount_raw(self._get_token_decimals())
 
         entries = [
@@ -702,7 +716,17 @@ class Invoice(Entity, TimestampedMixin):
 
         wallet = Wallet()
         subaccount = self.get_subaccount()
-        invoice_currency = self.currency or "ckBTC"
+        invoice_currency = (self.currency or "").strip()
+        if not invoice_currency:
+            from core.realm_currency import no_treasury_token_error
+
+            err = no_treasury_token_error()
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": "",
+                **err,
+            }
 
         token = self._find_token()
         if not token:
@@ -772,7 +796,18 @@ class Invoice(Entity, TimestampedMixin):
         an error is returned — the invoice stays Pending until the indexer is
         configured or the operator uses find_by_nonce_amount() externally.
         """
-        invoice_currency = self.currency or "ckBTC"
+        invoice_currency = (self.currency or "").strip()
+        if not invoice_currency:
+            from core.realm_currency import no_treasury_token_error
+
+            err = no_treasury_token_error()
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": "",
+                **err,
+            }
+
         token = self._find_token()
 
         if not token:

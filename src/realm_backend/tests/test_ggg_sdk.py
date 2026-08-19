@@ -301,7 +301,7 @@ def test_reads_return_defaults_without_an_rpc_channel():
 
     env = h(args={}, context={})
     assert env["ok"] is True
-    assert env["result"] == {"config": {}, "currency": "REALMS", "user": None}
+    assert env["result"] == {"config": {}, "currency": "", "user": None}
 
 
 def test_rpc_denial_surfaces_as_a_failed_hook(fake_rpc):

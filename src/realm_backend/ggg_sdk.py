@@ -528,7 +528,7 @@ class _Realm:
         return self._read("realm", "realm.get", {})
 
     def currency(self):
-        return self._read("currency", "currency.get", "REALMS")
+        return self._read("currency", "currency.get", "")
 
 
 realm = _Realm()
