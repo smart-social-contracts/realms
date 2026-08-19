@@ -1266,6 +1266,8 @@ def _content_type_for(name: str) -> str:
         return "image/png"
     if name_lower.endswith(".jpg") or name_lower.endswith(".jpeg"):
         return "image/jpeg"
+    if name_lower.endswith(".webp"):
+        return "image/webp"
     if name_lower.endswith(".md") or name_lower.endswith(".txt"):
         return "text/plain"
     return "application/octet-stream"
@@ -1397,6 +1399,61 @@ def _upload_one_file(
             return "uploaded"
 
 
+_SCREENSHOT_IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def _is_safe_package_relative_path(path: str) -> bool:
+    normalized = path.replace("\\", "/").strip()
+    if not normalized or os.path.isabs(normalized) or normalized.startswith("/"):
+        return False
+    return ".." not in normalized.split("/")
+
+
+def _iter_manifest_screenshot_uploads(
+    source_dir: str,
+    manifest: dict,
+) -> tuple[list[tuple[str, str]], list[str]]:
+    """Return (registry_path, local_path) pairs and publish-fatal warnings.
+
+    Driven by ``manifest["screenshots"]`` so a missing or unsafe path fails
+    the release instead of shipping a broken marketplace listing.
+    """
+    declared = manifest.get("screenshots") or []
+    if not isinstance(declared, list):
+        return [], [
+            "  [yellow]![/yellow] manifest screenshots must be an array"
+        ]
+
+    specs: list[tuple[str, str]] = []
+    warnings: list[str] = []
+
+    for entry in sorted(declared, key=lambda x: str(x)):
+        if not isinstance(entry, str) or not entry.replace("\\", "/").strip():
+            warnings.append(
+                f"  [yellow]![/yellow] screenshot entry must be a non-empty string: {entry!r}"
+            )
+            continue
+        rel = entry.replace("\\", "/").strip()
+        if not _is_safe_package_relative_path(rel):
+            warnings.append(
+                f"  [yellow]![/yellow] rejected unsafe screenshot path: {entry}"
+            )
+            continue
+        if not rel.lower().endswith(_SCREENSHOT_IMAGE_SUFFIXES):
+            warnings.append(
+                f"  [yellow]![/yellow] unsupported screenshot format (expected "
+                f"{', '.join(_SCREENSHOT_IMAGE_SUFFIXES)}): {rel}"
+            )
+            continue
+        local = os.path.join(source_dir, rel)
+        if not os.path.isfile(local):
+            warnings.append(f"  [yellow]![/yellow] screenshot not found: {rel}")
+            continue
+        specs.append((rel, local))
+
+    return specs, warnings
+
+
 def _publish_namespace(
     registry: str,
     namespace: str,
@@ -1438,6 +1495,7 @@ def publish_extension_command(
       backend/<py files>
       frontend/dist/index.html, index.js, assets/…   (if frontend-rt/dist exists)
       frontend/i18n/locales/<locale>.json         (if frontend/i18n/ exists)
+      screenshots/<image files>                   (manifest ``screenshots`` list)
 
     Then, unless ``skip_publish`` is set, marks the namespace as published so
     realm canisters can install it via ``install_extension_from_registry``.
@@ -1564,6 +1622,17 @@ def publish_extension_command(
         _publish_i18n_files(locales_root, _map_shared_locales)
     elif os.path.isdir(i18n_legacy_root):
         _publish_i18n_files(i18n_legacy_root, lambda r: r)
+
+    # Marketplace card + detail gallery — paths come from manifest.screenshots so
+    # a typo or missing capture fails publish instead of a broken listing.
+    screenshot_specs, screenshot_warnings = _iter_manifest_screenshot_uploads(
+        source_dir, manifest
+    )
+    for warning in screenshot_warnings:
+        console.print(warning)
+        failed += 1
+    for reg_path, local in screenshot_specs:
+        _upload(reg_path, local)
 
     if uploaded == 0 and failed == 0:
         console.print(
