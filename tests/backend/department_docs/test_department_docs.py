@@ -175,22 +175,33 @@ class TestCreate:
                 caller=realm["head"], department=realm["dept"], title="  "
             )
 
+    def test_overlong_title_rejected(self, realm):
+        with pytest.raises(ValueError, match="512"):
+            ddb.v_doc_create(
+                caller=realm["head"],
+                department=realm["dept"],
+                title="x" * 513,
+            )
+
     def test_unknown_department_is_rejected(self, realm):
         with pytest.raises(ValueError, match="not found"):
             ddb.v_doc_create(caller=realm["admin"], department="Nope", title="X")
 
 
 # ---------------------------------------------------------------------------
-# Read, and attaching the blob
+# Read, and updating title / ciphertext
 # ---------------------------------------------------------------------------
 
 
-class TestSetAndGet:
-    def test_set_ciphertext_and_get(self, realm):
-        doc = ddb.v_doc_create(
-            caller=realm["head"], department=realm["dept"], title="Budget"
+class TestUpdate:
+    def _create(self, realm, title="Budget"):
+        return ddb.v_doc_create(
+            caller=realm["head"], department=realm["dept"], title=title
         )
-        ddb.v_doc_set_ciphertext(
+
+    def test_head_can_update_ciphertext_and_get(self, realm):
+        doc = self._create(realm)
+        ddb.v_doc_update(
             caller=realm["head"], id=doc["id"], ciphertext="enc:v=2:x"
         )
 
@@ -198,34 +209,104 @@ class TestSetAndGet:
         assert got["ciphertext"] == "enc:v=2:x"
         assert got["can_manage"] is False
 
-    def test_head_get_can_manage(self, realm):
-        doc = ddb.v_doc_create(
-            caller=realm["head"], department=realm["dept"], title="B"
+    def test_admin_can_update(self, realm):
+        doc = self._create(realm)
+        out = ddb.v_doc_update(
+            caller=realm["admin"], id=doc["id"], title="Renamed"
         )
+        assert out["title"] == "Renamed"
+
+    def test_member_cannot_update(self, realm):
+        """A member who could overwrite the blob could destroy a document they
+        are only entitled to read."""
+        doc = self._create(realm)
+        with pytest.raises(PermissionError):
+            ddb.v_doc_update(
+                caller=realm["member"], id=doc["id"], ciphertext="y"
+            )
+
+    def test_title_only_leaves_ciphertext_untouched(self, realm):
+        doc = self._create(realm)
+        ddb.v_doc_update(
+            caller=realm["head"], id=doc["id"], ciphertext="blob"
+        )
+        out = ddb.v_doc_update(
+            caller=realm["head"], id=doc["id"], title="New title"
+        )
+        assert out["title"] == "New title"
+        assert ddb.v_doc_get(caller=realm["head"], id=doc["id"])["ciphertext"] == "blob"
+
+    def test_ciphertext_only_leaves_title_untouched(self, realm):
+        doc = self._create(realm, title="Original")
+        out = ddb.v_doc_update(
+            caller=realm["head"], id=doc["id"], ciphertext="enc"
+        )
+        assert out["title"] == "Original"
+        assert "ciphertext" not in out
+
+    def test_both_title_and_ciphertext(self, realm):
+        doc = self._create(realm, title="Old")
+        out = ddb.v_doc_update(
+            caller=realm["head"],
+            id=doc["id"],
+            title="New",
+            ciphertext="enc:v=2:both",
+        )
+        assert out["title"] == "New"
+        assert "ciphertext" not in out
+        got = ddb.v_doc_get(caller=realm["head"], id=doc["id"])
+        assert got["ciphertext"] == "enc:v=2:both"
+
+    def test_blank_title_rejected(self, realm):
+        doc = self._create(realm)
+        with pytest.raises(ValueError, match="title"):
+            ddb.v_doc_update(caller=realm["head"], id=doc["id"], title="  ")
+
+    def test_overlong_title_rejected(self, realm):
+        doc = self._create(realm)
+        with pytest.raises(ValueError, match="512"):
+            ddb.v_doc_update(
+                caller=realm["head"], id=doc["id"], title="x" * 513
+            )
+
+    def test_neither_field_rejected(self, realm):
+        doc = self._create(realm)
+        with pytest.raises(ValueError, match="nothing to update"):
+            ddb.v_doc_update(caller=realm["head"], id=doc["id"])
+
+    def test_unknown_id_rejected(self, realm):
+        with pytest.raises(ValueError, match="not found"):
+            ddb.v_doc_update(
+                caller=realm["head"], id="nope", title="X"
+            )
+
+    def test_projection_excludes_ciphertext(self, realm):
+        doc = self._create(realm, title="Before")
+        out = ddb.v_doc_update(
+            caller=realm["head"],
+            id=doc["id"],
+            title="After",
+            ciphertext="secret",
+        )
+        assert out["title"] == "After"
+        assert "ciphertext" not in out
+        assert out["id"] == doc["id"]
+        assert out["department"] == realm["dept"]
+        assert out["can_manage"] is True
+
+    def test_head_get_can_manage(self, realm):
+        doc = self._create(realm, title="B")
         assert ddb.v_doc_get(caller=realm["head"], id=doc["id"])["can_manage"] is True
 
     def test_outsider_cannot_get(self, realm):
-        doc = ddb.v_doc_create(
-            caller=realm["head"], department=realm["dept"], title="B"
-        )
+        doc = self._create(realm, title="B")
         with pytest.raises(PermissionError):
             ddb.v_doc_get(caller=realm["outsider"], id=doc["id"])
 
-    def test_member_cannot_set_ciphertext(self, realm):
-        """A member who could overwrite the blob could destroy a document they
-        are only entitled to read."""
-        doc = ddb.v_doc_create(
-            caller=realm["head"], department=realm["dept"], title="B"
-        )
-        with pytest.raises(PermissionError):
-            ddb.v_doc_set_ciphertext(caller=realm["member"], id=doc["id"], ciphertext="y")
-
     def test_listing_omits_ciphertext(self, realm):
         """A listing must not ship every blob in the department."""
-        doc = ddb.v_doc_create(
-            caller=realm["head"], department=realm["dept"], title="B"
-        )
-        ddb.v_doc_set_ciphertext(caller=realm["head"], id=doc["id"], ciphertext="big")
+        doc = self._create(realm, title="B")
+        ddb.v_doc_update(caller=realm["head"], id=doc["id"], ciphertext="big")
         rows = ddb.v_doc_list(caller=realm["member"])["documents"]
         assert rows and all("ciphertext" not in r for r in rows)
 
@@ -326,6 +407,8 @@ def test_write_verbs_are_not_classified_as_reads():
 
     writes = set(ddb.VERBS) - set(ddb.READ_VERBS)
     assert writes == {
-        "dept_doc.create", "dept_doc.set_ciphertext", "dept_doc.delete",
+        "dept_doc.create", "dept_doc.update", "dept_doc.delete",
     }
+    assert "dept_doc.update" in ddb.VERBS
+    assert "dept_doc.update" not in ddb.READ_VERBS
     assert not writes & eb.READ_VERBS

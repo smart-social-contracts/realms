@@ -693,10 +693,13 @@ class _DeptDocs:
             "dept_doc.create", {"department": department, "title": title}
         )
 
-    def set_ciphertext(self, id, ciphertext):
-        return _require_rpc(
-            "dept_doc.set_ciphertext", {"id": id, "ciphertext": ciphertext}
-        )
+    def update(self, id, title=None, ciphertext=None):
+        payload = {"id": id}
+        if title is not None:
+            payload["title"] = title
+        if ciphertext is not None:
+            payload["ciphertext"] = ciphertext
+        return _require_rpc("dept_doc.update", payload)
 
     def delete(self, id):
         return _require_rpc("dept_doc.delete", {"id": id})

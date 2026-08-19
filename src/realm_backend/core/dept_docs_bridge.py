@@ -32,6 +32,22 @@ logger = get_logger("core.dept_docs_bridge")
 
 EXT_ID = "department_docs"
 DOC_TYPE = "DepartmentDocument"
+TITLE_MAX_LENGTH = 512
+
+
+def _clean_title(title: str) -> str:
+    """Strip and validate a document title.
+
+    The entity field caps title length at 512; rejecting overlong titles on
+    create as well as update keeps a row from being stuck with a title that
+    can never be edited back into compliance.
+    """
+    title = (title or "").strip()
+    if not title:
+        raise ValueError("title is required")
+    if len(title) > TITLE_MAX_LENGTH:
+        raise ValueError(f"title exceeds maximum length ({TITLE_MAX_LENGTH} chars)")
+    return title
 
 
 # ---------------------------------------------------------------------------
@@ -224,14 +240,12 @@ def v_doc_create(
     """Create an empty document and return its id and key scope.
 
     Empty on purpose: the scope embeds the new id, so the client cannot encrypt
-    until the row exists. ``set_ciphertext`` is the second half.
+    until the row exists. ``update`` is the second half.
     """
     department = (department or "").strip()
-    title = (title or "").strip()
     if not department:
         raise ValueError("department is required")
-    if not title:
-        raise ValueError("title is required")
+    title = _clean_title(title)
     if _department(department) is None:
         raise ValueError(f"department '{department}' not found")
 
@@ -251,21 +265,34 @@ def v_doc_create(
     return {"id": doc._id, "scope": scope}
 
 
-def v_doc_set_ciphertext(
-    caller: str = "", id: Any = None, ciphertext: str = "", **kwargs
+def v_doc_update(
+    caller: str = "",
+    id: Any = None,
+    title: Optional[str] = None,
+    ciphertext: Optional[str] = None,
+    **kwargs,
 ) -> dict:
-    """Attach or replace the encrypted blob.
+    """Update plaintext title and/or encrypted blob.
 
     Gated on manage rather than view: a member who could overwrite the
     ciphertext could destroy a document they are only supposed to read.
     """
     if id is None:
         raise ValueError("id is required")
+    if title is None and ciphertext is None:
+        raise ValueError("nothing to update")
+
     doc = _load(id)
     _require_manage(_doc_department(doc), caller, "editing this document")
 
-    doc.ciphertext = ciphertext or ""
-    return {"id": doc._id}
+    if title is not None:
+        doc.title = _clean_title(title)
+
+    if ciphertext is not None:
+        doc.ciphertext = ciphertext or ""
+
+    logger.info(f"dept_doc.update: {doc._id} by {caller}")
+    return project(doc, caller)
 
 
 def v_doc_delete(caller: str = "", id: Any = None, **kwargs) -> dict:
@@ -292,7 +319,7 @@ VERBS = {
     "dept_doc.list": v_doc_list,
     "dept_doc.get": v_doc_get,
     "dept_doc.create": v_doc_create,
-    "dept_doc.set_ciphertext": v_doc_set_ciphertext,
+    "dept_doc.update": v_doc_update,
     "dept_doc.delete": v_doc_delete,
 }
 
