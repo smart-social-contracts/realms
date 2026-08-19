@@ -6,6 +6,7 @@ Handles realm registration, runs canister_init.py if present, and reloads entity
 
 import subprocess
 import os
+import re
 import sys
 import json
 import time
@@ -395,59 +396,121 @@ except Exception as e:
 # Seed Token entities for Vault Manager
 print("\n🪙 Seeding Token entities...")
 try:
-    # Get canister IDs for tokens
     tokens_to_seed = []
-    
-    # Mainnet/staging ckBTC canister IDs (these are fixed on IC mainnet)
-    MAINNET_CKBTC_LEDGER = "mxzaz-hqaaa-aaaar-qaada-cai"
-    MAINNET_CKBTC_INDEXER = "n5wcd-faaaa-aaaar-qaaea-cai"
-    
-    # Staging shared REALMS token (ic-tokens deployment)
-    STAGING_REALMS_TOKEN = "2rqin-xaaaa-aaaah-qunsq-cai"
-    
-    # 1. ckBTC (shared)
-    ckbtc_ledger_id = None
-    ckbtc_indexer_id = None
-    try:
-        result = subprocess.run(
-            ['dfx', 'canister', 'id', 'ckbtc_ledger', '--network', network],
-            capture_output=True, text=True, timeout=5
+
+    def _unwrap_dfx_json(stdout):
+        data = json.loads((stdout or "").strip())
+        if isinstance(data, dict) and "Ok" in data:
+            return data["Ok"]
+        return data
+
+    def _unwrap_candid_text(out):
+        m = re.match(r'^\s*\(\s*"((?:[^"\\]|\\.)*)"\s*,?\s*\)\s*$', out or "", re.DOTALL)
+        if not m:
+            return out
+        raw = m.group(1)
+        return (
+            raw.replace("\\\\", "\\")
+            .replace('\\"', '"')
+            .replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace("\\t", "\t")
         )
-        if result.returncode == 0:
-            ckbtc_ledger_id = result.stdout.strip()
-            result = subprocess.run(
-                ['dfx', 'canister', 'id', 'ckbtc_indexer', '--network', network],
-                capture_output=True, text=True, timeout=5
+
+    def _dfx_query_json(method, arg='()'):
+        cmd = ['dfx', 'canister', 'call', '--query', backend_name, method, arg, '--output', 'json']
+        if network != 'local':
+            cmd.extend(['--network', network])
+        result = subprocess.run(cmd, cwd=realm_dir, capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            raise Exception(result.stderr or result.stdout)
+        return _unwrap_dfx_json(result.stdout)
+
+    def _dfx_update_text(method, arg):
+        cmd = ['dfx', 'canister', 'call', backend_name, method, arg]
+        if network != 'local':
+            cmd.extend(['--network', network])
+        result = subprocess.run(cmd, cwd=realm_dir, capture_output=True, text=True, timeout=120)
+        if result.returncode != 0:
+            raise Exception(result.stderr or result.stdout)
+        return _unwrap_candid_text(result.stdout.strip())
+
+    def _extract_status_record(status_response):
+        if not isinstance(status_response, dict):
+            return None
+        data = status_response.get("data", status_response)
+        if isinstance(data, dict) and "status" in data:
+            return data["status"]
+        return None
+
+    treasury_ledger_id = None
+    treasury_symbol = None
+    treasury_decimals = None
+    treasury_indexer_id = None
+
+    try:
+        status_response = _dfx_query_json('status')
+        status_record = _extract_status_record(status_response)
+        if isinstance(status_record, dict):
+            canisters = status_record.get("canisters") or []
+            for canister in canisters:
+                if not isinstance(canister, dict):
+                    continue
+                if canister.get("canister_type") == "token_backend":
+                    treasury_ledger_id = (canister.get("canister_id") or "").strip()
+                    break
+            treasury_symbol = (status_record.get("accounting_currency") or "").strip()
+            treasury_decimals = status_record.get("accounting_currency_decimals")
+    except Exception as status_err:
+        print(f"   ⚠️  Could not read realm status for treasury token: {status_err}")
+
+    if treasury_ledger_id:
+        try:
+            resolve_arg = f'("{treasury_ledger_id}")'
+            resolved_raw = _dfx_update_text('resolve_token_ledger', resolve_arg)
+            resolved = json.loads(resolved_raw) if isinstance(resolved_raw, str) else resolved_raw
+            if isinstance(resolved, dict) and resolved.get("success"):
+                treasury_symbol = (resolved.get("symbol") or treasury_symbol or "").strip()
+                if resolved.get("decimals") is not None:
+                    treasury_decimals = resolved.get("decimals")
+                treasury_indexer_id = (
+                    resolved.get("indexer_canister_id") or treasury_ledger_id
+                ).strip()
+            else:
+                resolve_error = (
+                    resolved.get("error") if isinstance(resolved, dict) else str(resolved)
+                )
+                print(
+                    f"   ⚠️  Could not resolve treasury ledger {treasury_ledger_id}: {resolve_error}"
+                )
+        except Exception as resolve_err:
+            print(f"   ⚠️  resolve_token_ledger failed for {treasury_ledger_id}: {resolve_err}")
+
+        if treasury_symbol:
+            try:
+                treasury_decimals = int(treasury_decimals if treasury_decimals is not None else 8)
+            except (TypeError, ValueError):
+                treasury_decimals = 8
+            tokens_to_seed.append({
+                "symbol": treasury_symbol,
+                "name": treasury_symbol,
+                "ledger_canister_id": treasury_ledger_id,
+                "indexer_canister_id": treasury_indexer_id or treasury_ledger_id,
+                "decimals": treasury_decimals,
+                "token_type": "realm",
+                "enabled": "true",
+            })
+            print(f"   ℹ️  Treasury token: {treasury_symbol} ({treasury_ledger_id})")
+        else:
+            print(
+                f"   ⚠️  Treasury ledger {treasury_ledger_id} configured but symbol could not be resolved; skipping token seed"
             )
-            ckbtc_indexer_id = result.stdout.strip() if result.returncode == 0 else ckbtc_ledger_id
-    except Exception:
-        pass
-    
-    # Fallback to mainnet IDs for staging/ic networks
-    if not ckbtc_ledger_id and network in ('staging', 'test', 'ic'):
-        ckbtc_ledger_id = MAINNET_CKBTC_LEDGER
-        ckbtc_indexer_id = MAINNET_CKBTC_INDEXER
-        print(f"   ℹ️  Using mainnet ckBTC canister IDs")
-    
-    if ckbtc_ledger_id:
-        tokens_to_seed.append({
-            "symbol": "ckBTC",
-            "name": "ckBTC",
-            "ledger_canister_id": ckbtc_ledger_id,
-            "indexer_canister_id": ckbtc_indexer_id or ckbtc_ledger_id,
-            "decimals": 8,
-            "token_type": "shared",
-            "enabled": "true"
-        })
-    
-    # 2. REALMS token (shared mundus token)
-    realms_token_id = os.environ.get('REALMS_TOKEN_CANISTER_ID')
-    
-    # Fallback to staging REALMS token if env var not set
-    if not realms_token_id and network in ('staging', 'ic'):
-        realms_token_id = STAGING_REALMS_TOKEN
-        print(f"   ℹ️  Using staging REALMS token: {realms_token_id}")
-    
+    else:
+        print(
+            "   ℹ️  No treasury token configured yet — it will be registered when the treasury ledger is set in Realm Settings"
+        )
+
+    realms_token_id = (os.environ.get('REALMS_TOKEN_CANISTER_ID') or "").strip()
     if realms_token_id:
         tokens_to_seed.append({
             "symbol": "REALMS",
@@ -456,46 +519,12 @@ try:
             "indexer_canister_id": realms_token_id,
             "decimals": 8,
             "token_type": "shared",
-            "enabled": "true"
+            "enabled": "false",
         })
+        print(f"   ℹ️  Including shared REALMS token (disabled): {realms_token_id}")
     else:
-        print(f"   ℹ️  REALMS_TOKEN_CANISTER_ID not set, skipping REALMS token")
-    
-    # 3. Realm-specific token (from token_backend)
-    realm_token_id = None
-    try:
-        result = subprocess.run(
-            ['dfx', 'canister', 'id', 'token_backend', '--network', network],
-            capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            realm_token_id = result.stdout.strip()
-    except Exception:
-        pass
-    
-    if realm_token_id:
-        # Get token name/symbol from manifest
-        manifest_path = os.path.join(realm_dir, 'manifest.json')
-        token_name = "Realm Token"
-        token_symbol = "RLM"
-        if os.path.exists(manifest_path):
-            with open(manifest_path, 'r') as f:
-                manifest = json.load(f)
-            token_config = manifest.get("token", {})
-            token_name = token_config.get("name", f"{manifest.get('name', 'Realm')} Token")
-            token_symbol = token_config.get("symbol", manifest.get('name', 'RLM')[:3].upper())
-        tokens_to_seed.append({
-            "symbol": token_symbol,
-            "name": token_name,
-            "ledger_canister_id": realm_token_id,
-            "indexer_canister_id": realm_token_id,
-            "decimals": 8,
-            "token_type": "realm",
-            "enabled": "true"
-        })
-    else:
-        print(f"   ℹ️  No token_backend found for this realm, skipping realm token")
-    
+        print(f"   ℹ️  REALMS_TOKEN_CANISTER_ID not set, skipping shared REALMS token")
+
     print(f"   📊 Tokens to seed: {len(tokens_to_seed)}")
     
     # Seed each token via execute_code (since upsert_object doesn't exist)
