@@ -1,61 +1,69 @@
 <script lang="ts">
-	import { Card, Frame, type LinkType } from 'flowbite-svelte';
-	import {
-		DiscordSolid,
-		DribbbleSolid,
-		FacebookSolid,
-		GithubSolid,
-		TwitterSolid,
-		XSolid,
-	} from 'flowbite-svelte-icons';
-	import type { ComponentType } from 'svelte';
+	import { Frame, type LinkType } from 'flowbite-svelte';
+	import { GithubSolid } from 'flowbite-svelte-icons';
 	import { testMode } from '$lib/stores/realmInfo';
 	import TestFlagsModal from '$lib/components/TestFlagsModal.svelte';
 
-	let testFlagsOpen = false;
+	let testFlagsOpen = $state(false);
 	
 	// Get commit hash from meta tag
-	let commitHash = '';
+	let commitHash = $state('');
+	let fullCommitHash = $state('');
 	// Get commit datetime from meta tag
-	let commitDatetime = '';
+	let commitDatetime = $state('');
 	// Get version from meta tag
-	let version = '';
+	let version = $state('');
 	
 	// This runs on the client side only
 	if (typeof document !== 'undefined') {
+		let hash = '';
+		let fullHash = '';
+		let datetime = '';
+		let ver = '';
+
 		const commitHashMeta = document.querySelector('meta[name="commit-hash"]');
 		if (commitHashMeta) {
-			commitHash = commitHashMeta.getAttribute('content') || '';
+			fullHash = commitHashMeta.getAttribute('content') || '';
+			hash = fullHash;
 			// Format to show only first 7 characters if it's a full hash
-			if (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER' && commitHash.length > 7) {
-				commitHash = commitHash.substring(0, 7);
+			if (hash && hash !== 'COMMIT_HASH_PLACEHOLDER' && hash.length > 7) {
+				hash = hash.substring(0, 7);
 			}
 		}
 		
 		const commitDatetimeMeta = document.querySelector('meta[name="commit-datetime"]');
 		if (commitDatetimeMeta) {
-			commitDatetime = commitDatetimeMeta.getAttribute('content') || '';
+			datetime = commitDatetimeMeta.getAttribute('content') || '';
 		}
 		
 		const versionMeta = document.querySelector('meta[name="version"]');
 		if (versionMeta) {
-			version = versionMeta.getAttribute('content') || '';
+			ver = versionMeta.getAttribute('content') || '';
 		}
 		
 		// Use build-time values as fallback for local development
 		// These are injected by Vite at build time via define config
-		if (!version || version === 'VERSION_PLACEHOLDER') {
+		if (!ver || ver === 'VERSION_PLACEHOLDER') {
 			// @ts-ignore - Vite injects this at build time
-			version = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev';
+			ver = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev';
 		}
-		if (!commitHash || commitHash === 'COMMIT_HASH_PLACEHOLDER') {
+		if (!hash || hash === 'COMMIT_HASH_PLACEHOLDER') {
 			// @ts-ignore - Vite injects this at build time
-			commitHash = typeof __BUILD_COMMIT__ !== 'undefined' ? __BUILD_COMMIT__ : 'local';
+			fullHash = typeof __BUILD_COMMIT__ !== 'undefined' ? __BUILD_COMMIT__ : 'local';
+			hash = fullHash;
+			if (hash.length > 7) {
+				hash = hash.substring(0, 7);
+			}
 		}
-		if (!commitDatetime || commitDatetime === 'COMMIT_DATETIME_PLACEHOLDER') {
+		if (!datetime || datetime === 'COMMIT_DATETIME_PLACEHOLDER') {
 			// @ts-ignore - Vite injects this at build time
-			commitDatetime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString().replace('T', ' ').substring(0, 19);
+			datetime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString().replace('T', ' ').substring(0, 19);
 		}
+
+		fullCommitHash = fullHash;
+		commitHash = hash;
+		commitDatetime = datetime;
+		version = ver;
 	}
 
 	const links: LinkType[] = [
@@ -64,12 +72,6 @@
 		{ name: 'Licensing', href: '#' },
 		{ name: 'Cookie Policy', href: '#' },
 		{ name: 'Contact', href: '#' }
-	];
-
-	const brands: [ComponentType, string][] = [
-		// [XSolid, 'https://twitter.com/realms_protocol'], # TODO: update when we have it
-		[GithubSolid, 'https://github.com/smart-social-contracts/realms'],
-		// [DiscordSolid, 'https://discord.gg/realms-community'],  # TODO: replace by OpenChat link when we have it
 	];
 </script>
 
@@ -92,20 +94,27 @@
 		{/each}
 	</ul> -->
 	
-	<!-- Social links -->
-	<div class="flex justify-center space-x-6">
-		{#each brands as [component, href]}
-			<a {href} class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-				<svelte:component this={component} size="md" />
-			</a>
-		{/each}
-	</div>
-	
 	<!-- App name, version and commit hash display -->
-	<div class="mt-3 text-center">
-		<span class="text-xs text-gray-400 dark:text-gray-500">
-			Realms GOS {version} ({commitHash}) - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ' - Local deployment' : ''}
-		</span>
+	<div class="mt-3 flex items-center justify-center gap-1 text-xs font-normal text-gray-400 dark:text-gray-500">
+		<span>Realms GOS {version}</span>
+		<a
+			href="https://github.com/smart-social-contracts/realms"
+			target="_blank"
+			rel="noopener noreferrer"
+			aria-label="Realms on GitHub"
+			class="inline-flex items-center text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400"
+		>
+			<GithubSolid class="block h-3 w-3" size="xs" />
+		</a>
+		<a
+			href="https://github.com/smart-social-contracts/realms/commit/{fullCommitHash}"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="text-gray-400 hover:underline dark:text-gray-500"
+		>
+			{commitHash}
+		</a>
+		<span>{commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ' - Local deployment' : ''}</span>
 	</div>
 
 	{#if $testMode}
@@ -113,7 +122,7 @@
 			<button
 				type="button"
 				class="rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-400 dark:hover:bg-gray-700"
-				on:click={() => (testFlagsOpen = true)}
+				onclick={() => (testFlagsOpen = true)}
 			>
 				Test flags
 			</button>
@@ -122,10 +131,10 @@
 	{/if}
 	
 	<!-- Built on Internet Computer section -->
-	<div class="flex justify-center mt-3">
-		<a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="flex items-center text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-			<img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" class="mr-2 grayscale" />
-			<span class="text-sm">Built on the Internet Computer</span>
+	<div class="mt-3 flex justify-center">
+		<a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-normal text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400">
+			<img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="12" height="12" class="block h-3 w-3 grayscale" />
+			<span>Built on the Internet Computer</span>
 		</a>
 	</div>
 </Frame>
