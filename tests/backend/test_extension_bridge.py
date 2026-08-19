@@ -171,6 +171,16 @@ def test_mine_filter_is_resolved_against_the_caller(realm):
     assert [r["h3_index"] for r in bob_result["rows"]] == ["8b1"]
 
 
+def test_entity_list_zone_omits_land_linked_rows(realm):
+    parcel_land = types.SimpleNamespace(id="land-1")
+    FakeZone.registry.append(
+        FakeZone("8c1", realm.alice, "Parcel zone", land=parcel_land),
+    )
+    handler = eb.make_rpc_handler("zone_selector", [ZONE_READ, "entity.list"], ALICE)
+    result = handler("zone_selector", "entity.list", {"type": "Zone"})
+    assert [r["h3_index"] for r in result["rows"]] == ["8a1", "8a2", "8b1"]
+
+
 def test_projection_is_limited_to_declared_fields(realm):
     handler = eb.make_rpc_handler("zone_selector", [ZONE_READ, "entity.list"], ALICE)
     row = handler("zone_selector", "entity.list", {"type": "Zone"})["rows"][0]

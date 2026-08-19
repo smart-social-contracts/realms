@@ -77,6 +77,10 @@ def realm(monkeypatch):
                 land.zones.append(zone)
             return zone
 
+        @staticmethod
+        def instances():
+            return list(zones.values())
+
         def __class_getitem__(cls, key):
             return zones.get(key)
 
@@ -173,7 +177,38 @@ def test_registered_by_is_the_caller_not_an_argument(realm):
 def test_multi_cell_parcel_labels_each_zone(realm):
     land = make_land(realm, h3_indexes=["a", "b", "c"], name="Big")
     assert land["h3_indexes"] == ["a", "b", "c"]
-    assert realm.zones["b"].name == "Big (2/3)"
+    assert len(realm.zones) == 0
+
+
+def test_territory_zone_does_not_block_parcel_create(realm):
+    realm.zones["8a1f"] = types.SimpleNamespace(
+        h3_index="8a1f", land=None, zone_type="residential", name="Territory",
+    )
+    land = make_land(realm, h3_indexes=["8a1f"], name="Parcel")
+    assert land["h3_index"] == "8a1f"
+    assert len(realm.zones) == 1
+
+
+def test_parcel_inherits_territory_land_type(realm):
+    realm.zones["8a1f"] = types.SimpleNamespace(
+        h3_index="8a1f", land=None, zone_type="residential", name="Territory",
+    )
+    land = make_land(
+        realm, h3_indexes=["8a1f"], name="Parcel", land_type="commercial",
+    )
+    assert land["land_type"] == "residential"
+
+
+def test_parcel_follows_territory_zone_type_change(realm):
+    realm.zones["8a1f"] = types.SimpleNamespace(
+        h3_index="8a1f", land=None, zone_type="residential", name="Territory",
+    )
+    make_land(realm, h3_indexes=["8a1f"], name="Parcel")
+    assert realm.lands[0].land_type == "residential"
+
+    realm.zones["8a1f"].zone_type = "commercial"
+    lb.sync_parcels_covering(["8a1f"])
+    assert realm.lands[0].land_type == "commercial"
 
 
 # ---------------------------------------------------------------------------

@@ -209,10 +209,8 @@ def _project(row, policy: "EntityPolicy") -> dict:
 ENTITY_POLICIES: Dict[str, EntityPolicy] = {
     "Zone": EntityPolicy(
         fields=("id", "h3_index", "name", "description", "zone_type", "metadata"),
-        # The zoning map is realm-public today: get_all_zones renders every
-        # zone for every member. Narrowing that is a product decision, not a
-        # bridge one, so the bridge preserves it and offers `mine` for the
-        # self-scoped view.
+        # Territory zones (land-use plan) are realm-public. Parcel geometry
+        # lives on Land and is not exposed through the Zone read surface.
         scope="realm",
         owner_field="user",
         filters=("mine", "h3_index", "zone_type"),
@@ -278,6 +276,17 @@ def _visible_rows(policy: EntityPolicy, caller: str, where: dict):
                 f"'{key}' is not a filterable field of {policy.type_name}"
             )
         rows = [r for r in rows if getattr(r, key, None) == value]
+
+    if policy.type_name == "Zone":
+        territory = []
+        for row in rows:
+            try:
+                if row.land is not None:
+                    continue
+            except Exception:
+                pass
+            territory.append(row)
+        rows = territory
     return rows
 
 
@@ -781,6 +790,25 @@ def _v_zone_create(caller="", h3_index="", **kwargs) -> dict:
         if existing.h3_index == h3_index and _is_territory_zone(existing):
             raise ValueError("A zone already exists at this location")
 
+    leftover = None
+    try:
+        leftover = Zone[h3_index]
+    except Exception:
+        leftover = None
+    if leftover is not None:
+        try:
+            if leftover.land is not None:
+                leftover.land = None
+                leftover.name = kwargs.get("name") or "Zone"
+                leftover.description = kwargs.get("description") or ""
+                leftover.zone_type = zone_type
+                leftover.metadata = kwargs.get("metadata") or "{}"
+                leftover.user = user
+                _land_bridge.sync_parcels_covering([h3_index])
+                return _project(leftover, ENTITY_POLICIES["Zone"])
+        except Exception:
+            pass
+
     zone = Zone(
         h3_index=h3_index,
         name=kwargs.get("name") or "Zone",
@@ -792,12 +820,14 @@ def _v_zone_create(caller="", h3_index="", **kwargs) -> dict:
     # Return the projection so the caller needs no follow-up read. A Zone's
     # entity ``id`` is not its h3_index, so a round-trip through entity.get
     # would not find it.
+    _land_bridge.sync_parcels_covering([h3_index])
     return _project(zone, ENTITY_POLICIES["Zone"])
 
 
 def _v_zone_update(caller="", h3_index="", **kwargs) -> dict:
     """Update a territory zone the caller owns (or any, for a realm admin)."""
     zone = _owned_zone_or_denied(h3_index, caller)
+    old_zone_type = getattr(zone, "zone_type", None)
 
     updated = []
     for field in _ZONE_WRITABLE:
@@ -808,6 +838,9 @@ def _v_zone_update(caller="", h3_index="", **kwargs) -> dict:
             value = _require_zone_type(value)
         setattr(zone, field, value)
         updated.append(field)
+
+    if "zone_type" in updated and getattr(zone, "zone_type", None) != old_zone_type:
+        _land_bridge.sync_parcels_covering([h3_index])
     return dict(_project(zone, ENTITY_POLICIES["Zone"]), updated_fields=updated)
 
 
@@ -815,6 +848,7 @@ def _v_zone_delete(caller="", h3_index="", **kwargs) -> dict:
     """Delete a territory zone the caller owns (or any, for a realm admin)."""
     zone = _owned_zone_or_denied(h3_index, caller)
     zone.delete()
+    _land_bridge.sync_parcels_covering([h3_index])
     return {"id": h3_index, "deleted": True}
 
 

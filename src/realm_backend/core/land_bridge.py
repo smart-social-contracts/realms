@@ -42,21 +42,108 @@ def _zones(land) -> list:
         return []
 
 
+def _land_cells(land) -> list:
+    """H3 cells a parcel occupies — metadata first, then legacy zone rows."""
+    meta = _metadata(land)
+    cells = [str(c) for c in (meta.get("h3_indexes") or []) if c]
+    if cells:
+        return cells
+    zone_rows = _zones(land)
+    if zone_rows:
+        return [
+            str(z.h3_index)
+            for z in zone_rows
+            if getattr(z, "h3_index", None)
+        ]
+    parent = meta.get("parent_zone")
+    if parent:
+        return [str(parent)]
+    return []
+
+
+def _covering_zone_type(h3_index: str) -> str:
+    """Territory zone type at *h3_index*, or ``unassigned`` when absent."""
+    from ggg import Zone
+
+    cell = str(h3_index)
+    zone = None
+    try:
+        zone = Zone[cell]
+    except Exception:
+        zone = None
+    if zone is not None:
+        try:
+            if zone.land is not None:
+                zone = None
+        except Exception:
+            pass
+    if zone is None:
+        try:
+            for z in Zone.instances():
+                if z.h3_index == cell:
+                    try:
+                        if z.land is None:
+                            zone = z
+                            break
+                    except Exception:
+                        zone = z
+                        break
+        except Exception:
+            pass
+    if zone is None:
+        return "unassigned"
+    return getattr(zone, "zone_type", None) or "unassigned"
+
+
+def _inherit_land_type(cells: list) -> str:
+    """Most common non-unassigned territory type across *cells*."""
+    from collections import Counter
+
+    if not cells:
+        return "unassigned"
+    types = [_covering_zone_type(c) for c in cells]
+    non_unassigned = [t for t in types if t and t != "unassigned"]
+    if not non_unassigned:
+        return "unassigned"
+    return Counter(non_unassigned).most_common(1)[0][0]
+
+
+def sync_parcels_covering(cells: list) -> None:
+    """Recompute ``land_type`` on parcels whose cells overlap *cells*."""
+    if not cells:
+        return
+    try:
+        from ggg import Land  # noqa: F401
+    except Exception:
+        return
+    cell_set = {str(c) for c in cells if c}
+    try:
+        lands = _all_lands()
+    except Exception:
+        return
+    for land in lands:
+        land_cells = _land_cells(land)
+        if not land_cells:
+            continue
+        if not cell_set.intersection(land_cells):
+            continue
+        land.land_type = _inherit_land_type(land_cells)
+
+
 def project(land) -> dict:
     """A land parcel as plain data."""
+    meta = _metadata(land)
+    cells = _land_cells(land)
     zones = [
         {
-            "h3_index": z.h3_index,
-            "name": z.name,
-            "zone_type": getattr(z, "zone_type", None) or "unassigned",
+            "h3_index": cell,
+            "name": (meta.get("name") or "").strip() or f"{land.id} parcel",
+            "zone_type": land.land_type,
         }
-        for z in _zones(land)
+        for cell in cells
     ]
-    meta = _metadata(land)
 
-    h3_indexes = [z["h3_index"] for z in zones if z.get("h3_index")]
-    if not h3_indexes and meta.get("parent_zone"):
-        h3_indexes = [str(meta["parent_zone"])]
+    h3_indexes = list(cells)
 
     owner_user = getattr(land, "owner_user", None)
     owner_org = getattr(land, "owner_organization", None)
@@ -187,13 +274,18 @@ def _all_lands():
         from_id = int(batch[-1]._id) + 1
 
 
-def _zone_is_taken(h3_index: str) -> bool:
+def _cell_is_taken(h3_index: str) -> bool:
+    """True when another parcel or leftover land-linked Zone owns *h3_index*."""
     from ggg import Zone
 
+    cell = str(h3_index)
+    for land in _all_lands():
+        if cell in _land_cells(land):
+            return True
     try:
-        zone = Zone[h3_index]
+        zone = Zone[cell]
     except Exception:
-        return False
+        zone = None
     if not zone:
         return False
     try:
@@ -297,7 +389,7 @@ def v_create(caller="", land_type=None, name="", id="", h3_index=None,
     an argument, so the provenance of a parcel cannot be forged.
     """
     _require_admin(caller, "land.create")
-    from ggg import Land, LandType, Zone
+    from ggg import Land, LandType
 
     land_type = land_type or LandType.UNASSIGNED
 
@@ -307,7 +399,7 @@ def v_create(caller="", land_type=None, name="", id="", h3_index=None,
 
     if cells:
         for cell in cells:
-            if _zone_is_taken(cell):
+            if _cell_is_taken(cell):
                 raise ValueError(f"Land parcel already exists at H3 cell {cell}")
 
         meta = metadata or {}
@@ -318,30 +410,21 @@ def v_create(caller="", land_type=None, name="", id="", h3_index=None,
                 meta = {}
         meta.setdefault("parent_zone", cells[0])
         meta["h3_indexes"] = cells
+        if (name or "").strip():
+            meta["name"] = (name or "").strip()
 
+        inherited_type = _inherit_land_type(cells)
         x_coord, y_coord = _synthetic_coords(cells)
         land = Land(
             x_coordinate=x_coord,
             y_coordinate=y_coord,
-            land_type=land_type,
+            land_type=inherited_type,
             size_width=max(1, len(cells)),
             size_height=1,
             metadata=json.dumps(meta),
             registered_by=caller,
         )
         land.id = str(id).strip() or f"land_{land._id}"
-
-        for index, cell in enumerate(cells):
-            label = (name or "").strip() or f"{land.id} parcel"
-            if len(cells) > 1:
-                label = f"{label} ({index + 1}/{len(cells)})"
-            Zone(
-                h3_index=cell,
-                name=label,
-                description=f"Land parcel {land.id}",
-                zone_type=land_type,
-                land=land,
-            )
 
         return dict(project(land), created=True)
 
@@ -378,11 +461,23 @@ def v_update(caller="", land_id="", **fields) -> dict:
     if not land:
         raise ValueError("Land not found")
 
+    has_cells = bool(_land_cells(land))
+
     updated = []
     for field in UPDATABLE:
-        if field in fields:
-            setattr(land, field, fields[field])
-            updated.append(field)
+        if field not in fields:
+            continue
+        if field == "land_type" and has_cells:
+            continue
+        setattr(land, field, fields[field])
+        updated.append(field)
+
+    if has_cells:
+        inherited = _inherit_land_type(_land_cells(land))
+        if land.land_type != inherited:
+            land.land_type = inherited
+            if "land_type" not in updated:
+                updated.append("land_type")
 
     rejected = sorted(
         set(fields) - set(UPDATABLE) - {"caller", "capabilities", "ext_id"}
