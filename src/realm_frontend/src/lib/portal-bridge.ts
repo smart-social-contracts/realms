@@ -11,6 +11,8 @@ let pendingDelegationRequest = false;
 let pendingNavPush: { path: string; replace: boolean } | null = null;
 let pendingFocusPush: { source: string; uri: string; label?: string } | null | undefined = undefined;
 let pendingAssistantOpen: boolean = false;
+let pendingUiReady: boolean = false;
+let uiReadySent: boolean = false;
 let sessionIdentity: Ed25519KeyIdentity | null = null;
 let delegationIdentity: DelegationIdentity | null = null;
 let delegationExpiresAt: number | null = null;
@@ -213,6 +215,11 @@ export function initPortalBridge() {
       pendingAssistantOpen = false;
       post({ type: 'assistant:open' });
     }
+    if (pendingUiReady && !uiReadySent) {
+      uiReadySent = true;
+      pendingUiReady = false;
+      post({ type: 'ui:ready' });
+    }
   };
 
   window.addEventListener('message', onWindowMessage);
@@ -295,6 +302,25 @@ export function portalAssistantOpen() {
   }
   pendingAssistantOpen = false;
   post({ type: 'assistant:open' });
+  return true;
+}
+
+/**
+ * Tell the portal host the realm has real content on screen (setup gate
+ * resolved) so it can drop its own loading overlay. Signalling at mount
+ * instead would hand off while the splash/skeleton is still showing.
+ * Fire-and-forget; queues briefly if the MessagePort is not ready yet.
+ * Fires exactly once per page load.
+ */
+export function portalUiReady() {
+  if (!isEmbeddedInPortal()) return false;
+  if (uiReadySent) return true;
+  if (!port) {
+    pendingUiReady = true;
+    return false;
+  }
+  uiReadySent = true;
+  post({ type: 'ui:ready' });
   return true;
 }
 

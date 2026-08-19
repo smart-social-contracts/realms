@@ -57,6 +57,22 @@ function getPreferredLocale(): string {
   } catch (e) {
     console.error('Error accessing localStorage:', e);
   }
+
+  // Check locale cookie (set by hooks.server or prior visit)
+  try {
+    const localeCookie = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('locale='));
+    if (localeCookie) {
+      const cookieLocale = localeCookie.split('=')[1];
+      if (targetLanguages.includes(cookieLocale)) {
+        console.log('Using locale from cookie:', cookieLocale);
+        return cookieLocale;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading locale cookie:', e);
+  }
   
   // Fall back to browser language preferences
   const browserLanguages = navigator.languages || [navigator.language];
@@ -184,21 +200,21 @@ export async function loadExtensionTranslations() {
   }
 }
 
-export async function initI18n() {
-  init({
-    fallbackLocale: "en",
-    initialLocale: browser ? getPreferredLocale() : "en"
+// Synchronous init at import time so $_ never throws; dictionaries load async
+// via register()ed loaders and stores update reactively when they arrive.
+init({
+  fallbackLocale: "en",
+  initialLocale: browser ? getPreferredLocale() : "en",
+});
+
+if (browser) {
+  void waitLocale().then(async () => {
+    console.log("i18n initialized in realm_frontend");
+    // Build-time bundled extension translations (legacy path; will be empty
+    // in fully layered deployments because no extension code is shipped in
+    // the realm_frontend WASM). Runtime extension translations are loaded
+    // lazily per-extension via loadExtensionTranslation().
+    await loadExtensionTranslations();
+    console.log("All translations (core + extensions) loaded");
   });
-
-  await waitLocale();
-
-  console.log('i18n initialized in realm_frontend');
-
-  // Build-time bundled extension translations (legacy path; will be empty
-  // in fully layered deployments because no extension code is shipped in
-  // the realm_frontend WASM). Runtime extension translations are loaded
-  // lazily per-extension via loadExtensionTranslation().
-  await loadExtensionTranslations();
-
-  console.log('All translations (core + extensions) loaded');
 }

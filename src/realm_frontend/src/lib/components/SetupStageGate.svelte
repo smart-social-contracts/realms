@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
@@ -16,6 +16,8 @@
 	} from '$lib/setup/gateLogic';
 	import SetupGatePage from '$lib/components/SetupGatePage.svelte';
 
+	let uiReadySignalled = false;
+
 	interface Props {
 		children: import('svelte').Snippet;
 	}
@@ -28,6 +30,9 @@
 	let probeTimer: ReturnType<typeof setInterval> | undefined;
 	let redirectedToSetup = $state(false);
 	let unknownStatusFailures = $state(0);
+	let showStillWorking = $state(false);
+	let stillWorkingTimer: ReturnType<typeof setTimeout> | undefined;
+	let loadingTimerStarted = false;
 
 	const gateInput = $derived({
 		loading: $setupStateStore.loading,
@@ -46,6 +51,39 @@
 			$setupStateStore.state?.is_caller_authorized &&
 			($page.url.pathname === '/setup' || $page.url.pathname.startsWith('/setup/'))
 	);
+
+	$effect(() => {
+		if (decision.kind !== 'loading') {
+			if (stillWorkingTimer) {
+				clearTimeout(stillWorkingTimer);
+				stillWorkingTimer = undefined;
+			}
+			showStillWorking = false;
+			loadingTimerStarted = false;
+			return;
+		}
+
+		if (!loadingTimerStarted) {
+			loadingTimerStarted = true;
+			stillWorkingTimer = setTimeout(() => {
+				showStillWorking = true;
+			}, 6000);
+		}
+	});
+
+	$effect(() => {
+		if (decision.kind === 'loading' || decision.kind === 'redirect' || uiReadySignalled) return;
+		uiReadySignalled = true;
+		void (async () => {
+			await tick();
+			const { portalUiReady } = await import('$lib/portal-bridge');
+			portalUiReady();
+		})();
+	});
+
+	onDestroy(() => {
+		if (stillWorkingTimer) clearTimeout(stillWorkingTimer);
+	});
 
 	async function refreshSetupState() {
 		try {
@@ -148,11 +186,19 @@
 </script>
 
 {#if decision.kind === 'loading'}
-	<div class="setup-stage-loading" role="status" aria-live="polite">
-		<div class="setup-stage-loading__dots" aria-hidden="true">
-			<span></span><span></span><span></span>
+	<div class="setup-shell" role="status" aria-live="polite">
+		<div class="setup-shell__header setup-shell__pulse" aria-hidden="true"></div>
+		<div class="setup-shell__main">
+			<div class="setup-shell__blocks" aria-hidden="true">
+				<div class="setup-shell__block setup-shell__pulse"></div>
+				<div class="setup-shell__block setup-shell__block--md setup-shell__pulse"></div>
+				<div class="setup-shell__block setup-shell__block--sm setup-shell__pulse"></div>
+			</div>
+			<p class="setup-shell__label">Loading setup…</p>
+			{#if showStillWorking}
+				<p class="setup-shell__sublabel">Still working…</p>
+			{/if}
 		</div>
-		<p class="setup-stage-loading__label">Loading setup…</p>
 	</div>
 {:else if decision.kind === 'gate'}
 	<SetupGatePage variant={decision.variant} realmName={$realmName || 'This realm'} />
@@ -161,54 +207,82 @@
 {/if}
 
 <style>
-	.setup-stage-loading {
+	.setup-shell {
 		display: flex;
 		flex-direction: column;
 		min-height: 100vh;
 		min-height: 100dvh;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
 		background: #ffffff;
 	}
 
-	.setup-stage-loading__label {
-		margin: 0;
-		font-size: 0.9375rem;
-		color: #64748b;
+	.setup-shell__header {
+		flex-shrink: 0;
+		height: 56px;
+		background: #e5e7eb;
 	}
 
-	.setup-stage-loading__dots {
+	.setup-shell__main {
+		flex: 1;
 		display: flex;
-		gap: 0.5rem;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem 1.5rem;
+		gap: 0.75rem;
 	}
 
-	.setup-stage-loading__dots span {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: #94a3b8;
-		animation: setup-dot-pulse 1.4s ease-in-out infinite;
+	.setup-shell__blocks {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		width: 100%;
+		max-width: 28rem;
+		margin-bottom: 0.5rem;
 	}
 
-	.setup-stage-loading__dots span:nth-child(2) {
-		animation-delay: 0.2s;
+	.setup-shell__block {
+		height: 5rem;
+		border-radius: 0.5rem;
+		background: #f3f4f6;
 	}
 
-	.setup-stage-loading__dots span:nth-child(3) {
-		animation-delay: 0.4s;
+	.setup-shell__block--md {
+		height: 3.5rem;
+		background: #e5e7eb;
 	}
 
-	@keyframes setup-dot-pulse {
+	.setup-shell__block--sm {
+		height: 2.5rem;
+		width: 60%;
+		background: #f3f4f6;
+	}
+
+	.setup-shell__pulse {
+		animation: setup-shell-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	}
+
+	.setup-shell__label {
+		margin: 0;
+		font-size: 0.875rem;
+		color: #64748b;
+		text-align: center;
+	}
+
+	.setup-shell__sublabel {
+		margin: 0;
+		font-size: 0.75rem;
+		color: #94a3b8;
+		text-align: center;
+	}
+
+	@keyframes setup-shell-pulse {
 		0%,
-		80%,
 		100% {
-			opacity: 0.3;
-			transform: scale(0.8);
-		}
-		40% {
 			opacity: 1;
-			transform: scale(1);
+		}
+
+		50% {
+			opacity: 0.5;
 		}
 	}
 </style>

@@ -2,11 +2,10 @@
 	import modeobserver from './utils/modeobserver';
 	import { onMount } from 'svelte';
 	import { afterNavigate, goto } from '$app/navigation';
-	import { initI18n } from '$lib/i18n';
 	import { browser } from '$app/environment';
-	import { locale, _ } from 'svelte-i18n';
+	import '$lib/i18n';
+	import { locale } from 'svelte-i18n';
 	import '../app.pcss';
-	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import { initializeTheme } from '$lib/theme/init';
 	import { restoreAuthSession, resetAuthSessionRestore, getPortalRedirectUrl } from '$lib/auth';
 	import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge.ts';
@@ -14,9 +13,6 @@
 	import SetupStageGate from '$lib/components/SetupStageGate.svelte';
 
 	export const SITE_NAME = "Realms GOS";
-
-	// Flag to track if i18n is ready
-	let i18nReady = false;
 
 	// Debug locale changes
 	if (browser) {
@@ -49,6 +45,8 @@
 	});
 
 	onMount(async () => {
+		document.getElementById('app-splash')?.remove();
+
 		// Standalone visit to the raw canister origin → bounce to the federation
 		// portal (https://…/r/<slug>/<same-path>), where the single II login is
 		// bridged into the embedded realm. Bookmarks and shared raw-URL links
@@ -96,23 +94,6 @@
 			};
 		}
 
-		await initI18n();
-		i18nReady = true;
-
-		if (browser) {
-			const storedLocale = localStorage.getItem('preferredLocale');
-			if (storedLocale) {
-				locale.set(storedLocale);
-			} else {
-				const localeCookie = document.cookie
-					.split('; ')
-					.find(row => row.startsWith('locale='));
-				if (localeCookie) {
-					locale.set(localeCookie.split('=')[1]);
-				}
-			}
-		}
-
 		return () => {
 			bridgeDispose?.();
 		};
@@ -120,19 +101,9 @@
 </script>
 
 <div class="app">
-	{#if browser && i18nReady}
-		<SetupStageGate>
-			<slot />
-		</SetupStageGate>
-	{:else}
-		<div class="loading">
-			<div class="loading-dots">
-				<span></span>
-				<span></span>
-				<span></span>
-			</div>
-		</div>
-	{/if}
+	<SetupStageGate>
+		<slot />
+	</SetupStageGate>
 </div>
 
 <style>
@@ -140,47 +111,5 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 100vh;
-	}
-	
-	.loading {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		height: 100vh;
-		height: 100dvh;
-		background: #ffffff;
-	}
-	
-	.loading-dots {
-		display: flex;
-		gap: 0.5rem;
-		align-items: center;
-	}
-	
-	.loading-dots span {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: #a3a3a3;
-		animation: dot-pulse 1.4s ease-in-out infinite;
-	}
-	
-	.loading-dots span:nth-child(2) {
-		animation-delay: 0.2s;
-	}
-	
-	.loading-dots span:nth-child(3) {
-		animation-delay: 0.4s;
-	}
-	
-	@keyframes dot-pulse {
-		0%, 80%, 100% {
-			opacity: 0.3;
-			transform: scale(0.8);
-		}
-		40% {
-			opacity: 1;
-			transform: scale(1);
-		}
 	}
 </style>
