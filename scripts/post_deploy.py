@@ -6,7 +6,6 @@ Handles realm registration, runs canister_init.py if present, and reloads entity
 
 import subprocess
 import os
-import re
 import sys
 import json
 import time
@@ -396,120 +395,53 @@ except Exception as e:
 # Seed Token entities for Vault Manager
 print("\n🪙 Seeding Token entities...")
 try:
-    tokens_to_seed = []
-
-    def _unwrap_dfx_json(stdout):
-        data = json.loads((stdout or "").strip())
-        if isinstance(data, dict) and "Ok" in data:
-            return data["Ok"]
-        return data
-
-    def _unwrap_candid_text(out):
-        m = re.match(r'^\s*\(\s*"((?:[^"\\]|\\.)*)"\s*,?\s*\)\s*$', out or "", re.DOTALL)
-        if not m:
-            return out
-        raw = m.group(1)
-        return (
-            raw.replace("\\\\", "\\")
-            .replace('\\"', '"')
-            .replace("\\n", "\n")
-            .replace("\\r", "\r")
-            .replace("\\t", "\t")
-        )
-
-    def _dfx_query_json(method, arg='()'):
-        cmd = ['dfx', 'canister', 'call', '--query', backend_name, method, arg, '--output', 'json']
-        if network != 'local':
-            cmd.extend(['--network', network])
-        result = subprocess.run(cmd, cwd=realm_dir, capture_output=True, text=True, timeout=60)
-        if result.returncode != 0:
-            raise Exception(result.stderr or result.stdout)
-        return _unwrap_dfx_json(result.stdout)
-
-    def _dfx_update_text(method, arg):
-        cmd = ['dfx', 'canister', 'call', backend_name, method, arg]
-        if network != 'local':
-            cmd.extend(['--network', network])
-        result = subprocess.run(cmd, cwd=realm_dir, capture_output=True, text=True, timeout=120)
-        if result.returncode != 0:
-            raise Exception(result.stderr or result.stdout)
-        return _unwrap_candid_text(result.stdout.strip())
-
-    def _extract_status_record(status_response):
-        if not isinstance(status_response, dict):
-            return None
-        data = status_response.get("data", status_response)
-        if isinstance(data, dict) and "status" in data:
-            return data["status"]
-        return None
-
-    treasury_ledger_id = None
-    treasury_symbol = None
-    treasury_decimals = None
-    treasury_indexer_id = None
-
     try:
-        status_response = _dfx_query_json('status')
-        status_record = _extract_status_record(status_response)
-        if isinstance(status_record, dict):
-            canisters = status_record.get("canisters") or []
-            for canister in canisters:
-                if not isinstance(canister, dict):
-                    continue
-                if canister.get("canister_type") == "token_backend":
-                    treasury_ledger_id = (canister.get("canister_id") or "").strip()
-                    break
-            treasury_symbol = (status_record.get("accounting_currency") or "").strip()
-            treasury_decimals = status_record.get("accounting_currency_decimals")
-    except Exception as status_err:
-        print(f"   ⚠️  Could not read realm status for treasury token: {status_err}")
-
-    if treasury_ledger_id:
-        try:
-            resolve_arg = f'("{treasury_ledger_id}")'
-            resolved_raw = _dfx_update_text('resolve_token_ledger', resolve_arg)
-            resolved = json.loads(resolved_raw) if isinstance(resolved_raw, str) else resolved_raw
-            if isinstance(resolved, dict) and resolved.get("success"):
-                treasury_symbol = (resolved.get("symbol") or treasury_symbol or "").strip()
-                if resolved.get("decimals") is not None:
-                    treasury_decimals = resolved.get("decimals")
-                treasury_indexer_id = (
-                    resolved.get("indexer_canister_id") or treasury_ledger_id
-                ).strip()
-            else:
-                resolve_error = (
-                    resolved.get("error") if isinstance(resolved, dict) else str(resolved)
-                )
-                print(
-                    f"   ⚠️  Could not resolve treasury ledger {treasury_ledger_id}: {resolve_error}"
-                )
-        except Exception as resolve_err:
-            print(f"   ⚠️  resolve_token_ledger failed for {treasury_ledger_id}: {resolve_err}")
-
-        if treasury_symbol:
-            try:
-                treasury_decimals = int(treasury_decimals if treasury_decimals is not None else 8)
-            except (TypeError, ValueError):
-                treasury_decimals = 8
-            tokens_to_seed.append({
-                "symbol": treasury_symbol,
-                "name": treasury_symbol,
-                "ledger_canister_id": treasury_ledger_id,
-                "indexer_canister_id": treasury_indexer_id or treasury_ledger_id,
-                "decimals": treasury_decimals,
-                "token_type": "realm",
-                "enabled": "true",
-            })
-            print(f"   ℹ️  Treasury token: {treasury_symbol} ({treasury_ledger_id})")
-        else:
-            print(
-                f"   ⚠️  Treasury ledger {treasury_ledger_id} configured but symbol could not be resolved; skipping token seed"
-            )
-    else:
-        print(
-            "   ℹ️  No treasury token configured yet — it will be registered when the treasury ledger is set in Realm Settings"
+        reconcile_cmd = [
+            'dfx', 'canister', 'call', backend_name, 'reconcile_treasury_token',
+            '()', '--output', 'json',
+        ]
+        if network != 'local':
+            reconcile_cmd.extend(['--network', network])
+        reconcile_result = subprocess.run(
+            reconcile_cmd, cwd=realm_dir, capture_output=True, text=True, timeout=120,
         )
+        if reconcile_result.returncode != 0:
+            print(
+                f"   ⚠️  reconcile_treasury_token failed: "
+                f"{reconcile_result.stderr or reconcile_result.stdout}"
+            )
+        else:
+            outer = json.loads((reconcile_result.stdout or "").strip())
+            inner = outer["Ok"] if isinstance(outer, dict) and "Ok" in outer else outer
+            if isinstance(inner, dict):
+                payload = inner
+            elif isinstance(inner, str):
+                payload = json.loads(inner)
+            else:
+                payload = {"success": False, "error": f"unexpected response: {inner!r}"}
 
+            if not payload.get("success"):
+                error = payload.get("error", "unknown error")
+                error_code = payload.get("error_code")
+                code_suffix = f" ({error_code})" if error_code else ""
+                print(f"   ⚠️  Treasury token resolution failed{code_suffix}: {error}")
+            elif payload.get("skipped"):
+                reason = payload.get("reason", "no_treasury_ledger")
+                if reason == "no_treasury_ledger":
+                    print(
+                        "   ℹ️  No treasury token configured yet — it will be registered "
+                        "when the treasury ledger is set in Realm Settings"
+                    )
+                else:
+                    print(f"   ℹ️  Treasury token skipped: {reason}")
+            else:
+                symbol = payload.get("symbol", "?")
+                ledger = payload.get("ledger", "?")
+                print(f"   ✅ Treasury token reconciled: {symbol} ({ledger})")
+    except Exception as treasury_err:
+        print(f"   ⚠️  Treasury token reconcile failed: {treasury_err}")
+
+    tokens_to_seed = []
     realms_token_id = (os.environ.get('REALMS_TOKEN_CANISTER_ID') or "").strip()
     if realms_token_id:
         tokens_to_seed.append({

@@ -342,6 +342,7 @@ service : {
   "unfreeze_token_account" : (text) -> (text);
   "get_nft_config" : () -> (text) query;
   "resolve_token_ledger" : (text) -> (text);
+  "reconcile_treasury_token" : () -> (text);
   "update_realm_config" : (text) -> (text);
   "get_sandbox_config" : () -> (text) query;
   "set_sandbox_config" : (text) -> (text);

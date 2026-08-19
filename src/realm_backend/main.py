@@ -4473,6 +4473,13 @@ def initialize() -> void:
     except Exception as e:
         logger.error(f"❌ Error starting proposal index backfill: {str(e)}")
 
+    try:
+        from core.treasury_reconcile import schedule_treasury_reconcile_on_boot
+
+        schedule_treasury_reconcile_on_boot()
+    except Exception as e:
+        logger.warning(f"Could not schedule treasury token reconcile: {e}")
+
 
 _PROPOSAL_INDEX_BACKFILL_FLAG = "fi_backfill:Proposal:v2"
 _PROPOSAL_INDEX_FIELDS = ["status", "org_scope"]
@@ -5660,6 +5667,22 @@ def resolve_token_ledger(ledger_canister_id: text) -> Async[text]:
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"resolve_token_ledger failed: {e}")
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def reconcile_treasury_token() -> Async[text]:
+    """Re-resolve treasury symbol/decimals from the configured ledger."""
+    try:
+        from core.treasury_reconcile import (
+            reconcile_treasury_token as _reconcile_treasury_token,
+        )
+
+        result = yield from _reconcile_treasury_token()
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"reconcile_treasury_token failed: {e}")
         return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 
