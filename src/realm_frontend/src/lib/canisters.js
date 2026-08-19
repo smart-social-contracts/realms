@@ -218,6 +218,18 @@ export async function initBackendWithIdentity(explicitIdentity = null) {
 			console.log('Backend initialized with authenticated identity');
 			return authenticatedActor;
 		} else {
+			const recoveredIdentity = await (async () => {
+				const { getEstablishedIdentity, resetAuthStoresIfDesynced } = await import('$lib/auth');
+				const identity = await getEstablishedIdentity();
+				if (identity) return identity;
+				await resetAuthStoresIfDesynced();
+				return null;
+			})();
+
+			if (recoveredIdentity) {
+				return initBackendWithIdentity(recoveredIdentity);
+			}
+
 			console.log('User not authenticated, using anonymous identity');
 			return backend;
 		}

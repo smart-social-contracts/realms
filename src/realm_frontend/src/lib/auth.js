@@ -4,7 +4,12 @@ import { Principal } from '@dfinity/principal';
 import { getTestModeIIBypass } from '$lib/config.js';
 import { isEmbeddedInPortal, getPortalDelegationIdentity } from '$lib/portal-bridge.ts';
 import { normalizePortalRedirectPath } from '$lib/portal-redirect-path.ts';
-import { resolveAuthChannel, shouldUseTestModeAuth, shouldPreferTestModeLogin, shouldRestoreTestModeSession } from '$lib/auth-precedence.ts';
+import {
+  resolveEffectiveAuthChannel,
+  shouldUseTestModeAuth,
+  shouldPreferTestModeLogin,
+  shouldRestoreTestModeSession
+} from '$lib/auth-precedence.ts';
 
 const II_URL = globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app';
 console.log(`Using Identity Provider: ${II_URL}`);
@@ -69,8 +74,41 @@ export function getPortalRedirectUrl() {
 let authClient;
 let authClientMode = null;
 
+const AUTH_CHANNEL_KEY = 'realms:auth_channel';
+
+function persistAuthChannel(channel) {
+  if (!channel) return;
+  try {
+    sessionStorage.setItem(AUTH_CHANNEL_KEY, channel);
+  } catch {
+    // private mode / sandbox
+  }
+}
+
+function readPersistedAuthChannel() {
+  try {
+    const raw = sessionStorage.getItem(AUTH_CHANNEL_KEY);
+    if (raw === 'portal' || raw === 'test' || raw === 'ii') return raw;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistedAuthChannel() {
+  try {
+    sessionStorage.removeItem(AUTH_CHANNEL_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 function getAuthMode() {
-  const channel = resolveAuthChannel(isEmbeddedInPortal(), getTestModeIIBypass());
+  const channel = resolveEffectiveAuthChannel(
+    isEmbeddedInPortal(),
+    getTestModeIIBypass(),
+    readPersistedAuthChannel()
+  );
   if (channel === 'portal') return 'portal';
   if (channel === 'test') return 'test';
   return 'ii';
@@ -160,6 +198,7 @@ async function restoreTestAuthSession() {
     _testIdentityIndex = persistedIndex;
     authClient = _createTestAuthClientMock();
     authClientMode = 'test';
+    persistAuthChannel('test');
     console.log(`[TEST MODE] Restored session from storage: index ${persistedIndex}`);
   }
 
@@ -274,6 +313,7 @@ export async function login({ random = false, identityIndex = null, preferTestMo
     _testLoggedIn = true;
     authClient = _createTestAuthClientMock();
     authClientMode = 'test';
+    persistAuthChannel('test');
     if (_testIdentityIndex != null) {
       persistTestAuthIndex(_testIdentityIndex);
     }
@@ -305,6 +345,7 @@ export async function login({ random = false, identityIndex = null, preferTestMo
     if (identity) {
       authClient = _createPortalAuthClientMock();
       authClientMode = 'portal';
+      persistAuthChannel('portal');
       const principal = identity.getPrincipal();
       console.log(`[portal] Authenticated via delegation: ${principal.toText()}`);
       return { identity, principal };
@@ -359,6 +400,7 @@ export async function login({ random = false, identityIndex = null, preferTestMo
 
 export async function logout() {
   resetAuthSessionRestore();
+  clearPersistedAuthChannel();
   if (getTestModeIIBypass()) {
     _testLoggedIn = false;
     _testIdentity = null;
@@ -372,8 +414,10 @@ export async function logout() {
 }
 
 export async function isAuthenticated() {
-  if (getTestModeIIBypass() && (_testLoggedIn || readPersistedTestAuthIndex() != null)) {
-    return true;
+  if (readPersistedAuthChannel() === 'test' || getTestModeIIBypass()) {
+    if (_testLoggedIn || readPersistedTestAuthIndex() != null) {
+      return true;
+    }
   }
   if (isEmbeddedInPortal()) {
     if (getPortalDelegationIdentity()) return true;
@@ -413,6 +457,7 @@ async function _restoreAuthSession() {
     if (!isEmbeddedInPortal()) return null;
     const portalId = getPortalDelegationIdentity();
     if (!portalId) return null;
+    persistAuthChannel('portal');
     // Swap the shared authClient to the portal mock so every later
     // isAuthenticated()/getIdentity() consumer sees the bridged session.
     await initializeAuthClient();
@@ -437,6 +482,9 @@ async function _restoreAuthSession() {
 
   const viaPortal = await restorePortal();
   if (viaPortal) return viaPortal;
+
+  const { backendReady } = await import('$lib/canisters.js');
+  await backendReady;
 
   const viaTest = await restoreTestAuthSession();
   if (viaTest) return viaTest;
@@ -474,4 +522,42 @@ async function _restoreAuthSession() {
   }
 
   return { authenticated: true, principal: principalText };
+}
+
+/** Recover the identity for an established session (pinned test, portal, or II). */
+export async function getEstablishedIdentity() {
+  const pinned = readPersistedAuthChannel();
+  if (pinned === 'test') {
+    if (_testLoggedIn && _testIdentity) return _testIdentity;
+    const persistedIndex = readPersistedTestAuthIndex();
+    if (persistedIndex != null) {
+      await restoreTestAuthSession();
+      if (_testIdentity) return _testIdentity;
+    }
+  }
+  if (pinned === 'portal' || isEmbeddedInPortal()) {
+    const portalId = getPortalDelegationIdentity();
+    if (portalId) return portalId;
+  }
+  const client = authClient || (await initializeAuthClient());
+  if (await client.isAuthenticated()) {
+    return client.getIdentity();
+  }
+  return null;
+}
+
+/** Clear auth stores when the UI claims a session but no identity is available. */
+export async function resetAuthStoresIfDesynced() {
+  const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
+    '$lib/stores/auth.js'
+  );
+  const { get } = await import('svelte/store');
+  if (get(isAuthenticatedStore)) {
+    console.error(
+      '[auth] Identity desync: authenticated UI state but anonymous backend actor — resetting auth stores'
+    );
+    isAuthenticatedStore.set(false);
+    userIdentity.set(null);
+    principal.set('');
+  }
 }

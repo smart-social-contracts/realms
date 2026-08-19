@@ -216,14 +216,14 @@
     }
   }
   
-  async function advanceStepAfterAuth() {
-    await initBackendWithIdentity();
+  async function advanceStepAfterAuth(identity) {
+    await initBackendWithIdentity(identity);
     // The target actor may have been built before authentication completed
     // (resolveJoinTarget runs on mount) — an anonymous actor here makes the
     // membership probe and join_realm run as the anonymous principal 2vxsx-fae.
     // Rebuild it now that an identity is available.
     if (targetQuarterId) {
-      await selectQuarter(targetQuarterId);
+      await selectQuarter(targetQuarterId, identity);
     }
     await loadUserProfiles();
     if (inviteCode) {
@@ -399,7 +399,7 @@
   }
 
   // Point the page at a specific quarter (or the capital) for validate + join.
-  async function selectQuarter(qid) {
+  async function selectQuarter(qid, explicitIdentity = null) {
     selectedQuarter = qid;
     targetQuarterId = qid;
     if (!qid || qid === capitalId) {
@@ -407,7 +407,7 @@
       return;
     }
     try {
-      targetActor = await createQuarterActor(qid);
+      targetActor = await createQuarterActor(qid, explicitIdentity);
     } catch (e) {
       console.error('Failed to build quarter actor, falling back to capital:', e);
       targetActor = backend;
@@ -470,10 +470,10 @@
     }
   }
 
-  async function completeAuthAfterLogin(userPrincipal) {
+  async function completeAuthAfterLogin(userPrincipal, identity) {
     isAuthenticated.set(true);
     principal.set(userPrincipal.toText());
-    await advanceStepAfterAuth();
+    await advanceStepAfterAuth(identity);
   }
 
   async function handleLogin(options = {}) {
@@ -481,9 +481,9 @@
     error = '';
     try {
       const preferTestMode = get(testModeIIBypass);
-      const { principal: userPrincipal } = await login({ ...options, preferTestMode });
-      if (userPrincipal) {
-        await completeAuthAfterLogin(userPrincipal);
+      const { principal: userPrincipal, identity } = await login({ ...options, preferTestMode });
+      if (userPrincipal && identity) {
+        await completeAuthAfterLogin(userPrincipal, identity);
       } else {
         error = 'Login was cancelled or failed. Please try again.';
       }

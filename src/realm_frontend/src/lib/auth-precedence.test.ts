@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	resolveAuthChannel,
+	resolveEffectiveAuthChannel,
 	shouldAttemptPortalAuth,
 	shouldPreferTestModeLogin,
 	shouldRestoreTestModeSession,
@@ -8,7 +9,7 @@ import {
 } from './auth-precedence';
 
 describe('auth-precedence', () => {
-	it('prefers portal auth when embedded even with II bypass', () => {
+	it('ambient precedence prefers portal when embedded even with II bypass', () => {
 		expect(resolveAuthChannel(true, true)).toBe('portal');
 		expect(shouldAttemptPortalAuth(true)).toBe(true);
 		expect(shouldUseTestModeAuth(true, true)).toBe(false);
@@ -34,5 +35,20 @@ describe('auth-precedence', () => {
 	it('restores test sessions when II bypass is on (including portal reloads)', () => {
 		expect(shouldRestoreTestModeSession(true)).toBe(true);
 		expect(shouldRestoreTestModeSession(false)).toBe(false);
+	});
+
+	it('pinned test channel wins over portal embed ambient precedence', () => {
+		expect(resolveEffectiveAuthChannel(true, true, 'test')).toBe('test');
+		expect(resolveEffectiveAuthChannel(true, false, 'test')).toBe('test');
+	});
+
+	it('pinned portal channel wins over standalone test ambient precedence', () => {
+		expect(resolveEffectiveAuthChannel(false, true, 'portal')).toBe('portal');
+	});
+
+	it('falls back to ambient precedence when no session pin is set', () => {
+		expect(resolveEffectiveAuthChannel(true, true, null)).toBe('portal');
+		expect(resolveEffectiveAuthChannel(false, true, null)).toBe('test');
+		expect(resolveEffectiveAuthChannel(false, false, null)).toBe('ii');
 	});
 });

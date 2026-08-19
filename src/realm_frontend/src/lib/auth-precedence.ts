@@ -13,6 +13,16 @@ export function resolveAuthChannel(
 	return 'ii';
 }
 
+/** Established session pin overrides ambient embed/bypass precedence. */
+export function resolveEffectiveAuthChannel(
+	embeddedInPortal: boolean,
+	testModeIIBypass: boolean,
+	pinnedChannel: AuthChannel | null = null
+): AuthChannel {
+	if (pinnedChannel) return pinnedChannel;
+	return resolveAuthChannel(embeddedInPortal, testModeIIBypass);
+}
+
 /** True when portal delegation restore/login should run (even if II bypass is on). */
 export function shouldAttemptPortalAuth(embeddedInPortal: boolean): boolean {
 	return embeddedInPortal;

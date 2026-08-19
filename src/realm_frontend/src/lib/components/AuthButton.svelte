@@ -44,7 +44,8 @@
 	});
 
 	async function handleLogin(options = {}) {
-		const { principal: userPrincipal } = await login(options);
+		const { identity, principal: userPrincipal } = await login(options);
+		if (!userPrincipal || !identity) return;
 		isAuthenticated.set(true);
 		principalText = userPrincipal.toText();
 
@@ -52,7 +53,7 @@
 		principal.set(principalText);
 
 		console.log('Principal at login:', principalText);
-		await initBackendWithIdentity();
+		await initBackendWithIdentity(identity);
 		await loadUserProfiles();
 		await loadUserProfilePicture();
 
