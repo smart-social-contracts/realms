@@ -24,14 +24,17 @@ Returning ciphertext to any department member is deliberate and unchanged: it is
 encrypted, and holding it is useless without a KeyEnvelope.
 """
 
+import json
 from typing import Any, Dict, List, Optional
 
 from ic_python_logging import get_logger
+from core.time_utils import format_timestamp_ms, now_ms
 
 logger = get_logger("core.dept_docs_bridge")
 
 EXT_ID = "department_docs"
 DOC_TYPE = "DepartmentDocument"
+RESHARE_JOB_TYPE = "ReshareJob"
 TITLE_MAX_LENGTH = 512
 
 
@@ -137,6 +140,12 @@ def _doc_class():
     from core import extension_bridge
 
     return extension_bridge.own_entity_class(EXT_ID, DOC_TYPE)
+
+
+def _reshare_job_class():
+    from core import extension_bridge
+
+    return extension_bridge.own_entity_class(EXT_ID, RESHARE_JOB_TYPE)
 
 
 def _load(doc_id: Any):
@@ -314,6 +323,146 @@ def v_doc_delete(caller: str = "", id: Any = None, **kwargs) -> dict:
     return {"id": id, "scope": scope}
 
 
+# ---------------------------------------------------------------------------
+# Re-share jobs — when a member joins after docs were shared
+# ---------------------------------------------------------------------------
+
+
+def _project_job(job) -> Dict[str, Any]:
+    return {
+        "id": job._id,
+        "department": getattr(job, "department", "") or "",
+        "new_member_principal": getattr(job, "new_member_principal", "") or "",
+        "status": getattr(job, "status", "") or "",
+        "created_at": getattr(job, "created_at", "") or "",
+    }
+
+
+def _load_job(job_id: Any):
+    job = _reshare_job_class()[job_id]
+    if not job:
+        raise ValueError(f"re-share job '{job_id}' not found")
+    return job
+
+
+def _pending_job_exists(department: str, principal: str) -> bool:
+    for job in _reshare_job_class().instances():
+        if (
+            getattr(job, "status", "") == "pending"
+            and getattr(job, "department", "") == department
+            and getattr(job, "new_member_principal", "") == principal
+        ):
+            return True
+    return False
+
+
+def _notify_reshare_managers(dept, department_name: str, new_member_principal: str) -> None:
+    from core import notification_bridge
+
+    recipients: set[str] = set()
+    head = getattr(dept, "head", None)
+    if head is not None:
+        head_principal = str(getattr(head, "id", ""))
+        if head_principal:
+            recipients.add(head_principal)
+
+    try:
+        from core.membership import users_with_profile
+
+        for admin in users_with_profile("realm.admin"):
+            pid = str(getattr(admin, "id", ""))
+            if pid:
+                recipients.add(pid)
+    except Exception as e:
+        logger.warning(f"reshare admin enumeration: {e}")
+
+    if not recipients:
+        return
+
+    metadata = json.dumps({
+        "department": department_name,
+        "new_member": new_member_principal,
+    })
+    title = "Document re-share needed"
+    message = (
+        f"A new member was added to {department_name}. "
+        "Re-share department documents so they can decrypt."
+    )
+
+    for subject in recipients:
+        try:
+            notification_bridge.v_create(
+                caller=new_member_principal,
+                title=title,
+                message=message,
+                audience_type="user",
+                subject=subject,
+                topic="dept_doc_reshare",
+                href="/extensions/department_docs",
+                metadata=metadata,
+            )
+        except Exception as e:
+            logger.warning(f"reshare notification to {subject}: {e}")
+
+
+def on_member_added(dept, user) -> None:
+    department = getattr(dept, "name", "") or ""
+    principal = str(getattr(user, "id", ""))
+    if not department or not principal:
+        return
+    if _pending_job_exists(department, principal):
+        return
+
+    created_at = format_timestamp_ms(now_ms())
+    _reshare_job_class()(
+        department=department,
+        new_member_principal=principal,
+        status="pending",
+        created_at=created_at,
+    )
+    _notify_reshare_managers(dept, department, principal)
+    logger.info(f"dept_doc.reshare: pending job for {principal} in {department}")
+
+
+def v_reshare_list(caller: str = "", department: str = "", **kwargs) -> dict:
+    wanted = (department or "").strip()
+    jobs = []
+    for job in _reshare_job_class().instances():
+        dept = getattr(job, "department", "") or ""
+        if getattr(job, "status", "") != "pending":
+            continue
+        if wanted and dept != wanted:
+            continue
+        if not can_manage(dept, caller):
+            continue
+        jobs.append(_project_job(job))
+
+    jobs.sort(key=lambda j: str(j.get("created_at", "")), reverse=True)
+    return {"jobs": jobs}
+
+
+def v_reshare_dismiss(caller: str = "", id: Any = None, **kwargs) -> dict:
+    if id is None:
+        raise ValueError("id is required")
+    job = _load_job(id)
+    dept = getattr(job, "department", "") or ""
+    _require_manage(dept, caller, "dismissing a re-share job")
+    job.status = "dismissed"
+    logger.info(f"dept_doc.reshare_dismiss: {id} in {dept} by {caller}")
+    return _project_job(job)
+
+
+def v_reshare_complete(caller: str = "", id: Any = None, **kwargs) -> dict:
+    if id is None:
+        raise ValueError("id is required")
+    job = _load_job(id)
+    dept = getattr(job, "department", "") or ""
+    _require_manage(dept, caller, "completing a re-share job")
+    job.status = "done"
+    logger.info(f"dept_doc.reshare_complete: {id} in {dept} by {caller}")
+    return _project_job(job)
+
+
 VERBS = {
     "department.list": v_department_list,
     "dept_doc.list": v_doc_list,
@@ -321,6 +470,11 @@ VERBS = {
     "dept_doc.create": v_doc_create,
     "dept_doc.update": v_doc_update,
     "dept_doc.delete": v_doc_delete,
+    "dept_doc.reshare_list": v_reshare_list,
+    "dept_doc.reshare_dismiss": v_reshare_dismiss,
+    "dept_doc.reshare_complete": v_reshare_complete,
 }
 
-READ_VERBS = frozenset({"department.list", "dept_doc.list", "dept_doc.get"})
+READ_VERBS = frozenset({
+    "department.list", "dept_doc.list", "dept_doc.get", "dept_doc.reshare_list",
+})

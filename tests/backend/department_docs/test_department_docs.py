@@ -407,7 +407,11 @@ def test_write_verbs_are_not_classified_as_reads():
 
     writes = set(ddb.VERBS) - set(ddb.READ_VERBS)
     assert writes == {
-        "dept_doc.create", "dept_doc.update", "dept_doc.delete",
+        "dept_doc.create",
+        "dept_doc.update",
+        "dept_doc.delete",
+        "dept_doc.reshare_dismiss",
+        "dept_doc.reshare_complete",
     }
     assert "dept_doc.update" in ddb.VERBS
     assert "dept_doc.update" not in ddb.READ_VERBS

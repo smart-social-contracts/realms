@@ -112,6 +112,12 @@ def add_department_member(dept, user) -> None:
     """Idempotently add *user* to *dept* via the forward relation."""
     if not user_in_department(user, dept):
         user.departments.add(dept)
+        try:
+            from core import dept_docs_bridge
+
+            dept_docs_bridge.on_member_added(dept, user)
+        except Exception as e:
+            logger.warning(f"dept_docs on_member_added: {e}")
 
 
 def remove_department_member(dept, user) -> None:

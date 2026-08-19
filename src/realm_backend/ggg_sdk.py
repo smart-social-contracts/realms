@@ -704,6 +704,17 @@ class _DeptDocs:
     def delete(self, id):
         return _require_rpc("dept_doc.delete", {"id": id})
 
+    def reshare_list(self, department=""):
+        return _require_rpc(
+            "dept_doc.reshare_list", {"department": department or ""}
+        )
+
+    def reshare_dismiss(self, job_id):
+        return _require_rpc("dept_doc.reshare_dismiss", {"id": job_id})
+
+    def reshare_complete(self, job_id):
+        return _require_rpc("dept_doc.reshare_complete", {"id": job_id})
+
 
 class _Procurement:
     """RFP tendering: lifecycle, sealed bids, scoring, vendor reputation.
