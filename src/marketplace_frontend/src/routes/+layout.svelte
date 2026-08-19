@@ -8,9 +8,9 @@ import "../index.scss";
 import { bootstrapAuth, isAuthenticated, login, logout, principalStore } from "$lib/auth";
 import { invalidateActor, marketplace } from "$lib/canisters";
 import { shortPrincipal } from "$lib/format";
-import { CONFIG } from "$lib/config";
+import { resolveCasalsUrl } from "$lib/config";
 
-const casalsUrl = CONFIG.casals_url;
+$: casalsUrl = browser ? resolveCasalsUrl() : "";
 let booted = false;
 let isController = false;
 let searchTerm = "";

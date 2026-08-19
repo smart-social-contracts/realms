@@ -6,36 +6,11 @@ import { _ } from "svelte-i18n";
 import ItemCard from "$lib/components/ItemCard.svelte";
 import SkeletonCard from "$lib/components/SkeletonCard.svelte";
 import { isAuthenticated } from "$lib/auth";
-import { categories as parseCategories, screenshots as parseScreenshots } from "$lib/format";
-import { fileUrl } from "$lib/file-registry-client";
+import { categories as parseCategories } from "$lib/format";
+import { listingScreenshotUrls } from "$lib/file-registry-client";
 import { marketplaceClient } from "$lib/marketplace-client";
-const LANG_NAMES = {
-  en: "English",
-  es: "Español",
-  fr: "Français",
-  de: "Deutsch",
-  it: "Italiano",
-  pt: "Português",
-  zh: "\u4E2D\u6587",
-  ja: "\u65E5\u672C\u8A9E",
-  ko: "\uD55C\uAD6D\uC5B4",
-  ar: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629",
-  ru: "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
-  nl: "Nederlands",
-  pl: "Polski",
-  tr: "T\xFCrk\xE7e",
-  hi: "\u0939\u093F\u0928\u094D\u0926\u0940"
-};
-function parseLangs(raw) {
-  return raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-}
-function langLabel(code) {
-  return LANG_NAMES[code] ?? code.toUpperCase();
-}
 function extensionThumbnail(ext) {
-  const paths = parseScreenshots(ext.screenshots ?? "");
-  if (!paths.length || !ext.file_registry_canister_id || !ext.file_registry_namespace) return "";
-  return fileUrl(ext.file_registry_canister_id, ext.file_registry_namespace, paths[0]);
+  return listingScreenshotUrls(ext)[0] || "";
 }
 let items = [];
 let total = 0;
@@ -46,7 +21,6 @@ let error = "";
 let searchQuery = "";
 let verifiedOnly = false;
 let selectedCategory = "";
-let selectedLanguage = "";
 let sortBy = "newest";
 let likedSet = new Set();
 let mounted = false;
@@ -56,7 +30,6 @@ onMount(() => {
   searchQuery = params.get("q") ?? "";
   verifiedOnly = params.get("verified") === "1";
   selectedCategory = params.get("category") ?? "";
-  selectedLanguage = params.get("lang") ?? "";
   lastUrlQ = searchQuery;
   mounted = true;
 });
@@ -78,7 +51,6 @@ function syncUrl() {
   if (searchQuery.trim()) params.set("q", searchQuery.trim());
   if (verifiedOnly) params.set("verified", "1");
   if (selectedCategory) params.set("category", selectedCategory);
-  if (selectedLanguage) params.set("lang", selectedLanguage);
   const qs = params.toString();
   lastUrlQ = searchQuery.trim();
   goto(qs ? `/extensions?${qs}` : "/extensions", { replaceState: true, keepFocus: true, noScroll: true });
@@ -86,19 +58,12 @@ function syncUrl() {
 $: availableCategories = Array.from(
   new Set(items.flatMap((e) => parseCategories(e.categories)))
 ).sort();
-$: availableLanguages = Array.from(
-  new Set(items.flatMap((e) => parseLangs(e.languages)))
-).sort();
 function selectCategory(c) {
   selectedCategory = selectedCategory === c ? "" : c;
   syncUrl();
 }
-function selectLanguage(l) {
-  selectedLanguage = selectedLanguage === l ? "" : l;
-  syncUrl();
-}
 $: sorted = applySort(
-  items.filter((e) => !selectedCategory || parseCategories(e.categories).includes(selectedCategory)).filter((e) => !selectedLanguage || parseLangs(e.languages).includes(selectedLanguage)),
+  items.filter((e) => !selectedCategory || parseCategories(e.categories).includes(selectedCategory)),
   sortBy
 );
 function applySort(list, key) {
@@ -192,18 +157,6 @@ function doSearch() {
   </div>
 {/if}
 
-{#if availableLanguages.length > 0}
-  <div class="cat-filter lang-filter" role="group" aria-label="Filter by language">
-    <span class="filter-label">{$_('filter.language')}:</span>
-    <button class:active={selectedLanguage === ''} on:click={() => selectLanguage('')}>{$_('filter.all')}</button>
-    {#each availableLanguages as l}
-      <button class:active={selectedLanguage === l} on:click={() => selectLanguage(l)}>
-        {langLabel(l)}
-      </button>
-    {/each}
-  </div>
-{/if}
-
 {#if loading}
   <div class="grid">
     {#each Array(8) as _}
@@ -215,10 +168,6 @@ function doSearch() {
 {:else if sorted.length === 0 && selectedCategory}
   <div class="state empty">
     <p>{$_('extensions.no_category', { values: { category: selectedCategory.replace(/_/g, ' ') } })} <button class="link" on:click={() => { selectedCategory = ''; syncUrl(); }}>{$_('discover.clear_filter')}</button></p>
-  </div>
-{:else if sorted.length === 0 && selectedLanguage}
-  <div class="state empty">
-    <p>{$_('extensions.no_language', { values: { language: langLabel(selectedLanguage) } })} <button class="link" on:click={() => { selectedLanguage = ''; syncUrl(); }}>{$_('discover.clear_filter')}</button></p>
   </div>
 {:else if sorted.length === 0}
   <div class="state empty">

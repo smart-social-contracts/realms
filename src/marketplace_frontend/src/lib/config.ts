@@ -22,6 +22,22 @@ function pick(...keys: string[]): string {
   return '';
 }
 
+/** Realms GOS Casals UI per product hostname. Used when VITE_CASALS_URL was not baked. */
+const CASALS_BY_HOST: Record<string, string> = {
+  'test.realmsgos.org': 'https://qtht4-saaaa-aaaap-quwna-cai.icp0.io',
+  'demo.realmsgos.org': 'https://usukh-2yaaa-aaaae-agztq-cai.icp0.io',
+  'staging.realmsgos.org': 'https://boysh-4aaaa-aaaaj-a6utq-cai.icp0.io',
+};
+
+export function resolveCasalsUrl(): string {
+  const baked = pick('VITE_CASALS_URL');
+  if (baked) return baked;
+  if (typeof window !== 'undefined') {
+    return CASALS_BY_HOST[window.location.hostname] || '';
+  }
+  return '';
+}
+
 export const CONFIG = {
   // Internet Identity URL used by @dfinity/auth-client.
   // Defaults to mainnet II; local dev points the env var at the local II canister.
@@ -50,7 +66,7 @@ export const CONFIG = {
   portal_url: pick('VITE_PORTAL_URL'),
   realms_version: pick('VITE_REALMS_VERSION'),
   // Realms GOS Casals frontend (not the GaaS platform orchestra).
-  casals_url: pick('VITE_CASALS_URL'),
+  casals_url: resolveCasalsUrl(),
 };
 
 // --- TEST_MODE umbrella and sub-flags ---

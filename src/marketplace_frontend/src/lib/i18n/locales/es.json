@@ -132,6 +132,8 @@
     "model_badge": "modelo: {value}",
     "no_description": "No se proporcionó descripción.",
     "screenshots": "Capturas de pantalla",
+    "enlarge_screenshot": "Ver captura {n} de {total} a tamaño completo",
+    "close_screenshot": "Cerrar captura",
     "categories": "Categorías",
     "no_namespace": "No hay un espacio de nombres de file_registry asociado a esta publicación.",
     "files_load_error": "No se pudieron cargar los archivos del registro: {error}",

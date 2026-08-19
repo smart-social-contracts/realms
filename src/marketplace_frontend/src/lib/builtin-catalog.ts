@@ -14,6 +14,7 @@ function ext(
   version: string,
   icon: string,
   cats: string,
+  shots = '',
 ): ExtensionListing {
   return {
     extension_id: id,
@@ -24,7 +25,7 @@ function ext(
     price_e8s: 0,
     icon,
     categories: cats,
-    screenshots: '',
+    screenshots: shots,
     file_registry_canister_id: '',
     file_registry_namespace: `ext/${id}/${version}`,
     download_url: `https://github.com/smart-social-contracts/realms/tree/main/extensions/extensions/${id}`,
@@ -77,7 +78,8 @@ export const builtinExtensions: ExtensionListing[] = [
     'member_dashboard',
     'My Dashboard',
     'Personal dashboard for members to manage their government services and documents',
-    '1.0.3', '📊', 'public_services',
+    '1.1.3', '📊', 'public_services',
+    'screenshots/01-overview.png',
   ),
   ext(
     'justice_litigation',
@@ -191,7 +193,8 @@ export const builtinExtensions: ExtensionListing[] = [
     'system_info',
     'System Info',
     'System information dashboard for realm administrators',
-    '1.0.0', '📈', 'other',
+    '1.0.3', '📈', 'other',
+    'screenshots/01-overview.png',
   ),
   ext(
     'task_monitor',

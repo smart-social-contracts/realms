@@ -6,8 +6,8 @@ import { _ } from "svelte-i18n";
 import ItemCard from "$lib/components/ItemCard.svelte";
 import SkeletonCard from "$lib/components/SkeletonCard.svelte";
 import InfoTip from "$lib/components/InfoTip.svelte";
-import { categories as parseCategories, screenshots as parseScreenshots } from "$lib/format";
-import { fileUrl } from "$lib/file-registry-client";
+import { categories as parseCategories } from "$lib/format";
+import { listingScreenshotUrls } from "$lib/file-registry-client";
 import {
   marketplaceClient
 } from "$lib/marketplace-client";
@@ -169,9 +169,7 @@ function categoriesFor(it) {
   return "";
 }
 function extensionThumbnail(ext) {
-  const paths = parseScreenshots(ext.screenshots ?? "");
-  if (!paths.length || !ext.file_registry_canister_id || !ext.file_registry_namespace) return "";
-  return fileUrl(ext.file_registry_canister_id, ext.file_registry_namespace, paths[0]);
+  return listingScreenshotUrls(ext)[0] || "";
 }
 </script>
 

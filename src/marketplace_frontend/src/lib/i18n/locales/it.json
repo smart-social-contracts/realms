@@ -132,6 +132,8 @@
     "model_badge": "modello: {value}",
     "no_description": "Nessuna descrizione fornita.",
     "screenshots": "Screenshot",
+    "enlarge_screenshot": "Apri screenshot {n} di {total} a schermo intero",
+    "close_screenshot": "Chiudi screenshot",
     "categories": "Categorie",
     "no_namespace": "Nessuno spazio dei nomi file_registry associato a questo annuncio.",
     "files_load_error": "Impossibile caricare i file dal registro: {error}",

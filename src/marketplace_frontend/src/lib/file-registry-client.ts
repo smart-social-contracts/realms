@@ -21,6 +21,8 @@ import { Principal } from '@dfinity/principal';
 import { IDL } from '@dfinity/candid';
 
 import { getIdentity } from './auth';
+import { CONFIG } from './config';
+import { screenshots as parseScreenshots } from './format';
 
 // ---------------------------------------------------------------------------
 // URL helpers
@@ -40,6 +42,18 @@ export function fileRegistryBaseUrl(canisterId: string): string {
 export function fileUrl(canisterId: string, namespace: string, path: string): string {
   const cleanPath = path.replace(/^\/+/, '');
   return `${fileRegistryBaseUrl(canisterId)}/${namespace}/${cleanPath}`;
+}
+
+/** Builtin catalog rows leave canister id empty; use the env's registry. */
+export function listingScreenshotUrls(item: {
+  screenshots?: string;
+  file_registry_canister_id?: string;
+  file_registry_namespace?: string;
+}): string[] {
+  const canister = item.file_registry_canister_id || CONFIG.file_registry_canister_id;
+  const ns = item.file_registry_namespace || '';
+  if (!canister || !ns) return [];
+  return parseScreenshots(item.screenshots ?? '').map((p) => fileUrl(canister, ns, p));
 }
 
 export interface RegistryFile {

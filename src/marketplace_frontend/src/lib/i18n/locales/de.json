@@ -132,6 +132,8 @@
     "model_badge": "Modell: {value}",
     "no_description": "Keine Beschreibung angegeben.",
     "screenshots": "Screenshots",
+    "enlarge_screenshot": "Screenshot {n} von {total} in voller Größe anzeigen",
+    "close_screenshot": "Screenshot schließen",
     "categories": "Kategorien",
     "no_namespace": "Dieser Eintrag hat keinen file_registry-Namespace.",
     "files_load_error": "Dateien konnten nicht aus der Registry geladen werden: {error}",

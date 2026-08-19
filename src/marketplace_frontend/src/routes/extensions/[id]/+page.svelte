@@ -9,12 +9,13 @@ import { isAuthenticated, principalStore } from "$lib/auth";
 import {
   fileRegistryBaseUrl,
   fileUrl,
-  listFiles
+  listFiles,
+  listingScreenshotUrls
 } from "$lib/file-registry-client";
 import {
   marketplaceClient
 } from "$lib/marketplace-client";
-import { categories, formatCount, formatPrice, formatTimeAgo, screenshots as parseScreenshots, shortPrincipal } from "$lib/format";
+import { categories, formatCount, formatPrice, formatTimeAgo, shortPrincipal } from "$lib/format";
 let item = null;
 let loading = true;
 let error = "";
@@ -27,15 +28,32 @@ let busyAudit = false;
 let auditMsg = "";
 let activeTab = "overview";
 let showInstallGuide = false;
+let lightboxIndex = -1;
+let lightboxEl;
+function lightboxAction(node) {
+  lightboxEl = node;
+  return {
+    destroy() {
+      if (lightboxEl === node) lightboxEl = null;
+    }
+  };
+}
+function openLightbox(i) {
+  lightboxIndex = i;
+  lightboxEl?.showModal();
+}
+function closeLightbox() {
+  lightboxIndex = -1;
+  if (lightboxEl?.open) lightboxEl.close();
+}
+function onLightboxClick(e) {
+  if (e.target === lightboxEl) closeLightbox();
+}
 $: id = decodeURIComponent($page.params.id);
 $: void load(id);
 $: void refreshLikes($isAuthenticated, id);
 $: void refreshPurchased($isAuthenticated, $principalStore?.toText() ?? null, id);
-$: screenshotUrls = item && item.file_registry_canister_id && item.file_registry_namespace
-  ? parseScreenshots(item.screenshots ?? "").map((p) =>
-      fileUrl(item.file_registry_canister_id, item.file_registry_namespace, p),
-    )
-  : [];
+$: screenshotUrls = item ? listingScreenshotUrls(item) : [];
 async function load(extId) {
   loading = true;
   error = "";
@@ -147,7 +165,7 @@ function isOwner() {
         <div class="badges">
           <span class="badge">{$_('detail.installs', { values: { count: formatCount(item.installs) } })}</span>
           <span class="badge">{item.price_e8s ? formatPrice(item.price_e8s) : $_('card.free')}</span>
-          {#each categories(item.categories) as c}
+          {#each categories(item.categories) as c (c)}
             <span class="badge cat">{c.replace(/_/g, ' ')}</span>
           {/each}
         </div>
@@ -181,14 +199,19 @@ function isOwner() {
         {#if screenshotUrls.length > 0}
           <h3>{$_('detail.screenshots')}</h3>
           <div class="screenshot-gallery">
-            {#each screenshotUrls as url, i}
-              <a class="screenshot-link" href={url} target="_blank" rel="noreferrer">
+            {#each screenshotUrls as url, i (url)}
+              <button
+                type="button"
+                class="screenshot-link"
+                on:click={() => openLightbox(i)}
+                aria-label={$_('detail.enlarge_screenshot', { values: { n: i + 1, total: screenshotUrls.length } })}
+              >
                 <img
                   src={url}
                   alt="{item.name} — {i + 1} / {screenshotUrls.length}"
                   loading="lazy"
                 />
-              </a>
+              </button>
             {/each}
           </div>
         {/if}
@@ -215,7 +238,7 @@ function isOwner() {
         {#if categories(item.categories).length > 0}
           <h3>{$_('detail.categories')}</h3>
           <div class="badges">
-            {#each categories(item.categories) as c}
+            {#each categories(item.categories) as c (c)}
               <span class="badge cat">{c.replace(/_/g, ' ')}</span>
             {/each}
           </div>
@@ -233,7 +256,7 @@ function isOwner() {
           <table class="files">
             <thead><tr><th>{$_('detail.col_path')}</th><th>{$_('detail.col_size')}</th><th>{$_('detail.col_type')}</th><th></th></tr></thead>
             <tbody>
-              {#each files as f}
+              {#each files as f (f.path)}
                 <tr>
                   <td><code>{f.path}</code></td>
                   <td>{formatBytes(f.size)}</td>
@@ -271,6 +294,31 @@ function isOwner() {
     {/if}
   </article>
 {/if}
+
+<dialog
+  use:lightboxAction
+  class="lightbox"
+  aria-label={$_('detail.screenshots')}
+  on:click={onLightboxClick}
+  on:close={() => (lightboxIndex = -1)}
+>
+  <button
+    type="button"
+    class="lightbox-close"
+    on:click={closeLightbox}
+    aria-label={$_('detail.close_screenshot')}
+    title={$_('detail.close_screenshot')}
+  >
+    <i class="ti ti-x" aria-hidden="true"></i>
+  </button>
+  {#if item && lightboxIndex >= 0 && screenshotUrls[lightboxIndex]}
+    <img
+      class="lightbox-img"
+      src={screenshotUrls[lightboxIndex]}
+      alt="{item.name} — {lightboxIndex + 1} / {screenshotUrls.length}"
+    />
+  {/if}
+</dialog>
 
 <script lang="ts" context="module">function formatBytes(n) {
   if (n < 1024) return `${n} B`;
@@ -339,24 +387,76 @@ function isOwner() {
   .block .description { color: var(--text); }
   .screenshot-gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 0.75rem;
-    margin-top: 0.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.95rem;
+    margin-top: 0.65rem;
   }
   .screenshot-link {
     display: block;
+    padding: 0;
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     overflow: hidden;
+    background: none;
+    cursor: zoom-in;
     transition: border-color 0.15s ease;
   }
-  .screenshot-link:hover { border-color: var(--border-strong); }
+  .screenshot-link:hover,
+  .screenshot-link:focus-visible { border-color: var(--border-strong); }
   .screenshot-link img {
     width: 100%;
     aspect-ratio: 16 / 9;
     object-fit: cover;
     display: block;
   }
+  .lightbox {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    margin: 0;
+    padding: 2.5rem;
+    border: none;
+    background: rgba(0, 0, 0, 0.82);
+    cursor: zoom-out;
+  }
+  .lightbox[open] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .lightbox::backdrop {
+    background: transparent;
+  }
+  .lightbox-img {
+    max-width: min(96vw, 1400px);
+    max-height: 90vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 0.4rem;
+    cursor: default;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+  }
+  .lightbox-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .lightbox-close .ti { font-size: 1.35rem; line-height: 1; }
+  .lightbox-close:hover,
+  .lightbox-close:focus-visible { background: rgba(0, 0, 0, 0.7); }
   .files {
     width: 100%; border-collapse: collapse;
   }

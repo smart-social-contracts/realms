@@ -132,6 +132,8 @@
     "model_badge": "modèle : {value}",
     "no_description": "Aucune description fournie.",
     "screenshots": "Captures d’écran",
+    "enlarge_screenshot": "Voir la capture {n} sur {total} en grand",
+    "close_screenshot": "Fermer la capture",
     "categories": "Catégories",
     "no_namespace": "Aucun espace de noms file_registry associé à cette annonce.",
     "files_load_error": "Impossible de charger les fichiers depuis le registre : {error}",
