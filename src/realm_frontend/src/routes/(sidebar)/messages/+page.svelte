@@ -17,6 +17,7 @@
 		: $notifications;
 
 	function formatDate(timestampMs: number): string {
+		if (!timestampMs) return '';
 		const date = new Date(timestampMs);
 		const now = new Date();
 		const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
@@ -92,9 +93,11 @@
 								<h4 class="text-sm truncate {message.read ? 'font-normal text-gray-600' : 'font-semibold text-gray-900'}">
 									{message.title}
 								</h4>
-								<span class="flex-shrink-0 text-xs text-gray-400">
-									{formatDate(message.timestamp_ms)}
-								</span>
+								{#if message.timestamp_ms}
+									<span class="flex-shrink-0 text-xs text-gray-400">
+										{formatDate(message.timestamp_ms)}
+									</span>
+								{/if}
 							</div>
 							<p class="mt-1 text-sm text-gray-500 line-clamp-2">{message.message}</p>
 						</div>

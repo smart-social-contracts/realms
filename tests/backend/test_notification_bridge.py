@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src" / "realm_backend"))
-sys.modules.setdefault("_cdk", MagicMock())
+sys.modules["_cdk"] = MagicMock()
 
 from core import extension_bridge as eb  # noqa: E402
 from core import notification_bridge as nb  # noqa: E402
@@ -117,6 +117,11 @@ def realm(monkeypatch):
 
 
 CAPS = sorted(nb.VERBS)
+
+
+@pytest.fixture(autouse=True)
+def _stable_now_ms(monkeypatch):
+    monkeypatch.setattr(nb, "now_ms", lambda: 1_700_000_000_123)
 
 
 def call(caller):
@@ -494,6 +499,17 @@ def test_notification_email_respects_explicit_disable(realm):
     assert metadata.get("email_status") != "pending"
 
 
+def test_create_stamps_timestamp_on_list(realm):
+    result = call("alice")("notifications", "notification.create", {
+        "title": "Stamped", "message": "body", "subject": "alice",
+    })
+    listed = call("alice")("notifications", "notification.list", {})[
+        "notifications"
+    ]
+    row = next(n for n in listed if n["id"] == result["id"])
+    assert row["timestamp_ms"] > 0
+
+
 def test_request_email_verification_queues_force_email(realm):
     """Requesting verification stores state and queues a force-email."""
     result = call("alice")(
@@ -512,6 +528,23 @@ def test_request_email_verification_queues_force_email(realm):
     assert metadata["email_status"] == "pending"
     assert metadata["event_type"] == "email_verification"
     assert metadata["force_email_to"] == "alice@example.com"
+
+    listed = call("alice")("notifications", "notification.list", {})[
+        "notifications"
+    ]
+    row = next(n for n in listed if n["id"] == result["id"])
+    code = data["email_verify_code"]
+    assert row["timestamp_ms"] > 0
+    assert "15 minutes" in row["message"]
+    assert code in row["message"]
+    assert note.message == code
+
+    realm.granted.add("notification.send")
+    pending = call("worker")(
+        "notifications", "notification.pending_emails", {}
+    )["notifications"]
+    email_row = next(p for p in pending if p["id"] == result["id"])
+    assert email_row["message"] == code
 
 
 def test_verify_email_code_success(realm):

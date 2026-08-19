@@ -22,7 +22,7 @@ fixed.
 
 import json
 
-from core.time_utils import parse_timestamp_ms
+from core.time_utils import format_timestamp_ms, now_ms, parse_timestamp_ms
 
 
 def _valid_email(address: str) -> bool:
@@ -155,11 +155,15 @@ def _timestamp_ms(n) -> int:
 
 
 def project(n, caller: str = "") -> dict:
+    topic = getattr(n, "topic", "") or ""
+    message = getattr(n, "message", "") or ""
+    if topic == "email_verification" and message:
+        message = f"{VERIFY_PREVIEW_TEXT} {message}"
     return {
         "id": n._id,
-        "topic": getattr(n, "topic", "") or "",
+        "topic": topic,
         "title": getattr(n, "title", "") or "",
-        "message": getattr(n, "message", "") or "",
+        "message": message,
         "sender": getattr(n, "sender", "") or "",
         "recipient": getattr(n, "recipient", "") or "",
         "visibility": getattr(n, "visibility", "private") or "private",
@@ -306,6 +310,7 @@ def v_create(caller="", title="", message="", audience_type="", subject="",
         color=color or "blue",
         metadata=metadata if isinstance(metadata, str) else json.dumps(metadata),
     )
+    _stamp(notification)
     queue_email(notification, event_type)
     return {"id": notification._id, "audience_type": audience_type}
 
@@ -491,6 +496,24 @@ def v_set_email_preferences(caller="", email_notifications_enabled=True,
 
 VERIFY_CODE_TTL_SECONDS = 15 * 60
 VERIFY_MAX_ATTEMPTS = 5
+VERIFY_PREVIEW_TEXT = (
+    "Use this code in Realm settings to confirm your email address. "
+    "It expires in 15 minutes."
+)
+
+
+def _stamp(n) -> None:
+    ms = now_ms()
+    if ms <= 0:
+        return
+    text = format_timestamp_ms(ms)
+    n.timestamp_created = text
+    n.timestamp_updated = text
+    n._timestamp_created = ms
+    n._timestamp_updated = ms
+    save = getattr(n, "_save", None)
+    if callable(save) and not getattr(n, "_do_not_save", False):
+        save()
 
 
 def _now_seconds() -> int:
@@ -500,18 +523,7 @@ def _now_seconds() -> int:
     nanosecond clock via ``ic.time()``. Falls back to ``time.time()`` for
     local/test runs.
     """
-    try:
-        from kybra import ic as _ic  # noqa: PLC0415
-
-        t = _ic.time()
-        if t and t > 0:
-            return int(t) // 1_000_000_000
-    except Exception:
-        pass
-    import time
-
-    t = time.time()
-    return int(t) if t and t > 0 else 0
+    return now_ms() // 1000
 
 
 def _generate_verify_code() -> str:
@@ -585,6 +597,7 @@ def v_request_email_verification(caller="", email="", **kwargs) -> dict:
             "force_email_to": address,
         }),
     )
+    _stamp(notification)
     return {"id": notification._id, "email": address}
 
 
@@ -728,6 +741,7 @@ def v_send_test_email(caller="", to="", subject="Realms email test",
             "force_email_to": address,
         }),
     )
+    _stamp(notification)
     return {"id": notification._id, "to": address}
 
 
