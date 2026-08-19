@@ -345,6 +345,7 @@ def _build_marketplace_frontend(
     build_env["VITE_CANISTER_ID_FILE_REGISTRY"] = file_registry_id
     build_env["VITE_ENV_NAME"] = env_config.get("name", "")
     build_env["VITE_PORTAL_URL"] = env_config.get("portal_url", "")
+    build_env["VITE_CASALS_URL"] = env_config.get("casals_url", "")
     build_env["VITE_REALMS_VERSION"] = env_config.get("realms_version", "main")
     billing_url = env_config.get("billing_service_url") or env_config.get("services", {}).get(
         "billing_url", ""
@@ -369,6 +370,7 @@ def _build_marketplace_frontend(
             "VITE_CANISTER_ID_FILE_REGISTRY": file_registry_id,
             "VITE_ENV_NAME": env_config.get("name", ""),
             "VITE_PORTAL_URL": env_config.get("portal_url", ""),
+            "VITE_CASALS_URL": env_config.get("casals_url", ""),
             "VITE_REALMS_VERSION": env_config.get("realms_version", "main"),
         }
     )

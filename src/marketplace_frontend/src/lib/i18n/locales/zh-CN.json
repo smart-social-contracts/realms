@@ -15,7 +15,8 @@
   "footer": {
     "open_source": "Realms 市场 · 开源",
     "built_on_ic": "基于 Internet Computer 构建",
-    "github": "GitHub"
+    "github": "GitHub",
+    "casals": "Casals"
   },
   "kind": {
     "extensions": "扩展",

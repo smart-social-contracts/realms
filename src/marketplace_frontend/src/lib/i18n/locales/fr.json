@@ -15,7 +15,8 @@
   "footer": {
     "open_source": "Realms Marketplace · open source",
     "built_on_ic": "Conçu sur Internet Computer",
-    "github": "GitHub"
+    "github": "GitHub",
+    "casals": "Casals"
   },
   "kind": {
     "extensions": "Extensions",

@@ -37,6 +37,7 @@ Configs live in `environments/<name>.json` at the repo root:
   "network": "demo",
   "domain": "demo.realmsgos.org",
   "portal_url": "https://demo.gos.earth",
+  "casals_url": "https://usukh-2yaaa-aaaae-agztq-cai.icp0.io",
   "realms_version": "main",
   "billing_service_principal": "",
   "canisters": [
@@ -54,6 +55,7 @@ Configs live in `environments/<name>.json` at the repo root:
 | `network` | dfx network name (`demo`, `staging`, `test`) |
 | `domain` | Custom product domain (`*.realmsgos.org`) |
 | `portal_url` | Linked GaaS portal URL (`*.gos.earth`) — passed to the frontend as `VITE_PORTAL_URL` |
+| `casals_url` | Realms GOS Casals frontend URL — passed to the frontend as `VITE_CASALS_URL` |
 | `realms_version` | Version label baked into the frontend (`VITE_REALMS_VERSION`) |
 | `billing_service_principal` | Optional principal for `set_billing_service_principal` on marketplace_backend |
 | `canisters` | Ordered list of stack canisters (documentation; deploy always uses the full stack) |
@@ -95,7 +97,7 @@ realms env deploy --env test --identity deployer
    billing principal when configured) via post-deploy update calls.
 5. **Build `marketplace_frontend`** — `npm run build --workspace=marketplace_frontend`
    with `CANISTER_ID_MARKETPLACE_BACKEND`, `CANISTER_ID_FILE_REGISTRY`,
-   `VITE_ENV_NAME`, `VITE_PORTAL_URL`, `VITE_REALMS_VERSION` (and
+   `VITE_ENV_NAME`, `VITE_PORTAL_URL`, `VITE_CASALS_URL`, `VITE_REALMS_VERSION` (and
    `VITE_BILLING_SERVICE_URL` when set in config).
 6. **Deploy `marketplace_frontend`** — asset canister from `dist/`.
 7. **Custom domain prep** (when `--domain` and `domain` is set) — writes

@@ -3,6 +3,7 @@
   "network": "test",
   "domain": "test.realmsgos.org",
   "portal_url": "https://test.gos.earth",
+  "casals_url": "https://qtht4-saaaa-aaaap-quwna-cai.icp0.io",
   "realms_version": "main",
   "billing_service_principal": "",
   "canisters": [

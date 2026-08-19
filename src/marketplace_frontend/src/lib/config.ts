@@ -49,6 +49,8 @@ export const CONFIG = {
   env_name: pick('VITE_ENV_NAME'),
   portal_url: pick('VITE_PORTAL_URL'),
   realms_version: pick('VITE_REALMS_VERSION'),
+  // Realms GOS Casals frontend (not the GaaS platform orchestra).
+  casals_url: pick('VITE_CASALS_URL'),
 };
 
 // --- TEST_MODE umbrella and sub-flags ---

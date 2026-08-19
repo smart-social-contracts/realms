@@ -8,6 +8,9 @@ import "../index.scss";
 import { bootstrapAuth, isAuthenticated, login, logout, principalStore } from "$lib/auth";
 import { invalidateActor, marketplace } from "$lib/canisters";
 import { shortPrincipal } from "$lib/format";
+import { CONFIG } from "$lib/config";
+
+const casalsUrl = CONFIG.casals_url;
 let booted = false;
 let isController = false;
 let searchTerm = "";
@@ -133,16 +136,30 @@ $: routeIsActive = (path) => {
 
 <footer class="footer">
   <div class="footer-card">
-    <a
-      class="social"
-      href="https://github.com/smart-social-contracts/realms"
-      target="_blank"
-      rel="noreferrer"
-      aria-label={$_('footer.github')}
-      title={$_('footer.github')}
-    >
-      <i class="ti ti-brand-github" aria-hidden="true"></i>
-    </a>
+    <div class="socials">
+      <a
+        class="social"
+        href="https://github.com/smart-social-contracts/realms"
+        target="_blank"
+        rel="noreferrer"
+        aria-label={$_('footer.github')}
+        title={$_('footer.github')}
+      >
+        <i class="ti ti-brand-github" aria-hidden="true"></i>
+      </a>
+      {#if casalsUrl}
+        <a
+          class="social casals"
+          href={casalsUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={$_('footer.casals')}
+          title={$_('footer.casals')}
+        >
+          <img src="/images/casals-logo.png" alt="" width="28" height="28" />
+        </a>
+      {/if}
+    </div>
     <div class="build-line">{$_('footer.open_source')}</div>
     <a class="icp" href="https://internetcomputer.org" target="_blank" rel="noreferrer">
       <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" />
@@ -323,6 +340,12 @@ $: routeIsActive = (path) => {
     align-items: center;
     gap: 0.75rem;
   }
+  .footer-card .socials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
   .footer-card .social {
     color: var(--text-muted);
     text-decoration: none;
@@ -330,6 +353,12 @@ $: routeIsActive = (path) => {
   }
   .footer-card .social:hover { color: var(--text); }
   .footer-card .social .ti { font-size: 1.4rem; }
+  .footer-card .social.casals img {
+    width: 28px;
+    height: 28px;
+    display: block;
+    object-fit: contain;
+  }
   .footer-card .build-line {
     font-size: 0.75rem;
     color: var(--text-faint);
