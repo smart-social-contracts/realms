@@ -13,10 +13,9 @@ This design supports the core Realms GOS principle: **opting out must always be 
 | Term | Definition |
 |------|-----------|
 | **Quarter** | A full realm backend canister that participates in a federation. Holds its own users, governance data, extensions. |
-| **Capital** | The quarter designated as the federation coordinator. Hosts the federation codex, coordinates realm-wide votes, tax aggregation. It is still a quarter — holds users, runs governance — and can be moved by vote. |
+| **Capital** | The codex origin and admission gate. Relays and aggregates federal votes; pushes codex amendments. Still an ordinary quarter — holds users, runs local governance. |
 | **Federation** | A group of quarters sharing a manifest, extensions, and governance framework. Communication is peer-to-peer. |
-| **Home quarter** | The quarter where a user is registered with full rights (vote, propose, tax obligations). |
-| **Guest access** | Lightweight presence on a non-home quarter (transact, view, participate in local events — no governance weight). |
+| **Home quarter** | Client-cached pointer to the quarter where a user first registered (not a global registry). |
 | **Secession** | A quarter leaving the federation to become an independent realm. Zero data migration required. |
 
 ---
@@ -52,7 +51,7 @@ This design supports the core Realms GOS principle: **opting out must always be 
      └────────────┘  └──────────────┘  └────────────┘
 ```
 
-- **Capital** coordinates realm-wide governance but is logically equal to other quarters.
+- **Capital** is the codex origin, admission gate, and federal-vote relay — logically equal to other quarters.
 - **Join-time population push** — after a new member registers on a quarter,
   that quarter immediately reports its live `User.count()` to the capital
   (`report_quarter_population`). The UI reads populations from **`capital.status().quarters`** only.
@@ -194,6 +193,19 @@ from a central index.
 
 ---
 
+## Federal Votes
+
+Realm-wide decisions use the **federal vote** GOS mechanism (issue #300):
+
+1. **Propose** — `propose_federal_vote` on any quarter; the capital opens the vote.
+2. **Local legs** — each quarter runs its own ballot via the voting extension.
+3. **Aggregate** — the capital collects leg outcomes under the frozen aggregation rule.
+4. **Execute** — if adopted, every quarter runs the frozen action (including non-voting quarters).
+
+The aggregation rule is set by the codex hook `get_federal_governance_params`, frozen at open time (default: `per_quarter` — one quarter, one vote). The capital is a relay, not the electorate; there is no global user registry. A `vote_hash` binds `action + rule + deadline`; execution happens only after hash verification. Dissent = fork; exit = secession.
+
+---
+
 ## Secession
 
 A quarter declares independence:
@@ -280,6 +292,20 @@ mints a backend-only quarter canister under the realm's existing stand.
 5. **Multi-quarter activation** (optional) — session routing among existing memberships, distinct from registration.
 
 Canonical product doc: root [`QUARTERS.md`](../../QUARTERS.md). Tracking: GitHub [#156](https://github.com/smart-social-contracts/realms/issues/156).
+
+## Acting inherit at quarter birth (issue #301)
+
+New quarters seed their org chart from the codex, then **inherit capital
+seat-holders as acting officers** on positions where `inherit_from_capital` is
+true (see `core/acting_appointments.py`). Copy runs once at quarter creation;
+it does not re-sync on later capital changes.
+
+- **Acting** holders are visible in Organizations (`access_manager`) with an
+  "acting" label; substantive appointments replace them locally.
+- **Congress** and other locally elected seats are appointed by each quarter's
+  own governance after beta — capital acting holders are a bootstrap only.
+- Department **target policies** (e.g. 5-of-10) are persisted at seed time and
+  applied to live policy at beta; quarter birth does not ratchet policies.
 
 ---
 

@@ -75,7 +75,7 @@ The codex is the only thing quarters of a realm share. It encodes, at minimum:
 - **Fee policy** — registration and maintenance fees per quarter, ideally set by supply/demand and technical constraints.
 - **Assignment policy** — how new members are placed on first join (`assign_quarter`). Default: least-populated joinable quarter with capacity. Free pick at join time is not the product default (overload / brigading risk).
 - **Governance** — how proposals are made, who votes, how amendments are ratified.
-- **Capital policy** — whether and how capital-hood can move (advocated: by realm-wide vote across all quarters).
+- **Capital policy** — whether and how capital-hood can move (typically via a federal vote).
 - **Taxation/tributes (optional)** — the codex may require quarters to pay tributes to the capital. This is allowed but not built-in; absence of tribute policy means no tribute.
 - **Justice, duplicates, sanctions** — how cross-quarter misbehaviour (e.g. duplicate registrations) is detected and punished. Detection is ex-post and codex-driven, analogous to how analog societies handle it — not prevented by central infrastructure.
 
@@ -125,9 +125,16 @@ Admission is the capital's gate. Whether a previously-seceded quarter re-enters 
 
 ## Governance: Amendment, Fork, Secession
 
-- **Amendment.** The capital pushes codex amendments. Ratification follows the codex's own rules (advocated: realm-wide vote involving all quarters). A fast sync mechanism propagates the new codex; transient version skew during rollout is handled by syncing, not by special-casing.
+- **Amendment.** The capital pushes codex amendments. Ratification follows the codex's own rules — often a **federal vote** (see below). A fast sync mechanism propagates the new codex; transient version skew during rollout is handled by syncing, not by special-casing.
 
-- **Fork (dissent).** Because "same codex = same realm," a quarter that rejects an amendment is — by definition — running a different codex, hence a different realm. A contentious amendment therefore *splits* the realm rather than coercing a minority. A realm-wide vote is thus a **coordination signal** (which codex version keeps the most quarters together), not an enforcement act.
+- **Federal vote.** Realm-wide decisions use a two-tier GOS mechanism (`propose_federal_vote`):
+  1. Each quarter runs a local **leg** ballot (voting extension).
+  2. The capital aggregates leg outcomes and broadcasts the result.
+  3. If adopted, **every quarter executes** the frozen action — including quarters that did not vote.
+
+  The aggregation rule comes from the codex hook `get_federal_governance_params`, frozen at open time (default: `per_quarter` — one quarter, one vote). The capital is a **relay and aggregator**, not the electorate; there is no global user registry. A `vote_hash` binds `action + rule + deadline`; quarters execute only after hash verification.
+
+- **Fork (dissent).** A quarter that rejects an adopted federal action (or amendment) is running a different codex — a different realm. Dissent is frictionless.
 
 - **Secession.** A quarter drops the codex and stops syncing. All its users and data remain intact. Former peers remove it from the realm. This is the only hard check in the system, and it disciplines the capital's admission and propagation powers.
 
