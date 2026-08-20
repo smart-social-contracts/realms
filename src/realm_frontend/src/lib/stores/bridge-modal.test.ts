@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
-import { bridgeModalRequest, showBridgeAlert, showBridgeNotice } from './bridge-modal';
+import {
+	bridgeModalRequest,
+	resetBridgeModalQueueForTests,
+	showBridgeAlert,
+	showBridgeNotice,
+} from './bridge-modal';
+
+afterEach(() => {
+	resetBridgeModalQueueForTests();
+});
 
 describe('showBridgeAlert', () => {
 	it('opens modal with default title and close action', async () => {
@@ -43,6 +52,40 @@ describe('showBridgeNotice', () => {
 		expect(request?.actions).toEqual([{ id: 'close', label: 'Close', tone: 'primary' }]);
 		request?.resolve('close');
 		await promise;
+		expect(get(bridgeModalRequest)).toBeNull();
+	});
+});
+
+describe('modal queue', () => {
+	it('queues sequential alerts and shows them one at a time', async () => {
+		const first = showBridgeAlert({ body: 'First' });
+		const second = showBridgeAlert({ body: 'Second' });
+
+		const firstRequest = get(bridgeModalRequest);
+		expect(firstRequest?.body).toBe('First');
+		firstRequest?.resolve('close');
+		await first;
+
+		const secondRequest = get(bridgeModalRequest);
+		expect(secondRequest?.body).toBe('Second');
+		secondRequest?.resolve('close');
+		await second;
+
+		expect(get(bridgeModalRequest)).toBeNull();
+	});
+
+	it('queues sequential notices after an alert', async () => {
+		const first = showBridgeAlert({ body: 'Error first' });
+		const second = showBridgeNotice({ body: 'Done second' });
+
+		expect(get(bridgeModalRequest)?.body).toBe('Error first');
+		get(bridgeModalRequest)?.resolve('close');
+		await first;
+
+		expect(get(bridgeModalRequest)?.body).toBe('Done second');
+		get(bridgeModalRequest)?.resolve('close');
+		await second;
+
 		expect(get(bridgeModalRequest)).toBeNull();
 	});
 });

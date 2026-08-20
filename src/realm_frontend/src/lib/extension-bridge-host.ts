@@ -11,10 +11,9 @@ import {
 	type HostState,
 	type TaskResultPayload,
 } from '@realmsgos/extension-bridge';
-import { showBridgeToast } from '$lib/stores/bridge-toast';
 import {
 	requestBridgeModal,
-	showBridgeAlert,
+	showBridgeNotify,
 	type BridgeModalAction,
 } from '$lib/stores/bridge-modal';
 import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
@@ -52,7 +51,7 @@ export interface SandboxBridgeDeps {
 	manifest: SandboxManifest;
 	callSync: (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 	/** Same backend path as in-process `ctx.callAsync` (extension_async_call). */
-	callAsync?: (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
+	callAsync: (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 	navigate: (path: string) => Promise<void>;
 	getHostState: () => HostState;
 	subscribeHostState: (onChange: (state: HostState) => void) => () => void;
@@ -92,12 +91,11 @@ export class SandboxBridgeService {
 		const serverRef: { current?: BridgeServer } = {};
 
 		const runAsyncExtensionCall = (taskId: string, fn: string, args: Record<string, unknown>) => {
-			if (!deps.callAsync) return;
 			this.inFlightAsyncTasks.add(taskId);
 			void (async () => {
 				let payload: TaskResultPayload;
 				try {
-					const result = await deps.callAsync!(fn, args);
+					const result = await deps.callAsync(fn, args);
 					payload = { status: 'completed', result };
 				} catch (e) {
 					const err = formatCallExtensionError(e);
@@ -130,13 +128,11 @@ export class SandboxBridgeService {
 					throw formatCallExtensionError(e);
 				}
 			},
-			onCallExtensionAsync: deps.callAsync
-				? async (fn, args) => {
-						const taskId = `${deps.extensionId}-${++nextBridgeTaskSeq}-${Date.now()}`;
-						runAsyncExtensionCall(taskId, fn, args ?? {});
-						return { taskId };
-					}
-				: undefined,
+			onCallExtensionAsync: async (fn, args) => {
+				const taskId = `${deps.extensionId}-${++nextBridgeTaskSeq}-${Date.now()}`;
+				runAsyncExtensionCall(taskId, fn, args ?? {});
+				return { taskId };
+			},
 			onNavigate: (path) => {
 				if (!isValidNavigatePath(path)) {
 					console.warn('[extension-bridge-host] Invalid navigate path dropped:', path);
@@ -145,11 +141,7 @@ export class SandboxBridgeService {
 				return deps.navigate(path);
 			},
 			onNotify: (level, message) => {
-				if (level === 'error') {
-					void showBridgeAlert({ body: message });
-				} else {
-					showBridgeToast(level, message);
-				}
+				void showBridgeNotify(level, message);
 			},
 			onOpenModal: (payload) =>
 				requestBridgeModal({

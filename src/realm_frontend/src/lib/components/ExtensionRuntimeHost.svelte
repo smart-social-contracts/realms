@@ -26,8 +26,7 @@
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
 	import { getExtensionManifestWithRetry } from '$lib/utils/extension-manifest';
 	import { resolveExtensionMountMode } from '$lib/utils/extension-runtime-mode';
-	import { requestBridgeModal, showBridgeAlert } from '$lib/stores/bridge-modal';
-	import { showBridgeToast } from '$lib/stores/bridge-toast';
+	import { requestBridgeModal, showBridgeNotify } from '$lib/stores/bridge-modal';
 	import type { HostRealmInfo, HostState } from '@realmsgos/extension-bridge';
 	import {
 		deriveMySharingVetKey,
@@ -207,11 +206,7 @@
 			},
 			navigate: goto,
 			notify: (level, message) => {
-				if (level === 'error') {
-					void showBridgeAlert({ body: message });
-				} else {
-					showBridgeToast(level, message);
-				}
+				void showBridgeNotify(level, message);
 			},
 			openModal: (payload) =>
 				requestBridgeModal({

@@ -126,7 +126,7 @@ export interface RealmExtensionContext {
 	/** Navigate to a path within the realm SPA (wraps SvelteKit's goto). */
 	navigate: (path: string) => Promise<void>;
 
-	/** Show a host toast (success/info/warning) or error modal. */
+	/** Show a host modal (notice for success/info/warning, alert for error). */
 	notify: (
 		level: 'success' | 'info' | 'warning' | 'error',
 		message: string,

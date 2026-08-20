@@ -12,7 +12,6 @@
 	import { resolvePortalNavSyncHref } from '$lib/portal-redirect-path.ts';
 	import SetupStageGate from '$lib/components/SetupStageGate.svelte';
 	import BridgeModalHost from '$lib/components/BridgeModalHost.svelte';
-	import BridgeToastHost from '$lib/components/BridgeToastHost.svelte';
 
 	export const SITE_NAME = "Realms GOS";
 
@@ -107,7 +106,6 @@
 		<slot />
 	</SetupStageGate>
 	<BridgeModalHost />
-	<BridgeToastHost />
 </div>
 
 <style>

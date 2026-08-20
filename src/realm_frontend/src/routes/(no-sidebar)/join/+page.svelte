@@ -344,6 +344,12 @@
     await selectQuarter(def);
   }
 
+  function quarterOptionSuffix(quarter) {
+    if (quarter.joinable !== false) return '';
+    if (!quarter.is_capital && quarter.status === 'setup') return ' (setting up)';
+    return ' (coordinator-only)';
+  }
+
   /** Pick least-populated joinable quarter, excluding skipped ids (issue #156). */
   function pickJoinQuarterExcluding(directory, skipped) {
     const skip = new Set(skipped || []);
@@ -987,7 +993,7 @@
                 >
                   {#each quarterDirectory as quarter (quarter.canister_id)}
                     <option value={quarter.canister_id}>
-                      {formatQuarterLabel(quarter)}{quarter.joinable === false ? ' (coordinator-only)' : ''}
+                      {formatQuarterLabel(quarter)}{quarterOptionSuffix(quarter)}
                     </option>
                   {/each}
                 </select>
@@ -1098,7 +1104,7 @@
                 >
                   {#each quarterDirectory as quarter (quarter.canister_id)}
                     <option value={quarter.canister_id}>
-                      {formatQuarterLabel(quarter)}{quarter.joinable === false ? ' (coordinator-only)' : ''}
+                      {formatQuarterLabel(quarter)}{quarterOptionSuffix(quarter)}
                     </option>
                   {/each}
                 </select>

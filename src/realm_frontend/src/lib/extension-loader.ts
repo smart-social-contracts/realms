@@ -214,6 +214,7 @@ export async function mountSandboxedExtension(
       extensionId: extId,
       manifest: deps.manifest,
       callSync: deps.callSync,
+      callAsync: deps.callAsync,
       navigate: deps.navigate,
       getHostState: deps.getHostState,
       subscribeHostState: deps.subscribeHostState,

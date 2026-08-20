@@ -84,7 +84,7 @@ const server = createBridgeServer(iframe, {
     /* SvelteKit goto */
   },
   onNotify: (level, message) => {
-    /* toast */
+    /* host modal via showBridgeNotice / showBridgeAlert */
   },
   onOpenModal: async ({ title, body, actions }) => {
     /* render modal, return chosen action */
