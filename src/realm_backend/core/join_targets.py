@@ -8,6 +8,24 @@ JOIN_QUARTER_NOT_READY = (
 )
 
 
+def is_joinable_status(status) -> bool:
+    """True only when a quarter catalog row may accept new joins."""
+    return (status or "").strip() == "active"
+
+
+def catalog_status_for_self(is_quarter, dashboard_installed) -> str:
+    """Catalog status for this canister's own directory row."""
+    if is_quarter and not dashboard_installed:
+        return "setup"
+    return "active"
+
+
+def should_activate_quarter(current_status, join_ready) -> bool:
+    """True when a setup quarter should be promoted to active."""
+    current = (current_status or "").strip() or "setup"
+    return current == "setup" and bool(join_ready)
+
+
 def is_dashboard_installed(installed_ids, resolved_id="member_dashboard") -> bool:
     """True if member_dashboard or its codex override is in the installed set."""
     ids = {str(x) for x in (installed_ids or []) if x}

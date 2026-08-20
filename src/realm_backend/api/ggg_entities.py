@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Optional
 
 from ggg import (
     # Finance
-    Balance, Budget, BudgetStatus, Category, EntryType, FiscalPeriod, FiscalPeriodStatus,
-    Fund, FundType, Instrument, Invoice, LedgerEntry, NFTToken, PaymentAccount, Token,
-    Trade, Transfer, Treasury,
+    Balance, Budget, BudgetStatus, Category, EntryType, FinancialReport, FiscalPeriod,
+    FiscalPeriodStatus, Fund, FundType, Instrument, Invoice, LedgerEntry, NFTToken,
+    PaymentAccount, Token, Trade, Transfer, Treasury,
     # Identity
     Human, Identity, Member, Organization,
     # Governance

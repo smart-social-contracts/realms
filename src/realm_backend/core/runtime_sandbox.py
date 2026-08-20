@@ -95,6 +95,7 @@ KNOWN_CODEX_HOOKS = (
     "role_revoke_prehook",
     "role_revoke_posthook",
     "get_governance_params",
+    "get_federal_governance_params",
     "get_config",
     "get_dashboard_config",
     "get_extension_overrides",

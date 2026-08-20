@@ -99,9 +99,9 @@ def build_bootstrap_plan(spec):
 
     Returns a JSON-able dict consumed by ``advance_bootstrap``. Codex/extension
     items are only included when a ``registry_canister_id`` is present (nothing
-    to pull from otherwise). Codices are installed before extensions because an
-    extension may depend on entities and config the codex ``init``/``seed`` hooks
-    create.
+    to pull from otherwise). Extensions are installed first (one per tick) so a
+    codex install never pulls its full dependency closure inline; codex ``init``
+    runs after those plan items are in place.
     """
     spec = spec or {}
     registry = (spec.get("registry_canister_id") or "").strip()
@@ -109,6 +109,7 @@ def build_bootstrap_plan(spec):
     parent = (spec.get("parent_realm_canister_id") or "").strip()
 
     items = []
+    codex_items = []
     # Prefer the explicit ``codices`` list (auto-derived from the capital's live
     # set); fall back to the single ``codex`` for back-compat with older callers.
     codices = spec.get("codices")
@@ -121,7 +122,7 @@ def build_bootstrap_plan(spec):
                 continue
             codex_id = (codex.get("codex_id") or "").strip()
             if codex_id:
-                items.append(
+                codex_items.append(
                     {
                         "kind": "codex",
                         "id": codex_id,
@@ -151,8 +152,10 @@ def build_bootstrap_plan(spec):
         ext_items.sort(key=_bootstrap_ext_sort_key)
         for item in ext_items:
             item.pop("_orig_idx", None)
-            items.append(item)
+        items.extend(ext_items)
+        items.extend(codex_items)
 
+    has_extensions = bool(ext_items)
     return {
         "parent": parent,
         "registry": registry,
@@ -163,7 +166,46 @@ def build_bootstrap_plan(spec):
         "done": [],
         "failed": [],
         "status": "complete" if not items else "pending",
+        "install_codex_dependencies": not has_extensions,
     }
+
+
+def reorder_pending_bootstrap_items(state):
+    """Re-sort pending plan items: extensions (priority) then codices.
+
+    Only reorders from ``cursor`` onward so completed installs stay put.
+    Also sets ``install_codex_dependencies`` when the plan lists extensions.
+    Returns True if ``items`` order changed.
+    """
+    if not isinstance(state, dict):
+        return False
+
+    items = state.get("items") or []
+    cursor = int(state.get("cursor") or 0)
+    if cursor >= len(items):
+        return False
+
+    head = items[:cursor]
+    tail = items[cursor:]
+    ext_items = [i for i in tail if i.get("kind") == "extension"]
+    codex_items = [i for i in tail if i.get("kind") == "codex"]
+    other_items = [i for i in tail if i.get("kind") not in ("extension", "codex")]
+
+    for idx, item in enumerate(ext_items):
+        item["_orig_idx"] = idx
+    ext_items.sort(key=_bootstrap_ext_sort_key)
+    for item in ext_items:
+        item.pop("_orig_idx", None)
+
+    new_tail = ext_items + codex_items + other_items
+    changed = new_tail != tail
+    if changed:
+        state["items"] = head + new_tail
+
+    if any(i.get("kind") == "extension" for i in state["items"]):
+        state["install_codex_dependencies"] = False
+
+    return changed
 
 
 def step_plan(state, ok, error=None):
@@ -357,7 +399,7 @@ def derive_capital_install_set(default_registry=""):
 
     # Unified ``kind: codex`` packages live under /extensions (issue #244); mirror
     # the ``list_codex_packages`` fallback so the quarter gets a codex item, not an
-    # extension item that would install out of order.
+    # extension item that would skip ``run_init`` and inline dep control.
     try:
         from core.codex_hooks import get_active_codex
         from core.runtime_extensions import get_all_extension_manifests
@@ -542,7 +584,11 @@ def _install_item(state, item):
         from api.file_registry import install_codex_from_registry as _install_codex
 
         res = yield from _install_codex(
-            registry, item.get("id"), item.get("version"), item.get("run_init", True)
+            registry,
+            item.get("id"),
+            item.get("version"),
+            item.get("run_init", True),
+            install_dependencies=state.get("install_codex_dependencies", True),
         )
         return json.loads(res) if isinstance(res, str) else res
 
@@ -605,11 +651,25 @@ def advance_bootstrap():
         disable_recurring_task(BOOTSTRAP_TASK_NAME)
         return {"success": True, "status": "idle", "message": "no bootstrap plan"}
 
+    if reorder_pending_bootstrap_items(state):
+        _persist_state(realm, state)
+
     items = state.get("items") or []
     cursor = int(state.get("cursor") or 0)
     if state.get("status") == "complete" or cursor >= len(items):
         state["status"] = "complete"
         _persist_state(realm, state)
+        inherit_res = None
+        if not state.get("acting_inherited"):
+            inherit_res = yield from inherit_acting_appointments_from_parent(realm, state)
+        if inherit_res and inherit_res.get("success") is False:
+            return {
+                "success": False,
+                "status": "complete",
+                "inherit": inherit_res,
+                "done": state.get("done", []),
+                "failed": state.get("failed", []),
+            }
         disable_recurring_task(BOOTSTRAP_TASK_NAME)
         return {
             "success": True,
@@ -662,11 +722,47 @@ def advance_bootstrap():
     state = step_plan(state, ok, error=error)
     _persist_state(realm, state)
 
+    if ok and not state.get("ready_reported"):
+        parent_id = (
+            (getattr(realm, "federation_realm_id", "") or "").strip()
+            or (state.get("parent") or "").strip()
+        )
+        if parent_id:
+            from core.join_targets import is_dashboard_installed
+            from core.runtime_extensions import list_installed, resolve_extension_id
+
+            if is_dashboard_installed(
+                list_installed(),
+                resolve_extension_id("member_dashboard"),
+            ):
+                from api.cross_quarter import report_ready_to_capital
+
+                report_res = yield from report_ready_to_capital(parent_id)
+                if report_res.get("success"):
+                    state["ready_reported"] = True
+                    _persist_state(realm, state)
+                else:
+                    logger.warning(
+                        f"report_quarter_ready to {parent_id} failed: {report_res}"
+                    )
+
     if state.get("status") == "complete":
-        disable_recurring_task(BOOTSTRAP_TASK_NAME)
         logger.info(
             f"Quarter bootstrap complete: done={state.get('done')} failed={state.get('failed')}"
         )
+        inherit_res = None
+        if not state.get("acting_inherited"):
+            inherit_res = yield from inherit_acting_appointments_from_parent(realm, state)
+        if inherit_res and inherit_res.get("success") is False:
+            return {
+                "success": False,
+                "status": "complete",
+                "inherit": inherit_res,
+                "cursor": int(state.get("cursor") or 0),
+                "item": item.get("id"),
+                "result": result,
+            }
+        disable_recurring_task(BOOTSTRAP_TASK_NAME)
 
     return {
         "success": ok,
@@ -675,6 +771,48 @@ def advance_bootstrap():
         "item": item.get("id"),
         "result": result,
     }
+
+
+# ── Acting appointment inherit (quarter ← capital, issue #301) ───────────────
+
+
+def inherit_acting_appointments_from_parent(realm, state):
+    """One-shot: copy capital seat-holders as acting officers after bootstrap.
+
+    Runs only once bootstrap is complete (positions exist from codex init).
+    Persists ``acting_inherited`` on bootstrap state so we do not re-fetch.
+    """
+    if state.get("acting_inherited"):
+        return {"success": True, "status": "skip", "reason": "already inherited"}
+
+    if not bool(getattr(realm, "is_quarter", False)):
+        return {"success": True, "status": "skip", "reason": "not a quarter"}
+
+    parent_id = (
+        (getattr(realm, "federation_realm_id", "") or "").strip()
+        or (state.get("parent") or "").strip()
+    )
+    if not parent_id:
+        return {"success": True, "status": "skip", "reason": "no parent"}
+
+    from api.cross_quarter import fetch_position_holders
+    from core.acting_appointments import apply_inherited_holders
+
+    fetched = yield from fetch_position_holders(parent_id)
+    if not fetched.get("success"):
+        return {
+            "success": False,
+            "status": "error",
+            "error": fetched.get("error", "fetch failed"),
+        }
+
+    result = apply_inherited_holders(fetched, parent_id)
+    state["acting_inherited"] = True
+    _persist_state(realm, state)
+    logger.info(
+        f"Inherited acting appointments from capital {parent_id}: {result}"
+    )
+    return {"success": True, "status": "inherited", "result": result}
 
 
 # ── Capital-side quarter directory merge (capital ← quarters) ───────────────
@@ -709,7 +847,7 @@ def sync_one_peer(peer_canister_id):
                     "name": q.name or "",
                     "canister_id": q.canister_id or "",
                     "population": int(q.population or 0),
-                    "status": q.status or "active",
+                    "status": q.status or "setup",
                 }
             )
 
@@ -733,6 +871,9 @@ def sync_one_peer(peer_canister_id):
                         new_pop = int(entry.get("population", 0) or 0)
                         if new_pop > int(q.population or 0):
                             q.population = new_pop
+                        merged_status = entry.get("status")
+                        if merged_status and merged_status != q.status:
+                            q.status = merged_status
                         if cid == peer_canister_id:
                             apply_self_report_to_quarter(q, peer_self)
                         break
@@ -741,7 +882,7 @@ def sync_one_peer(peer_canister_id):
                 name=entry.get("name") or cid[:8],
                 canister_id=cid,
                 population=int(entry.get("population", 0) or 0),
-                status=entry.get("status") or "active",
+                status=entry.get("status") or "setup",
             )
             if realm is not None:
                 new_q.federation = realm

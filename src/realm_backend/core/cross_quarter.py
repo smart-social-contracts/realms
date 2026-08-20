@@ -166,7 +166,10 @@ def merge_quarter_directory(
     for q in local_quarters or []:
         cid = (q or {}).get("canister_id")
         if cid:
-            by_id[cid] = dict(q)
+            entry = dict(q)
+            if not entry.get("status"):
+                entry["status"] = "setup"
+            by_id[cid] = entry
 
     changed = False
     for q in peer_quarters or []:
@@ -174,7 +177,10 @@ def merge_quarter_directory(
         if not cid:
             continue
         if cid not in by_id:
-            by_id[cid] = dict(q)
+            entry = dict(q)
+            if not entry.get("status"):
+                entry["status"] = "setup"
+            by_id[cid] = entry
             changed = True
             continue
         existing = by_id[cid]
@@ -182,10 +188,18 @@ def merge_quarter_directory(
         if peer_pop > int(existing.get("population", 0) or 0):
             existing["population"] = peer_pop
             changed = True
-        for field in ("name", "status"):
-            if not existing.get(field) and q.get(field):
-                existing[field] = q[field]
-                changed = True
+        if not existing.get("name") and q.get("name"):
+            existing["name"] = q["name"]
+            changed = True
+        merged_status, status_changed = merge_quarter_status(
+            existing.get("status"),
+            q.get("status"),
+            cid,
+            peer_canister_id,
+        )
+        if status_changed:
+            existing["status"] = merged_status
+            changed = True
 
     peer_id = (peer_canister_id or "").strip()
     if peer_self and peer_id and peer_id in by_id:
@@ -193,6 +207,28 @@ def merge_quarter_directory(
             changed = True
 
     return list(by_id.values()), changed
+
+
+def merge_quarter_status(existing_status, peer_status, quarter_cid, peer_canister_id):
+    """Merge peer-reported status without making bootstrapping quarters joinable.
+
+    Setup quarters may promote to active only when the peer is reporting about
+    itself (``quarter_cid == peer_canister_id``). Third-party gossip must not
+    fill an empty status with ``active``.
+    """
+    existing = (existing_status or "").strip()
+    peer = (peer_status or "").strip()
+    if not existing:
+        existing = "setup"
+    if not peer:
+        return existing, False
+    if peer == "active":
+        if quarter_cid == peer_canister_id and existing == "setup":
+            return "active", True
+        return existing, False
+    if not (existing_status or "").strip():
+        return peer, True
+    return existing, False
 
 
 def resolve_population_report(

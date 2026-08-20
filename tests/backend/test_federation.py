@@ -261,6 +261,30 @@ class TestGosTopics:
         )
         assert result["success"] is False
 
+    def test_federal_propose_reserved_not_codex(self, monkeypatch):
+        _install_fake_ggg(quarter_canister_ids=["q1-cai"])
+        calls = []
+
+        def fake_dispatch(topic, source, body):
+            calls.append(topic)
+            return {"success": False, "error": "codex should not run"}
+
+        monkeypatch.setattr(codex_hooks, "dispatch_federation_message", fake_dispatch)
+        monkeypatch.setattr(
+            "core.federal_vote_runtime.handle_federal_topic",
+            lambda topic, source, body: {"success": True, "vote_id": "fv_1"},
+        )
+
+        payload = _payload(
+            msg_id="m-fed",
+            topic="gos.federal.propose",
+            body={"action": {"module": "core.foo", "function": "bar", "args": {}}},
+        )
+        result = json.loads(federation.handle_incoming(payload, "q1-cai"))
+        assert result["success"] is True
+        assert result["vote_id"] == "fv_1"
+        assert calls == []
+
 
 # ---------------------------------------------------------------------------
 # Idempotency

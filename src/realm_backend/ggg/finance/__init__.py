@@ -1,6 +1,7 @@
 """Finance module - instruments, balances, budgets, tokens, and treasury."""
 
 from .allocation_rule import AllocationRule, AllocationRuleStatus, TreasuryConfig
+from .financial_report import FinancialReport, FinancialReportKind
 from .balance import Balance
 from .budget import Budget, BudgetStatus
 from .fiscal_period import FiscalPeriod, FiscalPeriodStatus
@@ -24,6 +25,8 @@ __all__ = [
     "BudgetStatus",
     "Category",
     "EntryType",
+    "FinancialReport",
+    "FinancialReportKind",
     "FiscalPeriod",
     "FiscalPeriodStatus",
     "Fund",

@@ -71,7 +71,7 @@ class TestRegisterQuarter:
         q.federation = realm
 
         assert q.population == 0
-        assert q.status == QuarterStatus.ACTIVE
+        assert q.status == QuarterStatus.SETUP
 
 
 class TestDeregisterQuarter:

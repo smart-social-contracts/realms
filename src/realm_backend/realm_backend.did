@@ -221,7 +221,7 @@ type ManagementCanister = service { bitcoin_get_balance : (GetBalanceArgs) -> (S
 type Ledger = service { transfer : (TransferArgs) -> (TransferResult); account_balance : (AccountBalanceArgs) -> (Tokens) query; transfer_fee : (TransferFeeArg) -> (TransferFee) query; query_blocks : (GetBlocksArgs) -> (QueryBlocksResponse) query; symbol : () -> (SymbolResult) query; name : () -> (NameResult) query; decimals : () -> (DecimalsResult) query; archives : () -> (Archives) query };
 type _ICRC1IndexerService = service { get_account_transactions : (_GetAccountTransactionsArgs) -> (_GetAccountTransactionsResult) query };
 type QuarterDirectoryService = service { get_quarter_directory : () -> (text) query };
-type CapitalPopulationService = service { report_quarter_population : (nat) -> (text) };
+type CapitalPopulationService = service { report_quarter_population : (nat) -> (text); report_quarter_ready : () -> (text) };
 type DemoRegistrationService = service { register_demo_citizens : (text) -> (text) };
 type FederationService = service { federation_message : (text) -> (text) };
 type FileRegistryService = service { get_extension_manifest : (text) -> (text) query; latest_version : (text) -> (text) query; list_extensions : () -> (text) query; list_codices : () -> (text) query; list_files_icc : (text) -> (text) query; get_file_size_icc : (text, text) -> (text) query; get_file_chunk_icc : (text, text, text, text) -> (text) query; get_namespace_approval_icc : (text) -> (text) };
@@ -236,6 +236,7 @@ type RealmRegistryService = service { register_realm : (text, text, text, text, 
 type TokenAuthorityService = service { forced_transfer : (ForcedTransferArgs) -> (TokenAuthorityResult); freeze_account : (FreezeAccountArgs) -> (TokenAuthorityResult); unfreeze_account : (TokenAccount) -> (TokenAuthorityResult) };
 type Icrc1MetadataService = service { icrc1_symbol : () -> (text) query; icrc1_name : () -> (text) query; icrc1_decimals : () -> (nat8) query };
 type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (GetCreditsResult) query; get_latest_version : () -> (UpgradeResult) query };
+type PositionHoldersService = service { list_position_holders : () -> (text) query };
 type TimerId = nat64;
 type Duration = nat64;
 type Address = text;
@@ -260,6 +261,7 @@ service : {
   "set_canister_config_json" : (text) -> (text);
   "set_test_flags_json" : (text) -> (text);
   "register_quarter" : (text, text) -> (RealmResponse);
+  "set_quarter_catalog_status" : (text, text) -> (text);
   "deregister_quarter" : (text) -> (RealmResponse);
   "set_quarter_config" : (text) -> (RealmResponse);
   "bootstrap_as_quarter" : (text) -> (text);
@@ -272,12 +274,19 @@ service : {
   "get_migration" : (text) -> (text) query;
   "record_migration" : (text) -> (text);
   "get_quarter_directory" : () -> (text) query;
+  "list_position_holders" : () -> (text) query;
   "get_join_targets" : () -> (text) query;
   "sync_quarters" : (text) -> (text);
   "get_quarter_codex_drift" : () -> (text) query;
   "report_quarter_population" : (nat) -> (text);
+  "report_quarter_ready" : () -> (text);
   "register_demo_citizens" : (text) -> (text);
   "federation_message" : (text) -> (text);
+  "propose_federal_vote" : (text) -> (text);
+  "get_federal_vote" : (text) -> (text) query;
+  "list_federal_votes" : (text) -> (text) query;
+  "finalize_federal_vote" : (text) -> (text);
+  "cancel_federal_vote" : (text) -> (text);
   "get_scale_status" : () -> (text) query;
   "set_quarter_provisioning_config" : (text) -> (text);
   "approve_orchestration_action" : (text) -> (text);

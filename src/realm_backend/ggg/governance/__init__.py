@@ -6,6 +6,21 @@ from .contract import Contract
 from .delegation import Delegation
 from .entity_migration import EntityMigration
 from .federation import FederationMessage, QuarterResident
+from .federal_vote import (
+    FederalVote,
+    FederalVoteLeg,
+    LEG_STATUS_ARMED,
+    LEG_STATUS_EXECUTED,
+    LEG_STATUS_EXPIRED,
+    LEG_STATUS_FAILED,
+    LEG_STATUS_OPEN,
+    LEG_STATUS_REPORTED,
+    VOTE_STATUS_ADOPTED,
+    VOTE_STATUS_EXPIRED,
+    VOTE_STATUS_NO_QUORUM,
+    VOTE_STATUS_OPEN,
+    VOTE_STATUS_REJECTED,
+)
 from .license import License, LicenseType, license_issue, license_revoke
 from .mandate import Mandate
 from .proposal import Proposal
@@ -21,7 +36,20 @@ __all__ = [
     "Contract",
     "Delegation",
     "EntityMigration",
+    "FederalVote",
+    "FederalVoteLeg",
     "FederationMessage",
+    "LEG_STATUS_ARMED",
+    "LEG_STATUS_EXECUTED",
+    "LEG_STATUS_EXPIRED",
+    "LEG_STATUS_FAILED",
+    "LEG_STATUS_OPEN",
+    "LEG_STATUS_REPORTED",
+    "VOTE_STATUS_ADOPTED",
+    "VOTE_STATUS_EXPIRED",
+    "VOTE_STATUS_NO_QUORUM",
+    "VOTE_STATUS_OPEN",
+    "VOTE_STATUS_REJECTED",
     "License",
     "LicenseType",
     "license_issue",

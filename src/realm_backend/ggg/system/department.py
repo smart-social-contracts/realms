@@ -32,7 +32,7 @@ class Department(Entity, TimestampedMixin):
     """
 
     __alias__ = "name"
-    __version__ = 2
+    __version__ = 3
 
     name = String(max_length=256)
     description = String(max_length=512)
@@ -57,6 +57,10 @@ class Department(Entity, TimestampedMixin):
     policy_quorum_percent = Integer(default=0)
     # Comma-separated principals that may veto an action under this department's policy.
     policy_veto_principals = String(max_length=2048, default="")
+    # Stage-driven ratchet (issue #301): copied onto policy_* at beta when m > 0.
+    target_policy_threshold_m = Integer(default=0)
+    target_policy_threshold_n = Integer(default=0)
+    target_policy_quorum_percent = Integer(default=0)
     # Budget envelope (governmental Fund).
     fund = OneToOne("Fund", "department")
     authorities_granted = OneToMany("DepartmentAuthority", "grantor")
@@ -70,6 +74,10 @@ class Department(Entity, TimestampedMixin):
             obj.setdefault("policy_threshold_n", 1)
             obj.setdefault("policy_quorum_percent", 0)
             obj.setdefault("policy_veto_principals", "")
+        if from_version < 3:
+            obj.setdefault("target_policy_threshold_m", 0)
+            obj.setdefault("target_policy_threshold_n", 0)
+            obj.setdefault("target_policy_quorum_percent", 0)
         return obj
 
     def __repr__(self):

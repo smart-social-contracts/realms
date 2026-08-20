@@ -1547,7 +1547,7 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
         quarter_canister_id: The canister principal ID of the quarter backend
     """
     try:
-        from ggg import Quarter, Realm
+        from ggg import Quarter, QuarterStatus, Realm
 
         realm = Realm.load("1")
         if not realm:
@@ -1579,6 +1579,7 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
             name=quarter_name,
             canister_id=quarter_canister_id,
             index=next_index,
+            status=QuarterStatus.SETUP,
         )
         quarter.federation = realm
 
@@ -1603,6 +1604,52 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
     except Exception as e:
         logger.error(f"Error registering quarter: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.QUARTER_CONFIGURE)
+def set_quarter_catalog_status(quarter_canister_id: text, status: text) -> text:
+    """Set a registered quarter's catalog status (setup/active/suspended/...)."""
+    try:
+        from ggg import Quarter, QuarterStatus
+
+        cid = (quarter_canister_id or "").strip()
+        next_status = (status or "").strip()
+        allowed = {
+            QuarterStatus.SETUP,
+            QuarterStatus.ACTIVE,
+            QuarterStatus.SUSPENDED,
+            QuarterStatus.SPLITTING,
+            QuarterStatus.MERGING,
+        }
+        if not cid:
+            return json.dumps({"success": False, "error": "missing canister id"})
+        if next_status not in allowed:
+            return json.dumps({
+                "success": False,
+                "error": f"invalid status {next_status!r}",
+            })
+        target = None
+        for q in Quarter.instances():
+            if q.canister_id == cid:
+                target = q
+                break
+        if target is None:
+            return json.dumps({
+                "success": False,
+                "error": f"Quarter '{cid}' not found",
+            })
+        previous = (target.status or "").strip() or QuarterStatus.SETUP
+        target.status = next_status
+        return json.dumps({
+            "success": True,
+            "canister_id": cid,
+            "previous": previous,
+            "status": next_status,
+        })
+    except Exception as e:
+        logger.error(f"set_quarter_catalog_status failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @update
@@ -2145,17 +2192,31 @@ def get_quarter_directory() -> text:
     Includes this canister plus every Quarter entity it knows about.
     """
     try:
+        from core.join_targets import (
+            catalog_status_for_self,
+            is_dashboard_installed,
+        )
         from core.quarter_drift import (
             build_directory_self,
             find_latest_codex_sync_ballot,
         )
         from core.quarter_sync import derive_quarter_current_codex
+        from core.runtime_extensions import list_installed, resolve_extension_id
         from ggg import Proposal, Quarter, Realm, User
 
         self_id = ic.id().to_str()
         realm = Realm.load("1")
         quarters = []
         seen = set()
+        is_quarter = bool(getattr(realm, "is_quarter", False)) if realm else False
+        if is_quarter:
+            dashboard_installed = is_dashboard_installed(
+                list_installed(),
+                resolve_extension_id("member_dashboard"),
+            )
+            self_status = catalog_status_for_self(True, dashboard_installed)
+        else:
+            self_status = "active"
         if realm is not None:
             try:
                 self_pop = int(User.count())
@@ -2165,7 +2226,7 @@ def get_quarter_directory() -> text:
                 "name": getattr(realm, "name", "") or "",
                 "canister_id": self_id,
                 "population": self_pop,
-                "status": "active",
+                "status": self_status,
                 "index": 0,
                 "is_self": True,
             })
@@ -2179,7 +2240,7 @@ def get_quarter_directory() -> text:
                 "name": q.name or "",
                 "canister_id": cid,
                 "population": int(q.population or 0),
-                "status": q.status or "active",
+                "status": q.status or "setup",
                 "index": int(q.index or 0),
             })
 
@@ -2191,7 +2252,14 @@ def get_quarter_directory() -> text:
 
             codex = derive_quarter_current_codex()
             ballot = find_latest_codex_sync_ballot(recent_proposals(Proposal))
-            payload["self"] = build_directory_self(self_id, codex, ballot)
+            federal = None
+            try:
+                from core.federal_vote_runtime import latest_leg_for_directory
+
+                federal = latest_leg_for_directory()
+            except Exception:
+                pass
+            payload["self"] = build_directory_self(self_id, codex, ballot, federal=federal)
         except Exception as e:
             logger.warning(f"get_quarter_directory: self block unavailable: {e}")
 
@@ -2199,6 +2267,15 @@ def get_quarter_directory() -> text:
     except Exception as e:
         logger.error(f"Error in get_quarter_directory: {e}\n{traceback.format_exc()}")
         return json.dumps({"quarters": [], "error": str(e)})
+
+
+@query
+def list_position_holders() -> text:
+    try:
+        from core.acting_appointments import dump_position_holders
+        return json.dumps(dump_position_holders(ic.id().to_str()))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e), "positions": []})
 
 
 @query
@@ -2225,7 +2302,7 @@ def get_join_targets() -> text:
     Public (no auth): the caller is typically anonymous at this point.
     """
     try:
-        from core.join_targets import pick_default_join_quarter
+        from core.join_targets import is_joinable_status, pick_default_join_quarter
         from ggg import Quarter, Realm
 
         self_id = ic.id().to_str()
@@ -2239,7 +2316,7 @@ def get_join_targets() -> text:
                 cid = q.canister_id or ""
                 if not cid or cid == self_id:
                     continue
-                status = q.status or "active"
+                status = q.status or "setup"
                 sub_quarters.append({
                     "canister_id": cid,
                     "name": q.name or "",
@@ -2247,7 +2324,7 @@ def get_join_targets() -> text:
                     "status": status,
                     "index": int(getattr(q, "index", 0) or 0),
                     "is_capital": False,
-                    "joinable": status == "active",
+                    "joinable": is_joinable_status(status),
                 })
 
         active_subs = [q for q in sub_quarters if q["joinable"]]
@@ -2418,6 +2495,63 @@ def report_quarter_population(population: nat) -> text:
 
 
 @update
+def report_quarter_ready() -> text:
+    """Accept a quarter's join-ready signal after member_dashboard is installed.
+
+    Auth: ``ic.caller()`` must be a canister id already registered as a
+    ``Quarter`` on this capital. Promotes ``setup`` (or empty) to ``active``.
+    Idempotent when already active.
+    """
+    try:
+        from core.join_targets import should_activate_quarter
+        from ggg import Quarter, QuarterStatus
+
+        caller = ic.caller().to_str()
+        target = None
+        for q in Quarter.instances():
+            cid = q.canister_id or ""
+            if cid == caller:
+                target = q
+                break
+
+        if target is None:
+            return json.dumps({
+                "success": False,
+                "error": "caller is not a registered quarter",
+                "canister_id": caller,
+            })
+
+        current = (target.status or "").strip() or QuarterStatus.SETUP
+        if current == QuarterStatus.ACTIVE:
+            return json.dumps({
+                "success": True,
+                "updated": False,
+                "status": QuarterStatus.ACTIVE,
+                "canister_id": caller,
+            })
+
+        if should_activate_quarter(current, True):
+            target.status = QuarterStatus.ACTIVE
+            logger.info(f"Quarter {caller} promoted setup -> active")
+            return json.dumps({
+                "success": True,
+                "updated": True,
+                "status": QuarterStatus.ACTIVE,
+                "canister_id": caller,
+            })
+
+        return json.dumps({
+            "success": False,
+            "error": f"quarter status {current!r} cannot be promoted",
+            "status": current,
+            "canister_id": caller,
+        })
+    except Exception as e:
+        logger.error(f"Error in report_quarter_ready: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
 def register_demo_citizens(payload: text) -> Async[text]:
     """Register synthetic demo citizens on this canister (capital or quarter).
 
@@ -2452,6 +2586,126 @@ def federation_message(payload: text) -> text:
         return handle_incoming(payload, ic.caller().to_str())
     except Exception as e:
         logger.error(f"Error in federation_message: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.FEDERAL_VOTE_PROPOSE)
+def propose_federal_vote(args: text) -> Async[text]:
+    """Originate a realm-wide federal vote (issue #300).
+
+    Args (JSON): ``{action, org_name?, confirm?}``
+    """
+    try:
+        params = json.loads(args or "{}")
+    except Exception as e:
+        return json.dumps({"success": False, "error": f"bad args: {e}"})
+
+    action, err = None, ""
+    try:
+        from core.federal_vote import validate_action as _validate_action
+
+        action, err = _validate_action(params.get("action"))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+    if action is None:
+        return json.dumps({"success": False, "error": err})
+
+    try:
+        from core.governed_action import build_backend_replay_code, gate as governed_gate
+        from core.federal_vote_runtime import dispatch_federal_propose
+
+        caller = ic.caller().to_str()
+        confirm = bool(params.get("confirm", False))
+        org_name = (params.get("org_name") or "").strip() or None
+        payload = {"action": action}
+        if params.get("vote_id"):
+            payload["vote_id"] = params.get("vote_id")
+
+        verdict = governed_gate(
+            caller=caller,
+            summary=f"Federal vote: {action.get('function', 'action')}",
+            replay_code=build_backend_replay_code(
+                "core.federal_vote_runtime",
+                "dispatch_federal_propose",
+                json.dumps(payload),
+            ),
+            org_name=org_name,
+            confirm=confirm,
+            metadata_extra={"federal_scope": "originate"},
+        )
+        if verdict is not None:
+            return json.dumps(verdict)
+
+        result = yield from dispatch_federal_propose(payload)
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"propose_federal_vote failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_federal_vote(vote_id: text) -> text:
+    """Return one federal vote as JSON, or ``{success:false}`` when missing."""
+    try:
+        from core.federal_vote_runtime import get_vote_view
+
+        view = get_vote_view(vote_id)
+        if view is None:
+            return json.dumps({"success": False, "error": "vote not found"})
+        return json.dumps({"success": True, "vote": view})
+    except Exception as e:
+        logger.error(f"get_federal_vote failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def list_federal_votes(args: text) -> text:
+    """List federal votes; optional JSON filter ``{status}``."""
+    try:
+        from core.federal_vote_runtime import list_votes
+
+        params = json.loads(args or "{}")
+        status = (params.get("status") or "").strip() or None
+        votes = list_votes(status=status)
+        return json.dumps({"success": True, "votes": votes})
+    except Exception as e:
+        logger.error(f"list_federal_votes failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def finalize_federal_vote(args: text) -> Async[text]:
+    """Permissionless poke to advance federal vote drivers (issue #300)."""
+    try:
+        from core.federal_vote_runtime import (
+            advance_federal_aggregate,
+            advance_federal_legs,
+        )
+
+        legs = yield from advance_federal_legs()
+        aggregate = yield from advance_federal_aggregate()
+        return json.dumps({"success": True, "legs": legs, "aggregate": aggregate})
+    except Exception as e:
+        logger.error(f"finalize_federal_vote failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.FEDERAL_VOTE_MANAGE)
+def cancel_federal_vote(args: text) -> Async[text]:
+    """Cancel an open federal vote before its deadline."""
+    try:
+        from core.federal_vote_runtime import cancel_federal_vote as _cancel
+
+        params = json.loads(args or "{}")
+        vote_id = (params.get("vote_id") or "").strip()
+        if not vote_id:
+            return json.dumps({"success": False, "error": "vote_id is required"})
+        result = yield from _cancel(vote_id)
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"cancel_federal_vote failed: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

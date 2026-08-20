@@ -151,13 +151,16 @@ def _codex_should_deploy_fn(realm):
 
 
 def quarter_populations(realm):
-    """Populations of every *joinable* active quarter (for the scale decision).
+    """Populations of every active or setup quarter (for the scale decision).
 
     The capital is included only while it still accepts joins (no peer quarters
     yet, or ``is_quarter`` is unset). Once peer quarters exist the capital is
     typically ``joinable=false``, and counting its historical members would
     either force perpetual scaling (``max`` policy) or suppress needed scales
     (``min`` policy). Peer quarters contribute their last-synced ``population``.
+
+    Setup quarters count as reserved capacity (usually pop 0) so autoscale does
+    not mint another quarter while bootstrap is still in progress.
     """
     pops = []
     try:
@@ -170,7 +173,8 @@ def quarter_populations(realm):
     peers = []
     try:
         for q in getattr(realm, "quarter_ids", []) or []:
-            if getattr(q, "status", "active") != "active":
+            status = (getattr(q, "status", "") or "setup").strip()
+            if status not in ("active", "setup"):
                 continue
             cid = (getattr(q, "canister_id", "") or "").strip()
             if not cid or cid == self_id:

@@ -101,6 +101,7 @@ def build_directory_self(
     canister_id: str,
     codex: Optional[Mapping[str, Any]],
     ballot: Optional[Mapping[str, Any]] = None,
+    federal: Optional[Mapping[str, Any]] = None,
 ) -> dict:
     """Build the gossip ``self`` block describing this realm's codex + ballot."""
     block = {"canister_id": (canister_id or "").strip()}
@@ -110,6 +111,11 @@ def build_directory_self(
     ballot = ballot or {}
     block["last_sync_ballot_id"] = (ballot.get("id") or "").strip()
     block["last_sync_ballot_status"] = (ballot.get("status") or "").strip()
+    federal = federal or {}
+    if federal.get("vote_id"):
+        block["last_federal_vote_id"] = (federal.get("vote_id") or "").strip()
+        block["last_federal_leg_status"] = (federal.get("status") or "").strip()
+        block["last_federal_leg_outcome"] = (federal.get("outcome") or "").strip()
     return block
 
 

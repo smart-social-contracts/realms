@@ -43,7 +43,7 @@ class TestBuildBootstrapPlan:
         assert plan["items"] == []
         assert plan["status"] == "complete"
 
-    def test_codex_first_then_extensions(self):
+    def test_extensions_first_then_codex(self):
         plan = qb.build_bootstrap_plan({
             "parent_realm_canister_id": "cap-1",
             "registry_canister_id": "reg-1",
@@ -61,11 +61,12 @@ class TestBuildBootstrapPlan:
         assert plan["frontend"] == "fe-1"
         kinds = [(i["kind"], i["id"]) for i in plan["items"]]
         assert kinds == [
-            ("codex", "agora/gov"),
             ("extension", "public_dashboard"),
             ("extension", "realm_settings"),
             ("extension", "voting"),
+            ("codex", "agora/gov"),
         ]
+        assert plan["install_codex_dependencies"] is False
         assert plan["status"] == "pending"
 
     def test_blank_codex_id_skipped(self):
@@ -76,7 +77,7 @@ class TestBuildBootstrapPlan:
         })
         assert [i["kind"] for i in plan["items"]] == ["extension"]
 
-    def test_codices_list_installs_all_before_extensions(self):
+    def test_codices_list_installs_extensions_before_codices(self):
         # The auto-derived path mirrors a capital with >1 codex package.
         plan = qb.build_bootstrap_plan({
             "registry_canister_id": "reg-1",
@@ -89,14 +90,15 @@ class TestBuildBootstrapPlan:
         })
         kinds = [(i["kind"], i["id"]) for i in plan["items"]]
         assert kinds == [
+            ("extension", "voting"),
             ("codex", "agora"),
             ("codex", "agora/gov"),
-            ("extension", "voting"),
         ]
         # run_init carried through; default True when omitted.
         codex_items = [i for i in plan["items"] if i["kind"] == "codex"]
         assert codex_items[0]["run_init"] is True
         assert codex_items[1]["run_init"] is True
+        assert plan["install_codex_dependencies"] is False
 
     def test_extension_priority_member_dashboard_first(self):
         plan = qb.build_bootstrap_plan({
@@ -123,6 +125,24 @@ class TestBuildBootstrapPlan:
             "codices": [{"codex_id": "derived"}],
         })
         assert [i["id"] for i in plan["items"] if i["kind"] == "codex"] == ["derived"]
+
+    def test_codex_only_plan_installs_dependencies_inline(self):
+        plan = qb.build_bootstrap_plan({
+            "registry_canister_id": "reg-1",
+            "codex": {"codex_id": "agora/gov", "run_init": True},
+        })
+        assert plan["items"] == [
+            {"kind": "codex", "id": "agora/gov", "version": None, "run_init": True},
+        ]
+        assert plan["install_codex_dependencies"] is True
+
+    def test_plan_with_extensions_sets_install_codex_dependencies_false(self):
+        plan = qb.build_bootstrap_plan({
+            "registry_canister_id": "reg-1",
+            "codex": {"codex_id": "agora"},
+            "extensions": ["voting"],
+        })
+        assert plan["install_codex_dependencies"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +531,7 @@ class TestDeriveCapitalInstallSet:
         assert "agora" not in ext_ids_out
         assert ext_ids_out == ["voting", "realm_settings"]
 
-    def test_unified_codex_plans_before_extensions(self):
+    def test_unified_codex_plans_extensions_before_codex(self):
         ext_ids = ["agora", "voting", "member_dashboard"]
         saved = _install_core_stubs(
             ext_ids=ext_ids,
@@ -535,12 +555,17 @@ class TestDeriveCapitalInstallSet:
             _restore_core_stubs(saved)
 
         assert plan["items"][0] == {
+            "kind": "extension",
+            "id": "member_dashboard",
+            "version": None,
+        }
+        assert plan["items"][-1] == {
             "kind": "codex",
             "id": "agora",
             "version": "0.9.5",
             "run_init": True,
         }
-        assert all(i["kind"] == "extension" for i in plan["items"][1:])
+        assert plan["install_codex_dependencies"] is False
 
     def test_no_codex_derives_empty_codices_list(self):
         saved = _install_core_stubs(
@@ -573,6 +598,58 @@ class TestDeriveCapitalInstallSet:
             {"codex_id": "agora/gov", "version": "0.1.0", "run_init": True},
         ]
         assert derived["extensions"] == [{"ext_id": "voting", "version": "1.0.0"}]
+
+
+class TestReorderPendingBootstrapItems:
+    def test_reorders_codex_first_plan_from_cursor(self):
+        state = {
+            "items": [
+                {"kind": "codex", "id": "agora", "version": "0.9.5", "run_init": True},
+                {"kind": "extension", "id": "voting", "version": None},
+                {"kind": "extension", "id": "member_dashboard", "version": None},
+            ],
+            "cursor": 0,
+        }
+        changed = qb.reorder_pending_bootstrap_items(state)
+        assert changed is True
+        assert [(i["kind"], i["id"]) for i in state["items"]] == [
+            ("extension", "member_dashboard"),
+            ("extension", "voting"),
+            ("codex", "agora"),
+        ]
+        assert state["install_codex_dependencies"] is False
+
+    def test_only_reorders_tail_after_cursor(self):
+        state = {
+            "items": [
+                {"kind": "codex", "id": "agora", "version": None, "run_init": True},
+                {"kind": "extension", "id": "voting", "version": None},
+                {"kind": "extension", "id": "member_dashboard", "version": None},
+            ],
+            "cursor": 1,
+            "done": ["agora"],
+        }
+        changed = qb.reorder_pending_bootstrap_items(state)
+        assert changed is True
+        assert [(i["kind"], i["id"]) for i in state["items"]] == [
+            ("codex", "agora"),
+            ("extension", "member_dashboard"),
+            ("extension", "voting"),
+        ]
+        assert state["install_codex_dependencies"] is False
+
+    def test_no_change_when_already_ordered(self):
+        state = {
+            "items": [
+                {"kind": "extension", "id": "member_dashboard", "version": None},
+                {"kind": "extension", "id": "voting", "version": None},
+                {"kind": "codex", "id": "agora", "version": None, "run_init": True},
+            ],
+            "cursor": 0,
+            "install_codex_dependencies": False,
+        }
+        changed = qb.reorder_pending_bootstrap_items(state)
+        assert changed is False
 
 
 class TestRecurringTaskShims:

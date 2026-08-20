@@ -12,11 +12,14 @@ from .notification import Notification
 from .permission import Permission
 from .position import (
     Appointment,
+    AppointmentKind,
     AppointmentStatus,
     Position,
     PositionStatus,
     appoint,
+    appointment_kind,
     department_personnel_cost,
+    end_acting_appointments,
     position_key,
 )
 from .service import Service
@@ -43,6 +46,7 @@ from .user_profile import Operations, Profiles, UserProfile
 
 __all__ = [
     "Appointment",
+    "AppointmentKind",
     "AppointmentStatus",
     "Call",
     "ContractStatus",
@@ -67,7 +71,9 @@ __all__ = [
     "RegistrationCode",
     "Service",
     "appoint",
+    "appointment_kind",
     "department_personnel_cost",
+    "end_acting_appointments",
     "position_key",
     "Task",
     "TaskExecution",

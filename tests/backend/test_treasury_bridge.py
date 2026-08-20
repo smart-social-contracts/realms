@@ -205,6 +205,7 @@ class TestActionConstruction:
             ("set_rule", {"rules": [{"fund": "f", "percent": 100}]}),
             ("set_epoch", {"epoch_length": "quarter"}),
             ("set_schedule", {"enabled": True}),
+            ("issue_report", {"period": "2025-Q1"}),
         ]:
             with pytest.raises(ValueError, match="triggered_by"):
                 tb.v_action(caller=realm["admin"], kind=kind,
@@ -238,7 +239,11 @@ class TestActionConstruction:
         import core.treasury_allocation  # noqa: F401
 
         assert set(tb.ACTION_FIELDS) == {
-            "set_rule", "run_allocation", "set_epoch", "set_schedule",
+            "set_rule",
+            "run_allocation",
+            "set_epoch",
+            "set_schedule",
+            "issue_report",
         }
 
 

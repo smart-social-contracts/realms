@@ -197,3 +197,29 @@ def org_has_authority(
         ):
             return True
     return False
+
+
+def apply_target_policies() -> dict:
+    """Copy persisted ``target_policy_*`` onto live ``policy_*`` (issue #301).
+
+    Runs at the alpha→beta transition. A department is skipped when
+    ``target_policy_threshold_m`` is 0 (unset). Idempotent.
+    """
+    from ggg import Department
+
+    applied = []
+    for dept in Department.instances():
+        m = int(getattr(dept, "target_policy_threshold_m", 0) or 0)
+        if m <= 0:
+            continue
+        n = int(getattr(dept, "target_policy_threshold_n", 0) or 0)
+        q = int(getattr(dept, "target_policy_quorum_percent", 0) or 0)
+        dept.policy_threshold_m = m
+        dept.policy_threshold_n = n
+        dept.policy_quorum_percent = q
+        applied.append(dept.name)
+        logger.info(
+            f"Applied target policy on {dept.name}: {m}/{n} quorum={q}"
+        )
+    return {"applied": applied, "count": len(applied)}
+

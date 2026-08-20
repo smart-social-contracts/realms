@@ -15,6 +15,7 @@ several organizations.
 """
 
 from ic_python_db import (
+    Boolean,
     Entity,
     Integer,
     ManyToOne,
@@ -40,6 +41,13 @@ class AppointmentStatus:
 
     ACTIVE = "active"
     ENDED = "ended"
+
+
+class AppointmentKind:
+    """How the seat is held (issue #301)."""
+
+    SUBSTANTIVE = "substantive"
+    ACTING = "acting"
 
 
 def position_key(department_name: str, title: str) -> str:
@@ -71,7 +79,18 @@ class Position(Entity, TimestampedMixin):
     salary_amount = Integer(default=0)
     salary_period = String(max_length=16, default="monthly")
     status = String(max_length=16, default=PositionStatus.OPEN)
+    # When True, a new quarter copies the capital's current holders as acting
+    # officers at birth (issue #301). Codex may set False for seats that must
+    # be locally elected from day one.
+    inherit_from_capital = Boolean(default=True)
     appointments = OneToMany("Appointment", "position")
+    __version__ = 2
+
+    @classmethod
+    def migrate(cls, obj, from_version, to_version):
+        if from_version < 2:
+            obj.setdefault("inherit_from_capital", True)
+        return obj
 
     def __repr__(self):
         return f"Position(key={self.key!r}, headcount={self.headcount!r})"
@@ -116,9 +135,28 @@ class Appointment(Entity, TimestampedMixin):
     started_at = Integer(default=0)
     ended_at = Integer(default=0)
     status = String(max_length=16, default=AppointmentStatus.ACTIVE)
+    # Empty kind on pre-#301 rows is treated as substantive.
+    kind = String(max_length=16, default=AppointmentKind.SUBSTANTIVE)
+    source_canister_id = String(max_length=64, default="")
+    source_position_key = String(max_length=512, default="")
+    __version__ = 2
+
+    @classmethod
+    def migrate(cls, obj, from_version, to_version):
+        if from_version < 2:
+            obj.setdefault("kind", AppointmentKind.SUBSTANTIVE)
+            obj.setdefault("source_canister_id", "")
+            obj.setdefault("source_position_key", "")
+        return obj
 
     def __repr__(self):
-        return f"Appointment(position={getattr(self.position, 'key', None)!r}, status={self.status!r})"
+        return (
+            f"Appointment(position={getattr(self.position, 'key', None)!r}, "
+            f"status={self.status!r}, kind={self.kind!r})"
+        )
+
+    def is_acting(self) -> bool:
+        return (self.kind or AppointmentKind.SUBSTANTIVE) == AppointmentKind.ACTING
 
     def end(self, ended_at: int = 0):
         self.status = AppointmentStatus.ENDED
@@ -141,17 +179,59 @@ def _now_ts() -> int:
     return int(t) if t and t > 1_000_000 else 0
 
 
-def appoint(position: Position, user) -> "Appointment | None":
+def appointment_kind(appointment) -> str:
+    """Normalize empty/legacy kind to substantive."""
+    raw = (getattr(appointment, "kind", None) or "").strip()
+    if raw == AppointmentKind.ACTING:
+        return AppointmentKind.ACTING
+    return AppointmentKind.SUBSTANTIVE
+
+
+def end_acting_appointments(position: Position) -> int:
+    """End every active acting appointment on *position*. Returns how many ended."""
+    ended = 0
+    for a in list(position.active_appointments()):
+        if appointment_kind(a) == AppointmentKind.ACTING:
+            a.end()
+            ended += 1
+    return ended
+
+
+def appoint(
+    position: Position,
+    user,
+    kind: str = AppointmentKind.SUBSTANTIVE,
+    source_canister_id: str = "",
+    source_position_key: str = "",
+) -> "Appointment | None":
     """Appoint *user* to *position* if a seat is free.
 
     Idempotent: returns the existing appointment when the user already holds
-    the seat. Returns ``None`` (and logs) when the position is not open or
-    has no vacancy — callers like ``join_realm`` must not fail the whole
+    the seat with the same kind. A **substantive** appoint ends every acting
+    term on the seat first (issue #301) so a local Congress vote supersedes
+    inherited capital officers.
+
+    Returns ``None`` (and logs) when the position is not open or has no
+    vacancy — callers like ``join_realm`` must not fail the whole
     registration over a full roster.
     """
     if (position.status or PositionStatus.OPEN) != PositionStatus.OPEN:
         logger.warning(f"Position '{position.key}' is {position.status}; not appointing")
         return None
+
+    resolved_kind = (
+        AppointmentKind.ACTING
+        if (kind or "").strip() == AppointmentKind.ACTING
+        else AppointmentKind.SUBSTANTIVE
+    )
+
+    if resolved_kind == AppointmentKind.SUBSTANTIVE:
+        ended = end_acting_appointments(position)
+        if ended:
+            logger.info(
+                f"Ended {ended} acting appointment(s) on '{position.key}' "
+                f"for substantive appoint of {getattr(user, 'id', '?')}"
+            )
 
     for a in position.active_appointments():
         holder = a.user
@@ -171,8 +251,14 @@ def appoint(position: Position, user) -> "Appointment | None":
         started_at=_now_ts(),
         ended_at=0,
         status=AppointmentStatus.ACTIVE,
+        kind=resolved_kind,
+        source_canister_id=(source_canister_id or "").strip(),
+        source_position_key=(source_position_key or "").strip(),
     )
-    logger.info(f"User {getattr(user, 'id', '?')} appointed to '{position.key}'")
+    logger.info(
+        f"User {getattr(user, 'id', '?')} appointed to '{position.key}' "
+        f"({resolved_kind})"
+    )
     return appointment
 
 

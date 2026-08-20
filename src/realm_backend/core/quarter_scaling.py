@@ -213,7 +213,7 @@ def run_quarter_scaling() -> Async[text]:
                          "(direct) or installer_canister_id (broker)",
             })
 
-        from ggg import Quarter
+        from ggg import Quarter, QuarterStatus
 
         # Register the freshly minted backend as a quarter (assign next index).
         already = any(q.canister_id == new_canister_id for q in Quarter.instances())
@@ -221,7 +221,12 @@ def run_quarter_scaling() -> Async[text]:
         if not already:
             for q in Quarter.instances():
                 new_index = max(new_index, int(q.index or 0) + 1)
-            q = Quarter(name=spec.get("name") or new_canister_id[:8], canister_id=new_canister_id, index=new_index)
+            q = Quarter(
+                name=spec.get("name") or new_canister_id[:8],
+                canister_id=new_canister_id,
+                index=new_index,
+                status=QuarterStatus.SETUP,
+            )
             q.federation = realm
 
         # Population freshness is push-based (issue #156): the new quarter

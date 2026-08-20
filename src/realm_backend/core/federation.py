@@ -21,6 +21,11 @@ Guarantees provided here (GOS level):
       gos.ping               liveness echo
       gos.directory.upsert   record a resident's home quarter (capital)
       gos.directory.resolve  look up a resident's home quarter (capital)
+      gos.federal.propose    originate a realm-wide federal vote (capital)
+      gos.federal.open       mirror a federal vote on a quarter (capital → quarter)
+      gos.federal.tally      report a quarter leg outcome (quarter → capital)
+      gos.federal.result     broadcast aggregated result (capital → quarters)
+      gos.federal.executed   execution receipt from a quarter (quarter → capital)
 
 Everything else goes to the active codex's ``on_federation_message`` hook.
 
@@ -209,6 +214,11 @@ def _handle_gos_topic(topic: str, source: str, body: dict) -> Dict[str, Any]:
         if not principal:
             return {"success": False, "error": "principal is required"}
         return {"success": True, "principal": principal, "quarter": resolve_home_quarter(principal)}
+
+    if topic.startswith("gos.federal."):
+        from core.federal_vote_runtime import handle_federal_topic
+
+        return handle_federal_topic(topic, source, body)
 
     return {"success": False, "error": f"Unknown reserved topic '{topic}'"}
 

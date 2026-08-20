@@ -670,6 +670,10 @@ class _Treasury:
         """Switch automation off. Never needs a vote — it is the safe direction."""
         return _require_rpc("treasury.disable_schedule", {})
 
+    def issue_draft(self):
+        """Freeze current working books as an unofficial draft snapshot."""
+        return _require_rpc("treasury.issue_draft", {})
+
 
 class _DeptDocs:
     """Encrypted documents shared with a department.

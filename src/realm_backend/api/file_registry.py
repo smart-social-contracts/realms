@@ -696,6 +696,7 @@ def install_extension_from_registry(
     ext_id: str,
     version: str = None,
     frontend_canister_id: str = None,
+    install_dependencies: bool = True,
 ) -> Async[str]:
     """Pull extension backend files from the file registry and install them.
     Frontend bundles are copied to the realm's frontend asset canister before
@@ -850,19 +851,21 @@ def install_extension_from_registry(
 
         # 4. Distro behavior: install dependency extensions first so the codex
         #    init hook can rely on them (and the realm is never left with a
-        #    half-working codex).
-        dependencies = _resolve_codex_dependencies(manifest, ext_id)
-        installed_deps, failed_deps = yield from _install_codex_dependencies(
-            registry_canister_id, ext_id, dependencies, fe_canister or None
-        )
-        if failed_deps:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": _format_failed_deps(ext_id, failed_deps),
-                    "dependency_warnings": failed_deps,
-                }
+        #    half-working codex). Skipped when callers already list deps as
+        #    separate plan items (quarter bootstrap with extensions first).
+        if install_dependencies:
+            dependencies = _resolve_codex_dependencies(manifest, ext_id)
+            installed_deps, failed_deps = yield from _install_codex_dependencies(
+                registry_canister_id, ext_id, dependencies, fe_canister or None
             )
+            if failed_deps:
+                return json.dumps(
+                    {
+                        "success": False,
+                        "error": _format_failed_deps(ext_id, failed_deps),
+                        "dependency_warnings": failed_deps,
+                    }
+                )
 
     # Copy frontend bundles before installing backend so we never mark an
     # extension installed without its same-origin UI assets.
@@ -969,6 +972,7 @@ def install_codex_from_registry(
     version: str = None,
     run_init: bool = True,
     frontend_canister_id: str = None,
+    install_dependencies: bool = True,
 ) -> Async[str]:
     """Install a codex, preferring the unified extension pipeline (issue #244).
 
@@ -1002,7 +1006,11 @@ def install_codex_from_registry(
         or None
     )
     unified_raw = yield from install_extension_from_registry(
-        registry_canister_id, codex_id, version, frontend_canister_id=frontend_id
+        registry_canister_id,
+        codex_id,
+        version,
+        frontend_canister_id=frontend_id,
+        install_dependencies=install_dependencies,
     )
     try:
         unified = json.loads(unified_raw)
@@ -1074,18 +1082,21 @@ def install_codex_from_registry(
     if init_py_error:
         return json.dumps({"success": False, "error": init_py_error})
 
-    dependencies = _resolve_codex_dependencies(codex_manifest, codex_id)
-    installed_deps, failed_deps = yield from _install_codex_dependencies(
-        registry_canister_id, codex_id, dependencies, frontend_id
-    )
-    if failed_deps:
-        return json.dumps(
-            {
-                "success": False,
-                "error": _format_failed_deps(codex_id, failed_deps),
-                "dependency_warnings": failed_deps,
-            }
+    installed_deps = []
+    failed_deps = []
+    if install_dependencies:
+        dependencies = _resolve_codex_dependencies(codex_manifest, codex_id)
+        installed_deps, failed_deps = yield from _install_codex_dependencies(
+            registry_canister_id, codex_id, dependencies, frontend_id
         )
+        if failed_deps:
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": _format_failed_deps(codex_id, failed_deps),
+                    "dependency_warnings": failed_deps,
+                }
+            )
 
     # Install via runtime_codex. Legacy init.py is refused above; the unified
     # path runs ``codex_hooks.run_init`` instead. ``run_init`` is kept in the

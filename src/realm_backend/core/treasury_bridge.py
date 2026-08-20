@@ -41,6 +41,7 @@ ACTION_FIELDS: Dict[str, FrozenSet[str]] = {
     "run_allocation": frozenset({"period"}),
     "set_epoch": frozenset({"epoch_length", "anchor_month", "epoch_minutes"}),
     "set_schedule": frozenset({"enabled", "auto_allocate"}),
+    "issue_report": frozenset({"as_of", "period"}),
 }
 
 DEFAULT_VOTING_WINDOW_SECONDS = 604_800
@@ -249,6 +250,9 @@ def _build_action(kind: str, fields: Dict[str, Any], caller: str) -> Dict[str, A
         action["enabled"] = bool(fields.get("enabled"))
         if fields.get("auto_allocate") is not None:
             action["auto_allocate"] = bool(fields["auto_allocate"])
+    elif kind == "issue_report":
+        action["as_of"] = str(fields.get("as_of") or "")
+        action["period"] = str(fields.get("period") or "")
 
     action["triggered_by"] = caller
     return action
@@ -391,6 +395,14 @@ def v_disable_schedule(caller: str = "", **kwargs) -> dict:
     return {**result, "applied": "direct"}
 
 
+def v_issue_draft(caller: str = "", **kwargs) -> dict:
+    """Freeze current books as an unofficial draft. Not a money movement."""
+    from core.financial_reports import issue_draft
+
+    user = _require_member(caller)
+    return _unwrap(issue_draft(issued_by=user.id))
+
+
 VERBS = {
     "treasury.overview": v_overview,
     "treasury.allocation_status": v_allocation_status,
@@ -399,6 +411,7 @@ VERBS = {
     "treasury.timeline": v_timeline,
     "treasury.action": v_action,
     "treasury.disable_schedule": v_disable_schedule,
+    "treasury.issue_draft": v_issue_draft,
 }
 
 READ_VERBS = frozenset(

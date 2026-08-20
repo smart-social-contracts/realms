@@ -36,6 +36,7 @@ class FiscalPeriod(Entity, TimestampedMixin):
     status = String(max_length=16, default=FiscalPeriodStatus.OPEN)
     ledger_entries = OneToMany("LedgerEntry", "fiscal_period")
     budgets = OneToMany("Budget", "fiscal_period")
+    financial_reports = OneToMany("FinancialReport", "period")
 
     def __repr__(self):
         return f"FiscalPeriod(id={self.id!r}, status={self.status!r})"

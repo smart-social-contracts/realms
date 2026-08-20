@@ -34,6 +34,8 @@ OPTIONAL_HOOKS = {
     "check_lifecycle_transition",
     "get_dashboard_config",
     "get_extension_overrides",
+    "get_federal_governance_params",
+    "on_federation_message",
 }
 
 # Internal/legacy directories that are not publishable codex packages.

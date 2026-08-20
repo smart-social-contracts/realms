@@ -233,7 +233,9 @@ def apply_position_action(action: dict) -> dict:
                                 f"Could not assign profile '{profile_name}' to {principal}: {prof_err}"
                             )
 
-            appointment = appoint(pos, user)
+            from ggg import AppointmentKind
+
+            appointment = appoint(pos, user, kind=AppointmentKind.SUBSTANTIVE)
             if appointment is None:
                 if (pos.status or PositionStatus.OPEN) != PositionStatus.OPEN:
                     return {"success": False, "error": f"Position '{key}' is not open"}

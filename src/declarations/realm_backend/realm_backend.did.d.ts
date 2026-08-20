@@ -157,6 +157,7 @@ export interface CanisterStatusResult {
 }
 export interface CapitalPopulationService {
   'report_quarter_population' : ActorMethod<[bigint], string>,
+  'report_quarter_ready' : ActorMethod<[], string>,
 }
 export interface CasalsProvisionService {
   'create_canister' : ActorMethod<[string], string>,
@@ -319,6 +320,7 @@ export interface ExtensionInput {
   'download_url' : string,
   'description' : string,
   'version' : string,
+  'screenshots' : string,
   'file_registry_canister_id' : string,
   'price_e8s' : bigint,
   'file_registry_namespace' : string,
@@ -343,6 +345,7 @@ export interface ExtensionListing {
   'verification_status' : string,
   'likes' : bigint,
   'version' : string,
+  'screenshots' : string,
   'is_active' : boolean,
   'file_registry_canister_id' : string,
   'price_e8s' : bigint,
@@ -671,6 +674,9 @@ export interface PendingAudit {
   'version' : string,
   'item_id' : string,
   'developer' : string,
+}
+export interface PositionHoldersService {
+  'list_position_holders' : ActorMethod<[], string>,
 }
 export interface ProvisionalCreateCanisterWithCyclesArgs {
   'settings' : [] | [CanisterSettings],
@@ -1047,6 +1053,7 @@ export interface _SERVICE {
   'accept_delegation_json' : ActorMethod<[string], string>,
   'approve_orchestration_action' : ActorMethod<[string], string>,
   'bootstrap_as_quarter' : ActorMethod<[string], string>,
+  'cancel_federal_vote' : ActorMethod<[string], string>,
   'change_quarter' : ActorMethod<[string], RealmResponse>,
   'complete_setup' : ActorMethod<[], string>,
   'create_multi_step_scheduled_task' : ActorMethod<
@@ -1094,6 +1101,7 @@ export interface _SERVICE {
     ExtensionCallResponse
   >,
   'federation_message' : ActorMethod<[string], string>,
+  'finalize_federal_vote' : ActorMethod<[string], string>,
   'find_objects' : ActorMethod<
     [string, Array<[string, string]>],
     RealmResponse
@@ -1115,6 +1123,7 @@ export interface _SERVICE {
   >,
   'get_extension_frontend_info' : ActorMethod<[string], string>,
   'get_extensions' : ActorMethod<[], RealmResponse>,
+  'get_federal_vote' : ActorMethod<[string], string>,
   'get_join_targets' : ActorMethod<[], string>,
   'get_menu_config' : ActorMethod<[], string>,
   'get_migration' : ActorMethod<[string], string>,
@@ -1160,15 +1169,19 @@ export interface _SERVICE {
   'list_codex_packages' : ActorMethod<[], string>,
   'list_delegations_json' : ActorMethod<[], string>,
   'list_extensions' : ActorMethod<[string], RealmResponse>,
+  'list_federal_votes' : ActorMethod<[string], string>,
+  'list_position_holders' : ActorMethod<[], string>,
   'list_runtime_extensions' : ActorMethod<[], string>,
   'list_share_audiences' : ActorMethod<[], RealmResponse>,
   'mint_land_nft_for_parcel' : ActorMethod<[string, string, string], string>,
   'policy_status' : ActorMethod<[], string>,
   'process_quarter_scaling' : ActorMethod<[], string>,
+  'propose_federal_vote' : ActorMethod<[string], string>,
   'receive_realm_message' : ActorMethod<
     [string, string, string, string],
     string
   >,
+  'reconcile_treasury_token' : ActorMethod<[], string>,
   'record_migration' : ActorMethod<[string], string>,
   'refresh_invoice' : ActorMethod<[string], string>,
   'register_demo_citizens' : ActorMethod<[string], string>,
@@ -1180,8 +1193,8 @@ export interface _SERVICE {
     string
   >,
   'reload_codex' : ActorMethod<[string], string>,
-  'reload_entity_method_overrides' : ActorMethod<[], string>,
   'report_quarter_population' : ActorMethod<[bigint], string>,
+  'report_quarter_ready' : ActorMethod<[], string>,
   'request_codex_sync' : ActorMethod<[string], string>,
   'request_quarter_codex_sync' : ActorMethod<[string], string>,
   'request_upgrade' : ActorMethod<[string], string>,
@@ -1207,6 +1220,7 @@ export interface _SERVICE {
   'set_menu_category_order' : ActorMethod<[string], string>,
   'set_menu_item_config' : ActorMethod<[string], string>,
   'set_menu_visibility' : ActorMethod<[string], string>,
+  'set_quarter_catalog_status' : ActorMethod<[string, string], string>,
   'set_quarter_config' : ActorMethod<[string], RealmResponse>,
   'set_quarter_provisioning_config' : ActorMethod<[string], string>,
   'set_sandbox_config' : ActorMethod<[string], string>,

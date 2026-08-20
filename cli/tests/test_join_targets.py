@@ -22,7 +22,38 @@ assert _spec.loader is not None
 _spec.loader.exec_module(_mod)
 pick_default_join_quarter = _mod.pick_default_join_quarter
 is_dashboard_installed = _mod.is_dashboard_installed
+is_joinable_status = _mod.is_joinable_status
+catalog_status_for_self = _mod.catalog_status_for_self
+should_activate_quarter = _mod.should_activate_quarter
 JOIN_QUARTER_NOT_READY = _mod.JOIN_QUARTER_NOT_READY
+
+
+class TestIsJoinableStatus:
+    def test_active_only(self):
+        assert is_joinable_status("active") is True
+        assert is_joinable_status("setup") is False
+        assert is_joinable_status("suspended") is False
+        assert is_joinable_status("") is False
+        assert is_joinable_status(None) is False
+
+
+class TestCatalogStatusForSelf:
+    def test_capital_or_ready_quarter_is_active(self):
+        assert catalog_status_for_self(False, False) == "active"
+        assert catalog_status_for_self(True, True) == "active"
+
+    def test_bootstrapping_quarter_is_setup(self):
+        assert catalog_status_for_self(True, False) == "setup"
+
+
+class TestShouldActivateQuarter:
+    def test_setup_and_ready(self):
+        assert should_activate_quarter("setup", True) is True
+        assert should_activate_quarter("", True) is True
+
+    def test_not_ready_or_already_active(self):
+        assert should_activate_quarter("setup", False) is False
+        assert should_activate_quarter("active", True) is False
 
 
 class TestIsDashboardInstalled:

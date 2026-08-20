@@ -32,6 +32,7 @@ from realm_backend.core.cross_quarter import (  # noqa: E402
     ResolutionStatus,
     classify_ref,
     merge_quarter_directory,
+    merge_quarter_status,
     resolve_population_report,
     walk_chain,
 )
@@ -170,6 +171,7 @@ class TestMergeQuarterDirectory:
         merged, changed = merge_quarter_directory(local, peer)
         ids = {q["canister_id"] for q in merged}
         assert ids == {"c1", "c2"}
+        assert merged[1]["status"] == "setup"
         assert changed is True
 
     def test_higher_population_wins(self):
@@ -191,14 +193,29 @@ class TestMergeQuarterDirectory:
         peer = [{"canister_id": "c1", "name": "North", "status": "active"}]
         merged, changed = merge_quarter_directory(local, peer)
         assert merged[0]["name"] == "North"
+        assert merged[0]["status"] == "setup"
+        assert changed is True
+
+    def test_self_report_promotes_setup_to_active(self):
+        local = [{"canister_id": "c1", "population": 0, "status": "setup"}]
+        peer = [{"canister_id": "c1", "population": 0, "status": "active"}]
+        merged, changed = merge_quarter_directory(local, peer, peer_canister_id="c1")
         assert merged[0]["status"] == "active"
         assert changed is True
+
+    def test_third_party_cannot_promote_to_active(self):
+        local = [{"canister_id": "c1", "population": 0, "status": "setup"}]
+        peer = [{"canister_id": "c1", "population": 0, "status": "active"}]
+        merged, changed = merge_quarter_directory(local, peer, peer_canister_id="other")
+        assert merged[0]["status"] == "setup"
+        assert changed is False
 
     def test_entries_without_canister_id_ignored(self):
         local = []
         peer = [{"population": 5}, {"canister_id": "c2", "population": 5}]
         merged, changed = merge_quarter_directory(local, peer)
         assert [q["canister_id"] for q in merged] == ["c2"]
+        assert merged[0]["status"] == "setup"
 
     def test_no_change_when_nothing_new(self):
         local = [{"canister_id": "c1", "population": 10, "name": "N", "status": "active"}]

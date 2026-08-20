@@ -29,11 +29,23 @@ class QuarterDirectoryService(Service):
         ...
 
 
+class PositionHoldersService(Service):
+    """Remote interface of a peer quarter's position-holder snapshot."""
+
+    @service_query
+    def list_position_holders(self) -> text:
+        ...
+
+
 class CapitalPopulationService(Service):
     """Remote interface of the capital's population-report endpoint."""
 
     @service_update
     def report_quarter_population(self, population: nat) -> text:
+        ...
+
+    @service_update
+    def report_quarter_ready(self) -> text:
         ...
 
 
@@ -90,6 +102,35 @@ def fetch_peer_directory(peer_canister_id: str) -> Async[Dict]:
         return {"success": False, "error": str(e)}
 
 
+def fetch_position_holders(peer_canister_id: str) -> Async[Dict]:
+    """Query a peer quarter's ``list_position_holders`` and return parsed data.
+
+    Returns the parsed payload dict or ``{"success": False, "error": ...}``.
+    """
+    logger.info(f"Fetching position holders from peer {peer_canister_id}")
+    try:
+        service = PositionHoldersService(Principal.from_str(peer_canister_id))
+        result: CallResult[text] = yield service.list_position_holders()
+        if isinstance(result, str):
+            raw = result
+        elif isinstance(result, dict):
+            raw = result.get("Ok", result.get("ok", str(result)))
+        elif hasattr(result, "Ok") and result.Ok is not None:
+            raw = result.Ok
+        else:
+            raw = str(result)
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {"success": False, "error": f"Unparseable peer response: {raw[:200]}"}
+        if isinstance(parsed, dict):
+            return parsed
+        return {"success": False, "error": f"Unexpected peer response: {parsed!r}"}
+    except Exception as e:
+        logger.error(f"Error fetching position holders from {peer_canister_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
 def _unwrap_call_text(result) -> str:
     """Extract text from an inter-canister ``CallResult`` (same as provisioning)."""
     if isinstance(result, str):
@@ -142,5 +183,33 @@ def report_population_to_capital(capital_canister_id: str, population: int) -> A
     except Exception as e:
         logger.error(
             f"Error reporting population to capital {capital_canister_id}: {e}"
+        )
+        return {"success": False, "error": str(e)}
+
+
+def report_ready_to_capital(capital_canister_id: str) -> Async[Dict]:
+    """Push join-ready signal to the capital after member_dashboard is installed.
+
+    Called from quarter bootstrap once the quarter can accept joins. Returns
+    ``{"success": bool, ...}`` parsed from the capital response, or
+    ``{"success": False, "error": ...}`` on transport failure.
+    """
+    logger.info(f"Reporting quarter ready to capital {capital_canister_id}")
+    try:
+        service = CapitalPopulationService(Principal.from_str(capital_canister_id))
+        result: CallResult[text] = yield service.report_quarter_ready()
+        raw = _unwrap_call_text(result)
+        if not raw:
+            return {"success": False, "error": "empty capital response"}
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {"success": False, "error": f"Unparseable capital response: {raw[:200]}"}
+        if isinstance(parsed, dict):
+            return parsed
+        return {"success": True, "result": parsed}
+    except Exception as e:
+        logger.error(
+            f"Error reporting quarter ready to capital {capital_canister_id}: {e}"
         )
         return {"success": False, "error": str(e)}

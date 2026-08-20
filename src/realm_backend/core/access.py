@@ -110,8 +110,33 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     if not user:
         return False
 
-    # 3. Profile-level check (coarse RBAC)
-    for profile in user.profiles:
+    # 3. Profile-level check (coarse RBAC) — direct profiles plus profiles
+    # attached to active appointments (issue #301 acting/substantive seats).
+    profiles = list(user.profiles or [])
+    try:
+        from ggg import Appointment, AppointmentStatus
+
+        rows = Appointment.instances()
+        # Production returns a list. Skip mocks / non-sequences so a MagicMock
+        # ``instances()`` cannot iterate as every caller.
+        if isinstance(rows, (list, tuple)):
+            for appointment in rows:
+                if (getattr(appointment, "status", None) or AppointmentStatus.ACTIVE) != AppointmentStatus.ACTIVE:
+                    continue
+                holder = getattr(appointment, "user", None)
+                holder_id = getattr(holder, "id", None) if holder is not None else None
+                if not isinstance(holder_id, str) or holder_id != caller_principal:
+                    continue
+                pos = getattr(appointment, "position", None)
+                if pos is None:
+                    continue
+                seat_profile = getattr(pos, "profile", None)
+                if seat_profile is not None:
+                    profiles.append(seat_profile)
+    except Exception:
+        pass
+
+    for profile in profiles:
         allowed = str(profile.allowed_to or "").split(",")
         if Operations.ALL in allowed or operation in allowed:
             return True

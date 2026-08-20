@@ -145,7 +145,7 @@ class TestSchemaGeneration:
         ggg_types = _ggg_entity_subclasses()
         declared = _parse_entity_types(schema_text)
         assert declared == ggg_types
-        assert len(declared) == 63
+        assert declared  # schema tracks every GGG Entity; count is not frozen
 
     def test_user_membership_hierarchy(self):
         schema_text = generate_realm_cedar_schema()

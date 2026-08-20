@@ -30,9 +30,9 @@ class TestQuarterEntity:
         assert q.canister_id == "abc-123-def"
 
     def test_quarter_default_status(self):
-        """Test that Quarter defaults to active status."""
+        """Test that Quarter defaults to setup status until join-ready."""
         q = Quarter(name="South")
-        assert q.status == QuarterStatus.ACTIVE
+        assert q.status == QuarterStatus.SETUP
 
     def test_quarter_default_population(self):
         """Test that Quarter population defaults to 0."""
@@ -41,6 +41,8 @@ class TestQuarterEntity:
 
     def test_quarter_status_values(self):
         """Test QuarterStatus enum-like values."""
+        assert QuarterStatus.SETUP == "setup"
+        assert QuarterStatus.SETUP == "setup"
         assert QuarterStatus.ACTIVE == "active"
         assert QuarterStatus.SUSPENDED == "suspended"
         assert QuarterStatus.SPLITTING == "splitting"

@@ -442,18 +442,14 @@ def _invoice_claimed_amounts() -> dict:
     return claimed
 
 
-def sweep_deposits():
-    """Generator: refresh the treasury wallet and book unmatched deposits.
+def recognize_unmatched_deposits() -> dict:
+    """Book incoming transfers that no invoice claimed as unallocated revenue.
 
-    Each new incoming transfer (to the canister's default account) that no
-    invoice claims is recognized as ``unallocated`` revenue on the source
-    fund, dated today (recognition date), in the current open period.
-    Idempotent via the deterministic transaction id ``SWEEP-<token>-<tx id>``.
+    Sync helper (no yield). Idempotent via deterministic transaction ids.
     """
     from _cdk import ic
     from ggg import Category, EntryType, FiscalPeriod, LedgerEntry, Token
     from ic_basilisk_toolkit.entities import WalletTransfer
-    from ic_basilisk_toolkit.wallet import Wallet
 
     currency = treasury_currency()
     if not currency:
@@ -467,13 +463,6 @@ def sweep_deposits():
     fund = _source_fund()
     if fund is None:
         return {"error": "No source fund — seed the realm's funds first"}
-
-    wallet = Wallet()
-    try:
-        refresh = yield wallet.refresh(currency)
-    except Exception as e:
-        logger.warning(f"Treasury sweep: wallet refresh failed: {e}")
-        refresh = {"new_txs": 0, "error": str(e)}
 
     period_id = current_epoch_id()
     period = FiscalPeriod[period_id]
@@ -503,6 +492,7 @@ def sweep_deposits():
             claimed[amount] -= 1
             skipped_invoice += 1
             continue
+        desc = f"Unassigned deposit from {wt.principal_from}"
         LedgerEntry.create_transaction(
             txid,
             [
@@ -514,7 +504,7 @@ def sweep_deposits():
                     "fiscal_period": period,
                     "entry_date": _iso(_today()),
                     "currency": currency,
-                    "description": f"Swept deposit from {wt.principal_from}",
+                    "description": desc,
                     "reference": str(wt.tx_id or ""),
                 },
                 {
@@ -525,7 +515,7 @@ def sweep_deposits():
                     "fiscal_period": period,
                     "entry_date": _iso(_today()),
                     "currency": currency,
-                    "description": f"Unclassified deposit from {wt.principal_from}",
+                    "description": desc,
                     "reference": str(wt.tx_id or ""),
                 },
             ],
@@ -536,11 +526,58 @@ def sweep_deposits():
     result = {
         "success": True,
         "currency": currency,
-        "new_txs": int(refresh.get("new_txs", 0) or 0),
         "swept": swept,
         "swept_amount": swept_amount,
         "skipped_invoice_matched": skipped_invoice,
         "period": period_id,
+    }
+    logger.info(f"Treasury recognition: {result}")
+    return result
+
+
+def sweep_deposits():
+    """Generator: refresh the treasury wallet and book unmatched deposits.
+
+    Each new incoming transfer (to the canister's default account) that no
+    invoice claims is recognized as ``unallocated`` revenue on the source
+    fund, dated today (recognition date), in the current open period.
+    Idempotent via the deterministic transaction id ``SWEEP-<token>-<tx id>``.
+    """
+    from ggg import Token
+    from ic_basilisk_toolkit.wallet import Wallet
+
+    currency = treasury_currency()
+    if not currency:
+        from core.realm_currency import no_treasury_token_error
+
+        return no_treasury_token_error()
+    token = Token[currency]
+    if token is None:
+        return {"error": f"No registered token for accounting currency '{currency}'"}
+
+    fund = _source_fund()
+    if fund is None:
+        return {"error": "No source fund — seed the realm's funds first"}
+
+    wallet = Wallet()
+    try:
+        refresh = yield wallet.refresh(currency)
+    except Exception as e:
+        logger.warning(f"Treasury sweep: wallet refresh failed: {e}")
+        refresh = {"new_txs": 0, "error": str(e)}
+
+    recognize = recognize_unmatched_deposits()
+    if recognize.get("error"):
+        return recognize
+
+    result = {
+        "success": True,
+        "currency": currency,
+        "new_txs": int(refresh.get("new_txs", 0) or 0),
+        "swept": recognize.get("swept", 0),
+        "swept_amount": recognize.get("swept_amount", 0),
+        "skipped_invoice_matched": recognize.get("skipped_invoice_matched", 0),
+        "period": recognize.get("period"),
     }
     logger.info(f"Treasury sweep: {result}")
     return result
@@ -893,7 +930,7 @@ def _tick_step_code() -> str:
 
 
 def treasury_tick():
-    """Generator: daily sweep, epoch rollover, and auto-allocation on close."""
+    """Generator: daily sweep, epoch rollover, auto-allocation, and period reports."""
     sweep = yield from sweep_deposits()
 
     periods = ensure_epoch_periods()
@@ -905,11 +942,20 @@ def treasury_tick():
         for period_id in periods.get("closed", []):
             auto_runs.append(run_allocation(period_id, triggered_by="schedule"))
 
+    from core.financial_reports import issue_period_report
+
+    issued_reports = []
+    for period_id in periods.get("closed", []):
+        issued_reports.append(
+            issue_period_report(period_id, issued_by="system")
+        )
+
     return {
         "sweep": sweep,
         "current_period": periods.get("current"),
         "closed_periods": periods.get("closed", []),
         "auto_allocations": auto_runs,
+        "issued_reports": issued_reports,
     }
 
 
@@ -1338,6 +1384,11 @@ def describe_treasury_action(action: dict) -> str:
         state = "Enable" if action.get("enabled") else "Disable"
         auto = " with automatic allocation" if action.get("auto_allocate") else ""
         return f"{state} the treasury schedule{auto}"
+    if kind == "issue_report":
+        if action.get("as_of"):
+            return f"Issue financial report as of {action.get('as_of')}"
+        period = action.get("period") or "current"
+        return f"Issue financial report for period {period}"
     return f"Treasury action {kind or '?'}"
 
 
@@ -1366,6 +1417,21 @@ def apply_treasury_action(action: dict) -> dict:
             auto_allocate=action.get("auto_allocate"),
             triggered_by=by,
         )
+    if kind == "issue_report":
+        from core.financial_reports import issue_as_of, issue_period_report
+        from ggg import FinancialReport
+
+        as_of = str(action.get("as_of") or "").strip()
+        period = str(action.get("period") or "").strip()
+        if as_of:
+            return issue_as_of(
+                as_of=as_of, issued_by=by, period_id=period or None
+            )
+        if period:
+            base_id = f"FR-{period}"
+            restate = FinancialReport[base_id] is not None
+            return issue_period_report(period, issued_by=by, restate=restate)
+        return {"error": "issue_report requires 'as_of' or 'period'"}
     return {"error": f"Unknown treasury action '{kind}'"}
 
 

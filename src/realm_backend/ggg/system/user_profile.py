@@ -89,6 +89,8 @@ class Operations:
     # Proposal lifecycle actions (open voting, finalize after deadline,
     # approve/execute) — deadline/policy rules are enforced in-code.
     PROPOSAL_MANAGE = "proposal.manage"
+    FEDERAL_VOTE_PROPOSE = "federal_vote.propose"
+    FEDERAL_VOTE_MANAGE = "federal_vote.manage"
     CONTRACT_CREATE_UNDER_MANDATE = "contract.create_under_mandate"
     SCOPE_AUTHORIZE = "scope.authorize"
     GOVERNANCE_UPDATE = "governance.update"
@@ -252,6 +254,8 @@ OPERATIONS_CATALOG = {
     "proposal.create": {"category": "Governance", "description": "Submit new governance proposals"},
     "proposal.vote": {"category": "Governance", "description": "Vote on governance proposals"},
     "proposal.manage": {"category": "Governance", "description": "Manage proposal lifecycle (open voting, finalize, execute)"},
+    "federal_vote.propose": {"category": "Governance", "description": "Propose a realm-wide federal vote"},
+    "federal_vote.manage": {"category": "Governance", "description": "Cancel a federal vote before its deadline"},
     "contract.create_under_mandate": {"category": "Governance", "description": "Create contracts under an active mandate"},
     "scope.authorize": {"category": "Governance", "description": "Authorize governance scopes"},
     "governance.update": {"category": "Governance", "description": "Update governance rules and parameters"},
@@ -343,6 +347,7 @@ class Profiles:
             # can revoke any of these from the profile per realm.
             Operations.PROPOSAL_CREATE,
             Operations.PROPOSAL_MANAGE,
+            Operations.FEDERAL_VOTE_PROPOSE,
             Operations.ORG_MANAGE_MEMBERS,
             Operations.ORG_MANAGE_BUDGET,
             Operations.DOCUMENT_MANAGE,
@@ -368,6 +373,8 @@ class Profiles:
         "allowed_to": [
             Operations.MANDATE_CREATE,
             Operations.PROPOSAL_CREATE,
+            Operations.FEDERAL_VOTE_PROPOSE,
+            Operations.FEDERAL_VOTE_MANAGE,
             Operations.CONTRACT_CREATE_UNDER_MANDATE,
             Operations.GOVERNANCE_UPDATE,
         ],

@@ -34,6 +34,7 @@ from realm_backend.core.autoscale import (  # noqa: E402
     LOW_THRESHOLD_N,
     default_threshold_n,
     maybe_request_quarter_scale,
+    quarter_populations,
     resolve_should_scale,
     scale_at,
     should_scale_default,
@@ -197,3 +198,30 @@ class TestMaybeRequestQuarterScale:
     def test_no_realm_is_safe(self):
         # No Realm created => no-op, never raises.
         assert maybe_request_quarter_scale() is False
+
+    def test_setup_quarter_with_pop_zero_blocks_remint(self):
+        """A setup quarter reserves capacity so we do not mint while bootstrapping."""
+        from realm_backend.ggg import Quarter, QuarterStatus, Realm
+
+        realm = _make_realm()
+        q_full = Quarter(
+            name="Full",
+            canister_id="q-full",
+            population=9,
+            status=QuarterStatus.ACTIVE,
+            index=1,
+        )
+        q_full.federation = realm
+        q_setup = Quarter(
+            name="Bootstrapping",
+            canister_id="q-setup",
+            population=0,
+            status=QuarterStatus.SETUP,
+            index=2,
+        )
+        q_setup.federation = realm
+
+        pops = quarter_populations(realm)
+        assert pops == [9, 0]
+        assert maybe_request_quarter_scale() is False
+        assert bool(Realm.load("1").scale_in_flight) is False
