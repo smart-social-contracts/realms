@@ -157,6 +157,7 @@ export interface CanisterStatusResult {
 }
 export interface CapitalPopulationService {
   'report_quarter_population' : ActorMethod<[bigint], string>,
+  'report_quarter_ready' : ActorMethod<[], string>,
 }
 export interface CasalsProvisionService {
   'create_canister' : ActorMethod<[string], string>,
@@ -676,6 +677,9 @@ export interface PendingAudit {
   'version' : string,
   'item_id' : string,
   'developer' : string,
+}
+export interface PositionHoldersService {
+  'list_position_holders' : ActorMethod<[], string>,
 }
 export interface ProvisionalCreateCanisterWithCyclesArgs {
   'settings' : [] | [CanisterSettings],
