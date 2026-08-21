@@ -1,6 +1,6 @@
 """Federal vote GOS runtime — federation transport + entity drivers (issue #300).
 
-Wires pure helpers from ``core.federal_vote`` and entities from
+Wires pure helpers from ``core.federal_tally`` and entities from
 ``ggg.governance.federal_vote`` into federation topics, recurring tasks,
 and realm endpoints. Capital originates votes; quarters mirror and ballot;
 capital aggregates and broadcasts results; quarters execute adopted actions.
@@ -13,17 +13,10 @@ from typing import Any, Dict, List, Optional
 
 from ic_python_logging import get_logger
 
-from core.federal_vote import (
-    aggregate,
-    build_vote_id,
-    classify_leg_outcome,
-    compute_deadline,
-    compute_vote_hash,
-    is_past,
-    resolve_rule,
-    validate_action,
-    verify_result,
-)
+# Bind the module object only. A `from core.federal_tally import aggregate`
+# during this file's Basilisk `_bload` fails on the canister: LazyMod returns
+# early while still loading, so the name is missing (unknown location).
+import core.federal_tally as _tally
 
 try:
     from ggg.governance.federal_vote import (
@@ -166,7 +159,7 @@ def load_federal_params() -> dict:
 
     raw = call_hook("get_federal_governance_params", {})
     params = raw if isinstance(raw, dict) else {}
-    return resolve_rule(params)
+    return _tally.resolve_rule(params)
 
 
 def upsert_vote(**fields):
@@ -260,6 +253,37 @@ def _leg_for_quarter(vote_id: str, quarter_id: str):
     return FederalVoteLeg[leg_key(vote_id, quarter_id)]
 
 
+def _serialize_leg(leg) -> dict:
+    return {
+        "quarter_canister_id": getattr(leg, "quarter_canister_id", ""),
+        "proposal_id": getattr(leg, "proposal_id", ""),
+        "outcome": getattr(leg, "outcome", ""),
+        "votes_yes": int(getattr(leg, "votes_yes", 0) or 0),
+        "votes_no": int(getattr(leg, "votes_no", 0) or 0),
+        "votes_abstain": int(getattr(leg, "votes_abstain", 0) or 0),
+        "eligible": int(getattr(leg, "eligible", 0) or 0),
+        "reported": bool(getattr(leg, "reported", False)),
+        "status": getattr(leg, "status", ""),
+        "error": getattr(leg, "error", ""),
+    }
+
+
+def _legs_for_vote(vote_id: str):
+    _FederalVote, FederalVoteLeg, *_rest = _import_ggg()
+    vote_id = (vote_id or "").strip()
+    try:
+        if hasattr(FederalVoteLeg, "find_by"):
+            batch, _ = FederalVoteLeg.find_by("vote_id", vote_id)
+            return list(batch)
+    except Exception:
+        pass
+    return [
+        leg
+        for leg in FederalVoteLeg.instances()
+        if (getattr(leg, "vote_id", "") or "").strip() == vote_id
+    ]
+
+
 def _open_votes():
     FederalVote, *_rest = _import_ggg()
     try:
@@ -291,8 +315,11 @@ def _vote_view(vote) -> dict:
         tally = json.loads(getattr(vote, "tally_json", "") or "{}")
     except (json.JSONDecodeError, TypeError):
         pass
+    vote_id = getattr(vote, "vote_id", "")
+    legs = [_serialize_leg(leg) for leg in _legs_for_vote(vote_id)]
+    local = _leg_for_quarter(vote_id, _self_id())
     return {
-        "vote_id": getattr(vote, "vote_id", ""),
+        "vote_id": vote_id,
         "origin_quarter": getattr(vote, "origin_quarter", ""),
         "action": action,
         "rule": rule,
@@ -301,6 +328,8 @@ def _vote_view(vote) -> dict:
         "status": getattr(vote, "status", ""),
         "tally": tally,
         "known_quarters": int(getattr(vote, "known_quarters", 0) or 0),
+        "legs": legs,
+        "local_leg": _serialize_leg(local) if local else None,
     }
 
 
@@ -419,7 +448,7 @@ def handle_propose(source: str, body: dict) -> Dict[str, Any]:
         existing = FederalVote[vote_id]
         if existing:
             if body.get("action") is not None:
-                retry_action, err = validate_action(body.get("action"))
+                retry_action, err = _tally.validate_action(body.get("action"))
                 if retry_action is None:
                     return {"success": False, "error": err}
                 try:
@@ -427,7 +456,7 @@ def handle_propose(source: str, body: dict) -> Dict[str, Any]:
                 except (json.JSONDecodeError, TypeError):
                     stored_rule = {}
                 stored_deadline = int(getattr(existing, "deadline", 0) or 0)
-                expected = compute_vote_hash(
+                expected = _tally.compute_vote_hash(
                     retry_action, stored_rule, stored_deadline
                 )
                 if expected != (getattr(existing, "vote_hash", "") or "").strip():
@@ -439,18 +468,18 @@ def handle_propose(source: str, body: dict) -> Dict[str, Any]:
                 "deadline": int(existing.deadline or 0),
             }
 
-    action, err = validate_action(body.get("action"))
+    action, err = _tally.validate_action(body.get("action"))
     if action is None:
         return {"success": False, "error": err}
 
     rule = load_federal_params()
     now = now_epoch_s()
-    deadline = compute_deadline(now, rule)
+    deadline = _tally.compute_deadline(now, rule)
     global _propose_counter
     _propose_counter += 1
     if not vote_id:
-        vote_id = build_vote_id(source, now, _propose_counter)
-    vote_hash = compute_vote_hash(action, rule, deadline)
+        vote_id = _tally.build_vote_id(source, now, _propose_counter)
+    vote_hash = _tally.compute_vote_hash(action, rule, deadline)
     quarters = known_quarter_ids()
 
     upsert_vote(
@@ -502,7 +531,7 @@ def handle_open(source: str, body: dict) -> Dict[str, Any]:
         return {"success": False, "error": "vote_id is required"}
 
     existing = FederalVote[vote_id]
-    action, err = validate_action(body.get("action"))
+    action, err = _tally.validate_action(body.get("action"))
     if action is None:
         return {"success": False, "error": err}
 
@@ -511,7 +540,7 @@ def handle_open(source: str, body: dict) -> Dict[str, Any]:
         return {"success": False, "error": "rule must be a dict"}
     deadline = int(body.get("deadline") or 0)
     vote_hash = (body.get("vote_hash") or "").strip()
-    expected = compute_vote_hash(action, rule, deadline)
+    expected = _tally.compute_vote_hash(action, rule, deadline)
     if vote_hash != expected:
         return {"success": False, "error": "vote_hash mismatch"}
 
@@ -597,7 +626,7 @@ def handle_result(source: str, body: dict) -> Dict[str, Any]:
     if not local:
         return {"success": False, "error": "no local leg for vote"}
 
-    ok, err = verify_result(
+    ok, err = _tally.verify_result(
         getattr(local, "vote_hash", ""), (body.get("vote_hash") or "").strip()
     )
     if not ok:
@@ -779,7 +808,7 @@ def advance_federal_legs():
             prop_status = (getattr(proposal, "status", "") or "").strip().lower()
             deadline = int(getattr(vote, "deadline", 0) or 0)
             terminal = prop_status in _TERMINAL_PROPOSAL_STATUSES
-            past_deadline = is_past(now, deadline, 0)
+            past_deadline = _tally.is_past(now, deadline, 0)
             if not terminal and not past_deadline:
                 continue
 
@@ -794,7 +823,7 @@ def advance_federal_legs():
                 proposal = Proposal[proposal_id]
                 prop_status = (getattr(proposal, "status", "") or "").strip().lower()
 
-            outcome = classify_leg_outcome(prop_status)
+            outcome = _tally.classify_leg_outcome(prop_status)
             if outcome:
                 yield from _send_tally(vote_id, leg, outcome, proposal)
                 tallied += 1
@@ -819,7 +848,7 @@ def advance_federal_legs():
                 leg.error = "invalid action json"[:256]
                 continue
 
-            action, err = validate_action(action)
+            action, err = _tally.validate_action(action)
             if action is None:
                 leg.status = LEG_STATUS_FAILED
                 leg.error = (err or "invalid action")[:256]
@@ -833,7 +862,7 @@ def advance_federal_legs():
                 continue
 
             deadline = int(getattr(vote, "deadline", 0) or 0)
-            expected = compute_vote_hash(action, rule, deadline)
+            expected = _tally.compute_vote_hash(action, rule, deadline)
             if expected != (getattr(vote, "vote_hash", "") or "").strip():
                 logger.error(
                     f"refusing execution of {vote_id}: recomputed vote_hash mismatch"
@@ -945,10 +974,10 @@ def advance_federal_aggregate():
                 all_reported = False
 
         grace = int(rule.get("grace_hours") or 0)
-        if not all_reported and not is_past(now, deadline, grace):
+        if not all_reported and not _tally.is_past(now, deadline, grace):
             continue
 
-        tally = aggregate(legs_payload, len(quarters), rule)
+        tally = _tally.aggregate(legs_payload, len(quarters), rule)
         vote.status = (tally.get("status") or "")[:32]
         vote.tally_json = json.dumps(tally, separators=(",", ":"))[:2048]
         finalized += 1

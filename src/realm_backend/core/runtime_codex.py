@@ -94,6 +94,10 @@ def _create_or_update_codex_entity(name: str, code: str):
     The Codex entity stores code at /{name} on the persistent filesystem
     and is accessible via Codex[name].
     """
+    if (name or "").startswith("proposal_"):
+        raise ValueError(
+            f"Codex name '{name}' is reserved for voting code-execution proposals"
+        )
     try:
         from ggg import Codex
 

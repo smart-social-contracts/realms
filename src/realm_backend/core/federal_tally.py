@@ -1,4 +1,4 @@
-"""Federal vote aggregation and verification (issue #300).
+"""Federal vote aggregation and verification (``core.federal_tally``, issue #300).
 
 Pure helpers for freezing a realm-wide question spec, hashing it for
 tamper detection, classifying quarter-side leg outcomes, and aggregating

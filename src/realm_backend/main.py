@@ -2603,9 +2603,9 @@ def propose_federal_vote(args: text) -> Async[text]:
 
     action, err = None, ""
     try:
-        from core.federal_vote import validate_action as _validate_action
+        import core.federal_tally as _tally
 
-        action, err = _validate_action(params.get("action"))
+        action, err = _tally.validate_action(params.get("action"))
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
     if action is None:
@@ -7200,6 +7200,22 @@ def register_realm_from_registry(args: text) -> Async[text]:
 
 
 # ── In-realm setup wizard (issue #8) ─────────────────────────────────────
+
+
+@update
+def enter_setup(creator: Principal, registry_id: text, environment: text) -> text:
+    """Put a new realm into in-realm setup (GOS installer bootstrap)."""
+    try:
+        if not ic.is_controller(ic.caller()):
+            return json.dumps({"ok": False, "error": "unauthorized"})
+        from core.setup import enter_setup as _enter_setup
+
+        return json.dumps(
+            _enter_setup(creator.to_str(), registry_id, environment)
+        )
+    except Exception as e:
+        logger.error(f"enter_setup error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"ok": False, "error": str(e)})
 
 
 @query

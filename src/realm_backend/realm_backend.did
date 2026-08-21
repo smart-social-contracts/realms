@@ -374,6 +374,7 @@ service : {
   "install_codex_from_registry" : (text) -> (text);
   "install_branding_from_registry" : (text) -> (text);
   "register_realm_from_registry" : (text) -> (text);
+  "enter_setup" : (principal, text, text) -> (text);
   "get_setup_state" : () -> (text) query;
   "get_available_codices_cached" : () -> (text) query;
   "list_available_codices" : () -> (text);

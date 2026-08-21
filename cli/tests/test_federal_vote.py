@@ -12,9 +12,9 @@ import types
 
 _FV_PATH = os.path.join(
     os.path.dirname(__file__),
-    "..", "..", "src", "realm_backend", "core", "federal_vote.py",
+    "..", "..", "src", "realm_backend", "core", "federal_tally.py",
 )
-_spec = importlib.util.spec_from_file_location("federal_vote_under_test", _FV_PATH)
+_spec = importlib.util.spec_from_file_location("federal_tally_under_test", _FV_PATH)
 fv = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fv)
 
@@ -29,7 +29,7 @@ if "_cdk" not in sys.modules:
     _cdk_stub.Async = _Async
     sys.modules["_cdk"] = _cdk_stub
 
-from realm_backend.core.federal_vote import (
+from realm_backend.core.federal_tally import (
     ACTION_MAX_LENGTH,
     DEFAULT_RULE,
     LEG_ADOPTED,

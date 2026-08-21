@@ -96,6 +96,36 @@ def set_realm_registry_canister_id(realm, registry_id: str) -> None:
     update_setup_config(realm, {"realm_registry_canister_id": registry_id})
 
 
+def enter_setup(creator: str, registry_id: str, environment: str = "") -> dict:
+    """Record founding creator and registry link when GOS enters in-realm setup."""
+    from ggg import Realm
+
+    from .network_infra import apply_network_infra
+
+    realm = Realm.load("1")
+    if not realm:
+        return {"ok": False, "error": "realm not initialized"}
+
+    setup = get_setup_config(realm)
+    if setup.get("setup_completed_at") or effective_realm_status(realm) != "setup":
+        return {"ok": False, "error": "setup already completed"}
+
+    creator = (creator or "").strip()
+    existing = (setup.get("creator_principal") or "").strip()
+    if existing and existing != creator:
+        return {"ok": False, "error": "setup already entered by another creator"}
+
+    set_creator_principal(realm, creator)
+    set_realm_registry_canister_id(realm, registry_id)
+    network = (environment or "").strip()
+    if network:
+        realm.network = network
+    infra_err = apply_network_infra(realm, network)
+    if infra_err:
+        return infra_err
+    return {"ok": True}
+
+
 def get_realm_registry_canister_id(realm) -> str:
     setup = get_setup_config(realm)
     stored = (setup.get("realm_registry_canister_id") or "").strip()

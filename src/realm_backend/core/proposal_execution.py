@@ -114,11 +114,13 @@ def drive_async_effects(deferred: List[dict]):
         verb = effect.get("verb")
         kwargs = effect.get("kwargs") or {}
         if verb == "treasury.transfer":
-            vault_args = json.dumps({
+            vault_args = {
                 "to_principal": kwargs.get("to_principal", ""),
                 "amount": kwargs.get("amount", 0),
-            })
-            yield extension_async_call("vault", "transfer", vault_args)
+            }
+            if kwargs.get("token"):
+                vault_args["token"] = kwargs["token"]
+            yield extension_async_call("vault", "transfer", json.dumps(vault_args))
             continue
         raise PermissionError(f"unsupported deferred effect '{verb}'")
 
