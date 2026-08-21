@@ -227,8 +227,8 @@ def _valid_canister_id(value: str) -> bool:
 _SHARED_TOKEN_LEDGERS = {
     "staging": {
         "REALMS": {
-            "ledger": "2rqin-xaaaa-aaaah-qunsq-cai",
-            "indexer": "2rqin-xaaaa-aaaah-qunsq-cai",
+            "ledger": "cj65k-laaaa-aaaac-bfxqq-cai",
+            "indexer": "cj65k-laaaa-aaaac-bfxqq-cai",
             "decimals": 8,
             "name": "REALMS Token",
         },

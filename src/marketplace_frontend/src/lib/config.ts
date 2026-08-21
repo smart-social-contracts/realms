@@ -26,7 +26,7 @@ function pick(...keys: string[]): string {
 const CASALS_BY_HOST: Record<string, string> = {
   'test.realmsgos.org': 'https://qtht4-saaaa-aaaap-quwna-cai.icp0.io',
   'demo.realmsgos.org': 'https://usukh-2yaaa-aaaae-agztq-cai.icp0.io',
-  'staging.realmsgos.org': 'https://boysh-4aaaa-aaaaj-a6utq-cai.icp0.io',
+  'staging.realmsgos.org': 'https://h6mrr-iiaaa-aaaae-ag2uq-cai.icp0.io',
 };
 
 export function resolveCasalsUrl(): string {

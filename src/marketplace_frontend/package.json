@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "setup": "npm i && dfx canister create marketplace_backend && dfx generate marketplace_backend && dfx deploy",
+    "setup": "npm i && dfx --run-deprecated canister create marketplace_backend && dfx --run-deprecated generate marketplace_backend && dfx --run-deprecated deploy",
     "start": "vite --port 3002",
-    "prebuild": "dfx generate marketplace_backend",
+    "prebuild": "dfx --run-deprecated generate marketplace_backend",
     "build": "vite build",
     "test:e2e": "playwright test",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss,svelte}\""

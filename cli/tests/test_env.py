@@ -81,8 +81,14 @@ class TestDfxDeployBasiliskEnv:
         )
 
         mock_run.assert_called_once()
-        _, kwargs = mock_run.call_args
-        assert kwargs["env"] is dfx_env
+        args, kwargs = mock_run.call_args
+        cmd = args[0]
+        assert cmd[:3] == ["dfx", "--run-deprecated", "deploy"]
+        env = kwargs["env"]
+        assert env["PATH"] == dfx_env["PATH"]
+        assert env["VIRTUAL_ENV"] == dfx_env["VIRTUAL_ENV"]
+        assert env["TERM"] == "xterm-256color"
+        assert env["DFX_WARNING"] == "-mainnet_plaintext_identity"
 
 
 class TestEnvDeployBasiliskEnv:

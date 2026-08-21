@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -22,17 +23,16 @@ from .extension import (
 
 console = Console()
 
-_FILE_REGISTRY_IDS = {
-    "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
-    "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
-    "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
-}
+_CORE = Path(__file__).resolve().parents[2] / "src" / "realm_backend" / "core"
+if str(_CORE) not in sys.path:
+    sys.path.insert(0, str(_CORE))
+from network_infra import NETWORK_INFRA, file_registry_id_for  # noqa: E402
 
 
 def _resolve_registry(network: str, registry: Optional[str]) -> str:
     if registry:
         return registry
-    rid = _FILE_REGISTRY_IDS.get(network, "")
+    rid = file_registry_id_for(network)
     if not rid:
         raise typer.BadParameter(
             f"No file_registry canister ID for network '{network}'. Use --registry."

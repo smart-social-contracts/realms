@@ -647,7 +647,7 @@ def _resync_extension_frontends_after_deploy(
     Casals rollout already resyncs; mundus must do the same.
     """
     from .extension import _dfx_call as _icp_call
-    from .files import _FILE_REGISTRY_IDS
+    from .files import file_registry_id_for
 
     backend_id = (realm.get("canister_id") or "").strip()
     frontend_id = (realm.get("frontend_canister_id") or "").strip()
@@ -656,7 +656,7 @@ def _resync_extension_frontends_after_deploy(
 
     registry = (
         (infra or {}).get("file_registry_canister_id")
-        or _FILE_REGISTRY_IDS.get(network, "")
+        or file_registry_id_for(network)
         or ""
     ).strip()
 

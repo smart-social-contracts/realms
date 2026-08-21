@@ -30,7 +30,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import typer
 from rich.console import Console
@@ -54,12 +54,30 @@ MARKETPLACE_FRONTEND = "marketplace_frontend"
 FILE_REGISTRY = "file_registry"
 
 
+def _dfx_cmd(*args: str) -> List[str]:
+    """Prefix dfx subcommand args with the srv1-compatible deprecated wrapper."""
+    return ["dfx", "--run-deprecated", *args]
+
+
+def _dfx_subprocess_env(base_env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    """Env vars required for dfx 0.30 on operator hosts (colour + mainnet warning)."""
+    env = (base_env or os.environ).copy()
+    env["TERM"] = "xterm-256color"
+    env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+    env.pop("NO_COLOR", None)
+    env.pop("FORCE_COLOR", None)
+    return env
+
+
 def _dfx_canister_id(name: str, network: str) -> Optional[str]:
     """Return the canister id (text) for ``name`` on ``network``, or None."""
     try:
         result = subprocess.run(
-            ["dfx", "canister", "id", name, "--network", network],
-            capture_output=True, text=True, timeout=30,
+            _dfx_cmd("canister", "id", name, "--network", network),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=_dfx_subprocess_env(),
         )
         if result.returncode == 0:
             cid = result.stdout.strip()
@@ -79,12 +97,11 @@ def _dfx_call(
     quiet: bool = False,
 ) -> subprocess.CompletedProcess:
     """Run ``dfx canister call`` and return the CompletedProcess."""
-    cmd = ["dfx", "canister", "call", "--network", network]
+    cmd = _dfx_cmd("canister", "call", "--network", network)
     if not update:
         cmd.append("--query")
     cmd.extend([canister, method, candid_args])
-    env = os.environ.copy()
-    env.setdefault("DFX_WARNING", "-mainnet_plaintext_identity")
+    env = _dfx_subprocess_env()
     if not quiet:
         console.print(f"[dim]$ {' '.join(cmd)}[/dim]")
     return subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)

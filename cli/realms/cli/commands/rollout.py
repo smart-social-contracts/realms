@@ -46,7 +46,7 @@ from rich.table import Table
 from ..casals_versions import MAIN_CHANNEL, pick_latest_main_key
 from ..utils import get_project_root
 from .extension import _dfx_call
-from .files import _FILE_REGISTRY_IDS, files_publish_release_command
+from .files import file_registry_id_for, files_publish_release_command
 
 console = Console()
 
@@ -211,7 +211,7 @@ def _publish_gos_family(
         assets_wasm = _find_assets_wasm(root)
 
     casals = _CASALS_IDS.get(env)
-    file_registry = _FILE_REGISTRY_IDS.get(env)
+    file_registry = file_registry_id_for(env)
     if not casals or not file_registry:
         raise typer.BadParameter(f"no Casals/file_registry configured for '{env}'")
 
@@ -398,7 +398,7 @@ def _resync_extension_frontends(action: dict, identity: Optional[str]) -> tuple[
     backend_id = (action.get("realm_backend_id") or "").strip()
     if action.get("section") != _DEPLOYMENTS_SECTION or not backend_id:
         return True, "resync skipped"
-    file_registry = _FILE_REGISTRY_IDS.get(action["env"])
+    file_registry = file_registry_id_for(action["env"])
     payload: dict[str, str] = {"frontend_canister_id": action["canister_id"]}
     if file_registry:
         payload["registry_canister_id"] = file_registry

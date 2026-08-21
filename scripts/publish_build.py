@@ -38,7 +38,7 @@ _CERTIFIED_ASSETS_WASM_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
 
 # Per-environment canister IDs (imported from the installed CLI to stay in sync).
 from realms.cli.casals_versions import git_short_sha, main_build_version  # noqa: E402
-from realms.cli.commands.files import _FILE_REGISTRY_IDS  # noqa: E402
+from realms.cli.commands.files import file_registry_id_for  # noqa: E402
 from realms.cli.commands.rollout import _CASALS_IDS  # noqa: E402
 
 # GaaS stack (realm_registry_backend, realm_installer, realm_registry_frontend)
@@ -253,7 +253,7 @@ def main():
 
     env = args.environment
     casals = _CASALS_IDS.get(env)
-    file_registry = _FILE_REGISTRY_IDS.get(env)
+    file_registry = file_registry_id_for(env)
     if not casals:
         sys.exit(f"no Casals instance configured for '{env}'")
     if not file_registry:

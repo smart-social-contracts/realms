@@ -30,6 +30,8 @@ from .marketplace import (
     MARKETPLACE_FRONTEND,
     _dfx_call,
     _dfx_canister_id,
+    _dfx_cmd,
+    _dfx_subprocess_env,
 )
 from ..basilisk_env import basilisk_python_executable, dfx_env_with_basilisk
 from ..utils import (
@@ -113,10 +115,11 @@ def _canister_status_line(canister_ref: str, network: str) -> str:
     """Return a one-line ``dfx canister status`` summary or an error hint."""
     try:
         result = subprocess.run(
-            ["dfx", "canister", "status", canister_ref, "--network", network],
+            _dfx_cmd("canister", "status", canister_ref, "--network", network),
             capture_output=True,
             text=True,
             timeout=30,
+            env=_dfx_subprocess_env(),
         )
     except Exception as exc:
         return f"error: {exc}"
@@ -135,10 +138,11 @@ def _is_canister_dead(canister_ref: str, network: str) -> bool:
     """Return True when the replica reports the canister does not exist."""
     try:
         result = subprocess.run(
-            ["dfx", "canister", "status", canister_ref, "--network", network],
+            _dfx_cmd("canister", "status", canister_ref, "--network", network),
             capture_output=True,
             text=True,
             timeout=30,
+            env=_dfx_subprocess_env(),
         )
     except Exception:
         return False
@@ -162,10 +166,10 @@ def _create_canister(
     *,
     logger,
 ) -> str:
-    cmd = ["dfx", "canister", "create", canister_name, "--network", network]
+    cmd = _dfx_cmd("canister", "create", canister_name, "--network", network, "--no-wallet")
     if identity:
         cmd.extend(["--identity", identity])
-    rc = run_command(cmd, logger=logger)
+    rc = run_command(cmd, env=_dfx_subprocess_env(), logger=logger)
     if rc.returncode != 0:
         console.print(f"[red]❌ dfx canister create {canister_name} failed[/red]")
         raise typer.Exit(rc.returncode)
@@ -225,14 +229,14 @@ def _dfx_deploy(
     env: Optional[Dict[str, str]] = None,
     logger=None,
 ) -> None:
-    cmd = ["dfx", "deploy", canister, "--network", network, "--yes"]
+    cmd = _dfx_cmd("deploy", canister, "--network", network, "--yes")
     if mode != "auto":
         cmd.extend(["--mode", mode])
     if identity:
         cmd.extend(["--identity", identity])
     if extra_args:
         cmd.extend(extra_args)
-    rc = run_command(cmd, env=env, logger=logger)
+    rc = run_command(cmd, env=_dfx_subprocess_env(env), logger=logger)
     if rc.returncode != 0:
         console.print(f"[red]❌ {canister} deploy failed[/red]")
         if "not found" in (rc.stderr or "").lower() or "not found" in (rc.stdout or "").lower():
@@ -272,9 +276,9 @@ def _ensure_marketplace_declarations(
     did_path = project_root / "src" / MARKETPLACE_BACKEND / f"{MARKETPLACE_BACKEND}.did"
     if did_path.is_file():
         run_command(
-            ["dfx", "generate", MARKETPLACE_BACKEND],
+            _dfx_cmd("generate", MARKETPLACE_BACKEND),
             cwd=str(project_root),
-            env=dfx_env,
+            env=_dfx_subprocess_env(dfx_env),
             logger=logger,
         )
         return
@@ -297,9 +301,9 @@ def _ensure_marketplace_declarations(
         )
     if did_path.is_file():
         run_command(
-            ["dfx", "generate", MARKETPLACE_BACKEND],
+            _dfx_cmd("generate", MARKETPLACE_BACKEND),
             cwd=str(project_root),
-            env=dfx_env,
+            env=_dfx_subprocess_env(dfx_env),
             logger=logger,
         )
 
