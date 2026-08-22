@@ -211,9 +211,24 @@
 		initCollapsedCategories($sidebarConfig);
 	}
 
+	// Expand the section that contains the current page, but only when the
+	// route changes. Re-running on every sidebarConfig refresh (cache, then
+	// live fetch) would snap user-toggled folds back open.
+	let lastFoldExpandKey = '';
 	$: if ($sidebarConfig && $isAuthenticated && $page.url.pathname) {
-		expandForActivePage($sidebarConfig, $page.url.pathname, $page.url.search);
-		void tick().then(() => scrollActiveIntoView());
+		const path = $page.url.pathname;
+		const search = $page.url.search;
+		const hasItems =
+			($sidebarConfig.welcomeItems?.length || 0) +
+				($sidebarConfig.categories?.length || 0) +
+				($sidebarConfig.mundusItems?.length || 0) >
+			0;
+		const key = `${path}${search}`;
+		if (hasItems && lastFoldExpandKey !== key) {
+			expandForActivePage($sidebarConfig, path, search);
+			lastFoldExpandKey = key;
+			void tick().then(() => scrollActiveIntoView());
+		}
 	}
 
 	function sidebarTooltip(node: HTMLElement, text: string | undefined) {
