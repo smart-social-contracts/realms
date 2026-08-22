@@ -31,11 +31,15 @@
 		return pathname.includes('/extensions/public_dashboard');
 	}
 
-	function applySidebarVisibility() {
+	function applySidebarVisibility({ forceMobileClosed = false } = {}) {
 		if (!browser) return;
 
 		if (!isDesktopViewport()) {
-			drawerHidden = true;
+			// Keep a user-opened mobile drawer open across auth/store refreshes.
+			// Only force-close on first paint, breakpoint change, navigation, or logout.
+			if (!initialized || forceMobileClosed) {
+				drawerHidden = true;
+			}
 			return;
 		}
 
@@ -94,7 +98,7 @@
 			const handleResize = () => {
 				const isDesktop = window.innerWidth >= 1024;
 				if (wasDesktop !== isDesktop) {
-					applySidebarVisibility();
+					applySidebarVisibility({ forceMobileClosed: !isDesktop });
 				}
 				wasDesktop = isDesktop;
 			};
@@ -116,7 +120,7 @@
 			
 			const unsubAuth = isAuthenticated.subscribe((auth) => {
 				if (auth) void loadNotifications();
-				applySidebarVisibility();
+				applySidebarVisibility({ forceMobileClosed: !auth });
 			});
 
 			return () => {
@@ -131,7 +135,7 @@
 
 	afterNavigate(() => {
 		if (get(isAuthenticated)) void loadNotifications();
-		applySidebarVisibility();
+		applySidebarVisibility({ forceMobileClosed: true });
 	});
 
 	$: isFullBleedExtension =
@@ -149,11 +153,11 @@
 
 <div class="flex h-screen flex-col overflow-hidden">
 	<header
-		class="flex-none z-50 mx-auto w-full border-b border-gray-200 bg-white"
+		class="relative z-[70] flex-none mx-auto w-full border-b border-gray-200 bg-white"
 	>
 		<Navbar bind:drawerHidden />
 	</header>
-	<div class="flex min-h-0 flex-1 overflow-hidden bg-white">
+	<div class="relative flex min-h-0 flex-1 overflow-hidden bg-white">
 		<!-- Sidebar (left, in-flow on lg; mobile drawer is a separate overlay) -->
 		<Sidebar bind:drawerHidden desktopHidden={hideDesktopSidebar} />
 

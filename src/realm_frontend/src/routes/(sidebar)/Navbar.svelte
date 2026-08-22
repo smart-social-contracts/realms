@@ -1,7 +1,5 @@
 <script>
 	import AuthButton from '$lib/components/AuthButton.svelte';
-	import QuarterSwitcher from '$lib/components/QuarterSwitcher.svelte';
-	import QuarterIndicator from '$lib/components/QuarterIndicator.svelte';
 	import DelegationSwitcher from '$lib/components/DelegationSwitcher.svelte';
 	import { realmInfo, realmName } from '$lib/stores/realmInfo';
 	import { unreadCount } from '$lib/stores/notifications';
@@ -64,11 +62,9 @@
 
 		<div class="flex min-w-0 items-center justify-end gap-1 text-gray-500 sm:gap-2">
 			{#if showRealmControls}
-				<QuarterIndicator />
-				<QuarterSwitcher />
 				<DelegationSwitcher />
 			{/if}
-			<AuthButton />
+			<AuthButton {showRealmControls} />
 		</div>
 	</div>
 </Navbar>
