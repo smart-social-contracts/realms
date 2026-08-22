@@ -16,3 +16,10 @@ export function formatQuarterLabel(quarter: QuarterLabelInput | null | undefined
 	}
 	return `Quarter ${index}`;
 }
+
+/** Compact navbar label — fits a phone header without truncating to "Quarter 0...". */
+export function formatQuarterShortLabel(quarter: QuarterLabelInput | null | undefined): string {
+	if (!quarter) return 'Q';
+	const index = Number(quarter.index ?? 0);
+	return `Q${Number.isFinite(index) ? index : 0}`;
+}

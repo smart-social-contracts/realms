@@ -13,7 +13,7 @@
 	import { activeQuarterId } from '$lib/stores/quarters';
 	// @ts-ignore - canisters.js is untyped
 	import { setActiveQuarter } from '$lib/canisters';
-	import { formatQuarterLabel } from '$lib/utils/quarterLabels';
+	import { formatQuarterLabel, formatQuarterShortLabel } from '$lib/utils/quarterLabels';
 
 	interface QuarterOption {
 		name: string;
@@ -42,19 +42,19 @@
 
 {#if visible}
 	<div
-		class="inline-flex max-w-[9rem] items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-1.5 py-1 sm:max-w-none sm:px-2"
-		title={$_('quarters.switch_tab', { default: 'Quarter (this tab)' })}
+		class="inline-flex max-w-[5.5rem] items-center gap-1 rounded-lg border border-gray-200 bg-white px-1.5 py-1 sm:max-w-none sm:gap-1.5 sm:px-2"
+		title={`${formatQuarterLabel(quarters.find((q) => q.canister_id === selected) ?? null)} · ${$_('quarters.switch_tab', { default: 'Quarter (this tab)' })}`}
 	>
 		<IconBuildingCommunity size={18} class="hidden text-gray-500 sm:block" />
 		<select
 			value={selected}
 			onchange={onChange}
 			aria-label={$_('quarters.switch_tab', { default: 'Quarter (this tab)' })}
-			class="max-w-[7rem] cursor-pointer truncate border-0 bg-transparent p-0 pr-5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-0 sm:max-w-[12rem]"
+			class="max-w-[3.25rem] cursor-pointer truncate border-0 bg-transparent p-0 pr-4 text-sm font-medium text-gray-700 focus:outline-none focus:ring-0 sm:max-w-[12rem] sm:pr-5"
 		>
 			{#each quarters as quarter (quarter.canister_id)}
-				<option value={quarter.canister_id}>
-					{formatQuarterLabel(quarter)} ({quarter.population})
+				<option value={quarter.canister_id} title={formatQuarterLabel(quarter)}>
+					{formatQuarterShortLabel(quarter)}
 				</option>
 			{/each}
 		</select>

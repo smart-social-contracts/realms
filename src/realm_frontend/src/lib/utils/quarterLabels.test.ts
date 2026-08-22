@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatQuarterLabel } from './quarterLabels';
+import { formatQuarterLabel, formatQuarterShortLabel } from './quarterLabels';
 
 describe('formatQuarterLabel', () => {
 	it('labels the capital', () => {
@@ -19,5 +19,13 @@ describe('formatQuarterLabel', () => {
 		expect(formatQuarterLabel(null)).toBe('Quarter');
 		// candid status() drops is_capital — index 0 alone must still read as capital
 		expect(formatQuarterLabel({ index: 0 })).toBe('Quarter 0 (Capital)');
+	});
+});
+
+describe('formatQuarterShortLabel', () => {
+	it('uses a compact Q-index form', () => {
+		expect(formatQuarterShortLabel({ index: 0, is_capital: true })).toBe('Q0');
+		expect(formatQuarterShortLabel({ index: 2, is_capital: false })).toBe('Q2');
+		expect(formatQuarterShortLabel(null)).toBe('Q');
 	});
 });

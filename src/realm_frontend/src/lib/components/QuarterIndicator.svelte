@@ -11,7 +11,7 @@
 	import { userProfiles } from '$lib/stores/profiles';
 	import { realmInfo } from '$lib/stores/realmInfo';
 	import { activeQuarterId } from '$lib/stores/quarters';
-	import { formatQuarterLabel } from '$lib/utils/quarterLabels';
+	import { formatQuarterLabel, formatQuarterShortLabel } from '$lib/utils/quarterLabels';
 
 	interface QuarterOption {
 		name: string;
@@ -34,15 +34,15 @@
 	);
 	// Read-only badge for members of an actual federation. Admins use the switcher.
 	const visible = $derived(!isAdmin && quarters.length > 1 && !!active);
-	const label = $derived(active ? formatQuarterLabel(active) : '');
+	const label = $derived(active ? formatQuarterShortLabel(active) : '');
 </script>
 
 {#if visible}
 	<div
 		class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1"
-		title={$_('quarters.connected_to', { default: 'Connected to this quarter' })}
+		title={active ? formatQuarterLabel(active) : $_('quarters.connected_to', { default: 'Connected to this quarter' })}
 	>
-		<IconBuildingCommunity size={18} class="text-gray-500" />
-		<span class="max-w-[12rem] truncate text-sm font-medium text-gray-700">{label}</span>
+		<IconBuildingCommunity size={18} class="hidden text-gray-500 sm:block" />
+		<span class="max-w-[3.5rem] truncate text-sm font-medium text-gray-700 sm:max-w-[12rem]">{label}</span>
 	</div>
 {/if}
