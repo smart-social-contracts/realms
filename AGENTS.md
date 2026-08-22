@@ -979,7 +979,7 @@ Use this (not `runtime-install`) for **frontend-only** extensions such as `publi
 For a wizard realm, look up IDs first (do not use the Agora/Dominion/Syntropia rows below):
 
 ```bash
-# test registry backend
+# test registry backend — resolve_slug is an UPDATE (do not pass --query)
 dfx --run-deprecated canister call yhw3g-fyaaa-aaaas-qgorq-cai resolve_slug '("<slug>")' --network test --output json
 ```
 
@@ -1044,6 +1044,7 @@ dfx --run-deprecated identity use deployer   # or my_dev_identity_1 on test
 
 ```bash
 # 1. Resolve canister IDs (test registry)
+# resolve_slug is an UPDATE — do not pass --query
 dfx --run-deprecated canister call yhw3g-fyaaa-aaaas-qgorq-cai resolve_slug \
   '("realmtest6")' --network test --output json
 # → backend_canister_id, frontend_canister_id
@@ -1064,6 +1065,33 @@ realms extension registry-install \
 ```
 
 Do **not** wrap those IDs in a homemade mundus YAML.
+
+**`resolve_slug` is an update**, not a query. Do not pass `--query`.
+
+**Wizard frontend redeploy** (required if you touch `src/realm_frontend/` or are
+asked to redeploy a `/r/<slug>/` realm, not just the backend):
+
+1. Save live `/custom/logo.png` (and background) **before** any asset sync.
+2. Build the extension-bridge workspace first, then the realm frontend:
+   `npm run build --workspace=@realmsgos/extension-bridge`, then
+   `npm run build` in `src/realm_frontend`.
+3. Write `dist/canister_ids.js` **before** deploy (text candid `store` of JS
+   with quotes is painful; hex-blob `store` works). Include `realm_backend`,
+   `file_registry`, `derivation_origin` (`https://test.realmsgos.org` on test),
+   `portal_url`, and `test_mode_ii_bypass`.
+4. Copy branding into `dist/custom/`. Deploy the asset canister from a
+   **temp dfx project** whose `dfx.json` `networks.test` points at the live
+   frontend id — `cd` into that project or dfx reports `Network not found: test`.
+5. Asset sync **wipes `/ext/`**. Re-grant the backend `Commit`. Then
+   `resync_extension_frontends` (expect ~5–7 min; it can time out after most
+   extensions are restored). `pin_directory` is **not** on this asset canister.
+6. For any installed version **missing from file_registry**, build
+   `realms-extensions/extensions/<id>/frontend-rt` and `store` the full
+   `dist/` (not just `index.js`). Sandboxed UIs such as `member_dashboard`
+   load `index.html` + hashed `assets/*`; the shared postbuild `index.js`
+   stub is 19 bytes and is not the UI.
+7. `HEAD` every `/ext/{id}/{ver}/frontend/dist/index.js` and the hashed
+   assets referenced by `index.html`. Then hard-refresh the portal URL.
 
 **Staging canister IDs:**
 
@@ -1227,6 +1255,45 @@ Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the 
 
 ---
 
+## Cursor Cloud specific instructions
+
+This VM has no `icp.yaml` and no working OS keyring.
+
+**Identity.** Import `IC_IDENTITY_PEM_B64` as a plaintext icp (and dfx) identity
+named `deployer`. Do not use the baked `my_dev_identity_1` keyring identity.
+
+```bash
+printf '%s' "$IC_IDENTITY_PEM_B64" | base64 -d > /tmp/deployer.pem
+icp identity import deployer /tmp/deployer.pem --storage plaintext -f
+# same PEM as dfx identity `deployer` if a dfx asset-sync is required
+```
+
+**icp network.** Every `icp` call against IC mainnet / test / staging canisters
+needs an explicit replica (there is no project `icp.yaml`):
+
+```bash
+icp canister call <id> <method> ... \
+  -n https://icp0.io --root-key mainnet --identity deployer
+```
+
+**Basilisk.** Use a clean venv (`~/.venv-basilisk` is fine) with only
+`ic-basilisk`, `ic-basilisk-toolkit`, `ic-python-db`, `ic-python-logging`.
+`$PWD/.venv-basilisk` may not exist on this image.
+
+**Cycles.** The deployer's cycles wallet may be nearly empty (~40B). Backend
+upgrades spend the **target canister's** cycles. Do not block on minting.
+
+**Playwright.** Do not run `playwright install chromium` (needs sudo). Launch
+with `executable_path="/usr/local/bin/google-chrome"`. Walk `page.frames`;
+the portal page's top-level `body` text is empty. Use
+`https://test.gos.earth/r/<slug>/?skip_ii=true&test_mode=true`.
+
+Wizard `/r/<slug>/` frontend redeploys: see
+[Direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer)
+("Wizard frontend redeploy").
+
+---
+
 ## Debugging Python canisters (`__browse__` / `__shell__`)
 
 Realm backends (and other Basilisk canisters built with
@@ -1381,8 +1448,10 @@ until updated manually or re-provisioned.
 4. **`reinstall` wipes all state.** Use `upgrade` unless you want a clean slate.
 5. **Frontend bundles are built by CI.** The `deploy-files` workflow runs `realms files build` to compile `frontend-rt/` sources before publishing. No need to commit `dist/index.js`.
 6. **Mundus is not “skip the installer.”** It calls `request_deployment` on the realm registry and waits on **realm_installer**. If you meant the direct dfx path, do not write a temp mundus descriptor for a wizard slug.
-7. **A frontend (re)install wipes `/ext/`.** A pending mundus job that later runs will 404 every extension until you `registry-install` / resync them one by one.
+7. **A frontend (re)install wipes `/ext/`.** A pending mundus job *or* a direct wizard frontend asset sync will 404 every extension until you `registry-install` / `resync_extension_frontends` / store the missing bundles. `pin_directory` is not on this asset canister.
 8. **`runtime-install` needs `entry.py`.** Frontend-only extensions (`public_dashboard`) use `registry-install`.
+9. **Installed extension versions can be ahead of test `file_registry`.** `registry-install` cannot restore a version the registry does not have. Build from `realms-extensions` and `store` the full `dist/` (including hashed `assets/*` and `index.html`). A 19-byte postbuild `index.js` stub is not the UI for sandboxed extensions such as `member_dashboard`.
+10. **`resolve_slug` is an update.** Do not pass `--query`.
 
 ---
 
@@ -1447,6 +1516,10 @@ playwright install chromium   # downloads ~110 MB headless shell
 ```
 
 `playwright install --with-deps chromium` requires sudo and will fail in most agent environments. The `--with-deps` flag is not needed if system libraries are already present (they usually are).
+
+**Cursor Cloud:** `playwright install chromium` fails without sudo. Use system Chrome
+instead (`executable_path="/usr/local/bin/google-chrome"`). See
+[Cursor Cloud specific instructions](#cursor-cloud-specific-instructions).
 
 #### Inline test script pattern
 
@@ -1521,6 +1594,7 @@ await target.locator("text=Advanced").first.click()
 
 - [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — Deployment decision tree (Casals, mundus, extensions, release)
 - `AGENTS.md` — Agent/operator guide (deploy paths, canister IDs, fast iteration)
+- [Cursor Cloud specific instructions](#cursor-cloud-specific-instructions) — plaintext PEM, `icp` replica flags, Playwright Chrome path
 - `docs/reference/ENVIRONMENTS.md` — Per-env product stacks (`realms env deploy`, `*.realmsgos.org`)
 - `docs/reference/CASALS_ROLLOUT.md` — On-chain (Casals) deploy & upgrade runbook
 - `docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md` — Layered deploy runbook
