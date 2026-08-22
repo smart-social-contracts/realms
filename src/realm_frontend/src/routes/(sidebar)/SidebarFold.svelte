@@ -1,15 +1,35 @@
 <script lang="ts">
-	/** Collapsible sidebar section body. Height eases via grid-template-rows. */
+	/** Native <details> fold. The browser opens/closes on summary click. */
 	export let open = false;
+	export let summaryClass =
+		'flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer';
+	export let onToggle: ((nextOpen: boolean) => void) | undefined = undefined;
+
+	function handleToggle(event: Event) {
+		const el = event.currentTarget as HTMLDetailsElement;
+		if (el.open === open) return;
+		onToggle?.(el.open);
+	}
 </script>
 
-<div class="fold" class:is-open={open} aria-hidden={!open}>
-	<div class="fold-inner" inert={!open ? true : undefined}>
-		<slot />
+<details class="sidebar-details" {open} ontoggle={handleToggle}>
+	<summary class="fold-summary {summaryClass}">
+		<slot name="header" />
+	</summary>
+	<div class="fold" class:is-open={open} aria-hidden={!open}>
+		<div class="fold-inner" inert={!open ? true : undefined}>
+			<slot />
+		</div>
 	</div>
-</div>
+</details>
 
 <style>
+	.fold-summary {
+		list-style: none;
+	}
+	.fold-summary::-webkit-details-marker {
+		display: none;
+	}
 	.fold {
 		display: grid;
 		grid-template-rows: 0fr;
