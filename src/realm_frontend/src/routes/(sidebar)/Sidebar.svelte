@@ -27,6 +27,8 @@
 
 	const ACTIVE_ITEM_CLASSES =
 		'sidebar-nav-active bg-gray-200 text-gray-900 font-medium hover:bg-gray-200 hover:text-gray-900 dark:bg-[var(--color-gray-700)] dark:hover:bg-[var(--color-gray-600)]';
+	const SECTION_TOGGLE_CLASSES =
+		'flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer';
 
 	$: navPathname = $page.url.pathname;
 	$: navSearch = $page.url.search;
@@ -164,8 +166,7 @@
 		);
 		const inRealm =
 			config.welcomeItems.some((item) => navIsActive(item.href, pathname, search)) ||
-			activeCategory ||
-			config.mundusItems.some((item) => navIsActive(item.href, pathname, search));
+			activeCategory;
 
 		if (inRealm) {
 			next.delete('__section_realm__');
@@ -299,7 +300,7 @@
 					{:else}
 						<ul class="pt-5 pb-1 space-y-1">
 							<li>
-								<button class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" on:click={() => toggleCategory('__section_me__')}>
+								<button class={SECTION_TOGGLE_CLASSES} on:click={() => toggleCategory('__section_me__')}>
 									<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_ME}</h3>
 									<svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_me__') ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 								</button>
@@ -329,7 +330,7 @@
 						{#if $sidebarConfig}
 							<ul class="pt-3 pb-1 space-y-1">
 								<li>
-									<button class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" on:click={() => toggleCategory('__section_realm__')}>
+									<button class={SECTION_TOGGLE_CLASSES} on:click={() => toggleCategory('__section_realm__')}>
 										<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_REALM}</h3>
 										<svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_realm__') ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 									</button>
@@ -368,27 +369,27 @@
 										{/if}
 									</ul>
 								{/each}
-								{#if $sidebarConfig.mundusItems.length > 0}
-									<ul class="pt-4 pb-1 space-y-1">
-										<li class="px-3 pt-2 pb-1">
-											<button class="flex items-center justify-between w-full cursor-pointer group/cat" on:click={() => toggleCategory('__section_mundus__')}>
-												<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_MUNDUS}</h3>
-												<svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_mundus__') ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
-											</button>
-										</li>
-										{#if !collapsedCategories.has('__section_mundus__')}
-											{#each $sidebarConfig.mundusItems as item (item.href)}
-												{@const IconComp = getTablerIcon(item.icon)}
-												<li>
-													<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} on:click={handleNavClick}>
-														<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
-														<span class="ml-3">{item.label}</span>
-													</a>
-												</li>
-											{/each}
-										{/if}
-									</ul>
-								{/if}
+							{/if}
+							{#if $sidebarConfig.mundusItems.length > 0}
+								<ul class="pt-3 pb-1 space-y-1">
+									<li>
+										<button class={SECTION_TOGGLE_CLASSES} on:click={() => toggleCategory('__section_mundus__')}>
+											<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_MUNDUS}</h3>
+											<svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_mundus__') ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+										</button>
+									</li>
+									{#if !collapsedCategories.has('__section_mundus__')}
+										{#each $sidebarConfig.mundusItems as item (item.href)}
+											{@const IconComp = getTablerIcon(item.icon)}
+											<li>
+												<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} on:click={handleNavClick}>
+													<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
+													<span class="ml-3">{item.label}</span>
+												</a>
+											</li>
+										{/each}
+									{/if}
+								</ul>
 							{/if}
 						{/if}
 					{/if}
@@ -443,7 +444,7 @@
 			<ul class="pt-5 lg:pt-3 pb-1 space-y-1">
 				<li>
 					<button
-						class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer"
+						class={SECTION_TOGGLE_CLASSES}
 						on:click={() => toggleCategory('__section_me__')}
 					>
 						<h3 class={styles.sidebar.sectionHeader()}>
@@ -496,7 +497,7 @@
 				<ul class="pt-3 pb-1 space-y-1">
 					<li>
 						<button
-							class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer"
+							class={SECTION_TOGGLE_CLASSES}
 							on:click={() => toggleCategory('__section_realm__')}
 						>
 							<h3 class={styles.sidebar.sectionHeader()}>
@@ -570,45 +571,45 @@
 						{/if}
 						</ul>
 					{/each}
+				{/if}
 
-					<!-- MY MUNDUS section (super-category) -->
-					{#if $sidebarConfig.mundusItems.length > 0}
-						<ul class="pt-4 pb-1 space-y-1">
-							<li class="px-3 pt-2 pb-1">
-								<button
-									class="flex items-center justify-between w-full cursor-pointer group/cat"
-									on:click={() => toggleCategory('__section_mundus__')}
+				<!-- MY MUNDUS section (super-category) -->
+				{#if $sidebarConfig.mundusItems.length > 0}
+					<ul class="pt-3 pb-1 space-y-1">
+						<li>
+							<button
+								class={SECTION_TOGGLE_CLASSES}
+								on:click={() => toggleCategory('__section_mundus__')}
+							>
+								<h3 class={styles.sidebar.sectionHeader()}>
+									{SECTION_HEADER_MUNDUS}
+								</h3>
+								<svg
+									class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_mundus__') ? '-rotate-90' : ''}"
+									fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
 								>
-									<h3 class={styles.sidebar.sectionHeader()}>
-										{SECTION_HEADER_MUNDUS}
-									</h3>
-									<svg
-										class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_mundus__') ? '-rotate-90' : ''}"
-										fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+								</svg>
+							</button>
+						</li>
+						{#if !collapsedCategories.has('__section_mundus__')}
+							{#each $sidebarConfig.mundusItems as item (item.href)}
+								{@const IconComp = getTablerIcon(item.icon)}
+								<li>
+									<a 
+										href={item.href}
+										use:sidebarTooltip={item.tooltip}
+										class={itemClasses(item.href, $page.url.pathname, $page.url.search)}
+										data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined}
+										aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined}
 									>
-										<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-									</svg>
-								</button>
-							</li>
-							{#if !collapsedCategories.has('__section_mundus__')}
-								{#each $sidebarConfig.mundusItems as item (item.href)}
-									{@const IconComp = getTablerIcon(item.icon)}
-									<li>
-										<a 
-											href={item.href}
-											use:sidebarTooltip={item.tooltip}
-											class={itemClasses(item.href, $page.url.pathname, $page.url.search)}
-											data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined}
-											aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined}
-										>
-											<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
-											<span class="ml-3">{item.label}</span>
-										</a>
-									</li>
-								{/each}
-							{/if}
-						</ul>
-					{/if}
+										<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
+										<span class="ml-3">{item.label}</span>
+									</a>
+								</li>
+							{/each}
+						{/if}
+					</ul>
 				{/if}
 			{/if}
 			{/if}
