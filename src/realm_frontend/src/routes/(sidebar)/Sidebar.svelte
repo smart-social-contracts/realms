@@ -253,18 +253,25 @@
 
 </script>
 
-<!-- Mobile drawer: one full-screen layer above all page content -->
-{#if !drawerHidden}
-	<div class="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
-		<button
-			type="button"
-			class="absolute inset-0 border-0 bg-gray-900/50 p-0 cursor-pointer touch-manipulation"
-			aria-label="Close menu"
-			on:click={closeDrawer}
-		></button>
-		<aside
-			class="absolute top-16 left-0 bottom-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation"
-		>
+<!-- Mobile drawer: stay mounted so open/close can animate (200ms). -->
+<div
+	class="fixed inset-0 z-[60] lg:hidden {drawerHidden ? 'pointer-events-none' : ''}"
+	role="dialog"
+	aria-modal={!drawerHidden}
+	aria-hidden={drawerHidden}
+	inert={drawerHidden ? true : undefined}
+	aria-label="Navigation menu"
+>
+	<button
+		type="button"
+		class="absolute inset-0 border-0 bg-gray-900/50 p-0 cursor-pointer touch-manipulation transition-opacity duration-200 ease-out motion-reduce:transition-none {drawerHidden ? 'opacity-0' : 'opacity-100'}"
+		aria-label="Close menu"
+		tabindex={drawerHidden ? -1 : 0}
+		on:click={closeDrawer}
+	></button>
+	<aside
+		class="absolute top-16 left-0 bottom-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation transition-transform duration-200 ease-out motion-reduce:transition-none {drawerHidden ? '-translate-x-full' : 'translate-x-0'}"
+	>
 			<h4 class="sr-only">Main menu</h4>
 			<div
 				class={cn(styles.sidebar.container(), 'overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain')}
@@ -395,12 +402,11 @@
 				</nav>
 			</div>
 		</aside>
-	</div>
-{/if}
+</div>
 
 <!-- Desktop sidebar (in-flow beside main; do not pair fixed + ml-64) -->
 <aside
-	class="hidden lg:flex lg:shrink-0 flex-col min-h-0 h-full bg-white z-30 transition-[width] duration-200 motion-reduce:transition-none {desktopHidden ? 'w-0 min-w-0 overflow-hidden border-r-0 pointer-events-none' : 'w-64 border-r border-gray-200'}"
+	class="hidden lg:flex lg:shrink-0 flex-col min-h-0 h-full bg-white z-30 transition-[width] duration-200 ease-out motion-reduce:transition-none {desktopHidden ? 'w-0 min-w-0 overflow-hidden border-r-0 pointer-events-none' : 'w-64 border-r border-gray-200'}"
 	aria-hidden={desktopHidden ? true : undefined}
 	inert={desktopHidden ? true : undefined}
 >
