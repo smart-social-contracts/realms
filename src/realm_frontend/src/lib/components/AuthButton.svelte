@@ -13,6 +13,10 @@
 	import { IconCheck, IconCopy, IconLogin } from '@tabler/icons-svelte';
 	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
 	import { copyText } from '$lib/clipboard.js';
+	import QuarterSwitcher from '$lib/components/QuarterSwitcher.svelte';
+	import QuarterIndicator from '$lib/components/QuarterIndicator.svelte';
+
+	export let showRealmControls = true;
 
 	let principalText = '';
 	let showDropdown = false;
@@ -228,6 +232,10 @@
 						{userTypeLabel}
 					</p>
 				</div>
+				{#if showRealmControls}
+					<QuarterSwitcher variant="menu" />
+					<QuarterIndicator variant="menu" />
+				{/if}
 				<hr class="h-px bg-gray-200 border-0 dark:bg-gray-700">
 				<button 
 					class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
