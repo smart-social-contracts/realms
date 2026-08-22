@@ -90,7 +90,10 @@
 		}
 	}
 
+	let userHasToggledFolds = false;
+
 	function toggleCategory(id: string) {
+		userHasToggledFolds = true;
 		if (collapsedCategories.has(id)) {
 			collapsedCategories.delete(id);
 		} else {
@@ -105,6 +108,15 @@
 		const id = btn.dataset.foldId;
 		if (!id) return;
 		toggleCategory(id);
+	}
+
+	function foldRoot(node: HTMLElement) {
+		node.addEventListener('click', handleFoldClick);
+		return {
+			destroy() {
+				node.removeEventListener('click', handleFoldClick);
+			}
+		};
 	}
 
 	function sectionOpen(id: string): boolean {
@@ -138,13 +150,10 @@
 		}
 		// Capture-phase listener: Svelte 5 delegated onclick can no-op or
 		// double-fire on these headers, which cancels the fold toggle.
-		document.addEventListener('click', handleFoldClick, true);
-
 		return () => {
 			if (sidebarContainer) {
 				sidebarContainer.removeEventListener('scroll', checkScrollPosition);
 			}
-			document.removeEventListener('click', handleFoldClick, true);
 		};
 	});
 	
@@ -158,8 +167,14 @@
 		}
 	}
 
-	afterNavigate(() => {
+	afterNavigate((nav) => {
 		document.getElementById('svelte')?.scrollTo({ top: 0 });
+		const from = `${nav.from?.url.pathname ?? ''}${nav.from?.url.search ?? ''}`;
+		const to = `${nav.to.url.pathname}${nav.to.url.search}`;
+		if (from !== to) {
+			userHasToggledFolds = false;
+			lastFoldExpandKey = '';
+		}
 	});
 
 	function expandForActivePage(
@@ -227,7 +242,7 @@
 	// route changes. Re-running on every sidebarConfig refresh (cache, then
 	// live fetch) would snap user-toggled folds back open.
 	let lastFoldExpandKey = '';
-	$: if ($sidebarConfig && $isAuthenticated && $page.url.pathname) {
+	$: if ($sidebarConfig && $isAuthenticated && $page.url.pathname && !userHasToggledFolds) {
 		const path = $page.url.pathname;
 		const search = $page.url.search;
 		const hasItems =
@@ -302,6 +317,7 @@
 		onclick={closeDrawer}
 	></button>
 	<aside
+		use:foldRoot
 		class="drawer-panel absolute inset-y-0 left-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation {drawerHidden ? 'is-closed' : ''}"
 	>
 			<h4 class="sr-only">Main menu</h4>
@@ -444,6 +460,7 @@
 
 <!-- Desktop sidebar (in-flow beside main; do not pair fixed + ml-64) -->
 <aside
+	use:foldRoot
 	class="hidden lg:flex lg:shrink-0 flex-col min-h-0 h-full bg-white z-30 transition-[width] duration-200 ease-out motion-reduce:transition-none {desktopHidden ? 'w-0 min-w-0 overflow-hidden border-r-0 pointer-events-none' : 'w-64 border-r border-gray-200'}"
 	aria-hidden={desktopHidden ? true : undefined}
 	inert={desktopHidden ? true : undefined}
