@@ -15,6 +15,7 @@
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
 	import { isNavItemActive } from '$lib/utils/breadcrumb';
 	import { IconLogin, IconLayoutDashboard } from '@tabler/icons-svelte';
+	import SidebarFold from './SidebarFold.svelte';
 	// @ts-ignore
 	import { backend, quarterBackendStore } from '$lib/canisters';
 
@@ -96,6 +97,10 @@
 			collapsedCategories.add(id);
 		}
 		collapsedCategories = collapsedCategories;
+	}
+
+	function sectionOpen(id: string): boolean {
+		return !collapsedCategories.has(id);
 	}
 
 	// get_sidebar resolves visibility from the *caller's* user record, which in
@@ -306,12 +311,14 @@
 					{:else}
 						<ul class="pt-5 pb-1 space-y-1">
 							<li>
-								<button class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" on:click={() => toggleCategory('__section_me__')}>
+								<button class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" aria-expanded={sectionOpen('__section_me__')} on:click={() => toggleCategory('__section_me__')}>
 									<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_ME}</h3>
-									<svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_me__') ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+									<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_me__') ? '' : 'is-folded'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 								</button>
 							</li>
-							{#if !collapsedCategories.has('__section_me__')}
+						</ul>
+						<SidebarFold open={sectionOpen('__section_me__')}>
+							<ul class="pb-1 space-y-1">
 								{#each topUtilityItems as item}
 									{@const IconComp = getTablerIcon(item.icon)}
 									<li>
@@ -326,8 +333,8 @@
 										</a>
 									</li>
 								{/each}
-							{/if}
-						</ul>
+							</ul>
+						</SidebarFold>
 						{#if $profilesLoading || $sidebarLoading}
 							<div class="py-4 flex items-center justify-center">
 								<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
@@ -336,13 +343,13 @@
 						{#if $sidebarConfig}
 							<ul class="pt-3 pb-1 space-y-1">
 								<li>
-									<button class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" on:click={() => toggleCategory('__section_realm__')}>
+									<button class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" aria-expanded={sectionOpen('__section_realm__')} on:click={() => toggleCategory('__section_realm__')}>
 										<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_REALM}</h3>
-										<svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_realm__') ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+										<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_realm__') ? '' : 'is-folded'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 									</button>
 								</li>
 							</ul>
-							{#if !collapsedCategories.has('__section_realm__')}
+							<SidebarFold open={sectionOpen('__section_realm__')}>
 								<ul class="pb-1 space-y-1">
 									{#each $sidebarConfig.welcomeItems as item (item.href)}
 										{@const IconComp = getTablerIcon(item.icon)}
@@ -357,12 +364,14 @@
 								{#each $sidebarConfig.categories as category (category.id)}
 									<ul class="pt-2 pb-1 space-y-1">
 										<li class="px-3 pt-2 pb-1">
-											<button class="flex items-center justify-between w-full cursor-pointer group/cat" on:click={() => toggleCategory(category.id)}>
+											<button class="flex items-center justify-between w-full cursor-pointer group/cat" aria-expanded={sectionOpen(category.id)} on:click={() => toggleCategory(category.id)}>
 												<h3 class={styles.sidebar.categoryHeader()}>{category.label}</h3>
-												<svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has(category.id) ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+												<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen(category.id) ? '' : 'is-folded'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 											</button>
 										</li>
-										{#if !collapsedCategories.has(category.id)}
+									</ul>
+									<SidebarFold open={sectionOpen(category.id)}>
+										<ul class="pb-1 space-y-1">
 											{#each category.items as item (item.href)}
 												{@const IconComp = getTablerIcon(item.icon)}
 												<li>
@@ -372,18 +381,20 @@
 													</a>
 												</li>
 											{/each}
-										{/if}
-									</ul>
+										</ul>
+									</SidebarFold>
 								{/each}
 								{#if $sidebarConfig.mundusItems.length > 0}
 									<ul class="pt-4 pb-1 space-y-1">
 										<li class="px-3 pt-2 pb-1">
-											<button class="flex items-center justify-between w-full cursor-pointer group/cat" on:click={() => toggleCategory('__section_mundus__')}>
+											<button class="flex items-center justify-between w-full cursor-pointer group/cat" aria-expanded={sectionOpen('__section_mundus__')} on:click={() => toggleCategory('__section_mundus__')}>
 												<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_MUNDUS}</h3>
-												<svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_mundus__') ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+												<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_mundus__') ? '' : 'is-folded'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 											</button>
 										</li>
-										{#if !collapsedCategories.has('__section_mundus__')}
+									</ul>
+									<SidebarFold open={sectionOpen('__section_mundus__')}>
+										<ul class="pb-1 space-y-1">
 											{#each $sidebarConfig.mundusItems as item (item.href)}
 												{@const IconComp = getTablerIcon(item.icon)}
 												<li>
@@ -393,10 +404,10 @@
 													</a>
 												</li>
 											{/each}
-										{/if}
-									</ul>
+										</ul>
+									</SidebarFold>
 								{/if}
-							{/if}
+							</SidebarFold>
 						{/if}
 					{/if}
 				</nav>
@@ -450,20 +461,23 @@
 				<li>
 					<button
 						class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer"
+						aria-expanded={sectionOpen('__section_me__')}
 						on:click={() => toggleCategory('__section_me__')}
 					>
 						<h3 class={styles.sidebar.sectionHeader()}>
 							{SECTION_HEADER_ME}
 						</h3>
 						<svg
-							class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_me__') ? '-rotate-90' : ''}"
+							class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_me__') ? '' : 'is-folded'}"
 							fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
 						>
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 						</svg>
 					</button>
 				</li>
-				{#if !collapsedCategories.has('__section_me__')}
+			</ul>
+			<SidebarFold open={sectionOpen('__section_me__')}>
+				<ul class="pb-1 space-y-1">
 					{#each topUtilityItems as item}
 						{@const IconComp = getTablerIcon(item.icon)}
 						<li>
@@ -487,8 +501,8 @@
 							</a>
 						</li>
 					{/each}
-				{/if}
-			</ul>
+				</ul>
+			</SidebarFold>
 
 			<!-- Loading State -->
 			{#if $profilesLoading || $sidebarLoading}
@@ -503,13 +517,14 @@
 					<li>
 						<button
 							class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer"
+							aria-expanded={sectionOpen('__section_realm__')}
 							on:click={() => toggleCategory('__section_realm__')}
 						>
 							<h3 class={styles.sidebar.sectionHeader()}>
 								{SECTION_HEADER_REALM}
 							</h3>
 							<svg
-								class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_realm__') ? '-rotate-90' : ''}"
+								class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_realm__') ? '' : 'is-folded'}"
 								fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
@@ -518,7 +533,7 @@
 					</li>
 				</ul>
 
-				{#if !collapsedCategories.has('__section_realm__')}
+				<SidebarFold open={sectionOpen('__section_realm__')}>
 					<!-- Welcome items (My Dashboard, etc.) -->
 					<ul class="pb-1 space-y-1">
 						{#each $sidebarConfig.welcomeItems as item (item.href)}
@@ -544,37 +559,40 @@
 							<li class="px-3 pt-2 pb-1">
 								<button
 									class="flex items-center justify-between w-full cursor-pointer group/cat"
+									aria-expanded={sectionOpen(category.id)}
 									on:click={() => toggleCategory(category.id)}
 								>
 									<h3 class={styles.sidebar.categoryHeader()}>
 										{category.label}
 									</h3>
 									<svg
-										class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has(category.id) ? '-rotate-90' : ''}"
+										class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen(category.id) ? '' : 'is-folded'}"
 										fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
 									>
 										<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 									</svg>
 								</button>
 							</li>
-						{#if !collapsedCategories.has(category.id)}
-							{#each category.items as item (item.href)}
-								{@const IconComp = getTablerIcon(item.icon)}
-								<li>
-									<a 
-										href={item.href}
-										use:sidebarTooltip={item.tooltip}
-										class={itemClasses(item.href, $page.url.pathname, $page.url.search)}
-										data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined}
-										aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined}
-									>
-										<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
-										<span class="ml-3">{item.label}</span>
-									</a>
-								</li>
-							{/each}
-						{/if}
 						</ul>
+						<SidebarFold open={sectionOpen(category.id)}>
+							<ul class="pb-1 space-y-1">
+								{#each category.items as item (item.href)}
+									{@const IconComp = getTablerIcon(item.icon)}
+									<li>
+										<a 
+											href={item.href}
+											use:sidebarTooltip={item.tooltip}
+											class={itemClasses(item.href, $page.url.pathname, $page.url.search)}
+											data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined}
+											aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined}
+										>
+											<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
+											<span class="ml-3">{item.label}</span>
+										</a>
+									</li>
+								{/each}
+							</ul>
+						</SidebarFold>
 					{/each}
 
 					<!-- MY MUNDUS section (super-category) -->
@@ -583,20 +601,23 @@
 							<li class="px-3 pt-2 pb-1">
 								<button
 									class="flex items-center justify-between w-full cursor-pointer group/cat"
+									aria-expanded={sectionOpen('__section_mundus__')}
 									on:click={() => toggleCategory('__section_mundus__')}
 								>
 									<h3 class={styles.sidebar.sectionHeader()}>
 										{SECTION_HEADER_MUNDUS}
 									</h3>
 									<svg
-										class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has('__section_mundus__') ? '-rotate-90' : ''}"
+										class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_mundus__') ? '' : 'is-folded'}"
 										fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
 									>
 										<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 									</svg>
 								</button>
 							</li>
-							{#if !collapsedCategories.has('__section_mundus__')}
+						</ul>
+						<SidebarFold open={sectionOpen('__section_mundus__')}>
+							<ul class="pb-1 space-y-1">
 								{#each $sidebarConfig.mundusItems as item (item.href)}
 									{@const IconComp = getTablerIcon(item.icon)}
 									<li>
@@ -612,10 +633,10 @@
 										</a>
 									</li>
 								{/each}
-							{/if}
-						</ul>
+							</ul>
+						</SidebarFold>
 					{/if}
-				{/if}
+				</SidebarFold>
 			{/if}
 			{/if}
 		</nav>
@@ -645,9 +666,18 @@
 	.drawer-panel.is-closed {
 		transform: translateX(-100%);
 	}
+	.fold-chevron {
+		transform: rotate(0deg);
+		transition: transform 200ms ease-out;
+		flex-shrink: 0;
+	}
+	.fold-chevron.is-folded {
+		transform: rotate(-90deg);
+	}
 	@media (prefers-reduced-motion: reduce) {
 		.drawer-backdrop,
-		.drawer-panel {
+		.drawer-panel,
+		.fold-chevron {
 			transition: none;
 		}
 	}
