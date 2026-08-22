@@ -199,7 +199,7 @@
 	<header
 		bind:this={headerEl}
 		class="z-50 mx-auto w-full border-b border-gray-200 bg-white transition-transform duration-200 ease-out motion-reduce:transition-none lg:relative lg:flex-none max-lg:absolute max-lg:inset-x-0 max-lg:top-0 {headerHidden
-			? '-translate-y-full'
+			? 'max-lg:-translate-y-full'
 			: 'translate-y-0'}"
 		data-mobile-header-hidden={headerHidden ? 'true' : 'false'}
 	>
