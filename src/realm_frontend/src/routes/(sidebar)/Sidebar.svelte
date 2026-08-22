@@ -264,13 +264,13 @@
 >
 	<button
 		type="button"
-		class="absolute inset-0 border-0 bg-gray-900/50 p-0 cursor-pointer touch-manipulation transition-opacity duration-200 ease-out motion-reduce:transition-none {drawerHidden ? 'opacity-0' : 'opacity-100'}"
+		class="drawer-backdrop absolute inset-0 border-0 bg-gray-900/50 p-0 cursor-pointer touch-manipulation {drawerHidden ? 'is-closed' : ''}"
 		aria-label="Close menu"
 		tabindex={drawerHidden ? -1 : 0}
 		on:click={closeDrawer}
 	></button>
 	<aside
-		class="absolute top-16 left-0 bottom-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation transition-transform duration-200 ease-out motion-reduce:transition-none {drawerHidden ? '-translate-x-full' : 'translate-x-0'}"
+		class="drawer-panel absolute top-16 left-0 bottom-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation {drawerHidden ? 'is-closed' : ''}"
 	>
 			<h4 class="sr-only">Main menu</h4>
 			<div
@@ -628,3 +628,27 @@
 		</div>
 	{/if}
 </aside>
+
+<style>
+	/* Use real transform/opacity values (not Tailwind translate-* CSS vars) so 200ms interpolates. */
+	.drawer-backdrop {
+		opacity: 1;
+		transition: opacity 200ms ease-out;
+	}
+	.drawer-backdrop.is-closed {
+		opacity: 0;
+	}
+	.drawer-panel {
+		transform: translateX(0);
+		transition: transform 200ms ease-out;
+	}
+	.drawer-panel.is-closed {
+		transform: translateX(-100%);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.drawer-backdrop,
+		.drawer-panel {
+			transition: none;
+		}
+	}
+</style>
