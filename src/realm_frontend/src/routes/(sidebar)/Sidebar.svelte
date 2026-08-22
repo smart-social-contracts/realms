@@ -287,7 +287,7 @@
 		class="drawer-backdrop absolute inset-0 border-0 bg-gray-900/50 p-0 cursor-pointer touch-manipulation {drawerHidden ? 'is-closed' : ''}"
 		aria-label="Close menu"
 		tabindex={drawerHidden ? -1 : 0}
-		on:click={closeDrawer}
+		onclick={closeDrawer}
 	></button>
 	<aside
 		class="drawer-panel absolute inset-y-0 left-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation {drawerHidden ? 'is-closed' : ''}"
@@ -305,7 +305,7 @@
 								</p>
 							</li>
 							<li>
-								<a href="/join" class={cn(styles.sidebar.item(), 'font-medium')} on:click={handleNavClick}>
+								<a href="/join" class={cn(styles.sidebar.item(), 'font-medium')} onclick={handleNavClick}>
 									<IconLogin size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
 									<span class="ml-3">Sign in</span>
 								</a>
@@ -316,7 +316,7 @@
 									class={itemClasses('/extensions/public_dashboard', $page.url.pathname, $page.url.search)}
 									data-sidebar-active={isActive('/extensions/public_dashboard', $page.url.pathname, $page.url.search) ? 'true' : undefined}
 									aria-current={isActive('/extensions/public_dashboard', $page.url.pathname, $page.url.search) ? 'page' : undefined}
-									on:click={handleNavClick}
+									onclick={handleNavClick}
 								>
 									<IconLayoutDashboard size={22} class={iconClasses('/extensions/public_dashboard', 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
 									<span class="ml-3">Public Dashboard</span>
@@ -337,7 +337,7 @@
 								{#each topUtilityItems as item}
 									{@const IconComp = getTablerIcon(item.icon)}
 									<li>
-										<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} on:click={handleNavClick}>
+										<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} onclick={handleNavClick}>
 											<span class="relative flex-shrink-0">
 												<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'w-5 h-5', $page.url.pathname, $page.url.search)} />
 												{#if item.href === '/messages' && $unreadCount > 0}
@@ -369,7 +369,7 @@
 									{#each $sidebarConfig.welcomeItems as item (item.href)}
 										{@const IconComp = getTablerIcon(item.icon)}
 										<li>
-											<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} on:click={handleNavClick}>
+											<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} onclick={handleNavClick}>
 												<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
 												<span class="ml-3">{item.label}</span>
 											</a>
@@ -390,7 +390,7 @@
 											{#each category.items as item (item.href)}
 												{@const IconComp = getTablerIcon(item.icon)}
 												<li>
-													<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} on:click={handleNavClick}>
+													<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} onclick={handleNavClick}>
 														<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
 														<span class="ml-3">{item.label}</span>
 													</a>
@@ -413,7 +413,7 @@
 											{#each $sidebarConfig.mundusItems as item (item.href)}
 												{@const IconComp = getTablerIcon(item.icon)}
 												<li>
-													<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} on:click={handleNavClick}>
+													<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} onclick={handleNavClick}>
 														<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
 														<span class="ml-3">{item.label}</span>
 													</a>
