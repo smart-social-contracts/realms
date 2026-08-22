@@ -31,11 +31,15 @@
 		return pathname.includes('/extensions/public_dashboard');
 	}
 
-	function applySidebarVisibility() {
+	function applySidebarVisibility({ forceMobileClosed = false } = {}) {
 		if (!browser) return;
 
 		if (!isDesktopViewport()) {
-			drawerHidden = true;
+			// Keep a user-opened mobile drawer open across auth/store refreshes.
+			// Only force-close on first paint, breakpoint change, navigation, or logout.
+			if (!initialized || forceMobileClosed) {
+				drawerHidden = true;
+			}
 			return;
 		}
 
@@ -94,7 +98,7 @@
 			const handleResize = () => {
 				const isDesktop = window.innerWidth >= 1024;
 				if (wasDesktop !== isDesktop) {
-					applySidebarVisibility();
+					applySidebarVisibility({ forceMobileClosed: !isDesktop });
 				}
 				wasDesktop = isDesktop;
 			};
@@ -116,7 +120,7 @@
 			
 			const unsubAuth = isAuthenticated.subscribe((auth) => {
 				if (auth) void loadNotifications();
-				applySidebarVisibility();
+				applySidebarVisibility({ forceMobileClosed: !auth });
 			});
 
 			return () => {
@@ -131,7 +135,7 @@
 
 	afterNavigate(() => {
 		if (get(isAuthenticated)) void loadNotifications();
-		applySidebarVisibility();
+		applySidebarVisibility({ forceMobileClosed: true });
 	});
 
 	$: isFullBleedExtension =
