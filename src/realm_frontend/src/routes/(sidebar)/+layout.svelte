@@ -149,11 +149,11 @@
 
 <div class="flex h-screen flex-col overflow-hidden">
 	<header
-		class="flex-none z-50 mx-auto w-full border-b border-gray-200 bg-white"
+		class="relative z-[70] flex-none mx-auto w-full border-b border-gray-200 bg-white"
 	>
 		<Navbar bind:drawerHidden />
 	</header>
-	<div class="flex min-h-0 flex-1 overflow-hidden bg-white">
+	<div class="relative flex min-h-0 flex-1 overflow-hidden bg-white">
 		<!-- Sidebar (left, in-flow on lg; mobile drawer is a separate overlay) -->
 		<Sidebar bind:drawerHidden desktopHidden={hideDesktopSidebar} />
 

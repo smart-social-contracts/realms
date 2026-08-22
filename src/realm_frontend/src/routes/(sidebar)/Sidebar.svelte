@@ -253,9 +253,9 @@
 
 </script>
 
-<!-- Mobile drawer: stay mounted so open/close can animate (200ms). -->
+<!-- Mobile drawer: fill the pane under the header (no guessed top-16 gap). -->
 <div
-	class="fixed inset-0 z-[60] lg:hidden {drawerHidden ? 'pointer-events-none' : ''}"
+	class="absolute inset-0 z-[60] lg:hidden {drawerHidden ? 'pointer-events-none' : ''}"
 	role="dialog"
 	aria-modal={!drawerHidden}
 	aria-hidden={drawerHidden}
@@ -270,7 +270,7 @@
 		on:click={closeDrawer}
 	></button>
 	<aside
-		class="drawer-panel absolute top-16 left-0 bottom-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation {drawerHidden ? 'is-closed' : ''}"
+		class="drawer-panel absolute inset-y-0 left-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation {drawerHidden ? 'is-closed' : ''}"
 	>
 			<h4 class="sr-only">Main menu</h4>
 			<div
