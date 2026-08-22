@@ -15,6 +15,8 @@
 	import { setActiveQuarter } from '$lib/canisters';
 	import { formatQuarterLabel, formatQuarterShortLabel } from '$lib/utils/quarterLabels';
 
+	let { variant = 'chip' }: { variant?: 'chip' | 'menu' } = $props();
+
 	interface QuarterOption {
 		name: string;
 		canister_id: string;
@@ -40,7 +42,26 @@
 	}
 </script>
 
-{#if visible}
+{#if visible && variant === 'menu'}
+	<div class="border-t border-gray-200 px-4 py-2 dark:border-gray-700">
+		<label class="mb-1 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400" for="quarter-switch-menu">
+			<IconBuildingCommunity size={14} />
+			{$_('quarters.switch_tab', { default: 'Quarter (this tab)' })}
+		</label>
+		<select
+			id="quarter-switch-menu"
+			value={selected}
+			onchange={onChange}
+			class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm font-medium text-gray-700 outline-none focus:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+		>
+			{#each quarters as quarter (quarter.canister_id)}
+				<option value={quarter.canister_id}>
+					{formatQuarterLabel(quarter)}
+				</option>
+			{/each}
+		</select>
+	</div>
+{:else if visible}
 	<div
 		class="inline-flex max-w-[5.5rem] items-center gap-1 rounded-lg border border-gray-200 bg-white px-1.5 py-1 sm:max-w-none sm:gap-1.5 sm:px-2"
 		title={`${formatQuarterLabel(quarters.find((q) => q.canister_id === selected) ?? null)} · ${$_('quarters.switch_tab', { default: 'Quarter (this tab)' })}`}

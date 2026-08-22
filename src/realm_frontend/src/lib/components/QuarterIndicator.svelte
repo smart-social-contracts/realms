@@ -13,6 +13,8 @@
 	import { activeQuarterId } from '$lib/stores/quarters';
 	import { formatQuarterLabel, formatQuarterShortLabel } from '$lib/utils/quarterLabels';
 
+	let { variant = 'chip' }: { variant?: 'chip' | 'menu' } = $props();
+
 	interface QuarterOption {
 		name: string;
 		canister_id: string;
@@ -37,7 +39,15 @@
 	const label = $derived(active ? formatQuarterShortLabel(active) : '');
 </script>
 
-{#if visible}
+{#if visible && variant === 'menu'}
+	<div class="border-t border-gray-200 px-4 py-2 dark:border-gray-700">
+		<p class="mb-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+			<IconBuildingCommunity size={14} />
+			{$_('quarters.connected_to', { default: 'Connected to this quarter' })}
+		</p>
+		<p class="text-sm font-medium text-gray-800 dark:text-gray-200">{active ? formatQuarterLabel(active) : label}</p>
+	</div>
+{:else if visible}
 	<div
 		class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1"
 		title={active ? formatQuarterLabel(active) : $_('quarters.connected_to', { default: 'Connected to this quarter' })}
