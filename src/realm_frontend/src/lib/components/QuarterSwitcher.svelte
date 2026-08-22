@@ -42,15 +42,15 @@
 
 {#if visible}
 	<div
-		class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1"
+		class="inline-flex max-w-[9rem] items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-1.5 py-1 sm:max-w-none sm:px-2"
 		title={$_('quarters.switch_tab', { default: 'Quarter (this tab)' })}
 	>
-		<IconBuildingCommunity size={18} class="text-gray-500" />
+		<IconBuildingCommunity size={18} class="hidden text-gray-500 sm:block" />
 		<select
 			value={selected}
 			onchange={onChange}
 			aria-label={$_('quarters.switch_tab', { default: 'Quarter (this tab)' })}
-			class="max-w-[12rem] cursor-pointer truncate border-0 bg-transparent p-0 pr-5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-0"
+			class="max-w-[7rem] cursor-pointer truncate border-0 bg-transparent p-0 pr-5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-0 sm:max-w-[12rem]"
 		>
 			{#each quarters as quarter (quarter.canister_id)}
 				<option value={quarter.canister_id}>

@@ -5,6 +5,7 @@
 	import DelegationSwitcher from '$lib/components/DelegationSwitcher.svelte';
 	import { realmInfo, realmName } from '$lib/stores/realmInfo';
 	import { unreadCount } from '$lib/stores/notifications';
+	import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
 	import { onMount } from 'svelte';
 	import { Navbar } from 'flowbite-svelte';
 	import { IconMenu2 } from '@tabler/icons-svelte';
@@ -15,51 +16,59 @@
 	export let showMenu = true;
 	export let showRealmControls = true;
 
+	const hideRealmName = isEmbeddedInPortal();
+
 	onMount(() => {
 		realmInfo.fetch();
 	});
 </script>
 
-<Navbar {fluid} class="text-black relative z-50" color="default" let:NavContainer style="pointer-events: auto;">
-	{#if showMenu}
-		<button
-			type="button"
-			on:click={() => (drawerHidden = !drawerHidden)}
-			class="relative m-0 inline-flex p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-600 hover:text-gray-900"
-			aria-label={$unreadCount > 0 ? 'Toggle navigation menu (unread messages)' : 'Toggle navigation menu'}
-			aria-expanded={!drawerHidden}
-		>
-			<IconMenu2 size={22} />
-			{#if $unreadCount > 0}
-				<span
-					class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
-					aria-hidden="true"
-				></span>
+<Navbar {fluid} class="text-black relative z-50" color="default" style="pointer-events: auto;">
+	<div class="grid w-full min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+		<div class="flex shrink-0 items-center">
+			{#if showMenu}
+				<button
+					type="button"
+					on:click={() => (drawerHidden = !drawerHidden)}
+					class="relative m-0 inline-flex p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-600 hover:text-gray-900"
+					aria-label={$unreadCount > 0 ? 'Toggle navigation menu (unread messages)' : 'Toggle navigation menu'}
+					aria-expanded={!drawerHidden}
+				>
+					<IconMenu2 size={22} />
+					{#if $unreadCount > 0}
+						<span
+							class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
+							aria-hidden="true"
+						></span>
+					{/if}
+				</button>
 			{/if}
-		</button>
-	{/if}
+		</div>
 
-	<div class="absolute left-1/2 transform -translate-x-1/2">
-		<a href="/" class="flex items-center cursor-pointer">
-			<img
-				src={$realmInfo.logoUrl || '/images/logo_sphere_only.svg'}
-				class="h-8 sm:h-10 pointer-events-none"
-				alt={$realmName || 'Realms Logo'}
-			/>
-			<span
-				class="ml-3 self-center whitespace-nowrap text-xl font-medium text-gray-700 sm:text-2xl pointer-events-none"
-			>
-				{$realmName || ''}
-			</span>
-		</a>
-	</div>
+		<div class="flex min-w-0 items-center justify-center">
+			<a href="/" class="flex min-w-0 max-w-full items-center">
+				<img
+					src={$realmInfo.logoUrl || '/images/logo_sphere_only.svg'}
+					class="h-8 shrink-0 sm:h-10 pointer-events-none"
+					alt={$realmName || 'Realms Logo'}
+				/>
+				{#if !hideRealmName}
+					<span
+						class="ml-2 min-w-0 truncate self-center text-lg font-medium text-gray-700 sm:ml-3 sm:text-2xl pointer-events-none"
+					>
+						{$realmName || ''}
+					</span>
+				{/if}
+			</a>
+		</div>
 
-	<div class="ms-auto flex items-center gap-2 text-gray-500">
-		{#if showRealmControls}
-			<QuarterIndicator />
-			<QuarterSwitcher />
-			<DelegationSwitcher />
-		{/if}
-		<AuthButton />
+		<div class="flex min-w-0 items-center justify-end gap-1 text-gray-500 sm:gap-2">
+			{#if showRealmControls}
+				<QuarterIndicator />
+				<QuarterSwitcher />
+				<DelegationSwitcher />
+			{/if}
+			<AuthButton />
+		</div>
 	</div>
 </Navbar>
