@@ -99,6 +99,14 @@
 		collapsedCategories = collapsedCategories;
 	}
 
+	function handleFoldClick(event: MouseEvent) {
+		const btn = (event.target as HTMLElement | null)?.closest?.('[data-fold-id]');
+		if (!(btn instanceof HTMLElement)) return;
+		const id = btn.dataset.foldId;
+		if (!id) return;
+		toggleCategory(id);
+	}
+
 	function sectionOpen(id: string): boolean {
 		return !collapsedCategories.has(id);
 	}
@@ -128,11 +136,15 @@
 			sidebarContainer.addEventListener('scroll', checkScrollPosition);
 			checkScrollPosition();
 		}
+		// Capture-phase listener: Svelte 5 delegated onclick can no-op or
+		// double-fire on these headers, which cancels the fold toggle.
+		document.addEventListener('click', handleFoldClick, true);
 
 		return () => {
 			if (sidebarContainer) {
 				sidebarContainer.removeEventListener('scroll', checkScrollPosition);
 			}
+			document.removeEventListener('click', handleFoldClick, true);
 		};
 	});
 	
@@ -326,7 +338,7 @@
 					{:else}
 						<ul class="pt-5 pb-1 space-y-1">
 							<li>
-								<button class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" aria-expanded={sectionOpen('__section_me__')} onclick={() => toggleCategory('__section_me__')}>
+								<button type="button" class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" data-fold-id="__section_me__" aria-expanded={sectionOpen('__section_me__')}>
 									<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_ME}</h3>
 									<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_me__') ? '' : 'is-folded'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 								</button>
@@ -358,7 +370,7 @@
 						{#if $sidebarConfig}
 							<ul class="pt-3 pb-1 space-y-1">
 								<li>
-									<button class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" aria-expanded={sectionOpen('__section_realm__')} onclick={() => toggleCategory('__section_realm__')}>
+									<button type="button" class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer" data-fold-id="__section_realm__" aria-expanded={sectionOpen('__section_realm__')}>
 										<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_REALM}</h3>
 										<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_realm__') ? '' : 'is-folded'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 									</button>
@@ -379,7 +391,7 @@
 								{#each $sidebarConfig.categories as category (category.id)}
 									<ul class="pt-2 pb-1 space-y-1">
 										<li class="px-3 pt-2 pb-1">
-											<button class="flex items-center justify-between w-full cursor-pointer group/cat" aria-expanded={sectionOpen(category.id)} onclick={() => toggleCategory(category.id)}>
+											<button type="button" class="flex items-center justify-between w-full cursor-pointer group/cat" data-fold-id={category.id} aria-expanded={sectionOpen(category.id)}>
 												<h3 class={styles.sidebar.categoryHeader()}>{category.label}</h3>
 												<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen(category.id) ? '' : 'is-folded'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 											</button>
@@ -402,7 +414,7 @@
 								{#if $sidebarConfig.mundusItems.length > 0}
 									<ul class="pt-4 pb-1 space-y-1">
 										<li class="px-3 pt-2 pb-1">
-											<button class="flex items-center justify-between w-full cursor-pointer group/cat" aria-expanded={sectionOpen('__section_mundus__')} onclick={() => toggleCategory('__section_mundus__')}>
+											<button type="button" class="flex items-center justify-between w-full cursor-pointer group/cat" data-fold-id="__section_mundus__" aria-expanded={sectionOpen('__section_mundus__')}>
 												<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_MUNDUS}</h3>
 												<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 {sectionOpen('__section_mundus__') ? '' : 'is-folded'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 											</button>
@@ -475,9 +487,10 @@
 			<ul class="pt-5 lg:pt-3 pb-1 space-y-1">
 				<li>
 					<button
+						type="button"
 						class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer"
+						data-fold-id="__section_me__"
 						aria-expanded={sectionOpen('__section_me__')}
-						onclick={() => toggleCategory('__section_me__')}
 					>
 						<h3 class={styles.sidebar.sectionHeader()}>
 							{SECTION_HEADER_ME}
@@ -531,9 +544,10 @@
 				<ul class="pt-3 pb-1 space-y-1">
 					<li>
 						<button
+							type="button"
 							class="flex items-center justify-between w-full px-3 py-1.5 rounded-md bg-gray-100 cursor-pointer"
+							data-fold-id="__section_realm__"
 							aria-expanded={sectionOpen('__section_realm__')}
-							onclick={() => toggleCategory('__section_realm__')}
 						>
 							<h3 class={styles.sidebar.sectionHeader()}>
 								{SECTION_HEADER_REALM}
@@ -573,9 +587,10 @@
 						<ul class="pt-2 pb-1 space-y-1">
 							<li class="px-3 pt-2 pb-1">
 								<button
+									type="button"
 									class="flex items-center justify-between w-full cursor-pointer group/cat"
+									data-fold-id={category.id}
 									aria-expanded={sectionOpen(category.id)}
-									onclick={() => toggleCategory(category.id)}
 								>
 									<h3 class={styles.sidebar.categoryHeader()}>
 										{category.label}
@@ -615,9 +630,10 @@
 						<ul class="pt-4 pb-1 space-y-1">
 							<li class="px-3 pt-2 pb-1">
 								<button
+									type="button"
 									class="flex items-center justify-between w-full cursor-pointer group/cat"
+									data-fold-id="__section_mundus__"
 									aria-expanded={sectionOpen('__section_mundus__')}
-									onclick={() => toggleCategory('__section_mundus__')}
 								>
 									<h3 class={styles.sidebar.sectionHeader()}>
 										{SECTION_HEADER_MUNDUS}
