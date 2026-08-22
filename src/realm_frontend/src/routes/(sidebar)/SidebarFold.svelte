@@ -79,6 +79,7 @@
 		overflow: hidden;
 	}
 	.sidebar-details :global(.fold-chevron) {
+		flex-shrink: 0;
 		transform: rotate(0deg);
 		transition: transform 200ms ease-out;
 	}
