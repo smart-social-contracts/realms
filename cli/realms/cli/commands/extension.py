@@ -729,6 +729,31 @@ _ICP_NETWORK_ALIASES = {"test": "ic", "staging": "ic", "demo": "ic"}
 _ICP_IDENTITY_ALIASES = {"deployer": "my_dev_identity_1"}
 
 
+def _icp_identity_exists(name: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["icp", "identity", "principal", "--identity", name],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _resolve_icp_identity(identity: Optional[str]) -> Optional[str]:
+    """Map CLI identity names to icp-cli store names when the alias exists."""
+    if not identity:
+        return identity
+    alias = _ICP_IDENTITY_ALIASES.get(identity)
+    if alias and _icp_identity_exists(alias):
+        return alias
+    if _icp_identity_exists(identity):
+        return identity
+    return identity
+
+
 def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=120):
     """Run a canister call (via icp when available, else dfx) and return parsed output.
 
@@ -742,7 +767,7 @@ def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=
     use_icp = shutil.which("icp") is not None
     if use_icp:
         cmd = ["icp", "canister", "call"]
-        icp_identity = _ICP_IDENTITY_ALIASES.get(identity, identity)
+        icp_identity = _resolve_icp_identity(identity)
         if icp_identity:
             cmd.extend(["--identity", icp_identity])
         cmd.extend(["--network", _ICP_NETWORK_ALIASES.get(network, network or "ic")])
