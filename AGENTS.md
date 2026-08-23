@@ -1259,6 +1259,10 @@ Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the 
 
 This VM has no `icp.yaml` and no working OS keyring.
 
+**Git.** Do **not** create a branch, commit, push, or open a PR unless the user
+explicitly asks. Stay on the current checkout. This repo rule overrides the
+Cloud agent’s default “always branch + draft PR” behavior.
+
 **Identity.** Import `IC_IDENTITY_PEM_B64` as a plaintext icp (and dfx) identity
 named `deployer`. Do not use the baked `my_dev_identity_1` keyring identity.
 
@@ -1469,7 +1473,10 @@ until updated manually or re-provisioned.
   or `publish_build.py` for file_registry, marketplace, dashboard. **Extensions:**
   `deploy-files.yml` to publish bundles into the file registry.
 - **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
-- Do not commit unless explicitly told to do so.
+- **Do not commit, create a branch, or open a PR unless the user explicitly
+  asks.** Operational work (redeploys, `__shell__`, live checks) stays on the
+  current checkout. Docs or code edits wait for an explicit “commit / branch /
+  PR” instruction. A Cloud agent’s default git policy does **not** override this.
 - Always use `mode=upgrade` for production/test deploys (`reinstall` wipes state).
 - Always scope rollouts as narrowly as possible:
   - **Target:** `-f targets=agora` — roll out one realm, not `all-realms`.
