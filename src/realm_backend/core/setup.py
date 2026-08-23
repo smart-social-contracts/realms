@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from _cdk import Async, CallResult, Principal, Service, ic, service_update, text
+from _cdk import Async, ic
 from ic_python_logging import get_logger
 
 logger = get_logger("core.setup")
@@ -33,11 +33,6 @@ SETUP_LAUNCH_STEP_CODE = (
     "    res = yield from advance_setup_launch()\n"
     "    return res\n"
 )
-
-
-class RealmRegistrySetupService(Service):
-    @service_update
-    def realm_setup_completed(self, args: text) -> text: ...
 
 
 def effective_realm_status(realm) -> str:
@@ -566,6 +561,12 @@ def _safe_log(level: str, message: str, *args: Any) -> None:
 
 
 def notify_registry_setup_completed(registry_canister_id: str) -> Async[None]:
+    from _cdk import CallResult, Principal, Service, service_update, text
+
+    class RealmRegistrySetupService(Service):
+        @service_update
+        def realm_setup_completed(self, args: text) -> text: ...
+
     backend_id = str(ic.id())
     payload = json.dumps({"realm_backend_canister_id": backend_id})
     try:

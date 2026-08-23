@@ -283,10 +283,15 @@ logger = get_logger("main")
 
 
 def setup_gate_error(caller: str):
-    """Lazy import — a top-level ``from core.setup import …`` traps init."""
-    from core.setup import setup_gate_error as _gate
+    """Load ``core.setup`` on demand.
 
-    return _gate(caller)
+    Use module attribute access (not ``from core.setup import …``). Basilisk
+    ``_LazyMod`` plus ``hasattr`` swallows an ``AttributeError`` from ``_bload``
+    and rewrites it as ``cannot import name … from 'core.setup'``.
+    """
+    import core.setup as _setup
+
+    return _setup.setup_gate_error(caller)
 
 
 def _init_secure_orm():

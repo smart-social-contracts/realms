@@ -74,7 +74,7 @@ def get_runtime_flags_payload() -> dict:
         realm = None
     if not realm:
         return {"success": False, "error": "Realm not found"}
-    from core.setup import get_primary_color
+    import core.setup as _setup
 
     return {
         "success": True,
@@ -97,5 +97,5 @@ def get_runtime_flags_payload() -> dict:
         "test_mode_skip_passport_zkproof": get_realm_flag(
             "test_mode_skip_passport_zkproof", False
         ),
-        "primary_color": get_primary_color(realm),
+        "primary_color": _setup.get_primary_color(realm),
     }

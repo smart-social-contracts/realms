@@ -416,6 +416,12 @@ def test_stranger_not_authorized_during_setup(monkeypatch):
     assert setup_core.is_setup_authorized("stranger-principal") is False
 
 
+def test_setup_module_loads_without_service_class():
+    """core.setup must import without constructing a Basilisk Service subclass."""
+    assert callable(setup_core.setup_gate_error)
+    assert not hasattr(setup_core, "RealmRegistrySetupService")
+
+
 def test_setup_gate_blocks_stranger():
     realm = _FakeRealm(status=RealmStatus.SETUP)
     _FakeRealm.reset(realm)

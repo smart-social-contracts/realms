@@ -75,13 +75,13 @@ def get_status() -> "dict[str, Any]":
     background_image_url = ""
     file_registry_canister_id = ""
     marketplace_canister_id = ""
-    from core.setup import DEFAULT_PRIMARY_COLOR, get_primary_color
+    import core.setup as _setup
 
-    primary_color = DEFAULT_PRIMARY_COLOR
+    primary_color = _setup.DEFAULT_PRIMARY_COLOR
     try:
         first_realm = Realm.load("1")
         if first_realm:
-            primary_color = get_primary_color(first_realm)
+            primary_color = _setup.get_primary_color(first_realm)
             realm_name = first_realm.name or ""
             realm_welcome_message = getattr(first_realm, "welcome_message", None) or ""
             realm_manifesto = getattr(first_realm, "manifesto", None) or ""
