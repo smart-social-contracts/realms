@@ -16,9 +16,9 @@ re-approved.
 
 Usage:
     python3 scripts/approve_registry_content.py --network ic \\
-        --registry iebdk-kqaaa-aaaau-agoxq-cai --dry-run
+        --registry feqzn-wyaaa-aaaae-ag23q-cai --dry-run
     python3 scripts/approve_registry_content.py --network ic \\
-        --registry iebdk-kqaaa-aaaau-agoxq-cai --execute
+        --registry feqzn-wyaaa-aaaae-ag23q-cai --execute
 """
 
 import argparse
@@ -120,7 +120,7 @@ def main():
     # approvals — realms refuse them).
     MARKETPLACE_BY_NETWORK = {
         "test": "2wldc-niaaa-aaaad-qlxga-cai",
-        "staging": "jji3o-uyaaa-aaaah-qreja-cai",
+        "staging": "l5qpy-wqaaa-aaaah-qu2mq-cai",
         "demo": "ehyfg-wyaaa-aaaae-qg3qq-cai",
     }
     if args.direct:

@@ -5,7 +5,7 @@
   "active": true,
   "parameters": {
     "network": "staging",
-    "file_registry_canister_id": "iebdk-kqaaa-aaaau-agoxq-cai",
+    "file_registry_canister_id": "feqzn-wyaaa-aaaae-ag23q-cai",
     "marketplace_canister_id": "jji3o-uyaaa-aaaah-qreja-cai",
     "test_flags": {
       "test_mode": true,

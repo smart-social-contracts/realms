@@ -6,7 +6,7 @@
 # not include extension frontends). Until backend ships resync_extension_frontends,
 # re-run install_extension_from_registry for each installed extension, or:
 #   realms extension resync-frontends -c epc7x-syaaa-aaaac-bfq3q-cai -n staging \
-#     -r iebdk-kqaaa-aaaau-agoxq-cai
+#     -r feqzn-wyaaa-aaaae-ag23q-cai
 version: 1
 
 object:

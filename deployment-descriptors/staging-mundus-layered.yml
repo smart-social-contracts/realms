@@ -2,7 +2,7 @@ version: 2
 network: staging
 
 infra:
-  file_registry_canister_id: iebdk-kqaaa-aaaau-agoxq-cai
+  file_registry_canister_id: feqzn-wyaaa-aaaae-ag23q-cai
   marketplace_canister_id: jji3o-uyaaa-aaaah-qreja-cai
   # No ii_derivation_origin: the federation portal is the ONLY II login origin
   # (FEDERATION_PORTAL.md) — pinning one would require every realm frontend in the

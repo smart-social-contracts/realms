@@ -167,7 +167,7 @@ def patch_staging_realm(
     *,
     network: str = "staging",
     identity: str = "deployer",
-    file_registry_id: str = "iebdk-kqaaa-aaaau-agoxq-cai",
+    file_registry_id: str = "feqzn-wyaaa-aaaae-ag23q-cai",
     derivation_origin: str = "https://staging.gos.earth",
     portal_url: str = "",
 ) -> None:

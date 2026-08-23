@@ -10,7 +10,7 @@ export const ENVIRONMENTS = {
   staging: {
     name: 'Staging',
     marketplace: 'jji3o-uyaaa-aaaah-qreja-cai',
-    fileRegistry: 'iebdk-kqaaa-aaaau-agoxq-cai',
+    fileRegistry: 'feqzn-wyaaa-aaaae-ag23q-cai',
     portal: 'https://staging.gos.earth',
   },
   test: {

@@ -13,7 +13,7 @@ from ic.candid import Types, encode
 from ic.client import Client
 from ic.identity import Identity
 
-DEFAULT_REGISTRY = "iebdk-kqaaa-aaaau-agoxq-cai"
+DEFAULT_REGISTRY = "feqzn-wyaaa-aaaae-ag23q-cai"
 DEFAULT_FRONTEND = "fcm3z-5qaaa-aaaac-bfq4a-cai"
 DEFAULT_PEM = "/root/.config/dfx/identity/deployer/identity.pem"
 DEFAULT_HOST = "https://icp0.io"
