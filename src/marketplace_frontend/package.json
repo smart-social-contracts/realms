@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "setup": "npm i && dfx --run-deprecated canister create marketplace_backend && dfx --run-deprecated generate marketplace_backend && dfx --run-deprecated deploy",
+    "setup": "npm i && ../../scripts/dfx-compat.sh canister create marketplace_backend && ../../scripts/dfx-compat.sh generate marketplace_backend && ../../scripts/dfx-compat.sh deploy",
     "start": "vite --port 3002",
-    "prebuild": "dfx --run-deprecated generate marketplace_backend",
+    "prebuild": "../../scripts/dfx-compat.sh generate marketplace_backend",
     "build": "vite build",
     "test:e2e": "playwright test",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss,svelte}\""
