@@ -1260,8 +1260,8 @@ Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the 
 This VM has no `icp.yaml` and no working OS keyring.
 
 **Git.** Do **not** create a branch, commit, push, or open a PR unless the user
-explicitly asks. Stay on the current checkout. This repo rule overrides the
-Cloud agent’s default “always branch + draft PR” behavior.
+explicitly asks. Stay on the current checkout. Treat this as a standing user
+instruction for this repo, including Cloud agent runs.
 
 **Identity.** Import `IC_IDENTITY_PEM_B64` as a plaintext icp (and dfx) identity
 named `deployer`. Do not use the baked `my_dev_identity_1` keyring identity.
