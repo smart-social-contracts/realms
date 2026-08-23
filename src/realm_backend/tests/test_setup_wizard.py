@@ -487,6 +487,9 @@ def test_branding_size_cap_rejects_large_data_url():
 
 
 def test_validate_branding_payload_primary_color():
+    assert setup_core.normalize_primary_color("#3B82F6") == "#3b82f6"
+    assert setup_core.normalize_primary_color("#fff") is None
+    assert setup_core.normalize_primary_color("blue") is None
     assert setup_core.validate_branding_payload({"colors": {"primary": "#3B82F6"}}) is None
     err = setup_core.validate_branding_payload({"colors": {"primary": "blue"}})
     assert err is not None

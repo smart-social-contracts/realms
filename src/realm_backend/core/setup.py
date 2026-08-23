@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Dict, List, Optional
 
 from _cdk import Async, ic
@@ -13,7 +12,7 @@ logger = get_logger("core.setup")
 
 SETUP_ERROR = "This realm is being set up and is not yet open to members."
 DEFAULT_PRIMARY_COLOR = "#3b82f6"
-PRIMARY_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+_HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
 BRANDING_DATA_URL_MAX_BYTES = 1_572_864  # ~1.5 MiB per asset
 MANIFESTO_MAX_CHARS = 256
 WELCOME_MESSAGE_MAX_CHARS = 1024
@@ -203,7 +202,9 @@ def normalize_primary_color(value: Any) -> Optional[str]:
     if not isinstance(value, str):
         return None
     trimmed = value.strip()
-    if not PRIMARY_COLOR_RE.match(trimmed):
+    if len(trimmed) != 7 or trimmed[0] != "#":
+        return None
+    if not all(ch in _HEX_DIGITS for ch in trimmed[1:]):
         return None
     return trimmed.lower()
 
