@@ -83,7 +83,6 @@ from api.vetkeys import (
 )
 from api.zones import get_zone_aggregation
 from core.access import _check_access, require, require_controller, set_controller
-from core.setup import setup_gate_error
 from core.cross_quarter import (
     ResolutionStatus,
     classify_ref,
@@ -281,6 +280,13 @@ def _get_frontend_canister_id() -> str:
         return ""
 
 logger = get_logger("main")
+
+
+def setup_gate_error(caller: str):
+    """Lazy import — a top-level ``from core.setup import …`` traps init."""
+    from core.setup import setup_gate_error as _gate
+
+    return _gate(caller)
 
 
 def _init_secure_orm():
