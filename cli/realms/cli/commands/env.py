@@ -45,6 +45,8 @@ from ..utils import (
 
 FILE_REGISTRY_FRONTEND = "file_registry_frontend"
 
+CANISTER_SUBNET_TYPE = "application"
+
 PRODUCT_STACK = (
     FILE_REGISTRY,
     FILE_REGISTRY_FRONTEND,
@@ -167,6 +169,10 @@ def _create_canister(
     logger,
 ) -> str:
     cmd = _dfx_cmd("canister", "create", canister_name, "--network", network, "--no-wallet")
+    if network != "local":
+        # The cycles ledger refuses to pick a subnet on its own unless the
+        # caller already owns canisters on exactly one.
+        cmd.extend(["--subnet-type", CANISTER_SUBNET_TYPE])
     if identity:
         cmd.extend(["--identity", identity])
     rc = run_command(cmd, env=_dfx_subprocess_env(), logger=logger)
