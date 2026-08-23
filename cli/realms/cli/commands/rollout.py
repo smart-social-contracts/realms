@@ -55,7 +55,7 @@ console = Console()
 _CASALS_IDS = {
     "test": "qthgp-3yaaa-aaaae-agveq-cai",
     "demo": "jo3cj-faaaa-aaaac-bffea-cai",
-    "staging": "jj2e5-iyaaa-aaaac-bffeq-cai",
+    "staging": "rbuam-sqaaa-aaaab-qhe5a-cai",
 }
 
 # Casals canisters are on mainnet; every dfx network alias points at icp0.io,

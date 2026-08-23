@@ -709,7 +709,7 @@ gh workflow run casals-upgrade.yml \
 |---|---|---|---|
 | Test | `qthgp-3yaaa-aaaae-agveq-cai` | `qic2k-baaaa-aaaae-agvga-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
 | Demo | `jo3cj-faaaa-aaaac-bffea-cai` | `hvwpv-aiaaa-aaaam-ajddq-cai` | `vi64l-3aaaa-aaaae-qj4va-cai` |
-| Staging | `jj2e5-iyaaa-aaaac-bffeq-cai` | `mcqbx-hyaaa-aaaaj-qsarq-cai` | `iebdk-kqaaa-aaaau-agoxq-cai` |
+| Staging | `rbuam-sqaaa-aaaab-qhe5a-cai` | `fdr7z-3aaaa-aaaae-ag23a-cai` | `feqzn-wyaaa-aaaae-ag23q-cai` |
 
 These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
 `canister_ids.json` (`casals_backend`/`casals_frontend`). Add new env IDs there.
@@ -870,7 +870,7 @@ for fast test iteration) and per-realm steps.
 
 | Canister | Test | Demo | Staging |
 |---|---|---|---|
-| file_registry | `uq2mu-kaaaa-aaaah-avqcq-cai` | `vi64l-3aaaa-aaaae-qj4va-cai` | `iebdk-kqaaa-aaaau-agoxq-cai` |
+| file_registry | `uq2mu-kaaaa-aaaah-avqcq-cai` | `vi64l-3aaaa-aaaae-qj4va-cai` | `feqzn-wyaaa-aaaae-ag23q-cai` |
 | Agora backend | `rnghe-haaaa-aaaak-qyxyq-cai` | `3bohd-2yaaa-aaaac-qcyla-cai` | `—` |
 | Agora frontend | `pqwsi-vyaaa-aaaau-agrbq-cai` | `3gpbx-xaaaa-aaaac-qcylq-cai` | `—` |
 | Dominion backend | `ku6cv-2iaaa-aaaab-agrpa-cai` | `h5vpp-qyaaa-aaaac-qai3a-cai` | `—` |
