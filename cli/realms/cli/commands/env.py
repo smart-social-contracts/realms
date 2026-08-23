@@ -48,7 +48,7 @@ FILE_REGISTRY_FRONTEND = "file_registry_frontend"
 
 CANISTER_CREATE_CYCLES = 2_000_000_000_000
 
-CANISTER_ID_RE = re.compile(r"\b([a-z0-9]{5}(?:-[a-z0-9]{5}){4}-cai)\b")
+CANISTER_ID_RE = re.compile(r"([a-z0-9]{5}(?:-[a-z0-9]{5}){3,10}-cai)")
 
 PRODUCT_STACK = (
     FILE_REGISTRY,
@@ -203,9 +203,13 @@ def _create_canister_via_ledger(
         console.print(f"[red]❌ icp canister create {canister_name} failed[/red]")
         console.print((result.stderr or result.stdout).strip()[:500])
         raise typer.Exit(result.returncode)
-    match = CANISTER_ID_RE.findall(result.stdout + "\n" + result.stderr)
+    output = f"{result.stdout}\n{result.stderr}"
+    match = CANISTER_ID_RE.findall(output)
     if not match:
+        # The canister exists and holds cycles; print the output so its id is
+        # not lost to an unrecognised format.
         console.print(f"[red]❌ Could not parse the new id for {canister_name}[/red]")
+        console.print(output.strip()[:2000])
         raise typer.Exit(1)
     return match[-1]
 
@@ -282,6 +286,23 @@ def resolve_or_create_canister(
     )
 
 
+def _canister_is_empty(canister_ref: str, network: str) -> bool:
+    """True when the canister exists but holds no Wasm module."""
+    try:
+        result = subprocess.run(
+            _dfx_cmd("canister", "status", canister_ref, "--network", network),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=_dfx_subprocess_env(),
+        )
+    except Exception:
+        return False
+    if result.returncode != 0:
+        return False
+    return "module hash: none" in result.stdout.lower()
+
+
 def _dfx_deploy(
     canister: str,
     network: str,
@@ -292,6 +313,10 @@ def _dfx_deploy(
     env: Optional[Dict[str, str]] = None,
     logger=None,
 ) -> None:
+    if mode == "auto" and _canister_is_empty(canister, network):
+        # dfx lists assets before installing, which traps on a canister that
+        # holds no Wasm yet — the state every freshly created canister is in.
+        mode = "install"
     cmd = _dfx_cmd("deploy", canister, "--network", network, "--yes")
     if mode != "auto":
         cmd.extend(["--mode", mode])

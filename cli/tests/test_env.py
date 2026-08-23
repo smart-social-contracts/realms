@@ -155,7 +155,7 @@ class TestCreateCanisterOnIc:
         from realms.cli.commands.env import _create_canister
 
         mock_run.return_value = MagicMock(
-            returncode=0, stdout="Created canister abcde-fghij-klmno-pqrst-uvwxy-cai\n", stderr=""
+            returncode=0, stdout="abcde-fghij-klmno-pqrst-cai\n", stderr=""
         )
         cid = _create_canister(
             "file_registry", "staging", "deployer",
@@ -166,7 +166,7 @@ class TestCreateCanisterOnIc:
         assert cmd[0] == "icp"
         assert "--cycles" in cmd
         assert not any(a.startswith("--with-icp") for a in cmd)
-        assert cid == "abcde-fghij-klmno-pqrst-uvwxy-cai"
+        assert cid == "abcde-fghij-klmno-pqrst-cai"
 
         ids = json.loads((tmp_path / "canister_ids.json").read_text())
         assert ids["file_registry"]["staging"] == cid
@@ -180,3 +180,36 @@ class TestCreateCanisterOnIc:
         _create_canister("file_registry", "local", None, logger=MagicMock())
 
         assert mock_run.call_args.args[0][0] == "dfx"
+
+
+class TestFirstDeployOfAnEmptyCanister:
+    """dfx lists assets before installing, which traps on an empty canister."""
+
+    @patch("realms.cli.commands.env.run_command")
+    @patch("realms.cli.commands.env.subprocess.run")
+    def test_auto_becomes_install_when_no_module(self, mock_status, mock_run):
+        from realms.cli.commands.env import _dfx_deploy
+
+        mock_status.return_value = MagicMock(
+            returncode=0, stdout="Status: Running\nModule hash: None\n", stderr=""
+        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        _dfx_deploy("file_registry_frontend", "staging", "auto", "deployer")
+
+        cmd = mock_run.call_args.args[0]
+        assert cmd[cmd.index("--mode") + 1] == "install"
+
+    @patch("realms.cli.commands.env.run_command")
+    @patch("realms.cli.commands.env.subprocess.run")
+    def test_auto_stays_auto_for_an_installed_canister(self, mock_status, mock_run):
+        from realms.cli.commands.env import _dfx_deploy
+
+        mock_status.return_value = MagicMock(
+            returncode=0, stdout="Status: Running\nModule hash: 0xabc\n", stderr=""
+        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        _dfx_deploy("file_registry_frontend", "staging", "auto", "deployer")
+
+        assert "--mode" not in mock_run.call_args.args[0]
