@@ -131,7 +131,7 @@ fr = _load_file_registry_module()
 # Fakes
 # ---------------------------------------------------------------------------
 
-MARKETPLACE = "jji3o-uyaaa-aaaah-qreja-cai"
+MARKETPLACE = "l5qpy-wqaaa-aaaah-qu2mq-cai"
 OTHER_APPROVER = "aaaaa-bbbbb-ccccc-ddddd-cai"
 
 

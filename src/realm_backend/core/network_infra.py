@@ -9,7 +9,7 @@ NETWORK_INFRA = {
     },
     "staging": {
         "file_registry": "hacwc-baaaa-aaaac-bfxmq-cai",
-        "marketplace": "h3hkh-3yaaa-aaaac-bfxoa-cai",
+        "marketplace": "l5qpy-wqaaa-aaaah-qu2mq-cai",
     },
 }
 

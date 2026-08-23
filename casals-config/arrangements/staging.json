@@ -6,7 +6,7 @@
   "parameters": {
     "network": "staging",
     "file_registry_canister_id": "feqzn-wyaaa-aaaae-ag23q-cai",
-    "marketplace_canister_id": "jji3o-uyaaa-aaaah-qreja-cai",
+    "marketplace_canister_id": "l5qpy-wqaaa-aaaah-qu2mq-cai",
     "test_flags": {
       "test_mode": true,
       "ii_bypass": true,
