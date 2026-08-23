@@ -148,9 +148,15 @@ def call_extension_function(
         logger.debug(f"Got result from function: {result}")
 
     except AttributeError as e:
-        # Missing function is not an error - extensions may not implement all hooks
-        logger.warning(f"Extension function not found: {e}")
-        return None
+        # Missing hook only — infrastructure AttributeErrors (e.g. sandbox
+        # missing sha256) must propagate.
+        msg = str(e)
+        if function_name in msg and (
+            "has no attribute" in msg or "has no function" in msg
+        ):
+            logger.warning(f"Extension function not found: {e}")
+            return None
+        raise
     except PermissionError as e:
         from core.extension_errors import payload_from_permission_error
 
