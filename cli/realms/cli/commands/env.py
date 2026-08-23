@@ -473,6 +473,18 @@ def _build_marketplace_frontend(
         if logger:
             logger.info(f"Wrote {env_file} ({len(env_vars)} vars)")
 
+    if not (project_root / "node_modules" / "vite").is_dir():
+        console.print("[dim]Installing workspace npm dependencies…[/dim]")
+        rc = run_command(
+            ["npm", "install", "--workspace=marketplace_frontend", "--include-workspace-root"],
+            cwd=str(project_root),
+            env=build_env,
+            logger=logger,
+        )
+        if rc.returncode != 0:
+            console.print("[red]❌ npm install failed[/red]")
+            raise typer.Exit(rc.returncode)
+
     console.print(Panel.fit("🔨 Building marketplace_frontend", style="bold blue"))
     rc = run_command(
         ["npm", "run", "build", "--workspace=marketplace_frontend"],
