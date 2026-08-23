@@ -486,14 +486,14 @@ def _check_marketplace_approval(
         )
 
     approver = (approval.get("approver") or "").strip()
+    if _is_founding_setup():
+        _remember_trusted_approver(approver)
+        logger.info(
+            f"'{namespace}' approved by {approver}; accepted during founding setup"
+        )
+        return ""
+
     if not trusted:
-        if _is_founding_setup():
-            _remember_trusted_approver(approver)
-            logger.info(
-                f"'{namespace}' approved by {approver}; accepted during setup "
-                f"because this realm has no marketplace yet"
-            )
-            return ""
         return (
             f"'{namespace}' is approved by {approver}, but this realm trusts no "
             f"approver (no marketplace configured). {hint}"

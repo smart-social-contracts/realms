@@ -1694,6 +1694,7 @@ def publish_codex_command(
             source_dir=source_dir,
             extension_id=codex_id or manifest.get("id"),
             version=version,
+            namespace_prefix=namespace_prefix,
             skip_publish=skip_publish,
             network=network,
             identity=identity,

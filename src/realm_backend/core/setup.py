@@ -18,6 +18,7 @@ MANIFESTO_MAX_CHARS = 256
 WELCOME_MESSAGE_MAX_CHARS = 1024
 SETUP_LAUNCH_TASK_NAME = "setup_launch"
 SETUP_LAUNCH_TICK_SECONDS = 1
+SETUP_LAUNCH_STALE_NANOS = 180 * 1_000_000_000
 SETUP_DRAFT_STEPS = frozenset({"welcome", "codex", "token", "branding", "review"})
 SETUP_LAUNCH_PHASES: List[tuple[str, str]] = [
     ("install_codex", "Install codex"),
@@ -392,9 +393,19 @@ def begin_setup_launch(realm) -> Optional[dict]:
         return {"success": False, "error": "setup launch already completed"}
 
     if status == "running":
-        return None
+        if not _launch_is_stale(launch):
+            return None
+        resumed = False
+        for step in launch.get("steps") or []:
+            if step.get("status") in ("running", "failed"):
+                step["status"] = "pending"
+                step["error"] = None
+                resumed = True
+                break
+        if not resumed:
+            launch = default_launch_state()
 
-    if status == "failed":
+    elif status == "failed":
         resumed = False
         for step in launch.get("steps") or []:
             if step.get("status") == "failed":
@@ -419,6 +430,23 @@ def _find_launch_step(launch: dict, name: str) -> Optional[dict]:
         if step.get("name") == name:
             return step
     return None
+
+
+def _launch_is_stale(launch: dict) -> bool:
+    updated_at_raw = launch.get("updated_at")
+    if updated_at_raw is not None:
+        try:
+            if ic.time() - int(updated_at_raw) > SETUP_LAUNCH_STALE_NANOS:
+                return True
+        except (TypeError, ValueError):
+            pass
+
+    phase = (launch.get("phase") or "").strip()
+    if phase == "install_codex":
+        step = _find_launch_step(launch, "install_codex")
+        if step and step.get("status") == "running":
+            return True
+    return False
 
 
 def _next_pending_launch_step(launch: dict) -> Optional[dict]:

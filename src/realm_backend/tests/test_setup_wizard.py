@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 import types
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -171,7 +172,7 @@ def _import_setup_api():
     file_registry_mod.install_codex_from_registry = MagicMock()
     sys.modules["api.file_registry"] = file_registry_mod
 
-    path = "/srv/dev/realms/src/realm_backend/api/setup.py"
+    path = str(Path(__file__).resolve().parents[1] / "api" / "setup.py")
     spec = importlib.util.spec_from_file_location("setup_api_under_test", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -241,7 +242,7 @@ def test_enter_setup_sets_creator_and_registry():
     assert setup_cfg["realm_registry_canister_id"] == "registry-canister"
     assert realm.network == "staging"
     assert realm.file_registry_canister_id == "file-reg-id"
-    assert realm.marketplace_canister_id == "2wldc-niaaa-aaaad-qlxga-cai"
+    assert realm.marketplace_canister_id == "h3hkh-3yaaa-aaaac-bfxoa-cai"
 
 
 def test_enter_setup_fills_empty_infra_ids_for_test():
@@ -844,6 +845,151 @@ def test_setup_launch_step_code_does_not_need_json():
     ns = {}
     exec(SETUP_LAUNCH_STEP_CODE, ns)
     assert callable(ns.get("async_task"))
+
+
+def test_begin_setup_launch_blocks_fresh_running_launch():
+    realm = _FakeRealm(
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "draft": {"codex": {"package": "agora", "version": "1.0.0"}},
+                    "launch": {
+                        "status": "running",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "install_codex", "status": "completed", "error": None},
+                            {"name": "configure_token", "status": "pending", "error": None},
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": str(mock_ic.time.return_value),
+                    },
+                }
+            }
+        )
+    )
+    _FakeRealm.reset(realm)
+
+    before = json.loads(realm.manifest_data)["setup"]["launch"]
+    assert setup_core.begin_setup_launch(realm) is None
+    after = json.loads(realm.manifest_data)["setup"]["launch"]
+    assert after == before
+
+
+def test_begin_setup_launch_resumes_stale_running_launch():
+    stale_at = mock_ic.time.return_value - setup_core.SETUP_LAUNCH_STALE_NANOS - 1
+    realm = _FakeRealm(
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "draft": {"codex": {"package": "agora", "version": "1.0.0"}},
+                    "launch": {
+                        "status": "running",
+                        "phase": "install_codex",
+                        "steps": [
+                            {"name": "install_codex", "status": "running", "error": None},
+                            {"name": "configure_token", "status": "pending", "error": None},
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": str(stale_at),
+                    },
+                }
+            }
+        )
+    )
+    _FakeRealm.reset(realm)
+
+    assert setup_core.begin_setup_launch(realm) is None
+    launch = json.loads(realm.manifest_data)["setup"]["launch"]
+    assert launch["status"] == "running"
+    install_step = next(s for s in launch["steps"] if s["name"] == "install_codex")
+    assert install_step["status"] == "pending"
+    assert install_step["error"] is None
+
+
+def test_begin_setup_launch_resumes_stuck_install_codex_phase():
+    realm = _FakeRealm(
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "draft": {"codex": {"package": "agora", "version": "1.0.0"}},
+                    "launch": {
+                        "status": "running",
+                        "phase": "install_codex",
+                        "steps": [
+                            {"name": "install_codex", "status": "running", "error": None},
+                            {"name": "configure_token", "status": "pending", "error": None},
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": str(mock_ic.time.return_value),
+                    },
+                }
+            }
+        )
+    )
+    _FakeRealm.reset(realm)
+
+    assert setup_core.begin_setup_launch(realm) is None
+    install_step = next(
+        s
+        for s in json.loads(realm.manifest_data)["setup"]["launch"]["steps"]
+        if s["name"] == "install_codex"
+    )
+    assert install_step["status"] == "pending"
+
+
+def test_complete_setup_persists_registry_id_before_notify(monkeypatch):
+    setup_api = _import_setup_api()
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "codex": {"package": "syntropia", "version": "1.0.0"},
+                }
+            }
+        ),
+    )
+    _FakeRealm.reset(realm)
+    mock_ic.caller.return_value.to_str.return_value = "creator-1"
+
+    persisted = []
+
+    def _track_set(realm_obj, registry_id):
+        persisted.append(registry_id)
+        setup_core.set_realm_registry_canister_id(realm_obj, registry_id)
+
+    monkeypatch.setattr(setup_api, "set_realm_registry_canister_id", _track_set)
+    monkeypatch.setattr(
+        setup_api,
+        "get_realm_registry_canister_id",
+        lambda _realm: "resolved-registry",
+    )
+
+    def _fake_notify(registry_id):
+        assert persisted == ["resolved-registry"]
+        yield None
+
+    monkeypatch.setattr(setup_api, "notify_registry_setup_completed", _fake_notify)
+
+    gen = setup_api.complete_setup()
+    try:
+        while True:
+            next(gen)
+    except StopIteration as stop:
+        result = json.loads(stop.value)
+
+    assert result["success"] is True
+    assert persisted == ["resolved-registry"]
+    setup_cfg = json.loads(realm.manifest_data)["setup"]
+    assert setup_cfg["realm_registry_canister_id"] == "resolved-registry"
 
 
 def test_setup_launch_requires_codex_in_draft():

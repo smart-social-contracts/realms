@@ -27,6 +27,7 @@ from core.setup import (
     merge_setup_draft,
     notify_registry_setup_completed,
     require_setup_authorized,
+    set_realm_registry_canister_id,
     update_setup_config,
     validate_branding_payload,
     validate_identity_payload,
@@ -492,6 +493,7 @@ def _launch_phase_complete(realm, draft: dict) -> Async[dict]:
 
     registry_id = get_realm_registry_canister_id(realm)
     if registry_id:
+        set_realm_registry_canister_id(realm, registry_id)
         yield from notify_registry_setup_completed(registry_id)
 
     return {
@@ -829,6 +831,7 @@ def complete_setup() -> Async[str]:
 
     registry_id = get_realm_registry_canister_id(realm)
     if registry_id:
+        set_realm_registry_canister_id(realm, registry_id)
         yield from notify_registry_setup_completed(registry_id)
     else:
         logger.warning(

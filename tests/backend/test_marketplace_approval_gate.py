@@ -327,6 +327,14 @@ def test_approval_is_refused_when_the_realm_trusts_nobody():
     assert "trusts no approver" in verdict
 
 
+def test_founding_setup_allows_untrusted_approver_when_marketplace_configured():
+    set_policy(marketplace_canister_id=MARKETPLACE)
+    FakeRealm._rows[0].status = "setup"
+    verdict, _ = check(responses=[approval(approver=OTHER_APPROVER)])
+    assert verdict == ""
+    assert OTHER_APPROVER in FakeRealm._rows[0].trusted_approvers
+
+
 def test_setup_allows_approved_content_when_no_marketplace_is_configured():
     set_policy(marketplace_canister_id="")
     FakeRealm._rows[0].status = "setup"
