@@ -24,7 +24,7 @@
 
 	const toneClasses: Record<Tone, string> = {
 		primary:
-			'bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700',
+			'bg-[var(--color-primary-600,#2563eb)] text-white hover:bg-[var(--color-primary-700,#1d4ed8)] focus-visible:ring-[var(--color-primary-300,#93c5fd)]',
 		secondary:
 			'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus-visible:ring-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700',
 		danger:

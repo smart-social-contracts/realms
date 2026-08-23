@@ -480,6 +480,13 @@ def test_branding_size_cap_rejects_large_data_url():
     assert "1.5MB" in err
 
 
+def test_validate_branding_payload_primary_color():
+    assert setup_core.validate_branding_payload({"colors": {"primary": "#3B82F6"}}) is None
+    err = setup_core.validate_branding_payload({"colors": {"primary": "blue"}})
+    assert err is not None
+    assert "colors.primary" in err
+
+
 def test_complete_setup_requires_codex():
     setup_api = _import_setup_api()
 

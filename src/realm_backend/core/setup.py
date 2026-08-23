@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional
 
 from _cdk import Async, CallResult, Principal, Service, ic, service_update, text
@@ -11,6 +12,8 @@ from ic_python_logging import get_logger
 logger = get_logger("core.setup")
 
 SETUP_ERROR = "This realm is being set up and is not yet open to members."
+DEFAULT_PRIMARY_COLOR = "#3b82f6"
+PRIMARY_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 BRANDING_DATA_URL_MAX_BYTES = 1_572_864  # ~1.5 MiB per asset
 MANIFESTO_MAX_CHARS = 256
 WELCOME_MESSAGE_MAX_CHARS = 1024
@@ -201,6 +204,43 @@ def validate_identity_payload(identity: dict) -> Optional[str]:
     return None
 
 
+def normalize_primary_color(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    trimmed = value.strip()
+    if not PRIMARY_COLOR_RE.match(trimmed):
+        return None
+    return trimmed.lower()
+
+
+def get_primary_color(realm) -> str:
+    setup = get_setup_config(realm)
+    branding = setup.get("branding")
+    if isinstance(branding, dict):
+        colors = branding.get("colors")
+        if isinstance(colors, dict):
+            normalized = normalize_primary_color(colors.get("primary"))
+            if normalized:
+                return normalized
+    return DEFAULT_PRIMARY_COLOR
+
+
+def set_primary_color(realm, hex_color: str) -> Optional[str]:
+    normalized = normalize_primary_color(hex_color)
+    if normalized is None:
+        return "primary_color must be a valid #RRGGBB hex color"
+    setup = get_setup_config(realm)
+    branding = dict(setup.get("branding") or {}) if isinstance(setup.get("branding"), dict) else {}
+    colors = dict(branding.get("colors") or {}) if isinstance(branding.get("colors"), dict) else {}
+    colors["primary"] = normalized
+    branding["colors"] = colors
+    try:
+        update_setup_config(realm, {"branding": branding})
+    except ValueError as exc:
+        return str(exc)
+    return None
+
+
 def validate_branding_payload(branding: dict) -> Optional[str]:
     if not isinstance(branding, dict):
         return "branding must be an object"
@@ -215,6 +255,9 @@ def validate_branding_payload(branding: dict) -> Optional[str]:
     colors = branding.get("colors")
     if colors is not None and not isinstance(colors, dict):
         return "colors must be an object"
+    if isinstance(colors, dict) and "primary" in colors:
+        if normalize_primary_color(colors.get("primary")) is None:
+            return "colors.primary must be a valid #RRGGBB hex color"
     return None
 
 

@@ -205,6 +205,14 @@ def apply_realm_config(config: dict) -> dict:
         realm.manifest_data = serialized_md
         updated_fields.append(f"email={list(email_config.keys())}")
 
+    if "primary_color" in config:
+        from core.setup import get_primary_color, set_primary_color
+
+        err = set_primary_color(realm, config["primary_color"])
+        if err:
+            return {"success": False, "error": err}
+        updated_fields.append(f"primary_color={get_primary_color(realm)}")
+
     if "logo_url" in config:
         realm.logo_url = config["logo_url"] or ""
         updated_fields.append(f"logo_url={realm.logo_url[:50]}...")

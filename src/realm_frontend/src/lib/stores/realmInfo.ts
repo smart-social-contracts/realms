@@ -1,5 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
+import { browser } from '$app/environment';
 import { backendStore, backendActorReady } from '$lib/canisters';
+import { applyBrandingPrimary, DEFAULT_PRIMARY_COLOR, parsePrimaryColor } from '$lib/theme/brandingPrimary';
 
 const RUNTIME_FLAGS_TIMEOUT_MS = 12_000;
 const STATUS_QUERY_TIMEOUT_MS = 12_000;
@@ -63,6 +65,7 @@ interface RealmInfo {
 	parentRealmCanisterId: string;
 	logoUrl: string;
 	backgroundImageUrl: string;
+	primaryColor: string;
 	testMode: boolean;
 	testModeIIBypass: boolean;
 	testModeUserSelfRegistration: boolean;
@@ -86,6 +89,7 @@ const createRealmInfoStore = () => {
 		parentRealmCanisterId: '',
 		logoUrl: '',
 		backgroundImageUrl: '',
+		primaryColor: DEFAULT_PRIMARY_COLOR,
 		testMode: false,
 		testModeIIBypass: false,
 		testModeUserSelfRegistration: false,
@@ -178,6 +182,10 @@ const createRealmInfoStore = () => {
 					const fromFlags = flagsPayload?.success ? flagsPayload : null;
 					const openFromFlags = fromFlags?.open_registration as boolean | undefined;
 					const openFromStatus = status?.open_registration as boolean | undefined;
+					const primaryColor =
+						parsePrimaryColor(fromFlags?.primary_color) ??
+						parsePrimaryColor(status?.primary_color) ??
+						DEFAULT_PRIMARY_COLOR;
 					update(state => ({
 						...state,
 						name: (fromFlags?.realm_name as string) || (status?.realm_name as string) || '',
@@ -191,6 +199,7 @@ const createRealmInfoStore = () => {
 						parentRealmCanisterId: (status?.parent_realm_canister_id as string) || '',
 						logoUrl: (fromFlags?.logo_url as string) || (status?.logo_url as string) || '',
 						backgroundImageUrl: (fromFlags?.background_image_url as string) || (status?.background_image_url as string) || '',
+						primaryColor,
 						testMode: (fromFlags?.test_mode as boolean) ?? (status?.test_mode as boolean) ?? false,
 						testModeIIBypass: (fromFlags?.test_mode_ii_bypass as boolean) ?? (status?.test_mode_ii_bypass as boolean) ?? false,
 						testModeUserSelfRegistration: (fromFlags?.test_mode_user_self_registration as boolean) ?? (status?.test_mode_user_self_registration as boolean) ?? false,
@@ -199,6 +208,9 @@ const createRealmInfoStore = () => {
 						testModeSkipPassportZkproof: (fromFlags?.test_mode_skip_passport_zkproof as boolean) ?? (status?.test_mode_skip_passport_zkproof as boolean) ?? false,
 						loading: false
 					}));
+					if (browser) {
+						applyBrandingPrimary(primaryColor);
+					}
 				} else {
 					throw new Error('Failed to fetch realm info');
 				}

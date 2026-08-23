@@ -124,3 +124,17 @@ def test_runtime_flags_payload_includes_realm_stage(fake_ggg):
     payload = fake_ggg.get_runtime_flags_payload()
     assert payload["success"] is True
     assert payload["realm_stage"] == "beta"
+
+
+def test_runtime_flags_payload_includes_primary_color(fake_ggg):
+    import json
+
+    _set_realm(
+        name="Demo Realm",
+        manifest_data=json.dumps(
+            {"setup": {"branding": {"colors": {"primary": "#ff5500"}}}}
+        ),
+    )
+    payload = fake_ggg.get_runtime_flags_payload()
+    assert payload["success"] is True
+    assert payload["primary_color"] == "#ff5500"

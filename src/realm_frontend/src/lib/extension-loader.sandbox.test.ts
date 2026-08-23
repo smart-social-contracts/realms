@@ -43,6 +43,9 @@ describe('mountSandboxedExtension', () => {
 					isQuarter: false,
 					parentRealmCanisterId: '',
 				},
+				cssVariables: {
+					'--color-primary-600': '#3b82f6',
+				},
 			}),
 			subscribeHostState: () => () => {},
 		});

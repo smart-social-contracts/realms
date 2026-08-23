@@ -32,6 +32,7 @@ export interface HostState {
 	locale: string;
 	theme: 'light' | 'dark';
 	realmInfo: HostRealmInfo;
+	cssVariables?: Record<string, string>;
 }
 
 export type NotifyLevel = 'info' | 'success' | 'error';

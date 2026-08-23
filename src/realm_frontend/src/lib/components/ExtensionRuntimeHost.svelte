@@ -28,6 +28,7 @@
 	import { resolveExtensionMountMode } from '$lib/utils/extension-runtime-mode';
 	import { requestBridgeModal, showBridgeNotify } from '$lib/stores/bridge-modal';
 	import type { HostRealmInfo, HostState } from '@realmsgos/extension-bridge';
+	import { readPrimaryCssVariables } from '$lib/theme/brandingPrimary';
 	import {
 		deriveMySharingVetKey,
 		unwrapDek,
@@ -80,7 +81,8 @@
 			principal: get(principal) as string,
 			locale: get(locale) || 'en',
 			theme: readHostTheme(),
-			realmInfo: realmInfoSnapshot()
+			realmInfo: realmInfoSnapshot(),
+			cssVariables: readPrimaryCssVariables()
 		};
 	}
 

@@ -64,6 +64,18 @@ function bridgeError(err: BridgeErrorPayload): Error {
 	return e;
 }
 
+function applyHostCssVariables(state: HostState): void {
+	if (typeof document === 'undefined') return;
+	const vars = state.cssVariables;
+	if (!vars) return;
+	const root = document.documentElement;
+	for (const [key, value] of Object.entries(vars)) {
+		if (key.startsWith('--') && typeof value === 'string') {
+			root.style.setProperty(key, value);
+		}
+	}
+}
+
 /**
  * Create an extension-side bridge client and wait for the host handshake.
  */
@@ -148,6 +160,7 @@ export async function createExtensionClient(
 			latestState = msg.state;
 			handshakeComplete = true;
 			clearTimeout(handshakeTimer);
+			applyHostCssVariables(msg.state);
 			for (const listener of stateListeners) {
 				listener(msg.state);
 			}
@@ -164,6 +177,7 @@ export async function createExtensionClient(
 
 		if (msg.kind === 'state') {
 			latestState = msg.state;
+			applyHostCssVariables(msg.state);
 			for (const listener of stateListeners) {
 				listener(msg.state);
 			}

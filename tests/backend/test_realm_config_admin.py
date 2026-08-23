@@ -87,3 +87,57 @@ def test_apply_realm_config_skips_treasury_token_without_symbol(fake_ggg):
 def test_realm_accounting_currency_defaults_empty():
     source = _REALM_PATH.read_text()
     assert 'accounting_currency = String(max_length=16, default="")' in source
+
+
+def test_apply_primary_color_valid(fake_ggg):
+    import json
+
+    realm = FakeRealm._rows[0]
+    realm.manifest_data = json.dumps(
+        {"setup": {"branding": {"logo": True, "colors": {"secondary": "#111111"}}}}
+    )
+
+    result = rca.apply_realm_config({"primary_color": "#FF5500"})
+
+    assert result["success"] is True
+    assert "primary_color=#ff5500" in result["updated_fields"]
+    manifest = json.loads(realm.manifest_data)
+    assert manifest["setup"]["branding"]["logo"] is True
+    assert manifest["setup"]["branding"]["colors"]["secondary"] == "#111111"
+    assert manifest["setup"]["branding"]["colors"]["primary"] == "#ff5500"
+
+
+def test_apply_primary_color_rejects_invalid_hex(fake_ggg):
+    realm = FakeRealm._rows[0]
+    before = realm.manifest_data
+
+    result = rca.apply_realm_config({"primary_color": "not-a-color"})
+
+    assert result["success"] is False
+    assert "primary_color" in result["error"]
+    assert realm.manifest_data == before
+
+
+def test_apply_primary_color_merges_existing_branding(fake_ggg):
+    import json
+
+    realm = FakeRealm._rows[0]
+    realm.manifest_data = json.dumps(
+        {
+            "setup": {
+                "branding": {
+                    "background": True,
+                    "colors": {"primary": "#123456", "accent": "#abcdef"},
+                }
+            }
+        }
+    )
+
+    result = rca.apply_realm_config({"primary_color": "#654321"})
+
+    assert result["success"] is True
+    manifest = json.loads(realm.manifest_data)
+    colors = manifest["setup"]["branding"]["colors"]
+    assert colors["primary"] == "#654321"
+    assert colors["accent"] == "#abcdef"
+    assert manifest["setup"]["branding"]["background"] is True
