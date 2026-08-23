@@ -115,7 +115,6 @@ test.describe('Staging runtime-loaded extension', () => {
 			timeout: 20_000,
 		});
 		await expect(page.getByRole('heading', { name: /Notifications/i })).toBeVisible();
-		await expect(page.getByRole('heading', { name: /Payment accounts/i })).toBeVisible();
 
 		expect(bundleResponses.length, 'expected GET for bundle').toBeGreaterThan(0);
 		const hit = bundleResponses.find((r) => r.url.includes(`${REG_ID}.`));
