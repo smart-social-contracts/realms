@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -45,7 +46,9 @@ from ..utils import (
 
 FILE_REGISTRY_FRONTEND = "file_registry_frontend"
 
-CANISTER_SUBNET_TYPE = "application"
+CANISTER_CREATE_CYCLES = 2_000_000_000_000
+
+CANISTER_ID_RE = re.compile(r"\b([a-z0-9]{5}(?:-[a-z0-9]{5}){4}-cai)\b")
 
 PRODUCT_STACK = (
     FILE_REGISTRY,
@@ -161,18 +164,70 @@ def _is_canister_dead(canister_ref: str, network: str) -> bool:
     return any(marker in combined for marker in dead_markers)
 
 
+def _identity_principal(identity: Optional[str]) -> str:
+    cmd = _dfx_cmd("identity", "get-principal")
+    if identity:
+        cmd.extend(["--identity", identity])
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, timeout=60, env=_dfx_subprocess_env()
+    )
+    if result.returncode != 0:
+        console.print("[red]❌ Could not resolve the deploy principal[/red]")
+        raise typer.Exit(result.returncode)
+    return result.stdout.strip()
+
+
+def _create_canister_via_ledger(
+    canister_name: str,
+    identity: Optional[str],
+    *,
+    logger,
+) -> str:
+    """Mint a canister from the caller's cycles ledger balance, never from ICP."""
+    cmd = [
+        "icp", "canister", "create",
+        "--detached",
+        "--cycles", str(CANISTER_CREATE_CYCLES),
+        "-n", "ic",
+        "--controller", _identity_principal(identity),
+        "--quiet",
+    ]
+    if identity:
+        cmd.extend(["--identity", identity])
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, timeout=300, env=_dfx_subprocess_env()
+    )
+    if logger:
+        logger.info(" ".join(cmd))
+    if result.returncode != 0:
+        console.print(f"[red]❌ icp canister create {canister_name} failed[/red]")
+        console.print((result.stderr or result.stdout).strip()[:500])
+        raise typer.Exit(result.returncode)
+    match = CANISTER_ID_RE.findall(result.stdout + "\n" + result.stderr)
+    if not match:
+        console.print(f"[red]❌ Could not parse the new id for {canister_name}[/red]")
+        raise typer.Exit(1)
+    return match[-1]
+
+
 def _create_canister(
     canister_name: str,
     network: str,
     identity: Optional[str],
     *,
     logger,
+    project_root: Optional[Path] = None,
 ) -> str:
-    cmd = _dfx_cmd("canister", "create", canister_name, "--network", network, "--no-wallet")
     if network != "local":
-        # The cycles ledger refuses to pick a subnet on its own unless the
-        # caller already owns canisters on exactly one.
-        cmd.extend(["--subnet-type", CANISTER_SUBNET_TYPE])
+        # dfx --no-wallet asks the cycles ledger to pick a subnet, which it
+        # refuses to do unless the caller already owns canisters on exactly
+        # one. icp names the subnet itself and spends cycles, never ICP.
+        cid = _create_canister_via_ledger(canister_name, identity, logger=logger)
+        if project_root is not None:
+            _set_canister_id(project_root, canister_name, network, cid)
+        return cid
+
+    cmd = _dfx_cmd("canister", "create", canister_name, "--network", network, "--no-wallet")
     if identity:
         cmd.extend(["--identity", identity])
     rc = run_command(cmd, env=_dfx_subprocess_env(), logger=logger)
@@ -222,7 +277,9 @@ def resolve_or_create_canister(
     if not existing:
         console.print(f"[dim]No live id for {canister_name} on {network} — creating…[/dim]")
 
-    return _create_canister(canister_name, network, identity, logger=logger)
+    return _create_canister(
+        canister_name, network, identity, logger=logger, project_root=project_root
+    )
 
 
 def _dfx_deploy(
