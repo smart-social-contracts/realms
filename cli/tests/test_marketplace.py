@@ -57,3 +57,39 @@ class TestMarketplaceDeployBasiliskEnv:
         build_env = npm_calls[0].kwargs["env"]
         assert build_env["CANISTER_ID_MARKETPLACE_BACKEND"] == "aaaaa-aa"
         assert build_env["VITE_CANISTER_ID_MARKETPLACE_BACKEND"] == "aaaaa-aa"
+
+
+class TestDfxDeprecatedWrapperProbe:
+    """Only operator hosts wrap dfx; stock dfx rejects --run-deprecated."""
+
+    def setup_method(self):
+        from realms.cli.commands import marketplace
+
+        marketplace._DFX_ACCEPTS_RUN_DEPRECATED = None
+
+    teardown_method = setup_method
+
+    @patch("realms.cli.commands.marketplace.subprocess.run")
+    def test_wrapper_flag_used_when_dfx_accepts_it(self, mock_run):
+        from realms.cli.commands.marketplace import _dfx_cmd
+
+        mock_run.return_value = MagicMock(returncode=0)
+        assert _dfx_cmd("canister", "create", "file_registry") == [
+            "dfx",
+            "--run-deprecated",
+            "canister",
+            "create",
+            "file_registry",
+        ]
+
+    @patch("realms.cli.commands.marketplace.subprocess.run")
+    def test_wrapper_flag_omitted_for_stock_dfx(self, mock_run):
+        from realms.cli.commands.marketplace import _dfx_cmd
+
+        mock_run.return_value = MagicMock(returncode=2)
+        assert _dfx_cmd("canister", "create", "file_registry") == [
+            "dfx",
+            "canister",
+            "create",
+            "file_registry",
+        ]

@@ -54,9 +54,31 @@ MARKETPLACE_FRONTEND = "marketplace_frontend"
 FILE_REGISTRY = "file_registry"
 
 
+_DFX_ACCEPTS_RUN_DEPRECATED: Optional[bool] = None
+
+
+def _dfx_accepts_run_deprecated() -> bool:
+    """Operator hosts wrap dfx and require --run-deprecated; stock dfx rejects it."""
+    global _DFX_ACCEPTS_RUN_DEPRECATED
+    if _DFX_ACCEPTS_RUN_DEPRECATED is None:
+        try:
+            result = subprocess.run(
+                ["dfx", "--run-deprecated", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            _DFX_ACCEPTS_RUN_DEPRECATED = result.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            _DFX_ACCEPTS_RUN_DEPRECATED = False
+    return _DFX_ACCEPTS_RUN_DEPRECATED
+
+
 def _dfx_cmd(*args: str) -> List[str]:
     """Prefix dfx subcommand args with the srv1-compatible deprecated wrapper."""
-    return ["dfx", "--run-deprecated", *args]
+    if _dfx_accepts_run_deprecated():
+        return ["dfx", "--run-deprecated", *args]
+    return ["dfx", *args]
 
 
 def _dfx_subprocess_env(base_env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
