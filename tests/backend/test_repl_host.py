@@ -41,6 +41,7 @@ from core.repl_host import (  # noqa: E402
     json_args,
     load_allowed_methods,
     parse_candid_methods,
+    _default_did_path,
 )
 
 
@@ -136,6 +137,13 @@ class TestDidAllowlist:
         names = load_allowed_methods(missing)
         assert "ping" in names
         assert "__shell__" not in names
+
+    def test_did_path_without_file(self, monkeypatch):
+        import core.repl_host as rh
+
+        monkeypatch.delitem(rh.__dict__, "__file__", raising=False)
+        path = _default_did_path()
+        assert path.name == "realm_backend.did"
 
 
 class TestHostDispatch:

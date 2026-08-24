@@ -33,9 +33,15 @@ BLOCKED_METHODS = frozenset(
     }
 )
 
-# Do not Path.resolve() here: WASI realpath can fail at import, which would
-# take down HostSecureORM (and therefore __shell__) for the whole process.
-_DID_PATH = Path(__file__).parent.parent / "realm_backend.did"
+def _default_did_path() -> Path:
+    # Basilisk loads canister modules via exec(), so ``__file__`` is absent.
+    here = globals().get("__file__")
+    if here:
+        return Path(here).parent.parent / "realm_backend.did"
+    return Path("realm_backend.did")
+
+
+_DID_PATH = _default_did_path()
 
 # Appended to the SecureORM stub module. ``rpc`` is injected by the sandbox.
 # ``eval_repl`` is redefined so ``api`` / ``ext`` survive in ``_repl_ns``.
