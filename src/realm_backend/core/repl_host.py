@@ -33,7 +33,15 @@ BLOCKED_METHODS = frozenset(
     }
 )
 
-_DID_PATH = Path(__file__).resolve().parent.parent / "realm_backend.did"
+def _default_did_path() -> Path:
+    """DID path for tests; the canister has no filesystem copy of the file."""
+    try:
+        return Path(__file__).parent.parent / "realm_backend.did"
+    except Exception:
+        return Path("realm_backend.did")
+
+
+_DID_PATH = _default_did_path()
 
 # Appended to the SecureORM stub module. ``rpc`` is injected by the sandbox.
 # ``eval_repl`` is redefined so ``api`` / ``ext`` survive in ``_repl_ns``.
@@ -97,11 +105,18 @@ def parse_candid_methods(did_text: str) -> FrozenSet[str]:
 def load_allowed_methods(
     did_path: Optional[Path] = None,
     blocked: Iterable[str] = BLOCKED_METHODS,
+    host_module: Any = None,
 ) -> FrozenSet[str]:
+    """Allowlist from the DID file, or from the injected Candid hack on-canister."""
+    blocked_set = frozenset(blocked)
     path = Path(did_path) if did_path is not None else _DID_PATH
-    if not path.is_file():
-        raise RpcError(f"Candid interface not found at {path}; host RPC disabled")
-    return parse_candid_methods(path.read_text()) - frozenset(blocked)
+    if path.is_file():
+        return parse_candid_methods(path.read_text()) - blocked_set
+    module = host_module if host_module is not None else sys.modules.get("main")
+    hack = getattr(module, "__get_candid_interface_tmp_hack", None) if module else None
+    if callable(hack):
+        return parse_candid_methods(hack()) - blocked_set
+    raise RpcError("Candid interface not found; host RPC disabled")
 
 
 def json_args(args: Any) -> str:
@@ -164,9 +179,29 @@ class HostSecureORM(SecureORM):
         return list(super().actions()) + list(HOST_ACTIONS)
 
     def allowed_methods(self) -> FrozenSet[str]:
-        if self._allowed_methods is not None:
-            return self._allowed_methods - self._blocked_methods
-        return load_allowed_methods(self._did_path, self._blocked_methods)
+        if self._allowed_methods is None:
+            self._allowed_methods = load_allowed_methods(
+                self._did_path,
+                self._blocked_methods,
+                host_module=self.host_module(),
+            )
+        return self._allowed_methods - self._blocked_methods
+
+    def _ensure_sandbox_hash(self) -> None:
+        """Hash stub source even when this image has no ``sb.sha256``."""
+        if self._sandbox_hash:
+            return
+        import _basilisk_sandbox as sb
+        from core.runtime_sandbox import _content_hash
+
+        self._sandbox_hash = _content_hash(self._stub_source)
+        approve = getattr(sb, "approve_hash", None)
+        if callable(approve):
+            approve(self._sandbox_hash)
+
+    def shell(self, code: str) -> str:
+        self._ensure_sandbox_hash()
+        return super().shell(code)
 
     def host_module(self) -> Any:
         if self._host_module is not None:

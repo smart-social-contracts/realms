@@ -332,9 +332,11 @@ def _init_secure_orm():
     )
 
 
+_secure_orm_error = ""
 try:
     secure_orm = _init_secure_orm()
 except Exception as exc:
+    _secure_orm_error = f"{type(exc).__name__}: {exc}"
     logger.warning(f"secure_orm unavailable: {exc}")
     secure_orm = None
 
@@ -5124,7 +5126,9 @@ def __shell__(code: str) -> str:
     host methods and gates as the UI). Entity stubs remain Cedar-gated.
     """
     if secure_orm is None:
-        raise RuntimeError("secure_orm is not available in this build")
+        raise RuntimeError(
+            f"secure_orm is not available in this build: {_secure_orm_error}"
+        )
     return secure_orm.shell(code)
 
 

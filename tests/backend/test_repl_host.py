@@ -39,6 +39,7 @@ from core.repl_host import (  # noqa: E402
     HOST_STUB_APPENDIX,
     HostSecureORM,
     json_args,
+    load_allowed_methods,
     parse_candid_methods,
 )
 
@@ -120,6 +121,22 @@ class TestDidAllowlist:
             "http_transform",
             "__get_candid_interface_tmp_hack",
         }
+
+    def test_missing_did_uses_injected_candid_hack(self, tmp_path):
+        did_text = (
+            "service : {\n"
+            '  "status" : () -> (text) query;\n'
+            '  "__shell__" : (text) -> (text);\n'
+            "}\n"
+        )
+        host = SimpleNamespace(__get_candid_interface_tmp_hack=lambda: did_text)
+        names = load_allowed_methods(tmp_path / "missing.did", host_module=host)
+        assert "status" in names
+        assert "__shell__" not in names
+
+    def test_missing_did_and_hack_raises(self, tmp_path):
+        with pytest.raises(RpcError, match="Candid interface not found"):
+            load_allowed_methods(tmp_path / "missing.did", host_module=SimpleNamespace())
 
 
 class TestHostDispatch:
@@ -234,6 +251,23 @@ class TestSandboxSurface:
         exec(HOST_STUB_APPENDIX, ns)
         assert ns["api"].methods() is None
         assert ns["ext"].call("voting", "cast_vote", {"proposal_id": "p1"}) is None
+
+    def test_ensure_sandbox_hash_without_sha256(self, monkeypatch):
+        import hashlib
+        import types
+
+        approved = []
+
+        class NoSha256:
+            def approve_hash(self, h):
+                approved.append(h)
+
+        monkeypatch.setitem(sys.modules, "_basilisk_sandbox", NoSha256())
+        orm = _orm()
+        orm._ensure_sandbox_hash()
+        expected = hashlib.sha256(orm._stub_source.encode("utf-8")).hexdigest()
+        assert orm._sandbox_hash == expected
+        assert approved == [expected]
 
     def test_json_args_matches_spa(self):
         assert json_args(None) == "{}"

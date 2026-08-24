@@ -8,7 +8,9 @@ rpc handler, and the fallback for images whose ``spawn_subinterpreter`` predates
 those arguments. The second half covers the per-hook context spec.
 """
 
+import hashlib
 import sys
+import types
 
 import pytest
 
@@ -167,6 +169,63 @@ def test_subinterpreter_is_always_closed(fake_sandbox):
 
     runtime_sandbox._run_in_subinterpreter("src", "hook", {})
 
+    assert sandbox.closed == [1]
+
+
+def test_content_hash_uses_sandbox_sha256_when_present(fake_sandbox):
+    fake_sandbox()
+
+    assert runtime_sandbox._content_hash("hello") == "hash-of-5-bytes"
+
+
+def test_content_hash_falls_back_to_hashlib_when_sha256_missing(monkeypatch):
+    mod = types.SimpleNamespace(
+        approve_hash=lambda h: None,
+        revoke_hash=lambda h: None,
+    )
+    monkeypatch.setitem(sys.modules, "_basilisk_sandbox", mod)
+
+    source = "def f(): pass\n"
+    expected = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    assert runtime_sandbox._content_hash(source) == expected
+    assert len(expected) == 64
+
+
+def test_run_in_subinterpreter_without_sandbox_sha256(monkeypatch):
+    source = "def hook(args): return {'ok': True}\n"
+    expected_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+    class SandboxNoSha256:
+        def __init__(self):
+            self.approved = []
+            self.spawns = []
+            self.closed = []
+
+        def approve_hash(self, h):
+            self.approved.append(h)
+
+        def revoke_hash(self, h):
+            pass
+
+        def spawn_subinterpreter(self, src, content_hash, *args):
+            self.spawns.append((src, content_hash, args))
+            return 1
+
+        def call_in_subinterpreter(self, handle, fn, kwargs=None):
+            return {"ok": True}
+
+        def close_subinterpreter(self, handle):
+            self.closed.append(handle)
+
+    sandbox = SandboxNoSha256()
+    monkeypatch.setitem(sys.modules, "_basilisk_sandbox", sandbox)
+    monkeypatch.setattr(runtime_sandbox, "_extended_spawn", None, raising=False)
+
+    result = runtime_sandbox._run_in_subinterpreter(source, "hook", {})
+
+    assert result == {"ok": True}
+    assert sandbox.approved == [expected_hash]
+    assert sandbox.spawns[0][1] == expected_hash
     assert sandbox.closed == [1]
 
 
