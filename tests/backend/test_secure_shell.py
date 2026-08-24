@@ -216,3 +216,41 @@ class TestHandleRpc:
         assert result["amount"] == 42
         assert fake.requests
         assert fake.requests[-1]["context"] == {"repl": True}
+
+
+class TestSecureOrmLazyInit:
+    def test_retries_after_import_time_failure(self, main_module, monkeypatch):
+        saved = main_module.secure_orm
+        saved_err = main_module._secure_orm_error
+
+        class FakeOrm:
+            def shell(self, code):
+                return "ok\n"
+
+        try:
+            main_module.secure_orm = None
+            main_module._secure_orm_error = "ImportError: earlier"
+            monkeypatch.setattr(main_module, "_init_secure_orm", FakeOrm)
+            assert main_module._try_init_secure_orm() is not None
+            assert main_module.secure_orm is not None
+            assert main_module._secure_orm_error == ""
+        finally:
+            main_module.secure_orm = saved
+            main_module._secure_orm_error = saved_err
+
+    def test_shell_surfaces_init_error(self, main_module, monkeypatch):
+        saved = main_module.secure_orm
+        saved_err = main_module._secure_orm_error
+        try:
+            main_module.secure_orm = None
+            main_module._secure_orm_error = ""
+
+            def fail():
+                raise ValueError("principal type 'User' is not among the entity types")
+
+            monkeypatch.setattr(main_module, "_init_secure_orm", fail)
+            with pytest.raises(RuntimeError, match="ValueError: principal type"):
+                main_module.__shell__("1+1")
+        finally:
+            main_module.secure_orm = saved
+            main_module._secure_orm_error = saved_err

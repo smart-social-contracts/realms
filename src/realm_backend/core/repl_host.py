@@ -33,7 +33,9 @@ BLOCKED_METHODS = frozenset(
     }
 )
 
-_DID_PATH = Path(__file__).resolve().parent.parent / "realm_backend.did"
+# Do not Path.resolve() here: WASI realpath can fail at import, which would
+# take down HostSecureORM (and therefore __shell__) for the whole process.
+_DID_PATH = Path(__file__).parent.parent / "realm_backend.did"
 
 # Appended to the SecureORM stub module. ``rpc`` is injected by the sandbox.
 # ``eval_repl`` is redefined so ``api`` / ``ext`` survive in ``_repl_ns``.
@@ -94,14 +96,41 @@ def parse_candid_methods(did_text: str) -> FrozenSet[str]:
     return frozenset(names)
 
 
+def _candid_text_from_host_module() -> str:
+    """Basilisk injects ``__get_candid_interface_tmp_hack`` returning the .did.
+
+    The WASM image does not ship ``realm_backend.did`` as a file, so host RPC
+    falls back to that embedded string once ``main`` is loaded.
+    """
+    module = sys.modules.get("main")
+    if module is None:
+        return ""
+    hack = getattr(module, "__get_candid_interface_tmp_hack", None)
+    if not callable(hack):
+        return ""
+    try:
+        text = hack()
+    except Exception:
+        return ""
+    return text if isinstance(text, str) else ""
+
+
 def load_allowed_methods(
     did_path: Optional[Path] = None,
     blocked: Iterable[str] = BLOCKED_METHODS,
 ) -> FrozenSet[str]:
     path = Path(did_path) if did_path is not None else _DID_PATH
-    if not path.is_file():
+    text = ""
+    try:
+        if path.is_file():
+            text = path.read_text()
+    except OSError:
+        text = ""
+    if not text:
+        text = _candid_text_from_host_module()
+    if not text:
         raise RpcError(f"Candid interface not found at {path}; host RPC disabled")
-    return parse_candid_methods(path.read_text()) - frozenset(blocked)
+    return parse_candid_methods(text) - frozenset(blocked)
 
 
 def json_args(args: Any) -> str:

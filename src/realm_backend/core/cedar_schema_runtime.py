@@ -6,7 +6,7 @@ than committed as a hand-written file, so entity changes cannot silently drift
 from what the authorizer expects.
 """
 
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 _SCHEMA_CACHE: Optional[str] = None
 
@@ -74,25 +74,35 @@ def _ensure_schema_deps():
                 del sys.modules[name]
 
 
-def generate_realm_cedar_schema() -> str:
-    """Build Cedar schema text from the current ggg entity definitions."""
-    global _SCHEMA_CACHE
-    if _SCHEMA_CACHE is not None:
-        return _SCHEMA_CACHE
+def collect_ggg_schema_entities() -> Tuple[List[Type], Dict[str, Any]]:
+    """Entity classes and a Cedar-safe schema dict keyed by ``Class.__name__``.
 
+    ``ic_python_db.schema.build_schema`` keys rows by ``get_full_type_name()``,
+    which is ``namespace::Class`` when ``__namespace__`` is set. Cedar treats
+    ``::`` as its own namespace separator, so those keys cannot go into the
+    realm schema. They are dropped here instead of failing the whole REPL.
+    """
     _ensure_schema_deps()
     import ggg
     from ic_python_db import Entity
     from ic_python_db.schema import build_schema
-    from ic_basilisk_toolkit.cedar_schema import generate_cedar_schema
 
-    candidates = [
-        getattr(ggg, name)
-        for name in ggg.__all__
-        if isinstance(getattr(ggg, name), type)
-        and issubclass(getattr(ggg, name), Entity)
-    ]
-    included = []
+    names = list(ggg.__all__)
+    if "User" not in names:
+        names = ["User", *names]
+
+    candidates: List[Type] = []
+    seen = set()
+    for name in names:
+        cls = getattr(ggg, name, None)
+        if not isinstance(cls, type) or not issubclass(cls, Entity):
+            continue
+        if cls in seen:
+            continue
+        seen.add(cls)
+        candidates.append(cls)
+
+    included: List[Type] = []
     for cls in candidates:
         try:
             build_schema({cls.__name__: cls})
@@ -103,12 +113,56 @@ def generate_realm_cedar_schema() -> str:
             continue
         included.append(cls)
 
-    schema_dict = build_schema({cls.__name__: cls for cls in included})
+    user_cls = getattr(ggg, "User", None)
+    if (
+        isinstance(user_cls, type)
+        and issubclass(user_cls, Entity)
+        and user_cls not in included
+    ):
+        included.insert(0, user_cls)
+
+    raw = build_schema({cls.__name__: cls for cls in included})
+    schema_dict: Dict[str, Any] = {}
+    kept: List[Type] = []
+    for cls in included:
+        full_name = cls.get_full_type_name()
+        if "::" in full_name:
+            _log_warning(
+                f"cedar_schema: dropping namespaced type {full_name!r}"
+            )
+            continue
+        desc = raw.get(full_name) or raw.get(cls.__name__)
+        if desc is None:
+            continue
+        schema_dict[cls.__name__] = desc
+        kept.append(cls)
+    return kept, schema_dict
+
+
+def generate_realm_cedar_schema() -> str:
+    """Build Cedar schema text from the current ggg entity definitions."""
+    global _SCHEMA_CACHE
+    if _SCHEMA_CACHE is not None:
+        return _SCHEMA_CACHE
+
+    from ic_basilisk_toolkit.cedar_schema import generate_cedar_schema
+
+    _kept, schema_dict = collect_ggg_schema_entities()
+    if PRINCIPAL_TYPE not in schema_dict:
+        raise ValueError(
+            f"principal type {PRINCIPAL_TYPE!r} is not among the entity types"
+        )
+    known = set(schema_dict)
+    memberships = {
+        typ: list(rels)
+        for typ, rels in MEMBERSHIPS.items()
+        if typ in known
+    }
     text, _report = generate_cedar_schema(
         schema_dict,
         namespace=NAMESPACE,
         principal_type=PRINCIPAL_TYPE,
-        memberships=MEMBERSHIPS,
+        memberships=memberships,
         actions=ACTIONS,
         context=CONTEXT,
     )

@@ -39,6 +39,7 @@ from core.repl_host import (  # noqa: E402
     HOST_STUB_APPENDIX,
     HostSecureORM,
     json_args,
+    load_allowed_methods,
     parse_candid_methods,
 )
 
@@ -120,6 +121,21 @@ class TestDidAllowlist:
             "http_transform",
             "__get_candid_interface_tmp_hack",
         }
+
+    def test_missing_did_uses_embedded_candid(self, tmp_path, monkeypatch):
+        missing = tmp_path / "absent.did"
+        monkeypatch.setitem(
+            sys.modules,
+            "main",
+            SimpleNamespace(
+                __get_candid_interface_tmp_hack=lambda: (
+                    'service : {\n  "ping": () -> ();\n  "__shell__": (text) -> (text);\n}'
+                )
+            ),
+        )
+        names = load_allowed_methods(missing)
+        assert "ping" in names
+        assert "__shell__" not in names
 
 
 class TestHostDispatch:
