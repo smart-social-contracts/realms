@@ -43,63 +43,99 @@ def _default_did_path() -> Path:
 
 _DID_PATH = _default_did_path()
 
-# Appended to the SecureORM stub module. ``rpc`` is injected by the sandbox.
-# ``eval_repl`` is redefined so ``api`` / ``ext`` survive in ``_repl_ns``.
+# Appended to the SecureORM stub. ``rpc`` is a sandbox builtin, not a global,
+# and basilisk may bind the first ``eval_repl`` — so ``api``/``ext`` go in
+# ``__builtins__`` and ``rpc`` is resolved at call time.
 HOST_STUB_APPENDIX = r'''
+def _host_rpc(action, **kwargs):
+    b = __builtins__
+    fn = b.get("rpc") if isinstance(b, dict) else getattr(b, "rpc", None)
+    if fn is None:
+        fn = globals().get("rpc")
+    if not callable(fn):
+        raise RuntimeError("rpc is not available")
+    return fn(action, **kwargs)
+
 class api:
     @staticmethod
     def call(method, *args, **kwargs):
-        return rpc("host.call", method=method, args=list(args), kwargs=dict(kwargs))
+        return _host_rpc("host.call", method=method, args=list(args), kwargs=dict(kwargs))
 
     @staticmethod
     def methods():
-        return rpc("host.list_methods")
+        return _host_rpc("host.list_methods")
 
 class ext:
     @staticmethod
     def call(extension_name, function_name, args=None):
-        return rpc("host.ext_sync", extension_name=extension_name, function_name=function_name, args=args)
+        return _host_rpc("host.ext_sync", extension_name=extension_name, function_name=function_name, args=args)
 
     @staticmethod
     def call_async(extension_name, function_name, args=None):
-        return rpc("host.ext_async", extension_name=extension_name, function_name=function_name, args=args)
+        return _host_rpc("host.ext_async", extension_name=extension_name, function_name=function_name, args=args)
 
+def _install_host_names():
+    b = __builtins__
+    if isinstance(b, dict):
+        b["api"] = api
+        b["ext"] = ext
+    else:
+        b.api = api
+        b.ext = ext
+    ns = globals().get("_repl_ns")
+    if isinstance(ns, dict):
+        ns["api"] = api
+        ns["ext"] = ext
+        if not callable(ns.get("rpc")):
+            fn = b.get("rpc") if isinstance(b, dict) else getattr(b, "rpc", None)
+            if callable(fn):
+                ns["rpc"] = fn
+
+_install_host_names()
 _eval_repl_inner = eval_repl
 def eval_repl(code):
-    ns = globals().get("_repl_ns")
-    if ns is None:
-        ns = {"rpc": globals().get("rpc"), "__builtins__": __builtins__}
-        for _name, _val in list(globals().items()):
-            if isinstance(_val, type) and _name[:1].isupper():
-                ns[_name] = _val
-        ns["api"] = api
-        ns["ext"] = ext
-        globals()["_repl_ns"] = ns
-    else:
-        ns["api"] = api
-        ns["ext"] = ext
+    _install_host_names()
     return _eval_repl_inner(code)
 '''
 
 
 def parse_candid_methods(did_text: str) -> FrozenSet[str]:
-    """Quoted method names from the last ``service :`` block. No ``re`` module."""
+    """Quoted method names from the last ``service :`` block. No ``re`` module.
+
+    Handles both multiline DID files and the one-line form basilisk embeds
+    in ``__get_candid_interface_tmp_hack``.
+    """
     marker = "service :"
     idx = did_text.rfind(marker)
     body = did_text[idx:] if idx >= 0 else did_text
     names = []
-    for line in body.splitlines():
-        stripped = line.strip()
-        if not stripped.startswith('"'):
-            continue
-        end = stripped.find('"', 1)
-        if end <= 1:
-            continue
-        name = stripped[1:end]
-        rest = stripped[end + 1 :].lstrip()
-        if rest.startswith(":"):
+    i = 0
+    while True:
+        q = body.find('"', i)
+        if q < 0:
+            break
+        end = body.find('"', q + 1)
+        if end < 0:
+            break
+        name = body[q + 1 : end]
+        rest = body[end + 1 :].lstrip()
+        if rest.startswith(":") and name:
             names.append(name)
+        i = end + 1
     return frozenset(names)
+
+
+def _resolve_host_module(host_module: Any = None) -> Any:
+    if host_module is not None:
+        return host_module
+    mod = sys.modules.get("main") or sys.modules.get("__main__")
+    if mod is not None:
+        return mod
+    try:
+        import main as mod  # type: ignore
+        return mod
+    except Exception:
+        return None
 
 
 def load_allowed_methods(
@@ -110,12 +146,21 @@ def load_allowed_methods(
     """Allowlist from the DID file, or from the injected Candid hack on-canister."""
     blocked_set = frozenset(blocked)
     path = Path(did_path) if did_path is not None else _DID_PATH
+    did_text = None
     if path.is_file():
-        return parse_candid_methods(path.read_text()) - blocked_set
-    module = host_module if host_module is not None else sys.modules.get("main")
-    hack = getattr(module, "__get_candid_interface_tmp_hack", None) if module else None
-    if callable(hack):
-        return parse_candid_methods(hack()) - blocked_set
+        try:
+            did_text = path.read_text()
+        except Exception:
+            did_text = None
+    if not did_text:
+        module = _resolve_host_module(host_module)
+        hack = getattr(module, "__get_candid_interface_tmp_hack", None) if module else None
+        if callable(hack):
+            did_text = hack()
+    if did_text:
+        names = parse_candid_methods(did_text) - blocked_set
+        if names:
+            return names
     raise RpcError("Candid interface not found; host RPC disabled")
 
 
@@ -179,7 +224,7 @@ class HostSecureORM(SecureORM):
         return list(super().actions()) + list(HOST_ACTIONS)
 
     def allowed_methods(self) -> FrozenSet[str]:
-        if self._allowed_methods is None:
+        if not self._allowed_methods:
             self._allowed_methods = load_allowed_methods(
                 self._did_path,
                 self._blocked_methods,
@@ -187,26 +232,13 @@ class HostSecureORM(SecureORM):
             )
         return self._allowed_methods - self._blocked_methods
 
-    def _ensure_sandbox_hash(self) -> None:
-        """Hash stub source even when this image has no ``sb.sha256``."""
-        if self._sandbox_hash:
-            return
-        import _basilisk_sandbox as sb
-        from core.runtime_sandbox import _content_hash
-
-        self._sandbox_hash = _content_hash(self._stub_source)
-        approve = getattr(sb, "approve_hash", None)
-        if callable(approve):
-            approve(self._sandbox_hash)
-
-    def shell(self, code: str) -> str:
-        self._ensure_sandbox_hash()
-        return super().shell(code)
-
     def host_module(self) -> Any:
         if self._host_module is not None:
             return self._host_module
-        return sys.modules.get("main")
+        resolved = _resolve_host_module()
+        if resolved is not None:
+            self._host_module = resolved
+        return resolved
 
     def handle_rpc(self, principal_id: str, action: str, kwargs: dict) -> Any:
         kwargs = dict(kwargs or {})

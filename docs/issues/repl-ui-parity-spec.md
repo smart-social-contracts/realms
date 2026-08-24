@@ -105,7 +105,7 @@ Host RPCs **must not** run Cedar with `context.repl`. Extension work still goes 
 - `__shell__` cannot be called through `host.call`.
 - `AccessDenied` from a host method surfaces as `PermissionError`.
 - `actions()` includes `host.*` and `orm.*`, length ≤ 32.
-- Stub source defines `api` / `ext` and wraps `eval_repl` so they persist in `_repl_ns`.
+- Stub source defines `api` / `ext` on `__builtins__` (and wraps `eval_repl`) so they work even when basilisk binds the first `eval_repl` and `rpc` is a builtin.
 - Same principal + args → host dispatch vs direct Candid function → identical result (unit: fake `main` module).
 
 ---

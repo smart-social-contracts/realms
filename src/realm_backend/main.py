@@ -329,6 +329,7 @@ def _init_secure_orm():
         principal_type="User",
         principal_entity=ggg.User,
         shell_context={"repl": True},
+        host_module=sys.modules[__name__],
     )
 
 

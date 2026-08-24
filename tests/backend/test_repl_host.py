@@ -114,6 +114,12 @@ class TestDidAllowlist:
         assert "http_request" in methods
         assert "__get_candid_interface_tmp_hack" in methods
 
+    def test_parses_inline_one_line_service_block(self):
+        did = 'service : { "status" : () -> (text) query; "__shell__" : (text) -> (text); }'
+        names = parse_candid_methods(did)
+        assert "status" in names
+        assert "__shell__" in names
+
     def test_blocked_names_are_the_recursion_and_http_surface(self):
         assert BLOCKED_METHODS == {
             "__shell__",
@@ -240,34 +246,50 @@ class TestSandboxSurface:
         src = orm.stub_source()
         assert "class api:" in src
         assert "class ext:" in src
-        assert "rpc(\"host.call\"" in src
+        assert "host.call" in src
         assert HOST_STUB_APPENDIX.strip() in src
         assert "_eval_repl_inner = eval_repl" in src
-        assert 'ns["api"] = api' in src
-        assert 'ns["ext"] = ext' in src
+        assert 'b["api"] = api' in src
+        assert 'b["ext"] = ext' in src
 
     def test_host_appendix_execs_with_rpc_injected(self):
-        ns = {"rpc": lambda *a, **k: None, "eval_repl": lambda code: ""}
+        import builtins as _builtins
+
+        calls = []
+
+        def rpc(*a, **k):
+            calls.append((a, k))
+            return ["status"]
+
+        b = dict(vars(_builtins))
+        b["rpc"] = rpc
+        ns = {"eval_repl": lambda code: "", "__builtins__": b}
         exec(HOST_STUB_APPENDIX, ns)
-        assert ns["api"].methods() is None
-        assert ns["ext"].call("voting", "cast_vote", {"proposal_id": "p1"}) is None
+        assert ns["api"].methods() == ["status"]
+        assert calls[0][0] == ("host.list_methods",)
+        assert ns["ext"].call("voting", "cast_vote", {"proposal_id": "p1"}) == ["status"]
 
-    def test_ensure_sandbox_hash_without_sha256(self, monkeypatch):
-        import hashlib
-        import types
+    def test_api_works_when_eval_repl_does_not_wrap(self):
+        """Basilisk may bind the first eval_repl; api still lives on builtins."""
+        import builtins as _builtins
 
-        approved = []
+        def rpc(*a, **k):
+            return ["status", "extension_sync_call"]
 
-        class NoSha256:
-            def approve_hash(self, h):
-                approved.append(h)
+        b = dict(vars(_builtins))
+        b["rpc"] = rpc
+        inner_ns = {"rpc": None, "__builtins__": b}
 
-        monkeypatch.setitem(sys.modules, "_basilisk_sandbox", NoSha256())
-        orm = _orm()
-        orm._ensure_sandbox_hash()
-        expected = hashlib.sha256(orm._stub_source.encode("utf-8")).hexdigest()
-        assert orm._sandbox_hash == expected
-        assert approved == [expected]
+        def inner_eval_repl(code):
+            return eval(code, inner_ns, inner_ns)
+
+        g = {"eval_repl": inner_eval_repl, "__builtins__": b}
+        exec(HOST_STUB_APPENDIX, g)
+        assert eval("api.methods()", inner_ns, inner_ns) == [
+            "status",
+            "extension_sync_call",
+        ]
+        assert eval("ext.call('system_info', 'get_public_info', {})", inner_ns, inner_ns)
 
     def test_json_args_matches_spa(self):
         assert json_args(None) == "{}"
