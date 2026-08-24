@@ -116,7 +116,7 @@
 	}
 </script>
 
-<details class="sidebar-details" use:detailsRoot={open}>
+<details class="sidebar-details" class:is-open={open} use:detailsRoot={open}>
 	<summary class="fold-summary {summaryClass}">
 		<slot name="header" />
 	</summary>
@@ -134,12 +134,19 @@
 	.fold-summary::-webkit-details-marker {
 		display: none;
 	}
+	/* Chrome 131+ wraps details bodies in ::details-content { height: 0 }.
+	   1fr then resolves to 0px and the fold never opens. Neutralize that. */
+	.sidebar-details::details-content {
+		height: auto;
+		overflow: hidden;
+		content-visibility: visible;
+	}
 	.fold {
 		display: grid;
 		grid-template-rows: 0fr;
 		transition: grid-template-rows 200ms ease-out;
 	}
-	.sidebar-details.is-open .fold {
+	.sidebar-details:global(.is-open) > .fold {
 		grid-template-rows: 1fr;
 	}
 	.fold-inner {

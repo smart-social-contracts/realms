@@ -11,9 +11,16 @@ describe('sidebar fold animation', () => {
 	it('animates height from an is-open class, not the native open attribute', () => {
 		expect(fold).toContain('grid-template-rows: 0fr');
 		expect(fold).toContain('transition: grid-template-rows 200ms ease-out');
-		expect(fold).toContain('.sidebar-details.is-open .fold');
+		expect(fold).toContain('.sidebar-details:global(.is-open) > .fold');
+		expect(fold).toContain('class:is-open={open}');
 		expect(fold).toContain('grid-template-rows: 1fr');
 		expect(fold).not.toMatch(/\.sidebar-details\[open\]\s+\.fold/);
+	});
+
+	it('overrides Chrome ::details-content so 1fr can resolve to content height', () => {
+		expect(fold).toContain('.sidebar-details::details-content');
+		expect(fold).toContain('content-visibility: visible');
+		expect(fold).toMatch(/::details-content[^{]*\{[^}]*height:\s*auto/);
 	});
 
 	it('rotates the chevron on both open and close', () => {
