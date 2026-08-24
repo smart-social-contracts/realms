@@ -34,7 +34,6 @@ sys.path.insert(0, BACKEND)
 
 from core import cedar_authz  # noqa: E402
 from core.cedar_policies import POLICIES  # noqa: E402
-from core.repl_host import HostSecureORM  # noqa: E402
 
 _main = None
 
@@ -150,7 +149,9 @@ class TestEmbeddedCedarArtifacts:
 class TestSecureOrmWiring:
     def test_secure_orm_shares_engine_and_shell_context(self, main_module):
         assert main_module.secure_orm is not None
-        assert isinstance(main_module.secure_orm, HostSecureORM)
+        from core.repl_host import HostSecureORM as LiveHostSecureORM
+
+        assert isinstance(main_module.secure_orm, LiveHostSecureORM)
         _sync_orm_engine(main_module.secure_orm)
         assert main_module.secure_orm.engine is cedar_authz._get_engine()
         assert main_module.secure_orm._shell_context == {"repl": True}
@@ -249,8 +250,8 @@ class TestSecureOrmLazyInit:
                 raise ValueError("principal type 'User' is not among the entity types")
 
             monkeypatch.setattr(main_module, "_init_secure_orm", fail)
-            with pytest.raises(RuntimeError, match="ValueError: principal type"):
-                main_module.__shell__("1+1")
+            assert main_module._try_init_secure_orm() is None
+            assert "ValueError: principal type" in main_module._secure_orm_error
         finally:
             main_module.secure_orm = saved
             main_module._secure_orm_error = saved_err
