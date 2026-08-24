@@ -34,7 +34,6 @@ sys.path.insert(0, BACKEND)
 
 from core import cedar_authz  # noqa: E402
 from core.cedar_policies import POLICIES  # noqa: E402
-from core.repl_host import HostSecureORM  # noqa: E402
 
 _main = None
 
@@ -150,7 +149,9 @@ class TestEmbeddedCedarArtifacts:
 class TestSecureOrmWiring:
     def test_secure_orm_shares_engine_and_shell_context(self, main_module):
         assert main_module.secure_orm is not None
-        assert isinstance(main_module.secure_orm, HostSecureORM)
+        from core.repl_host import HostSecureORM as LiveHostSecureORM
+
+        assert isinstance(main_module.secure_orm, LiveHostSecureORM)
         _sync_orm_engine(main_module.secure_orm)
         assert main_module.secure_orm.engine is cedar_authz._get_engine()
         assert main_module.secure_orm._shell_context == {"repl": True}
@@ -216,3 +217,41 @@ class TestHandleRpc:
         assert result["amount"] == 42
         assert fake.requests
         assert fake.requests[-1]["context"] == {"repl": True}
+
+
+class TestSecureOrmLazyInit:
+    def test_retries_after_import_time_failure(self, main_module, monkeypatch):
+        saved = main_module.secure_orm
+        saved_err = main_module._secure_orm_error
+
+        class FakeOrm:
+            def shell(self, code):
+                return "ok\n"
+
+        try:
+            main_module.secure_orm = None
+            main_module._secure_orm_error = "ImportError: earlier"
+            monkeypatch.setattr(main_module, "_init_secure_orm", FakeOrm)
+            assert main_module._try_init_secure_orm() is not None
+            assert main_module.secure_orm is not None
+            assert main_module._secure_orm_error == ""
+        finally:
+            main_module.secure_orm = saved
+            main_module._secure_orm_error = saved_err
+
+    def test_shell_surfaces_init_error(self, main_module, monkeypatch):
+        saved = main_module.secure_orm
+        saved_err = main_module._secure_orm_error
+        try:
+            main_module.secure_orm = None
+            main_module._secure_orm_error = ""
+
+            def fail():
+                raise ValueError("principal type 'User' is not among the entity types")
+
+            monkeypatch.setattr(main_module, "_init_secure_orm", fail)
+            assert main_module._try_init_secure_orm() is None
+            assert "ValueError: principal type" in main_module._secure_orm_error
+        finally:
+            main_module.secure_orm = saved
+            main_module._secure_orm_error = saved_err

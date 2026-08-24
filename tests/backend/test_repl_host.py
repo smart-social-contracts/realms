@@ -41,6 +41,7 @@ from core.repl_host import (  # noqa: E402
     json_args,
     load_allowed_methods,
     parse_candid_methods,
+    _default_did_path,
 )
 
 
@@ -143,6 +144,13 @@ class TestDidAllowlist:
     def test_missing_did_and_hack_raises(self, tmp_path):
         with pytest.raises(RpcError, match="Candid interface not found"):
             load_allowed_methods(tmp_path / "missing.did", host_module=SimpleNamespace())
+
+    def test_did_path_without_file(self, monkeypatch):
+        import core.repl_host as rh
+
+        monkeypatch.delitem(rh.__dict__, "__file__", raising=False)
+        path = _default_did_path()
+        assert path.name == "realm_backend.did"
 
 
 class TestHostDispatch:

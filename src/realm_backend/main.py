@@ -296,31 +296,13 @@ def setup_gate_error(caller: str):
 
 def _init_secure_orm():
     """Build the Cedar-gated ORM singleton for the sandboxed REPL (realms#313)."""
-    from ic_python_db import Entity
-    from ic_python_db.schema import build_schema
+    from core.cedar_schema_runtime import collect_ggg_schema_entities
     from core.repl_host import HostSecureORM
 
     import ggg
     from core import cedar_authz
 
-    candidates = [
-        getattr(ggg, name)
-        for name in ggg.__all__
-        if isinstance(getattr(ggg, name), type)
-        and issubclass(getattr(ggg, name), Entity)
-    ]
-    included = []
-    for cls in candidates:
-        try:
-            build_schema({cls.__name__: cls})
-        except Exception as exc:
-            logger.warning(
-                f"secure_orm: excluding {cls.__name__} from REPL stubs: {exc}"
-            )
-            continue
-        included.append(cls)
-
-    schema = build_schema({cls.__name__: cls for cls in included})
+    included, schema = collect_ggg_schema_entities()
     return HostSecureORM(
         engine=cedar_authz._get_engine(),
         namespace="Realm",
@@ -333,13 +315,27 @@ def _init_secure_orm():
     )
 
 
+secure_orm = None
 _secure_orm_error = ""
-try:
-    secure_orm = _init_secure_orm()
-except Exception as exc:
-    _secure_orm_error = f"{type(exc).__name__}: {exc}"
-    logger.warning(f"secure_orm unavailable: {exc}")
-    secure_orm = None
+
+
+def _try_init_secure_orm():
+    """Eager at import; retried on first ``__shell__`` if import-time failed."""
+    global secure_orm, _secure_orm_error
+    if secure_orm is not None:
+        return secure_orm
+    try:
+        secure_orm = _init_secure_orm()
+        _secure_orm_error = ""
+        return secure_orm
+    except Exception as exc:
+        _secure_orm_error = f"{type(exc).__name__}: {exc}"
+        logger.warning(f"secure_orm unavailable: {_secure_orm_error}")
+        secure_orm = None
+        return None
+
+
+_try_init_secure_orm()
 
 # HTTP types used by http_transform endpoint
 from _cdk import (
@@ -5126,11 +5122,12 @@ def __shell__(code: str) -> str:
     """Sandboxed REPL. Product surface is ``api.call`` / ``ext.call`` (same
     host methods and gates as the UI). Entity stubs remain Cedar-gated.
     """
-    if secure_orm is None:
+    orm = _try_init_secure_orm()
+    if orm is None:
         raise RuntimeError(
-            f"secure_orm is not available in this build: {_secure_orm_error}"
+            f"secure_orm is not available: {_secure_orm_error or 'unknown init failure'}"
         )
-    return secure_orm.shell(code)
+    return orm.shell(code)
 
 
 # Removed endpoints (use __shell__ + basilisk shell commands instead):

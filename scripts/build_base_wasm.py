@@ -73,6 +73,10 @@ _CEDAR_TEMPLATE_URL = (
     "cpython-wasm-3.13.0-ic1/cpython_canister_template_cedar.wasm"
 )
 
+# C symbol for _basilisk_sandbox.sha256 (basilisk_sandbox.c). Templates built
+# before this export cannot hash spawn sources and must not be used for Realms.
+_SANDBOX_SHA256_SYMBOL = b"sandbox_sha256"
+
 
 def _cedar_template_path() -> str:
     """Fetch the Cedar template to a local cache and return its path."""
@@ -85,6 +89,21 @@ def _cedar_template_path() -> str:
         print(f"   ⬇️  fetching Cedar template: {_CEDAR_TEMPLATE_URL}")
         urllib.request.urlretrieve(_CEDAR_TEMPLATE_URL, dest)
     return str(dest)
+
+
+def _require_sandbox_sha256_template(template_path: str) -> None:
+    """Refuse to build on a Cedar template that lacks _basilisk_sandbox.sha256."""
+    path = Path(template_path)
+    if not path.is_file():
+        raise SystemExit(f"BASILISK_TEMPLATE_WASM not found: {template_path}")
+    if _SANDBOX_SHA256_SYMBOL not in path.read_bytes():
+        raise SystemExit(
+            f"BASILISK template {template_path} predates _basilisk_sandbox.sha256 "
+            f"(missing C symbol {_SANDBOX_SHA256_SYMBOL!r}). Rebuild the Cedar "
+            f"template from current basilisk (ic-basilisk >= 0.14.2) and point "
+            f"BASILISK_TEMPLATE_WASM at it, or delete the cached template so a "
+            f"fresh one is fetched."
+        )
 
 
 # ── Stub source — must stay in sync with what ─────────────────────────────────
@@ -192,6 +211,7 @@ def _run_basilisk(repo_root: Path, *, dry_run: bool) -> Path:
     if not env.get("BASILISK_TEMPLATE_WASM"):
         env["BASILISK_TEMPLATE_WASM"] = _cedar_template_path()
         print(f"   🌲 template: {env['BASILISK_TEMPLATE_WASM']}")
+    _require_sandbox_sha256_template(env["BASILISK_TEMPLATE_WASM"])
 
     rc = subprocess.run(cmd, cwd=str(repo_root), env=env).returncode
     if rc != 0:

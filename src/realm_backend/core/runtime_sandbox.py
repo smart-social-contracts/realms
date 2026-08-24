@@ -162,11 +162,10 @@ _config_cache: Optional[dict] = None
 def is_sandbox_available() -> bool:
     """True when the running WASM image ships the sandbox primitive."""
     try:
-        import _basilisk_sandbox  # noqa: F401
-
-        return True
+        import _basilisk_sandbox
     except ImportError:
         return False
+    return callable(getattr(_basilisk_sandbox, "sha256", None))
 
 
 # ---------------------------------------------------------------------------

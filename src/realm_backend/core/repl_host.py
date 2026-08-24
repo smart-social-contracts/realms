@@ -34,7 +34,10 @@ BLOCKED_METHODS = frozenset(
 )
 
 def _default_did_path() -> Path:
-    """DID path for tests; the canister has no filesystem copy of the file."""
+    """DID path for tests. Basilisk execs modules with no ``__file__``."""
+    here = globals().get("__file__")
+    if here:
+        return Path(here).parent.parent / "realm_backend.did"
     try:
         return Path(__file__).parent.parent / "realm_backend.did"
     except Exception:
@@ -147,11 +150,11 @@ def load_allowed_methods(
     blocked_set = frozenset(blocked)
     path = Path(did_path) if did_path is not None else _DID_PATH
     did_text = None
-    if path.is_file():
-        try:
+    try:
+        if path.is_file():
             did_text = path.read_text()
-        except Exception:
-            did_text = None
+    except OSError:
+        did_text = None
     if not did_text:
         module = _resolve_host_module(host_module)
         hack = getattr(module, "__get_candid_interface_tmp_hack", None) if module else None

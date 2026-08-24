@@ -76,6 +76,39 @@ def clear_config_cache(monkeypatch):
     monkeypatch.setattr(runtime_sandbox, "_config_cache", None, raising=False)
 
 
+# ---------------------------------------------------------------------------
+# Availability probe (is_sandbox_available)
+# ---------------------------------------------------------------------------
+
+
+def test_is_sandbox_available_false_when_module_missing(monkeypatch):
+    import builtins
+
+    monkeypatch.delitem(sys.modules, "_basilisk_sandbox", raising=False)
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "_basilisk_sandbox":
+            raise ImportError("no sandbox primitive")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    assert runtime_sandbox.is_sandbox_available() is False
+
+
+def test_is_sandbox_available_false_without_sha256(monkeypatch):
+    class NoSha256:
+        pass
+
+    monkeypatch.setitem(sys.modules, "_basilisk_sandbox", NoSha256())
+    assert runtime_sandbox.is_sandbox_available() is False
+
+
+def test_is_sandbox_available_true_with_sha256(fake_sandbox):
+    fake_sandbox()
+    assert runtime_sandbox.is_sandbox_available() is True
+
+
 def _budget(patch):
     """Force a specific instruction budget into the policy cache."""
     config = dict(runtime_sandbox.DEFAULT_CONFIG)
