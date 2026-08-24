@@ -1,5 +1,11 @@
 # Agents Guide — Realms
 
+## Do not deploy without confirmation
+
+**Do not deploy automatically.** The human triggers all deployments.
+
+If a change needs a deployment to take effect or to be verified, state that clearly in your reply (what, where, and why) and wait for explicit confirmation before running any deploy, install, upgrade, reinstall, rollout, seed, or publish-to-canister command. The how-to below is for after that confirmation — not permission to deploy on your own.
+
 ## Model Selection
 
 Preferred models for agents working in this repo:
@@ -1461,7 +1467,8 @@ until updated manually or re-provisioned.
 
 ## Rules
 
-- **Default deploy path for sheet realms** (Agora, Dominion, Syntropia): `realms
+- **Do not deploy without confirmation.** See [Do not deploy without confirmation](#do-not-deploy-without-confirmation). If a deployment is needed, state it clearly and wait.
+- **Default deploy path for sheet realms** (Agora, Dominion, Syntropia) — **when the human has confirmed a deploy**: `realms
   mundus deploy` with `--version build` (~90s) **only if the installer is healthy**.
   For a wizard/portal realm (`/r/<slug>/`) or when the user says **fast off-chain**,
   use [direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer)
@@ -1472,7 +1479,7 @@ until updated manually or re-provisioned.
   source in this repo is no longer possible**. **Other infra:** `scripts/infra_dev_deploy.sh`
   or `publish_build.py` for file_registry, marketplace, dashboard. **Extensions:**
   `deploy-files.yml` to publish bundles into the file registry.
-- **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
+- **Visually verify every UI change before reporting back.** After a **confirmed** frontend or extension deploy, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix the code and ask for confirmation before deploying again.
 - **Do not commit, create a branch, or open a PR unless the user explicitly
   asks.** Operational work (redeploys, `__shell__`, live checks) stays on the
   current checkout. Docs or code edits wait for an explicit “commit / branch /
