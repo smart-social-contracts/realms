@@ -60,7 +60,6 @@ count enforced inside the interpreter loop (0 disables it). Images predating the
 extended spawn signature run unmetered — see ``supports_capabilities()``.
 """
 
-import hashlib
 import json
 import os
 from typing import Any, Dict, List, Optional
@@ -544,19 +543,12 @@ def supports_capabilities() -> Optional[bool]:
 def _content_hash(source: str) -> str:
     """SHA-256 hex digest of *source* for ``approve_hash`` / spawn.
 
-    Prefer ``_basilisk_sandbox.sha256`` when the WASM image exposes it; older
-    images ship spawn/approve without a Python ``sha256`` helper, so fall back
-    to ``hashlib`` (same UTF-8 bytes as ``basilisk_sandbox.c``).
+    Uses Basilisk C ``_basilisk_sandbox.sha256`` only. Missing ``sha256``
+    raises ``AttributeError`` — it is not a missing hook.
     """
     import _basilisk_sandbox
 
-    sha256_fn = getattr(_basilisk_sandbox, "sha256", None)
-    if callable(sha256_fn):
-        return sha256_fn(source)
-    logger.warning(
-        "_basilisk_sandbox.sha256 unavailable; falling back to hashlib"
-    )
-    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+    return _basilisk_sandbox.sha256(source)
 
 
 def _spawn_subinterpreter(
