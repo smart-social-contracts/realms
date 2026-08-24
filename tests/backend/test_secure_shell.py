@@ -1,4 +1,4 @@
-"""SecureORM wiring and REPL Cedar policy tests (realms#282)."""
+"""SecureORM wiring and REPL Cedar policy tests (realms#282, realms#313)."""
 
 import os
 import sys
@@ -34,6 +34,7 @@ sys.path.insert(0, BACKEND)
 
 from core import cedar_authz  # noqa: E402
 from core.cedar_policies import POLICIES  # noqa: E402
+from core.repl_host import HostSecureORM  # noqa: E402
 
 _main = None
 
@@ -149,6 +150,7 @@ class TestEmbeddedCedarArtifacts:
 class TestSecureOrmWiring:
     def test_secure_orm_shares_engine_and_shell_context(self, main_module):
         assert main_module.secure_orm is not None
+        assert isinstance(main_module.secure_orm, HostSecureORM)
         _sync_orm_engine(main_module.secure_orm)
         assert main_module.secure_orm.engine is cedar_authz._get_engine()
         assert main_module.secure_orm._shell_context == {"repl": True}
@@ -158,14 +160,21 @@ class TestSecureOrmWiring:
         # so per-entity verbs are not feasible); the _entity kwarg selects
         # the class at dispatch time.
         actions = set(main_module.secure_orm.actions())
-        assert actions == {
+        assert {
             "orm.create",
             "orm.list",
             "orm.get",
             "orm.update",
             "orm.delete",
             "orm.count",
-        }
+        } <= actions
+        assert {
+            "host.call",
+            "host.ext_sync",
+            "host.ext_async",
+            "host.list_methods",
+        } <= actions
+        assert len(actions) <= 32
         for entity in ("User", "Balance", "Proposal"):
             assert entity in main_module.secure_orm._name_map
 

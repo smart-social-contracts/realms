@@ -295,10 +295,10 @@ def setup_gate_error(caller: str):
 
 
 def _init_secure_orm():
-    """Build the Cedar-gated ORM singleton for the sandboxed REPL (realms#282)."""
+    """Build the Cedar-gated ORM singleton for the sandboxed REPL (realms#313)."""
     from ic_python_db import Entity
     from ic_python_db.schema import build_schema
-    from ic_basilisk_toolkit.secure_orm import SecureORM
+    from core.repl_host import HostSecureORM
 
     import ggg
     from core import cedar_authz
@@ -321,7 +321,7 @@ def _init_secure_orm():
         included.append(cls)
 
     schema = build_schema({cls.__name__: cls for cls in included})
-    return SecureORM(
+    return HostSecureORM(
         engine=cedar_authz._get_engine(),
         namespace="Realm",
         entities=included,
@@ -5120,10 +5120,8 @@ def http_transform(args: HttpTransformArgs) -> HttpResponse:
 @update
 @require(Operations.SHELL_EXECUTE)
 def __shell__(code: str) -> str:
-    """Run code in a sandboxed subinterpreter REPL with ORM-like stubs.
-
-    Mutations cross the trust boundary only through typed RPC actions, each
-    checked by Cedar with ``context.repl`` before touching entity storage.
+    """Sandboxed REPL. Product surface is ``api.call`` / ``ext.call`` (same
+    host methods and gates as the UI). Entity stubs remain Cedar-gated.
     """
     if secure_orm is None:
         raise RuntimeError("secure_orm is not available in this build")
