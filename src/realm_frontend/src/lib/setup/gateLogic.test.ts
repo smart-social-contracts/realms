@@ -17,11 +17,26 @@ const settledAuthorized = {
 };
 
 describe('shouldShowSetupLoading', () => {
-	it('shows loading while gate input is loading', () => {
+	it('does not show setup loading on a live-realm path while probing', () => {
 		expect(
 			shouldShowSetupLoading({
 				loading: true,
-				status: 'setup',
+				status: null,
+				unknownStatusFailures: 0,
+				isAuthenticated: false,
+				isCallerAuthorized: false,
+				authChannelSettled: false,
+				setupStateLoaded: false,
+				pathname: '/'
+			})
+		).toBe(false);
+	});
+
+	it('shows loading on /setup while setup status is still unknown', () => {
+		expect(
+			shouldShowSetupLoading({
+				loading: true,
+				status: null,
 				unknownStatusFailures: 0,
 				isAuthenticated: false,
 				isCallerAuthorized: false,
@@ -71,10 +86,20 @@ describe('shouldShowSetupLoading', () => {
 			})
 		).toBe(false);
 	});
+
+	it('does not flash the setup skeleton during a later refresh of known setup', () => {
+		expect(
+			shouldShowSetupLoading({
+				...settledAuthorized,
+				loading: true,
+				pathname: '/'
+			})
+		).toBe(false);
+	});
 });
 
 describe('resolveSetupGate', () => {
-	it('shows loading while gate input is loading', () => {
+	it('lets a live realm embed paint while setup status is still unknown', () => {
 		expect(
 			resolveSetupGate({
 				loading: true,
@@ -85,6 +110,21 @@ describe('resolveSetupGate', () => {
 				authChannelSettled: false,
 				setupStateLoaded: false,
 				pathname: '/'
+			})
+		).toEqual({ kind: 'normal' });
+	});
+
+	it('shows loading on /setup while gate input is probing', () => {
+		expect(
+			resolveSetupGate({
+				loading: true,
+				status: null,
+				unknownStatusFailures: 0,
+				isAuthenticated: false,
+				isCallerAuthorized: false,
+				authChannelSettled: false,
+				setupStateLoaded: false,
+				pathname: '/setup'
 			})
 		).toEqual({ kind: 'loading' });
 	});
@@ -164,6 +204,21 @@ describe('resolveSetupGate', () => {
 		).toEqual({ kind: 'loading' });
 	});
 
+	it('holds the setup skeleton on / once status is known to be setup', () => {
+		expect(
+			resolveSetupGate({
+				loading: false,
+				status: 'setup',
+				unknownStatusFailures: 0,
+				isAuthenticated: true,
+				isCallerAuthorized: false,
+				authChannelSettled: false,
+				setupStateLoaded: false,
+				pathname: '/'
+			})
+		).toEqual({ kind: 'loading' });
+	});
+
 	it('allows join flow during setup', () => {
 		expect(
 			resolveSetupGate({
@@ -174,6 +229,21 @@ describe('resolveSetupGate', () => {
 				isCallerAuthorized: false,
 				authChannelSettled: true,
 				setupStateLoaded: true,
+				pathname: '/join'
+			})
+		).toEqual({ kind: 'normal' });
+	});
+
+	it('does not paint the setup skeleton on /join while probing', () => {
+		expect(
+			resolveSetupGate({
+				loading: true,
+				status: null,
+				unknownStatusFailures: 0,
+				isAuthenticated: false,
+				isCallerAuthorized: false,
+				authChannelSettled: false,
+				setupStateLoaded: false,
 				pathname: '/join'
 			})
 		).toEqual({ kind: 'normal' });
@@ -197,7 +267,7 @@ describe('resolveSetupGate', () => {
 		).toEqual({ kind: 'setup_wizard' });
 	});
 
-	it('shows loading for unknown status with no failures yet', () => {
+	it('does not block a live path on unknown setup status', () => {
 		expect(
 			resolveSetupGate({
 				loading: false,
@@ -209,10 +279,22 @@ describe('resolveSetupGate', () => {
 				setupStateLoaded: true,
 				pathname: '/'
 			})
-		).toEqual({ kind: 'loading' });
+		).toEqual({ kind: 'normal' });
 	});
 
-	it('shows loading for unknown status with one failure', () => {
+	it('keeps probing unknown status on /setup until the fail-open cap', () => {
+		expect(
+			resolveSetupGate({
+				loading: false,
+				status: null,
+				unknownStatusFailures: 0,
+				isAuthenticated: true,
+				isCallerAuthorized: true,
+				authChannelSettled: true,
+				setupStateLoaded: true,
+				pathname: '/setup'
+			})
+		).toEqual({ kind: 'loading' });
 		expect(
 			resolveSetupGate({
 				loading: false,
@@ -222,12 +304,9 @@ describe('resolveSetupGate', () => {
 				isCallerAuthorized: true,
 				authChannelSettled: true,
 				setupStateLoaded: true,
-				pathname: '/'
+				pathname: '/setup'
 			})
 		).toEqual({ kind: 'loading' });
-	});
-
-	it('shows loading for unknown status with two failures', () => {
 		expect(
 			resolveSetupGate({
 				loading: false,
@@ -237,7 +316,7 @@ describe('resolveSetupGate', () => {
 				isCallerAuthorized: true,
 				authChannelSettled: true,
 				setupStateLoaded: true,
-				pathname: '/'
+				pathname: '/setup'
 			})
 		).toEqual({ kind: 'loading' });
 	});

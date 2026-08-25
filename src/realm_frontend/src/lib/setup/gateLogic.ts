@@ -34,15 +34,26 @@ function isSetupPath(pathname: string): boolean {
 	return pathname === SETUP_PATH || pathname.startsWith(`${SETUP_PATH}/`);
 }
 
+function isInSetupFlow(input: ResolveSetupGateInput): boolean {
+	if (isJoinPath(input.pathname)) return false;
+	return input.status === 'setup' || isSetupPath(input.pathname);
+}
+
 /**
- * True while setup gate must not show anonymous/unauthorized copy yet.
- * Keeps a neutral loading state until auth + setup state have settled.
+ * True while the setup skeleton / gate must hold instead of the live app.
+ *
+ * Ordinary boot of a live realm (portal embed at `/`, unknown or non-setup
+ * status) is not a setup flow — do not paint "Loading setup…". Keep the
+ * skeleton only when the visitor is already on `/setup` or we already know
+ * the realm is in setup, and auth + setup state have not settled yet.
  */
 export function shouldShowSetupLoading(input: ResolveSetupGateInput): boolean {
-	if (input.loading) return true;
-	if (input.status === null && input.unknownStatusFailures < MAX_UNKNOWN_SETUP_ATTEMPTS) {
-		return true;
+	if (!isInSetupFlow(input)) return false;
+
+	if (input.status === null) {
+		return input.unknownStatusFailures < MAX_UNKNOWN_SETUP_ATTEMPTS;
 	}
+
 	if (input.status !== 'setup') return false;
 	if (!input.authChannelSettled) return true;
 	if (!input.setupStateLoaded) return true;
