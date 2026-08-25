@@ -6,7 +6,7 @@
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
 	import DelegationBanner from '$lib/components/DelegationBanner.svelte';
 	import PageBreadcrumb from '$lib/components/PageBreadcrumb.svelte';
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
@@ -14,6 +14,8 @@
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { loadNotifications } from '$lib/stores/notifications';
 	import { hostActionEvents, documentFocus } from '$lib/host-bridge';
+	import { sidebarConfig } from '$lib/stores/sidebar';
+	import { resolveHomePath } from '$lib/utils/home-path';
 	import { portalFocusPush, portalAssistantOpen, isEmbeddedInPortal } from '$lib/portal-bridge.ts';
 	import { realmInfo } from '$lib/stores/realmInfo';
 	import {
@@ -127,10 +129,18 @@
 
 			// Chat UI lives on the mundus RegistryAssistant. When embedded in the
 			// portal, forward assistant.open to the parent; otherwise ignore.
+			// navigate.home is resolved here from the sidebar default path so
+			// extensions never name the member-home extension.
 			const unsubHostActions = hostActionEvents.subscribe((event) => {
-				if (event?.action.type !== 'assistant.open') return;
-				if (embeddedInPortal) {
-					portalAssistantOpen();
+				if (!event) return;
+				if (event.action.type === 'assistant.open') {
+					if (embeddedInPortal) {
+						portalAssistantOpen();
+					}
+					return;
+				}
+				if (event.action.type === 'navigate.home') {
+					void goto(resolveHomePath(get(sidebarConfig)));
 				}
 			});
 
