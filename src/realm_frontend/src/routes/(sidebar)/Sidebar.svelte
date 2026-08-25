@@ -54,26 +54,37 @@
 		);
 	}
 
-	let collapsedCategories: Set<string> = new Set();
+	// Bindable open flags (false = collapsed). `bind:open` needs a property,
+	// not a function result — a one-way `open={fn()}` plus an on-prefixed
+	// callback never flipped the child's `open` prop on tap.
+	let foldOpen: Record<string, boolean> = {
+		__section_me__: false,
+		__section_realm__: false,
+		__section_mundus__: false,
+	};
 	let categoriesInitialized = false;
 	let knownCategoryIds = new Set<string>();
 
-	function defaultCollapsedCategories(config: SidebarConfig): Set<string> {
-		const ids = new Set<string>(['__section_me__', '__section_realm__']);
+	function defaultFoldOpen(config: SidebarConfig): Record<string, boolean> {
+		const next: Record<string, boolean> = {
+			__section_me__: false,
+			__section_realm__: false,
+		};
 		if (config.mundusItems.length > 0) {
-			ids.add('__section_mundus__');
+			next.__section_mundus__ = false;
 		}
 		for (const category of config.categories) {
-			ids.add(category.id);
+			next[category.id] = false;
 		}
-		return ids;
+		return next;
 	}
 
-	function initCollapsedCategories(config: SidebarConfig) {
+	function initFoldOpen(config: SidebarConfig) {
 		if (!categoriesInitialized) {
 			categoriesInitialized = true;
 			knownCategoryIds = new Set(config.categories.map((category) => category.id));
-			collapsedCategories = defaultCollapsedCategories(config);
+			// Keep any tap that happened before get_sidebar resolved.
+			foldOpen = { ...defaultFoldOpen(config), ...foldOpen };
 			return;
 		}
 
@@ -81,12 +92,12 @@
 		for (const category of config.categories) {
 			if (!knownCategoryIds.has(category.id)) {
 				knownCategoryIds.add(category.id);
-				collapsedCategories.add(category.id);
+				foldOpen[category.id] = false;
 				changed = true;
 			}
 		}
 		if (changed) {
-			collapsedCategories = collapsedCategories;
+			foldOpen = foldOpen;
 		}
 	}
 
@@ -94,17 +105,8 @@
 
 	function setFoldOpen(id: string, nextOpen: boolean) {
 		userHasToggledFolds = true;
-		const next = new Set(collapsedCategories);
-		if (nextOpen) {
-			next.delete(id);
-		} else {
-			next.add(id);
-		}
-		collapsedCategories = next;
-	}
-
-	function sectionOpen(id: string): boolean {
-		return !collapsedCategories.has(id);
+		foldOpen[id] = nextOpen;
+		foldOpen = foldOpen;
 	}
 
 	// get_sidebar resolves visibility from the *caller's* user record, which in
@@ -167,10 +169,10 @@
 		// Always start from the folded default, then open only the sections that
 		// contain the current route. Avoids stale expanded categories from prior
 		// navigation or old localStorage entries.
-		const next = defaultCollapsedCategories(config);
+		const next = defaultFoldOpen(config);
 
 		if (topUtilityItems.some((item) => navIsActive(item.href, pathname, search))) {
-			next.delete('__section_me__');
+			next.__section_me__ = true;
 		}
 
 		const activeCategory = config.categories.find((category) =>
@@ -181,18 +183,18 @@
 			activeCategory;
 
 		if (inRealm) {
-			next.delete('__section_realm__');
+			next.__section_realm__ = true;
 		}
 
 		if (activeCategory) {
-			next.delete(activeCategory.id);
+			next[activeCategory.id] = true;
 		}
 
 		if (config.mundusItems.some((item) => navIsActive(item.href, pathname, search))) {
-			next.delete('__section_mundus__');
+			next.__section_mundus__ = true;
 		}
 
-		collapsedCategories = next;
+		foldOpen = next;
 	}
 
 	function scrollActiveIntoView() {
@@ -216,7 +218,7 @@
 	}
 
 	$: if ($sidebarConfig) {
-		initCollapsedCategories($sidebarConfig);
+		initFoldOpen($sidebarConfig);
 	}
 
 	// Expand the section that contains the current page, but only when the
@@ -333,7 +335,7 @@
 						</ul>
 					{:else}
 						<div class="pt-5 pb-1">
-							<SidebarFold open={sectionOpen('__section_me__')} onToggle={(nextOpen) => setFoldOpen('__section_me__', nextOpen)}>
+							<SidebarFold bind:open={foldOpen['__section_me__']} setOpen={(nextOpen) => setFoldOpen('__section_me__', nextOpen)}>
 								<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 									<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_ME}</h3>
 									<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 " fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
@@ -363,7 +365,7 @@
 						{/if}
 						{#if $sidebarConfig}
 							<div class="pt-3 pb-1">
-							<SidebarFold open={sectionOpen('__section_realm__')} onToggle={(nextOpen) => setFoldOpen('__section_realm__', nextOpen)}>
+							<SidebarFold bind:open={foldOpen['__section_realm__']} setOpen={(nextOpen) => setFoldOpen('__section_realm__', nextOpen)}>
 								<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 									<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_REALM}</h3>
 									<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 " fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
@@ -382,9 +384,9 @@
 								{#each $sidebarConfig.categories as category (category.id)}
 									<div class="pt-2 pb-1 px-3">
 									<SidebarFold
-										open={sectionOpen(category.id)}
+										bind:open={foldOpen[category.id]}
 										summaryClass="flex items-center justify-between w-full cursor-pointer bg-transparent p-0 group/cat"
-										onToggle={(nextOpen) => setFoldOpen(category.id, nextOpen)}
+										setOpen={(nextOpen) => setFoldOpen(category.id, nextOpen)}
 									>
 										<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 											<h3 class={styles.sidebar.categoryHeader()}>{category.label}</h3>
@@ -409,8 +411,8 @@
 							{#if $sidebarConfig.mundusItems.length > 0}
 								<div class="pt-3 pb-1">
 								<SidebarFold
-									open={sectionOpen('__section_mundus__')}
-									onToggle={(nextOpen) => setFoldOpen('__section_mundus__', nextOpen)}
+									bind:open={foldOpen['__section_mundus__']}
+									setOpen={(nextOpen) => setFoldOpen('__section_mundus__', nextOpen)}
 								>
 									<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 										<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_MUNDUS}</h3>
@@ -480,7 +482,7 @@
 			{:else}
 			<!-- ME section (super-category) -->
 			<div class="pt-5 lg:pt-3 pb-1">
-			<SidebarFold open={sectionOpen('__section_me__')} onToggle={(nextOpen) => setFoldOpen('__section_me__', nextOpen)}>
+			<SidebarFold bind:open={foldOpen['__section_me__']} setOpen={(nextOpen) => setFoldOpen('__section_me__', nextOpen)}>
 				<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 					<h3 class={styles.sidebar.sectionHeader()}>
 						{SECTION_HEADER_ME}
@@ -530,7 +532,7 @@
 			<!-- MY REALM section (super-category) -->
 			{#if $sidebarConfig}
 				<div class="pt-3 pb-1">
-				<SidebarFold open={sectionOpen('__section_realm__')} onToggle={(nextOpen) => setFoldOpen('__section_realm__', nextOpen)}>
+				<SidebarFold bind:open={foldOpen['__section_realm__']} setOpen={(nextOpen) => setFoldOpen('__section_realm__', nextOpen)}>
 					<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 						<h3 class={styles.sidebar.sectionHeader()}>
 							{SECTION_HEADER_REALM}
@@ -565,9 +567,9 @@
 					{#each $sidebarConfig.categories as category (category.id)}
 						<div class="pt-2 pb-1 px-3">
 						<SidebarFold
-							open={sectionOpen(category.id)}
+							bind:open={foldOpen[category.id]}
 							summaryClass="flex items-center justify-between w-full cursor-pointer bg-transparent p-0 group/cat"
-							onToggle={(nextOpen) => setFoldOpen(category.id, nextOpen)}
+							setOpen={(nextOpen) => setFoldOpen(category.id, nextOpen)}
 						>
 							<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 								<h3 class={styles.sidebar.categoryHeader()}>
@@ -607,8 +609,8 @@
 				{#if $sidebarConfig.mundusItems.length > 0}
 					<div class="pt-3 pb-1">
 					<SidebarFold
-						open={sectionOpen('__section_mundus__')}
-						onToggle={(nextOpen) => setFoldOpen('__section_mundus__', nextOpen)}
+						bind:open={foldOpen['__section_mundus__']}
+						setOpen={(nextOpen) => setFoldOpen('__section_mundus__', nextOpen)}
 					>
 						<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 							<h3 class={styles.sidebar.sectionHeader()}>

@@ -15,7 +15,7 @@ describe('MY MUNDUS super-category styling', () => {
 
 		const mundusFolds = [
 			...sidebar.matchAll(
-				/<SidebarFold\s+open=\{sectionOpen\('__section_mundus__'\)\}[\s\S]*?<\/SidebarFold>/g,
+				/<SidebarFold\s+bind:open=\{foldOpen\['__section_mundus__'\]\}[\s\S]*?<\/SidebarFold>/g,
 			),
 		];
 		expect(mundusFolds.length).toBeGreaterThanOrEqual(2);
