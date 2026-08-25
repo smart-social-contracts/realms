@@ -54,9 +54,10 @@
 		);
 	}
 
-	// Bindable open flags (false = collapsed). `bind:open` needs a property,
-	// not a function result — a one-way `open={fn()}` plus an on-prefixed
-	// callback never flipped the child's `open` prop on tap.
+	// Bindable open flags (false = collapsed). Must be a template-bound
+	// object so Svelte 5 emits mutable_source. Live #315 computed open via
+	// a helper over a Set the template never read; the compiler left that
+	// Set as a plain let and taps never re-rendered.
 	let foldOpen: Record<string, boolean> = {
 		__section_me__: false,
 		__section_realm__: false,

@@ -7,10 +7,11 @@
 	 * resolves to 0px and the panel never opens. A button avoids that UA box
 	 * and nested-details hit-testing (wrong-row chevrons).
 	 *
-	 * Visual open state is assigned here (`open = !open`) and bound to the
-	 * parent. #315 only invoked a camelCase on-prefixed callback — Svelte 5
-	 * treats that as a component event, so the parent never ran, `open` stayed
-	 * false, and the live tap left height at 0. Do not use an on* callback.
+	 * Visual open state is assigned here (`open = !open`) and bound to a
+	 * parent record. Live #315 (7734920) did call the parent callback; the
+	 * parent stored open ids in a Set that the template never read, so
+	 * Svelte 5 compiled `open={sectionOpen(id)}` as a derived over a plain
+	 * `let` and never invalidated `is-open` / aria-expanded after a tap.
 	 */
 	export let open = false;
 	export let summaryClass =
@@ -28,7 +29,12 @@
 	<button type="button" class="fold-summary {summaryClass}" aria-expanded={open} onclick={toggle}>
 		<slot name="header" />
 	</button>
-	<div class="fold" style:grid-template-rows={open ? '1fr' : '0fr'}>
+	<div
+		class="fold"
+		style:display="grid"
+		style:overflow="hidden"
+		style:grid-template-rows={open ? '1fr' : '0fr'}
+	>
 		<div class="fold-inner" inert={!open ? true : undefined}>
 			<slot />
 		</div>
@@ -46,6 +52,7 @@
 	}
 	.fold {
 		display: grid;
+		overflow: hidden;
 		grid-template-rows: 0fr;
 		transition: grid-template-rows 200ms ease-out;
 	}

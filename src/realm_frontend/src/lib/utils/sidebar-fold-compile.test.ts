@@ -9,6 +9,41 @@ const foldSource = readFileSync(
 	'utf8',
 );
 
+describe('sidebar fold Svelte 5 state tracking', () => {
+	it('does not wrap a Set that the template only reads via a helper (live #315)', () => {
+		const result = compile(
+			`<script>
+				let collapsed = new Set(['me']);
+				function sectionOpen(id) { return !collapsed.has(id); }
+				function setFoldOpen(id, nextOpen) {
+					const next = new Set(collapsed);
+					if (nextOpen) next.delete(id); else next.add(id);
+					collapsed = next;
+				}
+			</script>
+			<button onclick={() => setFoldOpen('me', !sectionOpen('me'))}>{sectionOpen('me')}</button>`,
+			{ generate: 'client', filename: 'Live315.svelte' },
+		);
+		expect(result.js.code).toContain('let collapsed = new Set');
+		expect(result.js.code).not.toMatch(/collapsed = \$\.(?:mutable_source|state)\(/);
+	});
+
+	it('wraps a template-bound foldOpen record so bind:open invalidates after tap', () => {
+		const result = compile(
+			`<script>
+				let foldOpen = { me: false };
+				function setFoldOpen(id, nextOpen) {
+					foldOpen[id] = nextOpen;
+					foldOpen = foldOpen;
+				}
+			</script>
+			<button onclick={() => setFoldOpen('me', !foldOpen.me)}>{foldOpen.me}</button>`,
+			{ generate: 'client', filename: 'BoundFold.svelte' },
+		);
+		expect(result.js.code).toMatch(/foldOpen = \$\.mutable_source\(/);
+	});
+});
+
 describe('sidebar fold callback naming', () => {
 	it('compiles SidebarFold so toggle assigns open instead of emitting an on* event', () => {
 		const result = compile(foldSource, { generate: 'client', filename: 'SidebarFold.svelte' });
