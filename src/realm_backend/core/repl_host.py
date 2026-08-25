@@ -292,6 +292,9 @@ class HostSecureORM(SecureORM):
         module = self.host_module()
         if module is None:
             raise RpcError("host module is not loaded")
+        # The Candid surface *is* the decorated function. Do not unwrap
+        # ``@require`` / ``@update`` — that would skip the same gates the UI
+        # hits. SHELL_EXECUTE is not a superuser bit on these verbs.
         fn = getattr(module, method, None)
         if not callable(fn):
             raise RpcError(f"host method {method!r} is not defined")
@@ -300,8 +303,14 @@ class HostSecureORM(SecureORM):
             bound.apply_defaults()
         except TypeError as exc:
             raise RpcError(f"{method}: {exc}") from exc
+        from core.call_origin import host_call
+
         try:
-            return drive_result(fn(*bound.args, **bound.kwargs))
+            # Host verbs must not run Cedar with context.repl. Empty origin
+            # matches a browser Candid ingress; extension_sync_call then
+            # sets context.extension on the bridge like the UI does.
+            with host_call():
+                return drive_result(fn(*bound.args, **bound.kwargs))
         except PermissionError:
             raise
         except Exception as exc:

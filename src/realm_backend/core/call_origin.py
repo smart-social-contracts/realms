@@ -53,6 +53,18 @@ class origin:
         return False
 
 
+def host_call():
+    """Origin for a host Candid verb, including ones dispatched from the REPL.
+
+    Host code has nothing to declare. Clearing the ambient origin here is
+    what keeps ``api.call`` / ``ext.call`` from inheriting ``context.repl``
+    if the shell marked the ingress as REPL-originated. Extension work
+    still sets ``context.extension`` via :func:`extension_call` once the
+    host method reaches the bridge.
+    """
+    return origin()
+
+
 def extension_call(ext_id: str):
     """Origin for a call made from inside a sandboxed extension."""
     return origin(extension=ext_id)

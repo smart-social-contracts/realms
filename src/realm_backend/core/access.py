@@ -26,8 +26,14 @@ from ic_python_logging import get_logger
 logger = get_logger("core.access")
 
 
-class AccessDenied(Exception):
-    """Raised when a caller lacks the required permission."""
+class AccessDenied(PermissionError):
+    """Raised when a caller lacks the required permission.
+
+    A ``PermissionError`` so Candid ``@require`` and REPL ``api.call`` /
+    ``ext.call`` deny with the same exception class. ``SHELL_EXECUTE`` is
+    not a superuser bit — this is still the verb's own gate.
+    """
+
     pass
 
 

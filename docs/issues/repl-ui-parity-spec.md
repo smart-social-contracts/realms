@@ -1,6 +1,6 @@
 # REPL and UI must share the same host surface
 
-> **Status:** Spec + first implementation (`core.repl_host.HostSecureORM`)
+> **Status:** Closed — host verbs share the UI surface; member-shaped deny/allow tested
 > **Issue:** [realms#313](https://github.com/smart-social-contracts/realms/issues/313)
 > **App:** `src/realm_backend/core/repl_host.py`, `__shell__`
 > **Repo:** smart-social-contracts/realms
@@ -81,7 +81,11 @@ Allowlist = quoted methods in `realm_backend.did` `service : { … }`.
 
 C sandbox cap: **32** actions. Six `orm.*` + four `host.*` = 10.
 
-Host RPCs **must not** run Cedar with `context.repl`. Extension work still goes through `extension_sync_call` so G1/G2 see `context.extension`.
+Host RPCs **must not** run Cedar with `context.repl`. `_call_host` wraps the
+Candid function in `call_origin.host_call()` (empty origin, same as a browser
+ingress). Extension work still goes through `extension_sync_call` so G1/G2 see
+`context.extension`. `AccessDenied` is a `PermissionError` so Candid and
+`api.call` deny with the same class. Do not unwrap `@require`.
 
 ---
 
@@ -107,6 +111,9 @@ Host RPCs **must not** run Cedar with `context.repl`. Extension work still goes 
 - `actions()` includes `host.*` and `orm.*`, length ≤ 32.
 - Stub source defines `api` / `ext` on `__builtins__` (and wraps `eval_repl`) so they work even when basilisk binds the first `eval_repl` and `rpc` is a builtin.
 - Same principal + args → host dispatch vs direct Candid function → identical result (unit: fake `main` module).
+- Member-shaped (non-controller) principal: `api.call` allow matches the decorated Candid method and writes the same state (`tests/backend/test_repl_ui_parity.py`).
+- Same principal, insufficient permission: `api.call` and Candid raise the same `AccessDenied` (`PermissionError` subclass); `SHELL_EXECUTE` does not succeed the verb.
+- `ext.call` matches `extension_sync_call` / `gate_extension_call` for a real extension verb (`role_manager.generate_registration_url`).
 
 ---
 
