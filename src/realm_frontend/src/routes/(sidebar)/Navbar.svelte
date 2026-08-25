@@ -1,6 +1,7 @@
 <script>
 	import AuthButton from '$lib/components/AuthButton.svelte';
 	import DelegationSwitcher from '$lib/components/DelegationSwitcher.svelte';
+	import { resolveRealmMarkSrc } from '$lib/branding/realmMark';
 	import { realmInfo, realmName } from '$lib/stores/realmInfo';
 	import { unreadCount } from '$lib/stores/notifications';
 	import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
@@ -15,6 +16,15 @@
 	export let showRealmControls = true;
 
 	const hideRealmName = isEmbeddedInPortal();
+
+	let markFailed = false;
+	let lastMarkSrc = '';
+
+	$: markSrc = resolveRealmMarkSrc($realmInfo.logoUrl);
+	$: if (markSrc !== lastMarkSrc) {
+		lastMarkSrc = markSrc;
+		markFailed = false;
+	}
 
 	onMount(() => {
 		realmInfo.fetch();
@@ -45,11 +55,14 @@
 
 		<div class="flex min-w-0 items-center justify-center">
 			<a href="/" class="flex min-w-0 max-w-full items-center">
-				<img
-					src={$realmInfo.logoUrl || '/images/logo_sphere_only.svg'}
-					class="h-8 shrink-0 sm:h-10 pointer-events-none"
-					alt={$realmName || 'Realms Logo'}
-				/>
+				{#if markSrc && !markFailed}
+					<img
+						src={markSrc}
+						class="h-8 shrink-0 sm:h-10 pointer-events-none"
+						alt={$realmName || 'Realm logo'}
+						on:error={() => (markFailed = true)}
+					/>
+				{/if}
 				{#if !hideRealmName}
 					<span
 						class="ml-2 min-w-0 truncate self-center text-lg font-medium text-gray-700 sm:ml-3 sm:text-2xl pointer-events-none"

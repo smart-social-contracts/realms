@@ -1,5 +1,6 @@
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
+import { resolveRealmMarkSrc } from '$lib/branding/realmMark';
 import { backendStore, backendActorReady } from '$lib/canisters';
 import { applyBrandingPrimary, DEFAULT_PRIMARY_COLOR, parsePrimaryColor } from '$lib/theme/brandingPrimary';
 
@@ -87,7 +88,7 @@ const createRealmInfoStore = () => {
 		quarters: [],
 		isQuarter: false,
 		parentRealmCanisterId: '',
-		logoUrl: '',
+		logoUrl: resolveRealmMarkSrc(''),
 		backgroundImageUrl: '',
 		primaryColor: DEFAULT_PRIMARY_COLOR,
 		testMode: false,
@@ -197,7 +198,9 @@ const createRealmInfoStore = () => {
 						quarters: (status?.quarters as typeof state.quarters) || [],
 						isQuarter: (status?.is_quarter as boolean) || false,
 						parentRealmCanisterId: (status?.parent_realm_canister_id as string) || '',
-						logoUrl: (fromFlags?.logo_url as string) || (status?.logo_url as string) || '',
+						logoUrl: resolveRealmMarkSrc(
+							(fromFlags?.logo_url as string) || (status?.logo_url as string) || ''
+						),
 						backgroundImageUrl: (fromFlags?.background_image_url as string) || (status?.background_image_url as string) || '',
 						primaryColor,
 						testMode: (fromFlags?.test_mode as boolean) ?? (status?.test_mode as boolean) ?? false,
