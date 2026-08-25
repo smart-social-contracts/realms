@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
-import type { SidebarConfig } from '$lib/config/sidebar';
+import type { SidebarConfig, SidebarManifest } from '$lib/config/sidebar';
+import { resolveMemberHomeHref } from '../extension-home';
 
 export const sidebarConfig = writable<SidebarConfig | null>(null);
 export const sidebarLoading = writable(false);
@@ -25,11 +26,27 @@ function writeCache(config: SidebarConfig): void {
 }
 
 /**
- * Load the sidebar from the backend's get_sidebar endpoint.
- * The backend resolves all ordering, visibility, and welcome page logic.
+ * Load the sidebar from get_sidebar plus get_sidebar_manifests (the MY REALM
+ * / My Dashboard source). Host navigate.home reuses those same rows.
  */
+async function loadSidebarManifests(
+	backend: { get_sidebar_manifests?: () => Promise<string> },
+): Promise<SidebarManifest[]> {
+	if (typeof backend.get_sidebar_manifests !== 'function') return [];
+	try {
+		const raw = await backend.get_sidebar_manifests();
+		const parsed = JSON.parse(raw);
+		return parsed?.success && Array.isArray(parsed.manifests) ? parsed.manifests : [];
+	} catch {
+		return [];
+	}
+}
+
 export async function loadSidebar(
-	backend: { get_sidebar: (args: string) => Promise<string> },
+	backend: {
+		get_sidebar: (args: string) => Promise<string>;
+		get_sidebar_manifests?: () => Promise<string>;
+	},
 	locale: string = 'en',
 ): Promise<void> {
 	const cached = readCache();
@@ -39,18 +56,23 @@ export async function loadSidebar(
 
 	sidebarLoading.set(true);
 	try {
-		const raw = await backend.get_sidebar(JSON.stringify({ locale }));
+		const [raw, manifests] = await Promise.all([
+			backend.get_sidebar(JSON.stringify({ locale })),
+			loadSidebarManifests(backend),
+		]);
 		const parsed = JSON.parse(raw);
 
 		if (!parsed?.success) {
 			throw new Error(parsed?.error || 'Backend returned failure');
 		}
 
+		const welcomeItems = parsed.welcome_items || [];
 		const config: SidebarConfig = {
-			welcomeItems: parsed.welcome_items || [],
+			welcomeItems,
 			mundusItems: parsed.mundus_items || [],
 			categories: parsed.categories || [],
-			defaultPath: parsed.default_path || '/extensions/member_dashboard',
+			manifests,
+			defaultPath: resolveMemberHomeHref({ manifests, welcomeItems, locale }),
 			extensionOverrides: parsed.extension_overrides || {},
 		};
 

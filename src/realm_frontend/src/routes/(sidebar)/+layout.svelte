@@ -129,8 +129,8 @@
 
 			// Chat UI lives on the mundus RegistryAssistant. When embedded in the
 			// portal, forward assistant.open to the parent; otherwise ignore.
-			// navigate.home is resolved here from the sidebar default path so
-			// extensions never name the member-home extension.
+			// navigate.home reuses get_sidebar_manifests() → MY REALM → My Dashboard
+			// and goes to /extensions/[that id]. Extensions never name the target.
 			const unsubHostActions = hostActionEvents.subscribe((event) => {
 				if (!event) return;
 				if (event.action.type === 'assistant.open') {

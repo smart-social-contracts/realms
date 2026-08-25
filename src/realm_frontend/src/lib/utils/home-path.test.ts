@@ -5,14 +5,21 @@ import { describe, expect, it } from 'vitest';
 import { resolveHomePath } from './home-path';
 
 describe('resolveHomePath', () => {
-	it('uses the sidebar default path the host already resolved', () => {
-		expect(resolveHomePath({ defaultPath: '/extensions/welcome' })).toBe('/extensions/welcome');
+	it('resolves /extensions/[id] from get_sidebar_manifests', () => {
+		expect(
+			resolveHomePath({
+				manifests: [{ id: 'civic_home', sidebar_label: { en: 'My Dashboard' }, is_default: true }],
+			}),
+		).toBe('/extensions/civic_home');
 	});
 
-	it('falls back to realm root when sidebar config is missing', () => {
+	it('falls back to the first MY REALM item, then realm home', () => {
+		expect(
+			resolveHomePath({
+				welcomeItems: [{ extensionId: 'first_realm', href: '/extensions/first_realm' }],
+			}),
+		).toBe('/extensions/first_realm');
 		expect(resolveHomePath(null)).toBe('/');
-		expect(resolveHomePath(undefined)).toBe('/');
-		expect(resolveHomePath({ defaultPath: '   ' })).toBe('/');
 	});
 
 	it('is what the sidebar layout uses for navigate.home', () => {
@@ -23,5 +30,6 @@ describe('resolveHomePath', () => {
 		expect(layout).toContain('navigate.home');
 		expect(layout).toContain('resolveHomePath');
 		expect(layout).toContain('sidebarConfig');
+		expect(layout).toContain('get_sidebar_manifests');
 	});
 });

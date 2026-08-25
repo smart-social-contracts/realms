@@ -42,6 +42,13 @@ export interface ExtensionManifest {
   [key: string]: unknown;
 }
 
+export {
+  extensionHref,
+  resolveMemberHomeHref,
+  type SidebarHomeInput,
+  type SidebarManifestRow,
+} from './extension-home';
+
 export function fileRegistryBaseUrlFor(canisterId: string): string {
   const host = typeof window !== 'undefined' ? window.location.host : '';
   const isLocal = host.includes('localhost') || host.includes('127.0.0.1');

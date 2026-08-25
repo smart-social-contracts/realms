@@ -20,8 +20,7 @@
 		}
 		if (get(isAuthenticated) && hasJoined()) {
 			const config = get(sidebarConfig);
-			const defaultPath = config?.defaultPath || '/extensions/member_dashboard';
-			goto(defaultPath);
+			goto(config?.defaultPath || '/');
 		} else {
 			// Anonymous / not-yet-joined visitors see the public dashboard
 			// (same on portal embeds and standalone). Join remains available

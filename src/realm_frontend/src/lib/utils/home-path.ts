@@ -1,10 +1,9 @@
-import type { SidebarConfig } from '$lib/config/sidebar';
+import { resolveMemberHomeHref, type SidebarHomeInput } from '../extension-home';
 
 /**
- * Resolve the realm member-home path from host sidebar config.
- * Extensions emit `navigate.home`; only the host knows this target.
+ * Host-only wrapper: extensions emit `navigate.home`; the host resolves
+ * `/extensions/[id]` from get_sidebar_manifests() / MY REALM rows.
  */
-export function resolveHomePath(config: Pick<SidebarConfig, 'defaultPath'> | null | undefined): string {
-	const path = typeof config?.defaultPath === 'string' ? config.defaultPath.trim() : '';
-	return path || '/';
+export function resolveHomePath(input: SidebarHomeInput | null | undefined): string {
+	return resolveMemberHomeHref(input);
 }
