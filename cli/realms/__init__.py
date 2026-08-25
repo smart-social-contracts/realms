@@ -1,5 +1,5 @@
 """
-Realms GOS - Government Operating System SDK and CLI
+Realms GOS - Governance Operating System SDK and CLI
 
 Usage:
     # SDK (for workstation-side Python scripts/agents)
