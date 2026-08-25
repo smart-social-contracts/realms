@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   import Footer from '$lib/../routes/(sidebar)/Footer.svelte';
   import { _ } from 'svelte-i18n';
+  import { resolveRealmMarkSrc } from '$lib/branding/realmMark';
   import { realmInfo, realmName, realmWelcomeMessage, realmManifesto } from '$lib/stores/realmInfo';
   import { isAuthenticated } from '$lib/stores/auth';
   
@@ -38,7 +39,7 @@
   <!-- Top bar with logo -->
   <div class="top-bar">
     <div class="realms-logo">
-      <img src="/images/logo.png" alt="{$realmName}" class="logo-img" onerror={(e) => { e.currentTarget.src = '/images/logo_horizontal_white.svg'; }} />
+      <img src={resolveRealmMarkSrc($realmInfo.logoUrl)} alt="{$realmName}" class="logo-img" onerror={(e) => { e.currentTarget.remove(); }} />
     </div>
   </div>
 
