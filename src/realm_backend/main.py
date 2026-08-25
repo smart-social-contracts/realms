@@ -6343,6 +6343,7 @@ def get_sidebar_manifests() -> text:
             "profiles":         ["admin", "member"],
             "show_in_sidebar":  true,
             "sidebar_label":    {"en": "Voting", "de": "Abstimmung"},
+            "is_default":       false,                  # MY REALM / My Dashboard row
             "kind":             "runtime"               # or "bundled"
           },
           ...
@@ -6380,6 +6381,7 @@ def get_sidebar_manifests() -> text:
                 "profiles": m.get("profiles") or [],
                 "show_in_sidebar": m.get("show_in_sidebar", True) is not False,
                 "sidebar_label": label_obj,
+                "is_default": m.get("is_default") is True,
                 "kind": "runtime" if ext_id in runtime_ids else "bundled",
             })
 

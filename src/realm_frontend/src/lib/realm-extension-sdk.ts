@@ -55,7 +55,9 @@ export interface DocumentFocus {
 export type HostAction =
 	| { type: 'assistant.open' }
 	| { type: 'assistant.prompt'; message?: string; autoSend?: boolean }
-	| { type: 'clipboard.write'; text: string };
+	| { type: 'clipboard.write'; text: string }
+	/** Go to the realm member home (sidebar default path). Extensions must not name the target. */
+	| { type: 'navigate.home' };
 
 export interface PendingPrompt {
 	message: string;

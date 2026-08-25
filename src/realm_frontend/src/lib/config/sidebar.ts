@@ -9,9 +9,21 @@
 export interface SidebarNavItem {
 	label: string;
 	icon: string;
-	extensionId: string;
+	extensionId?: string;
+	/** Backend get_sidebar uses snake_case. */
+	extension_id?: string;
 	href: string;
 	tooltip?: string;
+}
+
+/** Slim row from realm_backend.get_sidebar_manifests(). */
+export interface SidebarManifest {
+	id: string;
+	name?: string;
+	sidebar_label?: string | Record<string, string>;
+	is_default?: boolean;
+	show_in_sidebar?: boolean;
+	categories?: string[];
 }
 
 export interface SidebarCategory {
@@ -27,6 +39,8 @@ export interface SidebarConfig {
 	defaultPath: string;
 	/** Codex extension overrides: base system extension id -> replacement id. */
 	extensionOverrides?: Record<string, string>;
+	/** Same get_sidebar_manifests() list the sidebar paints MY REALM from. */
+	manifests?: SidebarManifest[];
 }
 
 export interface TopUtilityItem {
