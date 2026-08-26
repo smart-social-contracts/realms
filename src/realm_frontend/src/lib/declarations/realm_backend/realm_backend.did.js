@@ -78,6 +78,7 @@ export const idlFactory = ({ IDL }) => {
     'private_data' : IDL.Text,
     'nickname' : IDL.Text,
     'profiles' : IDL.Vec(IDL.Text),
+    'departments' : IDL.Vec(IDL.Text),
     'avatar' : IDL.Text,
   });
   const RealmResponseData = IDL.Variant({

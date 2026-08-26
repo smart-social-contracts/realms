@@ -68,6 +68,7 @@ class StatusRecord(Record):
 class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
+    departments: Vec[text]
     nickname: text
     avatar: text
     private_data: text

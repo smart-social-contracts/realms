@@ -3,6 +3,7 @@ from typing import Any
 
 from ggg import User
 from ggg.system.user import user_register as ggg_user_register
+from core.membership import user_department_names
 from ic_python_logging import get_logger
 
 logger = get_logger("api.user")
@@ -17,6 +18,7 @@ def user_get(principal: str) -> dict[str, Any]:
         "success": True,
         "principal": user.id,
         "profiles": [profile.name for profile in user.profiles],
+        "departments": user_department_names(user),
         "nickname": user.nickname or "",
         "avatar": user.avatar or "",
         "private_data": user.private_data or "",
