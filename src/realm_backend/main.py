@@ -455,24 +455,31 @@ def _host_type_lookup_names(obj, name):
     return tuple(dict.fromkeys(names))
 
 
-def _host_type_attr(obj, name):
+def _host_type_attr(obj, name, skip_module_type=True):
     try:
         mro = type(obj).__mro__
     except Exception:
         return _HOST_MISSING
     candidates = _host_type_lookup_names(obj, name)
+    skip = set(_HOST_SKIP_MRO) if skip_module_type else {object, type}
     for cls in mro:
-        if cls in _HOST_SKIP_MRO:
+        if cls in skip:
             continue
         try:
             ns = object.__getattribute__(cls, "__dict__")
         except AttributeError:
             continue
-        if not _host_mapping_like(ns):
+        contains = getattr(ns, "__contains__", None)
+        if not callable(contains):
             continue
         for candidate in candidates:
             if candidate in ns:
                 return _host_bind_from_class(ns[candidate], obj, cls)
+        # Name-mangled leftover hack: any key ending with the Candid name.
+        if name == "__get_candid_interface_tmp_hack" and _host_mapping_like(ns):
+            for key, val in ns.items():
+                if key.endswith("__get_candid_interface_tmp_hack"):
+                    return _host_bind_from_class(val, obj, cls)
     return _HOST_MISSING
 
 
@@ -594,6 +601,50 @@ def _host_parse_candid(did_text):
     return frozenset(names)
 
 
+def _host_invoke_hack(hack, module):
+    if not callable(hack):
+        return None
+    try:
+        return hack()
+    except TypeError:
+        try:
+            return hack(module)
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+
+def _host_find_candid_hack(host_module=None):
+    """Leftover Candid hack: instance / type dict on host, ``__main__``, ``main``.
+
+    Leftover-executed ``__main__`` has HostSecureORM (shell starts) but the
+    injected ``__get_candid_interface_tmp_hack`` stays on leftover
+    ``_LazyMod``. Never getattr leftover. Include ``type(sys)`` — live
+    leftover may store the hack on the module type itself.
+    """
+    seen = []
+    for mod in (
+        host_module,
+        sys.modules.get("__main__"),
+        sys.modules.get("main"),
+    ):
+        if mod is None or mod in seen:
+            continue
+        seen.append(mod)
+        ns = _host_module_ns(mod)
+        if ns is not None:
+            hack = ns.get("__get_candid_interface_tmp_hack")
+            if callable(hack):
+                return hack, mod
+        typed = _host_type_attr(
+            mod, "__get_candid_interface_tmp_hack", skip_module_type=False
+        )
+        if typed is not _HOST_MISSING and callable(typed):
+            return typed, mod
+    return None, None
+
+
 def _host_load_allowed(did_path=None, blocked=_HOST_BLOCKED, host_module=None):
     blocked_set = frozenset(blocked)
     path = _HostPath(did_path) if did_path is not None else _host_did_path()
@@ -603,14 +654,13 @@ def _host_load_allowed(did_path=None, blocked=_HOST_BLOCKED, host_module=None):
             did_text = path.read_text()
     except OSError:
         did_text = None
+    if did_text:
+        names = _host_parse_candid(did_text) - blocked_set
+        if names:
+            return names
     module = _host_resolve_module(host_module)
-    if not did_text:
-        hack = _host_module_attr(module, "__get_candid_interface_tmp_hack") if module else None
-        if callable(hack):
-            try:
-                did_text = hack()
-            except TypeError:
-                did_text = hack(module)
+    hack, hack_mod = _host_find_candid_hack(module)
+    did_text = _host_invoke_hack(hack, hack_mod or module)
     if did_text:
         names = _host_parse_candid(did_text) - blocked_set
         if names:
@@ -737,8 +787,14 @@ class HostSecureORM(_SecureORMBase):
         if module is None:
             raise _HostRpcError("host module is not loaded")
         fn = _host_module_attr(module, method)
-        if not callable(fn) and module is not sys.modules.get("__main__"):
-            fn = _host_module_attr(sys.modules.get("__main__"), method)
+        if not callable(fn):
+            for key in ("__main__", "main"):
+                other = sys.modules.get(key)
+                if other is None or other is module:
+                    continue
+                fn = _host_module_attr(other, method)
+                if callable(fn):
+                    break
         if not callable(fn):
             raise _HostRpcError(f"host method {method!r} is not defined")
         try:

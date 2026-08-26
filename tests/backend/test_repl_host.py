@@ -618,6 +618,101 @@ class TestLazyModReimport:
             getattr(executed, "not_on_lazymod")
         assert executed._bload_count >= 1
 
+    def test_allowlist_from_leftover_main_when_host_has_no_hack(self, tmp_path):
+        """Live leftover: HostSecureORM host has no DID / hack; ``__main__`` does."""
+        _bMT = type(sys)
+        did_text = (
+            "service : {\n"
+            '  "get_sandbox_config" : () -> (text) query;\n'
+            '  "extension_sync_call" : (text, text, text) -> (text);\n'
+            '  "__shell__" : (text) -> (text);\n'
+            "}\n"
+        )
+
+        class _LazyMod(_bMT):
+            def __init__(self, name):
+                super().__init__(name)
+                self.__dict__["_bsrc"] = _LAZY_MAIN_SRC
+                self.__dict__["_bloaded"] = False
+                self.__dict__["_bloading"] = False
+                self.__dict__["_bload_count"] = 0
+
+            def _bload(self):
+                self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+                raise RuntimeError("Database instance already exists")
+
+            def __getattr__(self, name):
+                self._bload()
+
+            def __get_candid_interface_tmp_hack(self):
+                return did_text
+
+            def get_sandbox_config(self):
+                return {"available": True, "default_mode": "sandbox"}
+
+            def extension_sync_call(self, extension_name, function_name, args):
+                return {
+                    "success": True,
+                    "extension_name": extension_name,
+                    "function_name": function_name,
+                    "args": args,
+                }
+
+            def __shell__(self, code):
+                return "should never run"
+
+        leftover_main = _LazyMod("__main__")
+        executed = _bMT("main")
+        assert "__get_candid_interface_tmp_hack" not in executed.__dict__
+        missing_did = tmp_path / "missing.did"
+        saved_dunder = sys.modules.get("__main__")
+        saved_named = sys.modules.get("main")
+        try:
+            sys.modules["__main__"] = leftover_main
+            sys.modules["main"] = executed
+            names = load_allowed_methods(missing_did, host_module=executed)
+            assert "get_sandbox_config" in names
+            assert "extension_sync_call" in names
+            assert "__shell__" not in names
+            assert leftover_main._bload_count == 0
+
+            orm = _orm(
+                host_module=executed,
+                allowed_methods=None,
+                did_path=missing_did,
+            )
+            assert orm.handle_rpc(
+                "alice", "host.call", {"method": "get_sandbox_config"}
+            ) == {"available": True, "default_mode": "sandbox"}
+            assert orm.handle_rpc(
+                "alice",
+                "host.ext_sync",
+                {
+                    "extension_name": "department_docs",
+                    "function_name": "list_documents",
+                    "args": {},
+                },
+            ) == {
+                "success": True,
+                "extension_name": "department_docs",
+                "function_name": "list_documents",
+                "args": "{}",
+            }
+            with pytest.raises(PermissionError, match="__shell__"):
+                orm.handle_rpc(
+                    "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
+                )
+            assert leftover_main._bload_count == 0
+        finally:
+            if saved_dunder is None:
+                sys.modules.pop("__main__", None)
+            else:
+                sys.modules["__main__"] = saved_dunder
+            if saved_named is None:
+                sys.modules.pop("main", None)
+            else:
+                sys.modules["main"] = saved_named
+
 
 class TestWasiCollectionsAbc:
     def test_import_without_collections_abc_mapping(self, monkeypatch, tmp_path):

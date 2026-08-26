@@ -353,7 +353,7 @@ def _leftover_executed_main():
 
 class TestLeftoverReplHostShell:
     def test_shell_starts_when_repl_host_is_leftover_lazymod(
-        self, main_module, monkeypatch
+        self, main_module, monkeypatch, tmp_path
     ):
         """Leftover ``core.repl_host``: from-import / ``_bload`` die; ``__shell__`` starts."""
         import types as types_mod
@@ -368,17 +368,22 @@ class TestLeftoverReplHostShell:
         )
         monkeypatch.setitem(sys.modules, "types", stub)
         leftover = _leftover_repl_host_lazymod()
-        host = _leftover_executed_main()
+        # Leftover ``_LazyMod`` keeps the Candid hack; leftover-executed
+        # ``main`` has HostSecureORM and no DID file (live realmtest6).
+        candid_host = _leftover_executed_main()
+        executed = type(sys)("main")
         saved_mod = sys.modules.get("core.repl_host")
         saved_main = sys.modules.get("main")
         saved_dunder = sys.modules.get("__main__")
         saved_orm = main_module.secure_orm
         saved_err = main_module._secure_orm_error
+        missing_did = tmp_path / "missing.did"
         try:
             sys.modules["core.repl_host"] = leftover
-            sys.modules["main"] = main_module
-            sys.modules["__main__"] = host
+            sys.modules["main"] = executed
+            sys.modules["__main__"] = candid_host
             assert "HostSecureORM" not in leftover.__dict__
+            assert "__get_candid_interface_tmp_hack" not in executed.__dict__
             with pytest.raises(ImportError, match="unknown location"):
                 exec(
                     "from core.repl_host import HostSecureORM",
@@ -420,7 +425,8 @@ class TestLeftoverReplHostShell:
             assert started["n"] == 1
             assert leftover._bload_count == 0
 
-            orm._host_module = host
+            orm._host_module = executed
+            orm._did_path = missing_did
             orm._allowed_methods = None
             assert orm.handle_rpc(
                 "alice", "host.call", {"method": "get_sandbox_config"}
@@ -444,7 +450,7 @@ class TestLeftoverReplHostShell:
                     "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
                 )
             assert leftover._bload_count == 0
-            assert host._bload_count == 0
+            assert candid_host._bload_count == 0
         finally:
             main_module.secure_orm = saved_orm
             main_module._secure_orm_error = saved_err
