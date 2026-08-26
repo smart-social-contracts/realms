@@ -634,8 +634,13 @@ class TestWasiCollectionsAbc:
         )
         monkeypatch.setitem(sys.modules, "collections.abc", stub)
 
+        def _import_mapping():
+            from collections.abc import Mapping  # noqa: F401
+
+            return Mapping
+
         with pytest.raises(ImportError, match="Mapping"):
-            exec("from collections.abc import Mapping")
+            _import_mapping()
 
         sys.modules.pop("core.repl_host", None)
         imported = __import__("core.repl_host", fromlist=["load_allowed_methods"])
