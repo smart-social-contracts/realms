@@ -121,6 +121,17 @@ class TestManifestContract:
             path = codex_dir / "backend" / rel
             assert path.exists(), f"data_files[{key}] missing: backend/{rel}"
 
+    def test_codex_modules_allow_list_files_exist(self, codex_dir):
+        """If the package opts in, each listed stem must be backend/modules/<name>.py."""
+        manifest = _manifest(codex_dir)
+        if "codex_modules" not in manifest:
+            return
+        allow = manifest["codex_modules"]
+        assert isinstance(allow, list), "codex_modules must be a list of stems"
+        for stem in allow:
+            path = codex_dir / "backend" / "modules" / f"{stem}.py"
+            assert path.is_file(), f"codex_modules lists '{stem}' but {path} is missing"
+
 
 class TestPackageLayout:
     def test_backend_entry_exists(self, codex_dir):
