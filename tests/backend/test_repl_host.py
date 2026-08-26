@@ -5,6 +5,7 @@ See realms#313 and docs/issues/repl-ui-parity-spec.md.
 
 import os
 import sys
+import types
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -689,13 +690,11 @@ class TestWasiCollectionsAbc:
 
 class TestLeftoverReplHostSecureORM:
     def test_resolve_when_from_import_unknown_location(self):
-        """Leftover ``core.repl_host``: from-import dies; type-dict still works."""
+        """Leftover ``core.repl_host`` has no class; ``__main__`` leftover already does."""
         _bMT = type(sys)
         live = HostSecureORM
 
         class _LazyMod(_bMT):
-            HostSecureORM = live
-
             def __init__(self, name):
                 super().__init__(name)
                 self.__dict__["_bsrc"] = _LAZY_MAIN_SRC
@@ -730,10 +729,17 @@ class TestLeftoverReplHostSecureORM:
                     )
 
         leftover = _LazyMod("core.repl_host")
+        executed = types.ModuleType("__main__")
+        executed.HostSecureORM = live
         saved = sys.modules.get("core.repl_host")
+        saved_main = sys.modules.get("main")
+        saved_dunder = sys.modules.get("__main__")
         try:
             sys.modules["core.repl_host"] = leftover
+            sys.modules["__main__"] = executed
+            sys.modules["main"] = executed
             assert "HostSecureORM" not in leftover.__dict__
+            assert "HostSecureORM" not in type(leftover).__dict__
             with pytest.raises(ImportError, match="unknown location"):
                 exec(
                     "from core.repl_host import HostSecureORM",
@@ -746,8 +752,20 @@ class TestLeftoverReplHostSecureORM:
             leftover.__dict__["_bload_count"] = 0
             assert resolve_host_secure_orm() is live
             assert leftover._bload_count == 0
+            del executed.HostSecureORM
+            with pytest.raises(ImportError, match="unknown location"):
+                resolve_host_secure_orm()
+            assert leftover._bload_count == 0
         finally:
             if saved is None:
                 sys.modules.pop("core.repl_host", None)
             else:
                 sys.modules["core.repl_host"] = saved
+            if saved_main is None:
+                sys.modules.pop("main", None)
+            else:
+                sys.modules["main"] = saved_main
+            if saved_dunder is None:
+                sys.modules.pop("__main__", None)
+            else:
+                sys.modules["__main__"] = saved_dunder
