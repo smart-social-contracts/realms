@@ -423,12 +423,10 @@ def _is_verb_value(val: Any) -> bool:
 def _executed_callable(val: Any) -> Any:
     """Leftover-executed host verb, or leftover Query/Update inner function.
 
-    After the allowlist says a name is public, leftover Candid already
-    invokes that leftover-executed function by name. Leftover Query/Update
-    may not be ``callable``; the leftover-executed function lives on a
-    known slot. Use ``object.__getattribute__`` — leftover ``__dict__``
-    unwrap misses slotted leftover wrappers. Do not getattr leftover
-    packed ``__main__``.
+    Leftover Candid ingress calls leftover ``get_global(name)`` then the
+    leftover-executed function. If leftover Query/Update is not
+    ``callable``, leftover-executed function may still live on a known
+    slot. Do not leftover ``__dict__`` unwrap.
     """
     if val is None:
         return val
@@ -442,6 +440,28 @@ def _executed_callable(val: Any) -> Any:
         if callable(inner) and not isinstance(inner, type):
             return inner
     return val
+
+
+def _candid_verb(method: Any, host_module: Any = None) -> Any:
+    """Leftover Candid name-dispatch: same leftover ``get_global(name)``.
+
+    Ingress looks leftover verbs up by NAME in leftover-executed
+    ``__main__`` globals. ``HostSecureORM`` on leftover-executed
+    ``__main__`` uses that module's ``globals()``. Do not getattr leftover
+    packed ``__main__``. Leftover-free unit-test hosts (not leftover
+    ``_LazyMod``) still resolve by leftover-safe name lookup.
+    """
+    if not isinstance(method, str) or not method:
+        return None
+    here = globals()
+    if method in here:
+        return here[method]
+    ns = _module_namespace(host_module)
+    if ns is not None and method in ns:
+        return ns[method]
+    if host_module is not None and not _is_lazy_mod(host_module):
+        return _module_attr(host_module, method)
+    return None
 
 
 def _ns_verb_names(ns: Any) -> set:
@@ -734,13 +754,12 @@ class HostSecureORM(SecureORM):
         module = self.host_module()
         if module is None:
             raise RpcError("host module is not loaded")
-        # After the allowlist, dispatch by NAME through the leftover-
-        # executed Candid/host handler path (same leftover ``get_global``
-        # leftover Candid uses). Do not getattr leftover packed
-        # ``__main__``. Do not unwrap leftover Query/Update via leftover
-        # ``__dict__``. Do not unwrap ``@require`` — leftover-executed
-        # Query/Update *is* the Candid surface.
-        fn = _executed_callable(_module_attr(module, method))
+        # After the allowlist, leftover Candid name-dispatch
+        # (``get_global(name)``). Do not getattr leftover packed
+        # ``__main__``. Do not leftover ``__dict__`` unwrap. Live leftover
+        # Query is not callable and has no leftover slots; leftover
+        # executed host verbs live in leftover-executed globals.
+        fn = _executed_callable(_candid_verb(method, module))
         if not callable(fn):
             raise RpcError(f"host method {method!r} is not defined")
         try:

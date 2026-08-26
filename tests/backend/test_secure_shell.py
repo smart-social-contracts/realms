@@ -300,22 +300,14 @@ def _leftover_repl_host_lazymod():
     return leftover
 
 
-class Query:
-    """Honest leftover ``@query`` / ``@update``: not callable, no ``__dict__``."""
-
-    __slots__ = ("func",)
-
-    def __init__(self, func):
-        object.__setattr__(self, "func", func)
-
-
 def _leftover_executed_main():
-    """Live leftover: slotted leftover Query on leftover type, not instance.
+    """Live leftover: packed ``__main__`` has no leftover verb attributes.
 
-    Instance dict may omit ``get_sandbox_config``. No Candid hack. ``_bload``
-    cannot run. Leftover Query is not ``callable`` and leftover ``__dict__``
-    unwrap cannot see ``func`` (slots). Name-dispatch must invoke the
-    leftover-executed function via ``object.__getattribute__``.
+    Leftover Candid ingress looks leftover verbs up by NAME in leftover-
+    executed ``__main__`` globals (``get_global``), not leftover packed
+    ``__main__`` attrs. Instance and type dict omit ``get_sandbox_config``.
+    No Candid hack. ``_bload`` cannot run. Leftover ``_bsrc`` still lists
+    leftover public ``def`` names for leftover allowlist.
     """
     _bMT = type(sys)
 
@@ -337,31 +329,17 @@ def _leftover_executed_main():
         def __getattr__(self, name):
             self._bload()
 
-        get_sandbox_config = Query(
-            lambda: {"available": True, "default_mode": "sandbox"}
-        )
-        extension_sync_call = Query(
-            lambda extension_name, function_name, args: {
-                "success": True,
-                "extension_name": extension_name,
-                "function_name": function_name,
-                "args": args,
-            }
-        )
-        __shell__ = Query(lambda code: "should never run")
-
     executed = _LazyMod("__main__")
     assert "get_sandbox_config" not in executed.__dict__
+    assert "get_sandbox_config" not in type(executed).__dict__
+    assert "extension_sync_call" not in executed.__dict__
+    assert "extension_sync_call" not in type(executed).__dict__
     assert "__get_candid_interface_tmp_hack" not in executed.__dict__
     assert not any(
         str(key).endswith("__get_candid_interface_tmp_hack")
         for key in type(executed).__dict__
     )
     assert "HostSecureORM" not in executed.__dict__
-    leftover_query = type(executed).__dict__["get_sandbox_config"]
-    assert not callable(leftover_query)
-    with pytest.raises(AttributeError):
-        object.__getattribute__(leftover_query, "__dict__")
     return executed
 
 
@@ -396,8 +374,9 @@ class TestLeftoverReplHostShell:
         )
         monkeypatch.setitem(sys.modules, "types", stub)
         leftover = _leftover_repl_host_lazymod()
-        # Honest leftover image: leftover-executed host has verbs on the
-        # instance dict. No planted Candid hack. No repo DID.
+        # Honest leftover image: leftover packed ``__main__`` has no leftover
+        # verb attrs. Leftover Candid globals do. No planted Candid hack.
+        # No repo DID.
         executed = _leftover_executed_main()
         executed.__dict__["HostSecureORM"] = main_module.HostSecureORM
         saved_mod = sys.modules.get("core.repl_host")
@@ -405,6 +384,8 @@ class TestLeftoverReplHostShell:
         saved_dunder = sys.modules.get("__main__")
         saved_orm = main_module.secure_orm
         saved_err = main_module._secure_orm_error
+        saved_gsc = None
+        saved_esc = None
         missing_did = tmp_path / "missing.did"
         repo_did = os.path.join(BACKEND, "realm_backend.did")
         assert os.path.isfile(repo_did)
@@ -480,6 +461,32 @@ class TestLeftoverReplHostShell:
             assert "__shell__" not in names
             assert leftover._bload_count == 0
             assert executed._bload_count == 0
+            # Live leftover: leftover packed ``__main__`` has no leftover
+            # verb attr. Leftover Candid globals (this leftover-executed
+            # ``main`` module) do. Slot unwrap on leftover packed
+            # ``__main__`` cannot bind leftover-executed host verbs.
+            assert (
+                main_module._host_module_attr(executed, "get_sandbox_config")
+                is None
+            )
+            assert (
+                main_module._host_module_attr(executed, "extension_sync_call")
+                is None
+            )
+            saved_gsc = main_module.get_sandbox_config
+            saved_esc = main_module.extension_sync_call
+            main_module.get_sandbox_config = lambda: {
+                "available": True,
+                "default_mode": "sandbox",
+            }
+            main_module.extension_sync_call = (
+                lambda extension_name, function_name, args: {
+                    "success": True,
+                    "extension_name": extension_name,
+                    "function_name": function_name,
+                    "args": args,
+                }
+            )
 
             assert _leftover_api_eval(
                 orm,
@@ -505,6 +512,10 @@ class TestLeftoverReplHostShell:
             assert leftover._bload_count == 0
             assert executed._bload_count == 0
         finally:
+            if saved_gsc is not None:
+                main_module.get_sandbox_config = saved_gsc
+            if saved_esc is not None:
+                main_module.extension_sync_call = saved_esc
             main_module.secure_orm = saved_orm
             main_module._secure_orm_error = saved_err
             if saved_mod is None:
