@@ -79,6 +79,24 @@ def _restore_candid_globals(saved):
         _repl_host.extension_sync_call = esc
 
 
+def _leftover_inspect_without_signature():
+    """Live leftover WASI inspect is a stub: no leftover ``signature``."""
+    import inspect as real
+
+    stub = types.ModuleType("inspect")
+    stub.__dict__.update(
+        {
+            name: value
+            for name, value in vars(real).items()
+            if name not in {"signature", "Parameter", "BoundArguments"}
+        }
+    )
+    assert not hasattr(stub, "signature")
+    with pytest.raises(AttributeError, match="signature"):
+        stub.signature
+    return stub
+
+
 DID_PATH = Path(BACKEND) / "realm_backend.did"
 
 
@@ -188,6 +206,50 @@ class TestDidAllowlist:
 
 
 class TestHostDispatch:
+    def test_call_host_without_inspect_signature(self, monkeypatch):
+        """Live leftover WASI inspect has no leftover ``signature``."""
+        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_without_signature())
+        saved = _patch_candid_globals(
+            lambda: {"available": True, "default_mode": "sandbox"},
+            lambda extension_name, function_name, args: {
+                "success": True,
+                "extension_name": extension_name,
+                "function_name": function_name,
+                "args": args,
+            },
+        )
+        try:
+            orm = _orm(
+                allowed_methods=[
+                    "get_sandbox_config",
+                    "extension_sync_call",
+                    "__shell__",
+                ]
+            )
+            assert orm.handle_rpc(
+                "alice", "host.call", {"method": "get_sandbox_config"}
+            ) == {"available": True, "default_mode": "sandbox"}
+            assert orm.handle_rpc(
+                "alice",
+                "host.ext_sync",
+                {
+                    "extension_name": "department_docs",
+                    "function_name": "list_documents",
+                    "args": {},
+                },
+            ) == {
+                "success": True,
+                "extension_name": "department_docs",
+                "function_name": "list_documents",
+                "args": "{}",
+            }
+            with pytest.raises(PermissionError, match="__shell__"):
+                orm.handle_rpc(
+                    "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
+                )
+        finally:
+            _restore_candid_globals(saved)
+
     def test_call_positional_and_keyword(self):
         orm = _orm()
         assert orm.handle_rpc("alice", "host.call", {"method": "ping"}) == "pong"
@@ -660,7 +722,7 @@ class TestLazyModReimport:
             getattr(executed, "not_on_lazymod")
         assert executed._bload_count >= 1
 
-    def test_allowlist_when_instance_dict_is_not_a_dict(self, tmp_path):
+    def test_allowlist_when_instance_dict_is_not_a_dict(self, tmp_path, monkeypatch):
         """Live leftover after ``#342``: instance ns is mappingproxy, not dict.
 
         ``#342`` required ``isinstance(ns, dict)``. Leftover ``__dict__`` is
@@ -714,6 +776,7 @@ class TestLazyModReimport:
         b["rpc"] = rpc
         ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
         exec(HOST_STUB_APPENDIX, ns)
+        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_without_signature())
         saved = _patch_candid_globals(
             lambda: {"available": True, "default_mode": "sandbox"},
             lambda extension_name, function_name, args: {
@@ -739,7 +802,7 @@ class TestLazyModReimport:
         finally:
             _restore_candid_globals(saved)
 
-    def test_allowlist_from_type_dict_when_instance_has_no_verbs(self, tmp_path):
+    def test_allowlist_from_type_dict_when_instance_has_no_verbs(self, tmp_path, monkeypatch):
         """Live leftover: instance dict may omit ``get_sandbox_config``."""
         _bMT = type(sys)
 
@@ -801,6 +864,7 @@ class TestLazyModReimport:
         b["rpc"] = rpc
         ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
         exec(HOST_STUB_APPENDIX, ns)
+        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_without_signature())
         saved = _patch_candid_globals(
             lambda: {"available": True, "default_mode": "sandbox"},
             lambda extension_name, function_name, args: {
