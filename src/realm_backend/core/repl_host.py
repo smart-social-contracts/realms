@@ -13,7 +13,6 @@ import inspect
 import json
 import sys
 import types
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, FrozenSet, Iterable, Optional
 
@@ -146,13 +145,26 @@ _SKIP_TYPE_MRO = frozenset({object, type, types.ModuleType})
 _MISSING = object()
 
 
+def _mapping_like(ns: Any) -> bool:
+    """True for ``dict`` / ``mappingproxy``. No ``collections.abc.Mapping``.
+
+    Basilisk's WASI stub has no ``Mapping``. Class ``__dict__`` is a
+    ``mappingproxy``, not a ``dict``, so ``isinstance(..., dict)`` would
+    miss leftover host verbs on ``_LazyMod``.
+    """
+    get = getattr(ns, "get", None)
+    items = getattr(ns, "items", None)
+    contains = getattr(ns, "__contains__", None)
+    return callable(get) and callable(items) and callable(contains)
+
+
 def _is_lazy_mod(obj: Any) -> bool:
     """Basilisk ``_LazyMod`` instances stash source on ``_bsrc``."""
     ns = _module_namespace(obj)
     return bool(ns is not None and "_bsrc" in ns)
 
 
-def _iter_type_dicts(obj: Any) -> Iterable[Mapping]:
+def _iter_type_dicts(obj: Any) -> Iterable[Any]:
     """Class ``__dict__`` along ``type(obj).__mro__``, no instance getattr.
 
     Leftover Cedar images keep the Candid hack / host verbs on ``_LazyMod``
@@ -170,7 +182,7 @@ def _iter_type_dicts(obj: Any) -> Iterable[Mapping]:
             ns = object.__getattribute__(cls, "__dict__")
         except AttributeError:
             continue
-        if isinstance(ns, Mapping):
+        if _mapping_like(ns):
             yield ns
 
 
@@ -235,7 +247,7 @@ def _type_attr(obj: Any, name: str) -> Any:
             ns = object.__getattribute__(cls, "__dict__")
         except AttributeError:
             continue
-        if not isinstance(ns, Mapping):
+        if not _mapping_like(ns):
             continue
         for candidate in candidates:
             if candidate in ns:
@@ -251,7 +263,7 @@ def _is_class_host_value(key: str, val: Any) -> bool:
     return callable(val) or isinstance(val, (staticmethod, classmethod))
 
 
-def _has_host_callables(ns: Mapping) -> bool:
+def _has_host_callables(ns: Any) -> bool:
     return any(
         key not in _LAZY_KEYS and callable(val) for key, val in ns.items()
     )
