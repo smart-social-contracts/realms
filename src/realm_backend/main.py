@@ -858,7 +858,10 @@ def _host_json_args(args):
 
 
 def _host_drive_result(result):
-    if not _host_inspect.isgenerator(result):
+    """Leftover WASI inspect is a stub. Never leftover-inspect leftover generators."""
+    nxt = getattr(result, "__next__", None)
+    send = getattr(result, "send", None)
+    if not callable(nxt) or not callable(send):
         return result
     try:
         yielded = next(result)
@@ -871,6 +874,8 @@ def _host_drive_result(result):
             yielded = result.send(None)
     except StopIteration as done:
         return done.value
+    except TypeError:
+        return result
 
 
 class HostSecureORM(_SecureORMBase):
@@ -975,9 +980,9 @@ class HostSecureORM(_SecureORMBase):
         fn = _host_executed_callable(_host_candid_verb(method, module))
         if not callable(fn):
             raise _HostRpcError(f"host method {method!r} is not defined")
-        # Leftover WASI inspect is a stub with no leftover ``signature``.
-        # Call leftover-executed host verbs by name; do not leftover-inspect
-        # leftover signatures.
+        # Leftover WASI inspect is a stub. Call leftover-executed host
+        # verbs by name. Do not leftover-import or leftover-call leftover
+        # inspect on leftover invoke.
         from core.call_origin import host_call
 
         try:

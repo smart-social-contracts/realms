@@ -344,21 +344,18 @@ def _leftover_executed_main():
     return executed
 
 
-def _leftover_inspect_without_signature():
-    """Live leftover WASI inspect is a stub: no leftover ``signature``."""
-    import inspect as real
+def _leftover_inspect_stub():
+    """Live leftover WASI inspect is a stub: leftover leftover-safe attrs only."""
 
-    stub = types.ModuleType("inspect")
-    stub.__dict__.update(
-        {
-            name: value
-            for name, value in vars(real).items()
-            if name not in {"signature", "Parameter", "BoundArguments"}
-        }
-    )
-    assert not hasattr(stub, "signature")
-    with pytest.raises(AttributeError, match="signature"):
-        stub.signature
+    class _LeftoverInspect:
+        def __getattr__(self, name):
+            raise AttributeError(f"module 'inspect' has no attribute {name!r}")
+
+    stub = _LeftoverInspect()
+    for name in ("signature", "isgenerator", "getfullargspec", "isfunction", "Parameter"):
+        assert not hasattr(stub, name)
+        with pytest.raises(AttributeError, match=name):
+            getattr(stub, name)
     return stub
 
 
@@ -494,7 +491,7 @@ class TestLeftoverReplHostShell:
             )
             saved_gsc = main_module.get_sandbox_config
             saved_esc = main_module.extension_sync_call
-            leftover_inspect = _leftover_inspect_without_signature()
+            leftover_inspect = _leftover_inspect_stub()
             monkeypatch.setattr(main_module, "_host_inspect", leftover_inspect)
             main_module.get_sandbox_config = lambda: {
                 "available": True,

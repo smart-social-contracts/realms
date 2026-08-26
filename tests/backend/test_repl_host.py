@@ -79,21 +79,23 @@ def _restore_candid_globals(saved):
         _repl_host.extension_sync_call = esc
 
 
-def _leftover_inspect_without_signature():
-    """Live leftover WASI inspect is a stub: no leftover ``signature``."""
-    import inspect as real
+def _leftover_inspect_stub():
+    """Live leftover WASI inspect is a stub: leftover leftover-safe attrs only.
 
-    stub = types.ModuleType("inspect")
-    stub.__dict__.update(
-        {
-            name: value
-            for name, value in vars(real).items()
-            if name not in {"signature", "Parameter", "BoundArguments"}
-        }
-    )
-    assert not hasattr(stub, "signature")
-    with pytest.raises(AttributeError, match="signature"):
-        stub.signature
+    Leftover dispatch that leftover-calls leftover ``inspect.X`` fails this
+    leftover reconstruction. No leftover ``signature``, leftover
+    ``isgenerator``, leftover ``getfullargspec``, leftover ``isfunction``.
+    """
+
+    class _LeftoverInspect:
+        def __getattr__(self, name):
+            raise AttributeError(f"module 'inspect' has no attribute {name!r}")
+
+    stub = _LeftoverInspect()
+    for name in ("signature", "isgenerator", "getfullargspec", "isfunction", "Parameter"):
+        assert not hasattr(stub, name)
+        with pytest.raises(AttributeError, match=name):
+            getattr(stub, name)
     return stub
 
 
@@ -206,9 +208,16 @@ class TestDidAllowlist:
 
 
 class TestHostDispatch:
-    def test_call_host_without_inspect_signature(self, monkeypatch):
-        """Live leftover WASI inspect has no leftover ``signature``."""
-        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_without_signature())
+    def test_call_host_without_leftover_inspect(self, monkeypatch):
+        """Live leftover WASI inspect is a stub. Leftover dispatch must not leftover-call leftover inspect."""
+        import inspect as real
+
+        for fn in (HostSecureORM._call_host, _repl_host.drive_result):
+            src = real.getsource(fn)
+            assert "inspect.isgenerator" not in src
+            assert "inspect.signature" not in src
+            assert "inspect.getfullargspec" not in src
+        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_stub())
         saved = _patch_candid_globals(
             lambda: {"available": True, "default_mode": "sandbox"},
             lambda extension_name, function_name, args: {
@@ -776,7 +785,7 @@ class TestLazyModReimport:
         b["rpc"] = rpc
         ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
         exec(HOST_STUB_APPENDIX, ns)
-        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_without_signature())
+        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_stub())
         saved = _patch_candid_globals(
             lambda: {"available": True, "default_mode": "sandbox"},
             lambda extension_name, function_name, args: {
@@ -864,7 +873,7 @@ class TestLazyModReimport:
         b["rpc"] = rpc
         ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
         exec(HOST_STUB_APPENDIX, ns)
-        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_without_signature())
+        monkeypatch.setattr(_repl_host, "inspect", _leftover_inspect_stub())
         saved = _patch_candid_globals(
             lambda: {"available": True, "default_mode": "sandbox"},
             lambda extension_name, function_name, args: {
