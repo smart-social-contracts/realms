@@ -149,9 +149,7 @@ class TestEmbeddedCedarArtifacts:
 class TestSecureOrmWiring:
     def test_secure_orm_shares_engine_and_shell_context(self, main_module):
         assert main_module.secure_orm is not None
-        from core.repl_host import HostSecureORM as LiveHostSecureORM
-
-        assert isinstance(main_module.secure_orm, LiveHostSecureORM)
+        assert isinstance(main_module.secure_orm, main_module.HostSecureORM)
         _sync_orm_engine(main_module.secure_orm)
         assert main_module.secure_orm.engine is cedar_authz._get_engine()
         assert main_module.secure_orm._shell_context == {"repl": True}
@@ -257,58 +255,116 @@ class TestSecureOrmLazyInit:
             main_module._secure_orm_error = saved_err
 
 
+def _leftover_repl_host_lazymod():
+    """Live leftover: no HostSecureORM on instance or type; ``_bload`` crashes."""
+    _bMT = type(sys)
+    crash_src = "raise RuntimeError('Database instance already exists')\n"
+
+    class _LazyMod(_bMT):
+        def __init__(self, name):
+            super().__init__(name)
+            self.__dict__["_bsrc"] = crash_src
+            self.__dict__["_bloaded"] = True
+            self.__dict__["_bloading"] = False
+            self.__dict__["_bload_count"] = 0
+
+        def _bload(self):
+            self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+            if self.__dict__.get("_bloading") or self.__dict__.get("_bloaded"):
+                return
+            raise RuntimeError("Database instance already exists")
+
+        def __getattribute__(self, name):
+            ns = object.__getattribute__(self, "__dict__")
+            if name in ns:
+                return ns[name]
+            if name in {"__getattr__", "__getattribute__", "_bload"} or (
+                name.startswith("__") and name.endswith("__")
+            ):
+                return object.__getattribute__(self, name)
+            return object.__getattribute__(self, "__getattr__")(name)
+
+        def __getattr__(self, name):
+            object.__getattribute__(self, "_bload")()
+            ns = object.__getattribute__(self, "__dict__")
+            try:
+                return ns[name]
+            except KeyError:
+                raise AttributeError(
+                    f"module '{self.__name__}' has no attribute '{name}'"
+                )
+
+    leftover = _LazyMod("core.repl_host")
+    assert "HostSecureORM" not in leftover.__dict__
+    assert "HostSecureORM" not in type(leftover).__dict__
+    return leftover
+
+
+def _leftover_executed_main():
+    """Leftover ``__main__``: Candid hack / verbs on ``_LazyMod``, not instance."""
+    _bMT = type(sys)
+    crash_src = "raise RuntimeError('Database instance already exists')\n"
+    did_text = (
+        "service : {\n"
+        '  "get_sandbox_config" : () -> (text) query;\n'
+        '  "extension_sync_call" : (text, text, text) -> (text);\n'
+        '  "__shell__" : (text) -> (text);\n'
+        "}\n"
+    )
+
+    class _LazyMod(_bMT):
+        def __init__(self, name):
+            super().__init__(name)
+            self.__dict__["_bsrc"] = crash_src
+            self.__dict__["_bloaded"] = False
+            self.__dict__["_bloading"] = False
+            self.__dict__["_bload_count"] = 0
+
+        def _bload(self):
+            self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+            raise RuntimeError("Database instance already exists")
+
+        def __getattr__(self, name):
+            self._bload()
+
+        def __get_candid_interface_tmp_hack(self):
+            return did_text
+
+        def get_sandbox_config(self):
+            return {"available": True, "default_mode": "sandbox"}
+
+        def extension_sync_call(self, extension_name, function_name, args):
+            return {
+                "success": True,
+                "extension_name": extension_name,
+                "function_name": function_name,
+                "args": args,
+            }
+
+        def __shell__(self, code):
+            return "should never run"
+
+    executed = _LazyMod("__main__")
+    assert "__get_candid_interface_tmp_hack" not in executed.__dict__
+    assert "get_sandbox_config" not in executed.__dict__
+    assert "HostSecureORM" not in executed.__dict__
+    return executed
+
+
 class TestLeftoverReplHostShell:
     def test_shell_starts_when_repl_host_is_leftover_lazymod(self, main_module):
         """Leftover ``core.repl_host``: from-import / ``_bload`` die; ``__shell__`` starts."""
-        from core.repl_host import HostSecureORM as LiveHostSecureORM
-
-        _bMT = type(sys)
-        crash_src = (
-            "raise RuntimeError('Database instance already exists')\n"
-        )
-
-        class _LazyMod(_bMT):
-            HostSecureORM = LiveHostSecureORM
-
-            def __init__(self, name):
-                super().__init__(name)
-                self.__dict__["_bsrc"] = crash_src
-                self.__dict__["_bloaded"] = True
-                self.__dict__["_bloading"] = False
-                self.__dict__["_bload_count"] = 0
-
-            def _bload(self):
-                self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
-                if self.__dict__.get("_bloading") or self.__dict__.get("_bloaded"):
-                    return
-                raise RuntimeError("Database instance already exists")
-
-            def __getattribute__(self, name):
-                ns = object.__getattribute__(self, "__dict__")
-                if name in ns:
-                    return ns[name]
-                if name in {"__getattr__", "__getattribute__", "_bload"} or (
-                    name.startswith("__") and name.endswith("__")
-                ):
-                    return object.__getattribute__(self, name)
-                return object.__getattribute__(self, "__getattr__")(name)
-
-            def __getattr__(self, name):
-                object.__getattribute__(self, "_bload")()
-                ns = object.__getattribute__(self, "__dict__")
-                try:
-                    return ns[name]
-                except KeyError:
-                    raise AttributeError(
-                        f"module '{self.__name__}' has no attribute '{name}'"
-                    )
-
-        leftover = _LazyMod("core.repl_host")
+        leftover = _leftover_repl_host_lazymod()
+        host = _leftover_executed_main()
         saved_mod = sys.modules.get("core.repl_host")
+        saved_main = sys.modules.get("main")
+        saved_dunder = sys.modules.get("__main__")
         saved_orm = main_module.secure_orm
         saved_err = main_module._secure_orm_error
         try:
             sys.modules["core.repl_host"] = leftover
+            sys.modules["main"] = main_module
+            sys.modules["__main__"] = host
             assert "HostSecureORM" not in leftover.__dict__
             with pytest.raises(ImportError, match="unknown location"):
                 exec(
@@ -327,6 +383,7 @@ class TestLeftoverReplHostShell:
             assert orm is not None
             assert main_module._secure_orm_error == ""
             assert leftover._bload_count == 0
+            assert isinstance(orm, main_module.HostSecureORM)
 
             started = {"n": 0}
 
@@ -350,10 +407,31 @@ class TestLeftoverReplHostShell:
             assert started["n"] == 1
             assert leftover._bload_count == 0
 
+            orm._host_module = host
+            orm._allowed_methods = None
+            assert orm.handle_rpc(
+                "alice", "host.call", {"method": "get_sandbox_config"}
+            ) == {"available": True, "default_mode": "sandbox"}
+            assert orm.handle_rpc(
+                "alice",
+                "host.ext_sync",
+                {
+                    "extension_name": "department_docs",
+                    "function_name": "list_documents",
+                    "args": {},
+                },
+            ) == {
+                "success": True,
+                "extension_name": "department_docs",
+                "function_name": "list_documents",
+                "args": "{}",
+            }
             with pytest.raises(PermissionError, match="__shell__"):
                 orm.handle_rpc(
                     "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
                 )
+            assert leftover._bload_count == 0
+            assert host._bload_count == 0
         finally:
             main_module.secure_orm = saved_orm
             main_module._secure_orm_error = saved_err
@@ -361,3 +439,11 @@ class TestLeftoverReplHostShell:
                 sys.modules.pop("core.repl_host", None)
             else:
                 sys.modules["core.repl_host"] = saved_mod
+            if saved_main is None:
+                sys.modules.pop("main", None)
+            else:
+                sys.modules["main"] = saved_main
+            if saved_dunder is None:
+                sys.modules.pop("__main__", None)
+            else:
+                sys.modules["__main__"] = saved_dunder

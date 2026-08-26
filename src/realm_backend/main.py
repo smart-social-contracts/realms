@@ -302,76 +302,460 @@ def setup_gate_error(caller: str):
     return _setup.setup_gate_error(caller)
 
 
-def _leftover_safe_attr(obj, name, default=None):
-    """Read ``name`` from instance / type dict. Never getattr leftover ``_LazyMod``.
+# HostSecureORM lives on leftover-executed ``__main__``. Leftover
+# ``core.repl_host`` is a Basilisk ``_LazyMod``: the class is a module-level
+# name that only exists after ``_bload``, and ``_bload`` cannot run (Database
+# already exists / leftover ``_bloaded``). Type-dict / getattr mazes never
+# see it. Do not ``from core.repl_host import HostSecureORM``.
+from ic_basilisk_toolkit.secure_orm import RpcError as _HostRpcError
+from ic_basilisk_toolkit.secure_orm import SecureORM as _SecureORMBase
+import inspect as _host_inspect
+from pathlib import Path as _HostPath
+import types as _host_types
 
-    Leftover ``core.repl_host`` is a Basilisk ``_LazyMod`` at an unknown
-    location. ``from core.repl_host import HostSecureORM`` and getattr both
-    ``_bload`` (``Database instance already exists``) or raise ImportError.
-    Prefer the already-loaded ``_module_attr`` helper; otherwise walk the
-    type dict the same way as leftover allowlist reads (no Mapping).
-    """
-    if obj is None:
-        return default
-    helper = None
-    rh = sys.modules.get("core.repl_host")
-    if rh is not None:
-        try:
-            rns = object.__getattribute__(rh, "__dict__")
-        except AttributeError:
-            rns = None
-        if isinstance(rns, dict) and callable(rns.get("_module_attr")):
-            helper = rns["_module_attr"]
-    if helper is not None:
-        return helper(obj, name, default)
+_HOST_ACTIONS = (
+    "host.call",
+    "host.ext_sync",
+    "host.ext_async",
+    "host.list_methods",
+)
+_HOST_BLOCKED = frozenset(
+    {
+        "__shell__",
+        "http_request",
+        "http_transform",
+        "__get_candid_interface_tmp_hack",
+    }
+)
+_HOST_STUB_APPENDIX = r'''
+def _host_rpc(action, **kwargs):
+    b = __builtins__
+    fn = b.get("rpc") if isinstance(b, dict) else getattr(b, "rpc", None)
+    if fn is None:
+        fn = globals().get("rpc")
+    if not callable(fn):
+        raise RuntimeError("rpc is not available")
+    return fn(action, **kwargs)
+
+class api:
+    @staticmethod
+    def call(method, *args, **kwargs):
+        return _host_rpc("host.call", method=method, args=list(args), kwargs=dict(kwargs))
+
+    @staticmethod
+    def methods():
+        return _host_rpc("host.list_methods")
+
+class ext:
+    @staticmethod
+    def call(extension_name, function_name, args=None):
+        return _host_rpc("host.ext_sync", extension_name=extension_name, function_name=function_name, args=args)
+
+    @staticmethod
+    def call_async(extension_name, function_name, args=None):
+        return _host_rpc("host.ext_async", extension_name=extension_name, function_name=function_name, args=args)
+
+def _install_host_names():
+    b = __builtins__
+    if isinstance(b, dict):
+        b["api"] = api
+        b["ext"] = ext
+    else:
+        b.api = api
+        b.ext = ext
+    ns = globals().get("_repl_ns")
+    if isinstance(ns, dict):
+        ns["api"] = api
+        ns["ext"] = ext
+        if not callable(ns.get("rpc")):
+            fn = b.get("rpc") if isinstance(b, dict) else getattr(b, "rpc", None)
+            if callable(fn):
+                ns["rpc"] = fn
+
+_install_host_names()
+_eval_repl_inner = eval_repl
+def eval_repl(code):
+    _install_host_names()
+    return _eval_repl_inner(code)
+'''
+_HOST_LAZY_KEYS = frozenset({"_bsrc", "_bloaded", "_bloading", "_bload_count", "_bload"})
+_HOST_SKIP_MRO = frozenset({object, type, _host_types.ModuleType})
+_HOST_MISSING = object()
+
+
+def _host_did_path():
+    here = globals().get("__file__")
+    if here:
+        return _HostPath(here).parent / "realm_backend.did"
+    return _HostPath("realm_backend.did")
+
+
+def _host_mapping_like(ns):
+    """True for ``dict`` / ``mappingproxy``. No ``collections.abc.Mapping``."""
+    get = getattr(ns, "get", None)
+    items = getattr(ns, "items", None)
+    contains = getattr(ns, "__contains__", None)
+    return callable(get) and callable(items) and callable(contains)
+
+
+def _host_module_ns(obj):
     try:
         ns = object.__getattribute__(obj, "__dict__")
     except AttributeError:
-        ns = None
-    if isinstance(ns, dict) and name in ns:
-        return ns[name]
+        return None
+    return ns if isinstance(ns, dict) else None
+
+
+def _host_is_lazy(obj):
+    ns = _host_module_ns(obj)
+    return bool(ns is not None and "_bsrc" in ns)
+
+
+def _host_bind_from_class(val, obj, owner):
+    if isinstance(val, (staticmethod, classmethod)):
+        return val.__get__(obj, owner)
+    if _host_inspect.isfunction(val):
+        try:
+            params = list(_host_inspect.signature(val).parameters.values())
+        except (TypeError, ValueError):
+            return val
+        if (
+            params
+            and params[0].kind
+            in (
+                _host_inspect.Parameter.POSITIONAL_ONLY,
+                _host_inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            )
+            and params[0].default is _host_inspect.Parameter.empty
+            and params[0].name in {"self", "cls"}
+        ):
+            return val.__get__(obj, owner)
+        return val
+    getter = getattr(type(val), "__get__", None)
+    if getter is not None and not isinstance(val, type):
+        try:
+            return val.__get__(obj, owner)
+        except Exception:
+            return val
+    return val
+
+
+def _host_type_lookup_names(obj, name):
+    names = [name]
+    if name.startswith("__") and not name.endswith("__"):
+        try:
+            mro = type(obj).__mro__
+        except Exception:
+            return (name,)
+        for cls in mro:
+            if cls in _HOST_SKIP_MRO:
+                continue
+            names.append(f"_{cls.__name__.lstrip('_')}{name}")
+    return tuple(dict.fromkeys(names))
+
+
+def _host_type_attr(obj, name):
     try:
         mro = type(obj).__mro__
     except Exception:
-        return default
-    skip = {object, type, type(sys)}
+        return _HOST_MISSING
+    candidates = _host_type_lookup_names(obj, name)
     for cls in mro:
-        if cls in skip:
+        if cls in _HOST_SKIP_MRO:
             continue
         try:
-            tns = object.__getattribute__(cls, "__dict__")
+            ns = object.__getattribute__(cls, "__dict__")
         except AttributeError:
             continue
-        contains = getattr(tns, "__contains__", None)
-        if not callable(contains) or name not in tns:
+        if not _host_mapping_like(ns):
             continue
-        return tns[name]
-    return default
+        for candidate in candidates:
+            if candidate in ns:
+                return _host_bind_from_class(ns[candidate], obj, cls)
+    return _HOST_MISSING
 
 
-def _resolve_host_secure_orm():
-    """Late-bind ``HostSecureORM`` leftover-safely. No top-level from-import."""
-    rh = sys.modules.get("core.repl_host")
-    if rh is None:
-        import core.repl_host as rh  # fresh load only; leftover already occupies sys.modules
-    cls = _leftover_safe_attr(rh, "HostSecureORM")
-    if isinstance(cls, type):
-        return cls
-    resolver = _leftover_safe_attr(rh, "resolve_host_secure_orm")
-    if callable(resolver):
-        resolved = resolver()
-        if isinstance(resolved, type):
-            return resolved
-    for mod in list(sys.modules.values()):
-        if mod is None or mod is rh:
+def _host_module_attr(obj, name, default=None):
+    """Look up ``name`` without leftover ``_LazyMod._bload`` / Mapping."""
+    if obj is None:
+        return default
+    ns = _host_module_ns(obj)
+    if ns is not None and name in ns:
+        return ns[name]
+    typed = _host_type_attr(obj, name)
+    if typed is not _HOST_MISSING:
+        return typed
+    if _host_is_lazy(obj):
+        return default
+    try:
+        return getattr(obj, name)
+    except AttributeError:
+        return default
+
+
+def _host_iter_type_dicts(obj):
+    try:
+        mro = type(obj).__mro__
+    except Exception:
+        return
+    for cls in mro:
+        if cls in _HOST_SKIP_MRO:
             continue
-        cls = _leftover_safe_attr(mod, "HostSecureORM")
-        if isinstance(cls, type) and cls.__name__ == "HostSecureORM":
-            return cls
-    raise ImportError(
-        "cannot import name 'HostSecureORM' from 'core.repl_host' "
-        "(unknown location)"
+        try:
+            ns = object.__getattribute__(cls, "__dict__")
+        except AttributeError:
+            continue
+        if _host_mapping_like(ns):
+            yield ns
+
+
+def _host_is_class_host_value(key, val):
+    if key.endswith("__get_candid_interface_tmp_hack"):
+        return True
+    if key in _HOST_LAZY_KEYS or key.startswith("_"):
+        return False
+    return callable(val) or isinstance(val, (staticmethod, classmethod))
+
+
+def _host_has_callables(ns):
+    return any(
+        key not in _HOST_LAZY_KEYS and callable(val) for key, val in ns.items()
     )
+
+
+def _host_class_has_surface(obj):
+    for ns in _host_iter_type_dicts(obj):
+        if any(_host_is_class_host_value(key, val) for key, val in ns.items()):
+            return True
+    return False
+
+
+def _host_has_surface(mod):
+    ns = _host_module_ns(mod)
+    if ns is not None and _host_has_callables(ns):
+        return True
+    return _host_class_has_surface(mod)
+
+
+def _host_is_unloaded_lazy(mod):
+    if not _host_is_lazy(mod):
+        return False
+    ns = _host_module_ns(mod)
+    if ns is None or ns.get("_bloaded") is True:
+        return False
+    return not _host_has_surface(mod)
+
+
+def _host_is_executed(mod):
+    if mod is None:
+        return False
+    ns = _host_module_ns(mod)
+    if ns is None:
+        return False
+    if _host_is_lazy(mod) and ns.get("_bloaded") is False:
+        return _host_has_surface(mod)
+    return True
+
+
+def _host_resolve_module(host_module=None):
+    """Already-executed canister entry. Never ``import main`` / ``_bload``."""
+    if host_module is not None and not _host_is_unloaded_lazy(host_module):
+        return host_module
+    main = sys.modules.get("__main__")
+    named = sys.modules.get("main")
+    if _host_is_executed(main):
+        return main
+    if _host_is_executed(named):
+        return named
+    if host_module is not None:
+        return host_module
+    return main or named
+
+
+def _host_parse_candid(did_text):
+    marker = "service :"
+    idx = did_text.rfind(marker)
+    body = did_text[idx:] if idx >= 0 else did_text
+    names = []
+    i = 0
+    while True:
+        q = body.find('"', i)
+        if q < 0:
+            break
+        end = body.find('"', q + 1)
+        if end < 0:
+            break
+        name = body[q + 1 : end]
+        rest = body[end + 1 :].lstrip()
+        if rest.startswith(":") and name:
+            names.append(name)
+        i = end + 1
+    return frozenset(names)
+
+
+def _host_load_allowed(did_path=None, blocked=_HOST_BLOCKED, host_module=None):
+    blocked_set = frozenset(blocked)
+    path = _HostPath(did_path) if did_path is not None else _host_did_path()
+    did_text = None
+    try:
+        if path.is_file():
+            did_text = path.read_text()
+    except OSError:
+        did_text = None
+    module = _host_resolve_module(host_module)
+    if not did_text:
+        hack = _host_module_attr(module, "__get_candid_interface_tmp_hack") if module else None
+        if callable(hack):
+            try:
+                did_text = hack()
+            except TypeError:
+                did_text = hack(module)
+    if did_text:
+        names = _host_parse_candid(did_text) - blocked_set
+        if names:
+            return names
+    raise _HostRpcError("Candid interface not found; host RPC disabled")
+
+
+def _host_json_args(args):
+    if args is None:
+        return "{}"
+    if isinstance(args, str):
+        return args
+    return json.dumps(args)
+
+
+def _host_drive_result(result):
+    if not _host_inspect.isgenerator(result):
+        return result
+    try:
+        yielded = next(result)
+        while True:
+            if isinstance(yielded, tuple) and yielded and yielded[0] == "call":
+                raise RuntimeError(
+                    "async host method yielded an inter-canister call; "
+                    "the REPL cannot drive IC calls yet"
+                )
+            yielded = result.send(None)
+    except StopIteration as done:
+        return done.value
+
+
+class HostSecureORM(_SecureORMBase):
+    """SecureORM plus host-method RPCs. Defined here so leftover ``__main__`` has it."""
+
+    def __init__(
+        self,
+        *args,
+        host_module=None,
+        allowed_methods=None,
+        blocked_methods=None,
+        did_path=None,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self._host_module = host_module
+        self._blocked_methods = (
+            frozenset(blocked_methods) if blocked_methods is not None else _HOST_BLOCKED
+        )
+        self._allowed_methods = (
+            frozenset(allowed_methods) if allowed_methods is not None else None
+        )
+        self._did_path = _HostPath(did_path) if did_path is not None else _host_did_path()
+        self._stub_source = self._stub_source + "\n" + _HOST_STUB_APPENDIX
+        self._sandbox_hash = ""
+
+    def actions(self):
+        return list(super().actions()) + list(_HOST_ACTIONS)
+
+    def allowed_methods(self):
+        if not self._allowed_methods:
+            self._allowed_methods = _host_load_allowed(
+                self._did_path,
+                self._blocked_methods,
+                host_module=self.host_module(),
+            )
+        return self._allowed_methods - self._blocked_methods
+
+    def host_module(self):
+        if self._host_module is not None and not _host_is_unloaded_lazy(self._host_module):
+            return self._host_module
+        resolved = _host_resolve_module(self._host_module)
+        if resolved is not None:
+            self._host_module = resolved
+        return resolved
+
+    def handle_rpc(self, principal_id, action, kwargs):
+        kwargs = dict(kwargs or {})
+        if action.startswith("host."):
+            return self._handle_host(action, kwargs)
+        return super().handle_rpc(principal_id, action, kwargs)
+
+    def _handle_host(self, action, kwargs):
+        if action == "host.list_methods":
+            return sorted(self.allowed_methods())
+        if action == "host.call":
+            return self._call_host(
+                kwargs.get("method"),
+                list(kwargs.get("args") or []),
+                dict(kwargs.get("kwargs") or {}),
+            )
+        if action == "host.ext_sync":
+            return self._call_host(
+                "extension_sync_call",
+                [
+                    kwargs.get("extension_name"),
+                    kwargs.get("function_name"),
+                    _host_json_args(kwargs.get("args")),
+                ],
+                {},
+            )
+        if action == "host.ext_async":
+            return self._call_host(
+                "extension_async_call",
+                [
+                    kwargs.get("extension_name"),
+                    kwargs.get("function_name"),
+                    _host_json_args(kwargs.get("args")),
+                ],
+                {},
+            )
+        raise _HostRpcError(f"unknown action {action!r}")
+
+    def _call_host(self, method, args, call_kwargs):
+        if not isinstance(method, str) or not method:
+            raise _HostRpcError("host.call requires a method name")
+        if method in self._blocked_methods:
+            raise PermissionError(
+                f"host method {method!r} is not callable from the REPL"
+            )
+        allowed = self.allowed_methods()
+        if method not in allowed:
+            raise PermissionError(f"host method {method!r} is not on the allowlist")
+        module = self.host_module()
+        if module is None:
+            raise _HostRpcError("host module is not loaded")
+        fn = _host_module_attr(module, method)
+        if not callable(fn) and module is not sys.modules.get("__main__"):
+            fn = _host_module_attr(sys.modules.get("__main__"), method)
+        if not callable(fn):
+            raise _HostRpcError(f"host method {method!r} is not defined")
+        try:
+            bound = _host_inspect.signature(fn).bind(*args, **call_kwargs)
+            bound.apply_defaults()
+        except TypeError as exc:
+            raise _HostRpcError(f"{method}: {exc}") from exc
+        from core.call_origin import host_call
+
+        try:
+            with host_call():
+                return _host_drive_result(fn(*bound.args, **bound.kwargs))
+        except PermissionError:
+            raise
+        except Exception as exc:
+            if type(exc).__name__ == "AccessDenied":
+                raise PermissionError(str(exc)) from exc
+            raise
 
 
 def _init_secure_orm():
@@ -381,7 +765,6 @@ def _init_secure_orm():
     import ggg
     from core import cedar_authz
 
-    HostSecureORM = _resolve_host_secure_orm()
     included, schema = collect_ggg_schema_entities()
     return HostSecureORM(
         engine=cedar_authz._get_engine(),
