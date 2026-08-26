@@ -342,7 +342,7 @@ class TestExtensionOverrides:
         })
         overrides = codex_hooks.get_extension_overrides()
         assert overrides["member_dashboard"] == "hooked_dashboard"
-        assert overrides["voting"] == "legacy_voting"
+        assert "voting" not in overrides
 
     def test_cache_invalidation(self):
         module = MagicMock(spec=[])

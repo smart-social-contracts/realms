@@ -148,6 +148,13 @@ def install_codex_package(codex_id: str, files: Dict[str, str]) -> bool:
     pkg_path = _pkg_dir(codex_id)
     os.makedirs(pkg_path, exist_ok=True)
 
+    try:
+        from core.codex_overlay import preserve_current_as_previous
+
+        preserve_current_as_previous()
+    except Exception as exc:
+        logger.warning(f"Codex package {codex_id}: overlay snapshot failed — {exc}")
+
     # Write all files to the package directory
     for filename, content in files.items():
         filepath = os.path.join(pkg_path, filename)
@@ -175,9 +182,22 @@ def install_codex_package(codex_id: str, files: Dict[str, str]) -> bool:
     except Exception:
         pass
 
+    modules = list(_codex_names_for_package(codex_id))
+    for path in files:
+        if path.startswith("modules/") and path.endswith(".py"):
+            stem = path[len("modules/") : -3]
+            if stem and "/" not in stem and stem not in modules:
+                modules.append(stem)
+    try:
+        from core.codex_overlay import commit_current
+
+        commit_current(codex_id, files, modules)
+    except Exception as exc:
+        logger.warning(f"Codex package {codex_id}: overlay commit failed — {exc}")
+
     logger.info(
         f"Codex package {codex_id}: installed ({len(files)} files, "
-        f"{len(_codex_names_for_package(codex_id))} codexes)"
+        f"{len(modules)} codexes)"
     )
 
     return True
@@ -338,6 +358,8 @@ def get_extension_overrides() -> Dict[str, str]:
         for base, override in raw.items():
             if base and override and isinstance(override, str):
                 overrides[str(base)] = override
-    return overrides
+    from core.codex_overlay import filter_protected_overrides
+
+    return filter_protected_overrides(overrides)
 
 

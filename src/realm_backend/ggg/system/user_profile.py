@@ -151,6 +151,7 @@ class Operations:
     # Codex packages
     CODEX_INSTALL = "codex.install"
     CODEX_UNINSTALL = "codex.uninstall"
+    CODEX_REVERT = "codex.revert"
 
     # Data visibility — read-scoped operations used by extension
     # entry_access gates (permission-based cutover of the old
@@ -310,6 +311,10 @@ OPERATIONS_CATALOG = {
 
     "codex.install": {"category": "Codex", "description": "Install governance codex packages"},
     "codex.uninstall": {"category": "Codex", "description": "Uninstall governance codex packages"},
+    "codex.revert": {
+        "category": "Codex",
+        "description": "Revert the realm codex overlay to the previous package, or toggle safe mode",
+    },
 
     "self.join": {"category": "Self-service", "description": "Join the realm as a new member"},
     "self.update_public_profile": {"category": "Self-service", "description": "Update your own public profile"},
@@ -377,6 +382,7 @@ class Profiles:
             Operations.FEDERAL_VOTE_MANAGE,
             Operations.CONTRACT_CREATE_UNDER_MANDATE,
             Operations.GOVERNANCE_UPDATE,
+            Operations.CODEX_REVERT,
         ],
     }
     EXECUTOR = {

@@ -984,6 +984,13 @@ def install_extension_from_registry(
 
     from core.runtime_extensions import install_extension as _install
 
+    if is_codex:
+        from core.codex_overlay import preserve_current_as_previous, wipe_runtime_package
+
+        # Snapshot *before* install_extension overwrites /extensions/{id}.
+        preserve_current_as_previous()
+        wipe_runtime_package(ext_id)
+
     ok = _install(
         ext_id,
         files,
@@ -1006,9 +1013,16 @@ def install_extension_from_registry(
         # Governance module files become Codex DB entities (proposal targets).
         # Honor optional manifest ``codex_modules`` allow-list when present.
         seeded_modules = _seed_codex_module_entities(ext_id, files, manifest)
+        from core.codex_overlay import commit_current, ensure_codex_revert_grants
+
+        commit_current(ext_id, files, seeded_modules)
         # Post-install realm setup — the codex enforces its realm settings
         # server-side here, so no wizard bug can contradict the codex.
         init_error = codex_hooks.run_init(ext_id)
+        try:
+            ensure_codex_revert_grants()
+        except Exception:
+            pass
 
     result = {
         "success": True,

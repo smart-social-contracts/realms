@@ -101,8 +101,16 @@ def test_submit_gates():
     assert submit_gate("code_execution", {}) == "proposal.create"
     assert submit_gate("transaction", {}) == "transfer.create"
     assert submit_gate("upgrade", {"target": "codex"}) == "codex.install"
+    assert submit_gate("upgrade", {"target": "codex_revert"}) == "codex.revert"
     assert submit_gate("upgrade", {"target": "extension"}) == "extension.install"
     assert submit_gate("upgrade", {"target": "core"}) == "orchestration.approve"
+
+
+def test_upgrade_codex_revert_needs_no_package():
+    action, perms, err = freeze_action("upgrade", {"target": "codex_revert"})
+    assert err is None
+    assert perms == []
+    assert action == {"target": "codex_revert"}
 
 
 def test_timelock_only_transaction_and_core():
