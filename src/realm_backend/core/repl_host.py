@@ -604,8 +604,14 @@ def json_args(args: Any) -> str:
 
 
 def drive_result(result: Any) -> Any:
-    """Consume a Basilisk ``Async`` generator that does not yield IC calls."""
-    if not inspect.isgenerator(result):
+    """Consume a Basilisk ``Async`` generator that does not yield IC calls.
+
+    Leftover WASI inspect is a stub. Detect leftover generators with leftover
+    ``hasattr`` / leftover ``next``, never leftover inspect.
+    """
+    nxt = getattr(result, "__next__", None)
+    send = getattr(result, "send", None)
+    if not callable(nxt) or not callable(send):
         return result
     try:
         yielded = next(result)
@@ -618,6 +624,8 @@ def drive_result(result: Any) -> Any:
             yielded = result.send(None)
     except StopIteration as done:
         return done.value
+    except TypeError:
+        return result
 
 
 def _as_permission(exc: BaseException) -> PermissionError:
@@ -762,9 +770,9 @@ class HostSecureORM(SecureORM):
         fn = _executed_callable(_candid_verb(method, module))
         if not callable(fn):
             raise RpcError(f"host method {method!r} is not defined")
-        # Leftover WASI inspect is a stub with no leftover ``signature``.
-        # Call leftover-executed host verbs by name; do not leftover-inspect
-        # leftover signatures.
+        # Leftover WASI inspect is a stub. Call leftover-executed host
+        # verbs by name. Do not leftover-import or leftover-call leftover
+        # inspect on leftover invoke.
         from core.call_origin import host_call
 
         try:
