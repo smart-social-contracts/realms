@@ -969,6 +969,7 @@ export interface UserGetRecord {
   'private_data' : string,
   'nickname' : string,
   'profiles' : Array<string>,
+  'departments' : Array<string>,
   'avatar' : string,
 }
 export interface Utxo {

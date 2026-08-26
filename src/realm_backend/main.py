@@ -174,10 +174,18 @@ class StatusRecord(Record):
 class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
+    departments: Vec[text]
     nickname: text
     avatar: text
     private_data: text
     assigned_quarter: text
+
+
+def _text_vec(values) -> Vec[text]:
+    out = Vec[text]()
+    for value in values or []:
+        out.append(value)
+    return out
 
 
 class ObjectsListRecordPaginated(Record):
@@ -905,6 +913,7 @@ def join_realm(
                 userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
+                    departments=_text_vec(user.get("departments")),
                     nickname=user.get("nickname", ""),
                     avatar=user.get("avatar", ""),
                     private_data=user.get("private_data", ""),
@@ -971,6 +980,7 @@ def register_founder(principal: text) -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
+                    departments=_text_vec(user.get("departments")),
                     nickname=user.get("nickname", ""),
                     avatar=user.get("avatar", ""),
                     private_data=user.get("private_data", ""),
@@ -3082,6 +3092,7 @@ def get_my_user_status() -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
+                    departments=_text_vec(user.get("departments")),
                     nickname=user.get("nickname", ""),
                     avatar=user.get("avatar", ""),
                     private_data=user.get("private_data", ""),
@@ -3210,6 +3221,7 @@ def update_my_public_profile(nickname: str, avatar: str) -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=ic.caller(),
                     profiles=Vec[text](),
+                    departments=Vec[text](),
                     nickname=result["nickname"],
                     avatar=result["avatar"],
                     private_data="",
@@ -3246,6 +3258,7 @@ def update_my_private_data(private_data: str) -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=ic.caller(),
                     profiles=Vec[text](),
+                    departments=Vec[text](),
                     nickname="",
                     avatar="",
                     private_data=result["private_data"],

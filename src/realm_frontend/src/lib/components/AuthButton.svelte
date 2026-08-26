@@ -2,7 +2,9 @@
 <script>
 	import { login, logout, restoreAuthSession, resetAuthSessionRestore } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
-	import { loadUserProfiles, resetProfileState, userProfiles, hasJoined } from '$lib/stores/profiles';
+	import { loadUserProfiles, resetProfileState, applyUserGetRecord, userProfiles, userDepartments, hasJoined } from '$lib/stores/profiles';
+	import { formatProfileValues, formatDepartmentValues } from '$lib/utils/membershipLabels';
+	import { activeQuarterId } from '$lib/stores/quarters';
 	import { goto } from '$app/navigation';
 	import { Avatar, Button } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
@@ -10,7 +12,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
-	import { IconCheck, IconCopy, IconLogin } from '@tabler/icons-svelte';
+	import { IconBuilding, IconCheck, IconCopy, IconLogin, IconUser } from '@tabler/icons-svelte';
 	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
 	import { copyText } from '$lib/clipboard.js';
 	import QuarterSwitcher from '$lib/components/QuarterSwitcher.svelte';
@@ -108,13 +110,9 @@
 		return `https://api.dicebear.com/9.x/glass/svg?seed=${seed}`;
 	}
 	
-	// Show the user's actual profiles (users can hold several, e.g. member + judge).
-	$: userTypeLabel = (() => {
-		if (!$userProfiles || $userProfiles.length === 0) return 'Guest';
-		return $userProfiles
-			.map((p) => p.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()))
-			.join(', ');
-	})();
+	// Cedar profiles and department membership are different kinds of thing.
+	$: profileValues = formatProfileValues($userProfiles);
+	$: departmentValues = formatDepartmentValues($userDepartments);
 	
 	function goToSettings() {
 		showDropdown = false;
@@ -127,12 +125,24 @@
 		try {
 			const response = await backend.get_my_user_status();
 			if (response && response.success && response.data && response.data.userGet) {
-				userProfilePictureUrl = response.data.userGet.avatar || '';
+				const userGet = response.data.userGet;
+				userProfilePictureUrl = userGet.avatar || '';
+				applyUserGetRecord(userGet);
 			}
 		} catch (error) {
 			console.error('Error loading user profile picture:', error);
 			userProfilePictureUrl = '';
 		}
+	}
+
+	// Reload avatar + department membership when this tab's quarter changes.
+	let lastQuarterKey;
+	$: if ($isAuthenticated) {
+		const key = $activeQuarterId ?? '';
+		if (lastQuarterKey !== undefined && lastQuarterKey !== key) {
+			loadUserProfilePicture();
+		}
+		lastQuarterKey = key;
 	}
 
 	// Listen for profile picture updates from settings page
@@ -228,9 +238,24 @@
 							{/if}
 						</button>
 					</div>
-					<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-						{userTypeLabel}
-					</p>
+					<div class="mt-1 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+						<div
+							class="flex items-center gap-1.5 min-w-0"
+							title={$_('common.profile', { default: 'Profile' })}
+							aria-label={$_('common.profile', { default: 'Profile' })}
+						>
+							<IconUser size={14} class="shrink-0" aria-hidden="true" />
+							<span class="truncate">{profileValues}</span>
+						</div>
+						<div
+							class="flex items-center gap-1.5 min-w-0"
+							title={$_('common.dept', { default: 'Dept' })}
+							aria-label={$_('common.dept', { default: 'Dept' })}
+						>
+							<IconBuilding size={14} class="shrink-0" aria-hidden="true" />
+							<span class="truncate">{departmentValues}</span>
+						</div>
+					</div>
 				</div>
 				{#if showRealmControls}
 					<QuarterSwitcher variant="menu" />

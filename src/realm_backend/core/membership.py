@@ -54,6 +54,21 @@ def _scan_users(predicate: Callable, limit: Optional[int] = None) -> List:
 # ---------------------------------------------------------------------------
 
 
+def user_department_names(user) -> List[str]:
+    """Forward membership: department names this user belongs to."""
+    if user is None:
+        return []
+    try:
+        names = []
+        for dept in user.departments:
+            name = getattr(dept, "name", None)
+            if name:
+                names.append(str(name))
+        return names
+    except Exception:
+        return []
+
+
 def user_in_department(user, dept) -> bool:
     """Forward membership check: is *user* a member of *dept*?
 

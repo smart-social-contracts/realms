@@ -13,6 +13,7 @@ interface BackendResponse {
         userGet?: {
             principal: string;
             profiles: string[];
+            departments?: string[];
         };
     };
 }
@@ -20,6 +21,7 @@ interface BackendResponse {
 // Define a type for profile state
 interface ProfileState {
     profiles: string[];
+    departments: string[];
     loading: boolean;
     error: string | null;
 }
@@ -27,6 +29,7 @@ interface ProfileState {
 // Create a more comprehensive store for profiles with loading and error states
 const profileState = writable<ProfileState>({
     profiles: [],
+    departments: [],
     loading: false,
     error: null
 });
@@ -35,6 +38,12 @@ const profileState = writable<ProfileState>({
 export const userProfiles = derived(
     profileState,
     $state => $state.profiles
+);
+
+// Department membership on the active quarter (not Cedar profiles).
+export const userDepartments = derived(
+    profileState,
+    $state => $state.departments
 );
 
 // Derived store for the loading state
@@ -86,15 +95,31 @@ export function hasJoined(): boolean {
 export function resetProfileState(): void {
     profileState.set({
         profiles: [],
+        departments: [],
         loading: false,
         error: null
     });
 }
 
-export function setProfilesForTesting(profiles: string[]): void {
+export function applyUserGetRecord(userGet: {
+    profiles?: string[];
+    departments?: string[];
+} | null | undefined): void {
+    if (!userGet) return;
+    profileState.update(state => ({
+        ...state,
+        profiles: Array.isArray(userGet.profiles) ? userGet.profiles : state.profiles,
+        departments: Array.isArray(userGet.departments) ? [...userGet.departments] : [],
+        loading: false,
+        error: null
+    }));
+}
+
+export function setProfilesForTesting(profiles: string[], departments: string[] = []): void {
     profileState.update(state => ({
         ...state,
         profiles,
+        departments,
         loading: false,
         error: null
     }));
@@ -119,13 +144,16 @@ export async function loadUserProfiles() {
         const { primary } = await probeFederatedMembership({ activate: true, cache: true });
 
         if (primary) {
-            const profiles = primary.profiles || [];
+            const userGet = primary.response?.data?.userGet;
+            const profiles = primary.profiles || userGet?.profiles || [];
+            const departments = Array.isArray(userGet?.departments) ? userGet.departments : [];
             profileState.update(state => ({
                 ...state,
                 profiles,
+                departments,
                 loading: false
             }));
-            console.log('User profiles loaded via federated probe:', profiles, 'quarter:', primary.canisterId);
+            console.log('User profiles loaded via federated probe:', profiles, 'departments:', departments, 'quarter:', primary.canisterId);
 
             // Prefer assigned_quarter from the record when present (may refine cache).
             const assignedQuarter = primary.response?.data?.userGet?.assigned_quarter;
@@ -148,6 +176,7 @@ export async function loadUserProfiles() {
             profileState.update(state => ({
                 ...state,
                 profiles: [],
+                departments: [],
                 loading: false
             }));
         }
