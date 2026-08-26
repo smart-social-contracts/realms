@@ -27,7 +27,9 @@ Guarantees provided here (GOS level):
       gos.federal.result     broadcast aggregated result (capital → quarters)
       gos.federal.executed   execution receipt from a quarter (quarter → capital)
 
-Everything else goes to the active codex's ``on_federation_message`` hook.
+Reserved ``justice.transfer`` / ``justice.restitution`` have a host default
+(issue #325) when the Codex hook does not handle them. Everything else goes
+to the active codex's ``on_federation_message`` hook.
 
 Design rule (issue #263): federation messages carry claims/orders/receipts
 only — value always moves on the shared ICRC-1 ledgers, never between
@@ -231,6 +233,10 @@ def dispatch_message(topic: str, source: str, body: dict) -> Dict[str, Any]:
     from core.codex_hooks import dispatch_federation_message
 
     result = dispatch_federation_message(topic, source, body)
+    if result is None and topic.startswith("justice."):
+        from core.justice.federation import handle_justice_topic
+
+        result = handle_justice_topic(topic, source, body)
     if result is None:
         return {
             "success": False,

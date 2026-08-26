@@ -128,6 +128,42 @@ class Penalty(Entity, TimestampedMixin):
         logger.info(f"Penalty {penalty.id} executed")
 
 
+def _case_of_penalty(penalty: "Penalty"):
+    verdict = getattr(penalty, "verdict", None)
+    return getattr(verdict, "case", None) if verdict is not None else None
+
+
+def _require_executing_case(penalty: "Penalty", action: str):
+    """Penalties run only while the Case is executing.
+
+    ``verdict_issued`` still allows an appeal, so execute/waive is refused
+    there. A penalty with no Case is refused rather than treated as an
+    exception — production penalties are always attached to a verdict.
+    """
+    from .case import CaseStatus
+
+    case = _case_of_penalty(penalty)
+    if case is None:
+        raise ValueError(
+            f"Cannot {action} a penalty that is not attached to an executing Case"
+        )
+    if case.status != CaseStatus.EXECUTING:
+        raise ValueError(
+            f"Cannot {action} penalty while case is {case.status}; "
+            "the case must be executing (verdict is final; appeal is no longer possible)"
+        )
+    return case
+
+
+def _maybe_close_case(case) -> None:
+    from .case import CaseStatus, case_close, case_penalties_resolved
+
+    if case is None or case.status != CaseStatus.EXECUTING:
+        return
+    if case_penalties_resolved(case):
+        case_close(case)
+
+
 def penalty_execute(penalty: "Penalty") -> "Penalty":
     """
     Execute a Penalty.
@@ -140,6 +176,8 @@ def penalty_execute(penalty: "Penalty") -> "Penalty":
     """
     if penalty.status != "pending":
         raise ValueError(f"Cannot execute penalty in status {penalty.status}")
+
+    case = _require_executing_case(penalty, "execute")
     
     if not Penalty.penalty_execution_prehook(penalty):
         raise ValueError("Penalty execution blocked by prehook")
@@ -152,6 +190,7 @@ def penalty_execute(penalty: "Penalty") -> "Penalty":
         penalty.record_accounting()
     
     Penalty.penalty_executed_posthook(penalty)
+    _maybe_close_case(case)
     return penalty
 
 
@@ -168,10 +207,13 @@ def penalty_waive(penalty: "Penalty", reason: str = "") -> "Penalty":
     """
     if penalty.status != "pending":
         raise ValueError(f"Cannot waive penalty in status {penalty.status}")
+
+    case = _require_executing_case(penalty, "waive")
     
     penalty.status = "waived"
     if reason:
         penalty.metadata = f'{{"waive_reason": "{reason}"}}'
     
     logger.info(f"Penalty {penalty.id} waived: {reason}")
+    _maybe_close_case(case)
     return penalty

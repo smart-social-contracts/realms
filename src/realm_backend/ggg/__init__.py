@@ -45,12 +45,16 @@ from .justice import (
     AppealStatus,
     appeal_file,
     appeal_decide,
+    appeal_withdraw,
     Case,
     CaseStatus,
     case_file,
     case_assign_judges,
     case_issue_verdict,
     case_close,
+    case_transfer,
+    case_begin_executing,
+    case_penalties_resolved,
     Court,
     CourtLevel,
     Dispute,
@@ -231,6 +235,9 @@ __all__ = [
     "case_assign_judges",
     "case_issue_verdict",
     "case_close",
+    "case_transfer",
+    "case_begin_executing",
+    "case_penalties_resolved",
     "Verdict",
     "verdict_prehook",
     "verdict_posthook",
@@ -243,6 +250,7 @@ __all__ = [
     "AppealStatus",
     "appeal_file",
     "appeal_decide",
+    "appeal_withdraw",
     "Member",
     "Notification",
     "Operations",
@@ -306,8 +314,11 @@ def classes() -> list[str]:
         'LEG_STATUS_OPEN', 'LEG_STATUS_REPORTED', 'LEG_STATUS_ARMED',
         'LEG_STATUS_EXECUTED', 'LEG_STATUS_FAILED', 'LEG_STATUS_EXPIRED',
         'case_file', 'case_assign_judges',
-        'case_issue_verdict', 'case_close', 'verdict_prehook', 'verdict_posthook',
+        'case_issue_verdict', 'case_close', 'case_transfer', 'case_begin_executing',
+        'case_penalties_resolved',
+        'verdict_prehook', 'verdict_posthook',
         'penalty_execute', 'penalty_waive', 'appeal_file', 'appeal_decide',
+        'appeal_withdraw',
         'seed_justice_template',
         'license_issue', 'license_revoke', 'appoint', 'appointment_kind',
         'department_personnel_cost', 'end_acting_appointments',
@@ -317,3 +328,28 @@ def classes() -> list[str]:
         'grant_root_authority_over_local_orgs', 'iter_users', 'user_has_profile',
         'user_in_department',
     )]
+
+
+# Historical imports (`from ggg.case import CaseStatus`) resolve the justice
+# modules as top-level ggg attributes.
+import sys as _sys
+
+from .justice import appeal as _justice_appeal
+from .justice import case as _justice_case
+from .justice import court as _justice_court
+from .justice import judge as _justice_judge
+from .justice import justice_system as _justice_system
+from .justice import penalty as _justice_penalty
+from .justice import verdict as _justice_verdict
+from .governance import license as _license_mod
+from .system import user as _user_mod
+
+_sys.modules[f"{__name__}.appeal"] = _justice_appeal
+_sys.modules[f"{__name__}.case"] = _justice_case
+_sys.modules[f"{__name__}.court"] = _justice_court
+_sys.modules[f"{__name__}.judge"] = _justice_judge
+_sys.modules[f"{__name__}.justice_system"] = _justice_system
+_sys.modules[f"{__name__}.penalty"] = _justice_penalty
+_sys.modules[f"{__name__}.verdict"] = _justice_verdict
+_sys.modules[f"{__name__}.license"] = _license_mod
+_sys.modules[f"{__name__}.user"] = _user_mod

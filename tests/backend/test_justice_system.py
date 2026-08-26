@@ -15,9 +15,10 @@ import pytest
 src_path = Path(__file__).parent.parent.parent / "src" / "realm_backend"
 sys.path.insert(0, str(src_path))
 
-# Mock basilisk before importing anything that uses it
+# Mock basilisk / CDK before importing anything that uses them
 sys.modules["basilisk"] = MagicMock()
 sys.modules["basilisk.canisters.management"] = MagicMock()
+sys.modules.setdefault("_cdk", MagicMock())
 
 
 class TestJusticeSystemEntity:
@@ -137,6 +138,26 @@ class TestCaseEntity:
         assert case.has_verdict() is False
         assert case.can_appeal() is False
 
+    def test_is_open_and_can_appeal_for_new_statuses(self):
+        from ggg.justice.case import Case, CaseStatus
+
+        transferred = Case(
+            case_number="CASE-XFER", title="t", status=CaseStatus.TRANSFERRED,
+        )
+        executing = Case(
+            case_number="CASE-EXEC", title="t", status=CaseStatus.EXECUTING,
+        )
+        verdict = Case(
+            case_number="CASE-V", title="t", status=CaseStatus.VERDICT_ISSUED,
+        )
+
+        assert transferred.is_open() is False
+        assert transferred.can_appeal() is False
+        assert executing.is_open() is True
+        assert executing.can_appeal() is False
+        assert verdict.is_open() is True
+        assert verdict.can_appeal() is True
+
     def test_case_status_constants(self):
         """Test CaseStatus constants."""
         from ggg.case import CaseStatus
@@ -145,8 +166,11 @@ class TestCaseEntity:
         assert CaseStatus.ASSIGNED == "assigned"
         assert CaseStatus.IN_PROGRESS == "in_progress"
         assert CaseStatus.VERDICT_ISSUED == "verdict_issued"
-        assert CaseStatus.CLOSED == "closed"
         assert CaseStatus.APPEALED == "appealed"
+        assert CaseStatus.EXECUTING == "executing"
+        assert CaseStatus.TRANSFERRED == "transferred"
+        assert CaseStatus.CLOSED == "closed"
+        assert CaseStatus.DISMISSED == "dismissed"
 
 
 class TestVerdictEntity:
@@ -419,35 +443,53 @@ class TestPenaltyFunctions:
 
     def test_penalty_execute_function(self):
         """Test penalty_execute function."""
-        from ggg.penalty import Penalty, PenaltyType, penalty_execute
+        from ggg.justice.case import Case, CaseStatus
+        from ggg.justice.penalty import Penalty, PenaltyType, penalty_execute
+        from ggg.justice.verdict import Verdict
 
+        case = Case(
+            case_number="CASE-PEN-EXEC", title="t", status=CaseStatus.EXECUTING,
+        )
+        verdict = Verdict(decision="liable", reasoning="r")
+        verdict.case = case
+        case.verdict = verdict
         penalty = Penalty(
             id="PEN-EXEC",
             penalty_type=PenaltyType.FINE,
             amount=1000.0,
-            status="pending"
+            status="pending",
+            verdict=verdict,
         )
-
         executed = penalty_execute(penalty)
 
         assert executed.status == "executed"
         assert executed.executed_date is not None
+        assert case.status == CaseStatus.CLOSED
 
     def test_penalty_waive_function(self):
         """Test penalty_waive function."""
-        from ggg.penalty import Penalty, PenaltyType, penalty_waive
+        from ggg.justice.case import Case, CaseStatus
+        from ggg.justice.verdict import Verdict
+        from ggg.justice.penalty import Penalty, PenaltyType, penalty_waive
 
+        case = Case(
+            case_number="CASE-PEN-WAIVE", title="t", status=CaseStatus.EXECUTING,
+        )
+        verdict = Verdict(decision="liable", reasoning="r")
+        verdict.case = case
+        case.verdict = verdict
         penalty = Penalty(
             id="PEN-WAIVE",
             penalty_type=PenaltyType.FINE,
             amount=500.0,
-            status="pending"
+            status="pending",
+            verdict=verdict,
         )
-
         waived = penalty_waive(penalty, "Good behavior")
 
         assert waived.status == "waived"
         assert "waive_reason" in waived.metadata
+        assert case.status == CaseStatus.CLOSED
 
 
 class TestJusticeSystemIntegration:
@@ -562,6 +604,219 @@ class TestPenaltySpecsCurrency:
                 decision="liable",
                 penalties=[{"type": "fine", "amount": 50}],
             )
+
+
+def _court_and_parties():
+    from ggg import User
+    from ggg.justice.court import Court, CourtLevel
+
+    court = Court(name="Status Court", level=CourtLevel.FIRST_INSTANCE, status="active")
+    return court, User(id="plaintiff-s"), User(id="defendant-s")
+
+
+def _case(status, **extra):
+    from ggg.justice.case import Case
+
+    fields = dict(
+        case_number=extra.pop("case_number", "CASE-ST"),
+        title="Status case",
+        description="d",
+        status=status,
+    )
+    fields.update(extra)
+    return Case(**fields)
+
+
+def _attach_verdict(case, penalties=None):
+    from ggg.justice.verdict import Verdict
+
+    verdict = Verdict(decision="liable", reasoning="r", issued_date="2026-01-01")
+    verdict.case = case
+    case.verdict = verdict
+    for penalty in penalties or []:
+        penalty.verdict = verdict
+    return verdict
+
+
+class TestCaseStatusTransitions:
+    """Locked CaseStatus machine: transferred + executing."""
+
+    def test_transfer_from_pre_verdict_statuses(self):
+        from ggg.justice.case import CaseStatus, case_file, case_transfer
+        from ggg.justice.judge import Judge
+        from ggg.justice.case import case_assign_judges
+
+        court, plaintiff, defendant = _court_and_parties()
+        case = case_file(court, plaintiff, defendant, "T", "D")
+        dest = {"dest_quarter_id": "aaaaa-aaaaa-aaaaa-aaaaa-cai"}
+
+        case_transfer(case, dest=dest)
+        assert case.status == CaseStatus.TRANSFERRED
+        assert case.is_open() is False
+        assert '"dest_quarter_id"' in (case.metadata or "")
+
+        case = case_file(court, plaintiff, defendant, "T2", "D")
+        case_assign_judges(case, [Judge(id="J1", status="active")])
+        case_transfer(case, dest="remote-1")
+        assert case.status == CaseStatus.TRANSFERRED
+
+        case = _case(CaseStatus.IN_PROGRESS, case_number="CASE-IP")
+        case_transfer(case, dest={"dest_case_ref": "CASE-9"})
+        assert case.status == CaseStatus.TRANSFERRED
+
+    def test_transfer_refuses_post_verdict_and_terminal(self):
+        from ggg.justice.case import CaseStatus, case_transfer
+
+        for status in (
+            CaseStatus.VERDICT_ISSUED,
+            CaseStatus.APPEALED,
+            CaseStatus.EXECUTING,
+            CaseStatus.CLOSED,
+            CaseStatus.TRANSFERRED,
+        ):
+            with pytest.raises(ValueError, match="Cannot transfer"):
+                case_transfer(_case(status, case_number=f"CASE-{status}"))
+
+    def test_no_verdict_or_appeal_on_transferred(self):
+        from ggg import User
+        from ggg.justice.appeal import appeal_file
+        from ggg.justice.case import CaseStatus, case_issue_verdict, case_transfer
+
+        case = _case(CaseStatus.FILED, case_number="CASE-NOOP")
+        case_transfer(case, dest={"id": "x"})
+
+        with pytest.raises(ValueError, match="Cannot issue verdict"):
+            case_issue_verdict(case, "liable", "no")
+        with pytest.raises(ValueError, match="cannot be appealed"):
+            appeal_file(case, None, User(id="p"), "grounds")
+
+    def test_begin_executing_from_verdict_issued_only(self):
+        from ggg.justice.case import CaseStatus, case_begin_executing
+
+        case = _case(CaseStatus.VERDICT_ISSUED)
+        _attach_verdict(case)
+        case_begin_executing(case)
+        assert case.status == CaseStatus.EXECUTING
+        assert case.is_open() is True
+        assert case.can_appeal() is False
+
+        with pytest.raises(ValueError, match="Cannot begin executing"):
+            case_begin_executing(_case(CaseStatus.APPEALED, case_number="CASE-APL"))
+        with pytest.raises(ValueError, match="Cannot begin executing"):
+            case_begin_executing(_case(CaseStatus.FILED, case_number="CASE-F"))
+
+    def test_file_appeal_still_verdict_issued_to_appealed(self):
+        from ggg import User
+        from ggg.justice.appeal import appeal_file
+        from ggg.justice.case import CaseStatus
+
+        case = _case(CaseStatus.VERDICT_ISSUED, case_number="CASE-APL-IN")
+        _attach_verdict(case)
+        appeal = appeal_file(case, None, User(id="appellant"), "error")
+        assert case.status == CaseStatus.APPEALED
+        assert appeal.status == "filed"
+        assert case.can_appeal() is False
+
+    def test_appeal_denied_and_withdrawn_go_to_executing(self):
+        from ggg.justice.case import CaseStatus
+        from ggg.justice.appeal import (
+            Appeal, AppealStatus, appeal_decide, appeal_withdraw,
+        )
+
+        case = _case(CaseStatus.APPEALED, case_number="CASE-DEN")
+        appeal = Appeal(id="APL-DEN", status=AppealStatus.FILED, original_case=case)
+        appeal_decide(appeal, "denied", "stands")
+        assert appeal.status == AppealStatus.DENIED
+        assert case.status == CaseStatus.EXECUTING
+
+        case = _case(CaseStatus.APPEALED, case_number="CASE-WD")
+        appeal = Appeal(id="APL-WD", status=AppealStatus.FILED, original_case=case)
+        appeal_withdraw(appeal)
+        assert appeal.status == AppealStatus.WITHDRAWN
+        assert case.status == CaseStatus.EXECUTING
+
+        case = _case(CaseStatus.APPEALED, case_number="CASE-WD2")
+        appeal = Appeal(id="APL-WD2", status=AppealStatus.FILED, original_case=case)
+        appeal_decide(appeal, "withdrawn", "party withdrew")
+        assert appeal.status == AppealStatus.WITHDRAWN
+        assert case.status == CaseStatus.EXECUTING
+
+    def test_appeal_granted_resumes_in_progress(self):
+        from ggg.justice.case import CaseStatus
+        from ggg.justice.appeal import Appeal, AppealStatus, appeal_decide
+
+        case = _case(CaseStatus.APPEALED, case_number="CASE-GR")
+        appeal = Appeal(id="APL-GR", status=AppealStatus.FILED, original_case=case)
+        appeal_decide(appeal, "reversed", "error below")
+        assert appeal.status == AppealStatus.GRANTED
+        assert case.status == CaseStatus.IN_PROGRESS
+        assert case.is_open() is True
+        assert case.can_appeal() is False
+
+    def test_penalties_only_while_executing(self):
+        from ggg.justice.case import CaseStatus
+        from ggg.justice.penalty import Penalty, PenaltyType, penalty_execute, penalty_waive
+
+        penalty = Penalty(
+            id="PEN-BLOCK", penalty_type=PenaltyType.FINE, amount=1.0, status="pending",
+        )
+        case = _case(CaseStatus.VERDICT_ISSUED, case_number="CASE-V-PEN")
+        _attach_verdict(case, [penalty])
+
+        with pytest.raises(ValueError, match="must be executing"):
+            penalty_execute(penalty)
+        with pytest.raises(ValueError, match="must be executing"):
+            penalty_waive(penalty, "no")
+
+        case.status = CaseStatus.APPEALED
+        with pytest.raises(ValueError, match="must be executing"):
+            penalty_execute(penalty)
+
+        orphan = Penalty(
+            id="PEN-ORPH", penalty_type=PenaltyType.FINE, amount=1.0, status="pending",
+        )
+        with pytest.raises(ValueError, match="not attached"):
+            penalty_execute(orphan)
+
+    def test_executing_closes_when_penalties_resolved(self):
+        from ggg.justice.case import CaseStatus, case_close
+        from ggg.justice.penalty import Penalty, PenaltyType, penalty_execute, penalty_waive
+
+        p1 = Penalty(
+            id="PEN-1", penalty_type=PenaltyType.FINE, amount=1.0, status="pending",
+        )
+        p2 = Penalty(
+            id="PEN-2", penalty_type=PenaltyType.FINE, amount=1.0, status="pending",
+        )
+        case = _case(CaseStatus.EXECUTING, case_number="CASE-MULTI")
+        _attach_verdict(case, [p1, p2])
+
+        with pytest.raises(ValueError, match="penalties are pending"):
+            case_close(case)
+
+        penalty_execute(p1)
+        assert case.status == CaseStatus.EXECUTING
+        penalty_waive(p2, "mercy")
+        assert case.status == CaseStatus.CLOSED
+
+    def test_close_without_penalties_is_explicit(self):
+        from ggg.justice.case import CaseStatus, case_begin_executing, case_close
+
+        case = _case(CaseStatus.VERDICT_ISSUED, case_number="CASE-NOP")
+        _attach_verdict(case, [])
+        case_begin_executing(case)
+        assert case.status == CaseStatus.EXECUTING
+        case_close(case)
+        assert case.status == CaseStatus.CLOSED
+        assert case.closed_date
+
+    def test_close_refuses_verdict_issued_and_appealed(self):
+        from ggg.justice.case import CaseStatus, case_close
+
+        with pytest.raises(ValueError, match="Cannot close"):
+            case_close(_case(CaseStatus.VERDICT_ISSUED, case_number="CASE-C1"))
+        with pytest.raises(ValueError, match="Cannot close"):
+            case_close(_case(CaseStatus.APPEALED, case_number="CASE-C2"))
 
 
 if __name__ == "__main__":

@@ -43,6 +43,27 @@ def find_court(court_id):
         return None
 
 
+def preferred_appellate_court() -> Optional[object]:
+    """Supreme, else appellate, on this canister.
+
+    Used when the live case is already on Capital: appeal only changes
+    court level (issue #325). No inter-quarter hop.
+    """
+    from ggg import CourtLevel
+
+    courts = [c for c in all_courts() if getattr(c, "status", None) == "active"]
+    hear = [c for c in courts if getattr(c, "can_hear_appeal", lambda: False)()]
+    if not hear:
+        hear = [
+            c for c in courts
+            if getattr(c, "level", None) in (CourtLevel.SUPREME, CourtLevel.APPELLATE)
+        ]
+    supreme = [c for c in hear if getattr(c, "level", None) == CourtLevel.SUPREME]
+    appellate = [c for c in hear if getattr(c, "level", None) == CourtLevel.APPELLATE]
+    candidates = supreme or appellate
+    return candidates[0] if candidates else None
+
+
 def preferred_court() -> Optional[object]:
     """The court to file in when the caller does not name one.
 

@@ -1,7 +1,17 @@
 """Justice module - legal system, courts, cases, and verdicts."""
 
-from .appeal import Appeal, AppealStatus, appeal_file, appeal_decide
-from .case import Case, CaseStatus, case_file, case_assign_judges, case_issue_verdict, case_close
+from .appeal import Appeal, AppealStatus, appeal_file, appeal_decide, appeal_withdraw
+from .case import (
+    Case,
+    CaseStatus,
+    case_file,
+    case_assign_judges,
+    case_issue_verdict,
+    case_close,
+    case_transfer,
+    case_begin_executing,
+    case_penalties_resolved,
+)
 from .court import Court, CourtLevel
 from .dispute import Dispute
 from .judge import Judge
@@ -15,12 +25,16 @@ __all__ = [
     "AppealStatus",
     "appeal_file",
     "appeal_decide",
+    "appeal_withdraw",
     "Case",
     "CaseStatus",
     "case_file",
     "case_assign_judges",
     "case_issue_verdict",
     "case_close",
+    "case_transfer",
+    "case_begin_executing",
+    "case_penalties_resolved",
     "Court",
     "CourtLevel",
     "Dispute",

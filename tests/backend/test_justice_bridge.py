@@ -249,19 +249,24 @@ def ggg(monkeypatch, realm):
             store["penalties"].append(penalty)
         store["verdicts"].append(verdict)
         case.verdicts = list(case.verdicts) + [verdict]
+        case.verdict = verdict
+        case.status = "verdict_issued"
         return verdict
 
-    def appeal_file(case, verdict, appellant, grounds, appellate_court=None):
+    def appeal_file(case, appellate_court=None, appellant=None, grounds="",
+                    appeal_id=None, metadata=None, verdict=None):
         calls.append(("appeal_file", {
             "case": case._id, "appellant": appellant.id, "grounds": grounds,
         }))
+        original_verdict = verdict or getattr(case, "verdict", None)
         appeal = Node(f"a{len(store['appeals']) + 1}", original_case=case,
-                      original_verdict=verdict, appellant=appellant,
+                      original_verdict=original_verdict, appellant=appellant,
                       grounds=grounds, appellate_court=appellate_court,
                       status="pending", filed_date="2026-01-03",
-                      decision_date="", decision="")
+                      decision_date="", decided_date="", decision="")
         store["appeals"].append(appeal)
         case.appeals = list(case.appeals) + [appeal]
+        case.status = "appealed"
         return appeal
 
     def appeal_decide(appeal, decision, reasoning=""):
@@ -337,13 +342,23 @@ def ggg(monkeypatch, realm):
         SUPREME="supreme", SPECIALIZED="specialized",
     )
     module.JusticeSystemType = types.SimpleNamespace(PUBLIC="public")
+    class RealmLookup:
+        @staticmethod
+        def load(_key):
+            return types.SimpleNamespace(accounting_currency="REALMS")
+
     module.case_file = case_file
     module.case_assign_judges = case_assign_judges
     module.case_issue_verdict = case_issue_verdict
+    module.case_transfer = lambda case, dest=None: case
+    module.case_begin_executing = lambda case: case
+    module.case_close = lambda case: case
     module.appeal_file = appeal_file
     module.appeal_decide = appeal_decide
+    module.appeal_withdraw = lambda appeal: appeal
     module.penalty_execute = penalty_execute
     module.penalty_waive = penalty_waive
+    module.Realm = RealmLookup()
     monkeypatch.setitem(sys.modules, "ggg", module)
 
     return {"calls": calls, "of": lambda name: [
@@ -1112,6 +1127,8 @@ class TestRegistration:
             "file_case", "file_appeal", "create_litigation",
             "set_litigation_content", "assign_judge", "issue_verdict",
             "execute_penalty", "waive_penalty", "decide_appeal",
+            "withdraw_appeal", "transfer_case", "begin_executing",
+            "close_case",
             "create_court", "seed_default_courts", "initialize",
         }
         assert writes <= set(gated)

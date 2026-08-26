@@ -456,7 +456,9 @@ def is_active(self):
 
 
 def case_is_open(self):
-    return getattr(self, "status", None) in ("filed", "assigned", "in_progress")
+    return getattr(self, "status", None) not in (
+        "closed", "dismissed", "transferred",
+    )
 
 
 def case_has_verdict(self):
@@ -464,7 +466,7 @@ def case_has_verdict(self):
 
 
 def case_can_appeal(self):
-    return self.has_verdict() and getattr(self, "status", None) != "appealed"
+    return getattr(self, "status", None) == "verdict_issued"
 
 
 def verdict_is_appealed(self):

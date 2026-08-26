@@ -1,10 +1,12 @@
 """Case lifecycle: filing, judges, verdicts, penalties, appeals.
 
 The state changes themselves are :mod:`ggg.justice`'s (``case_file``,
-``case_assign_judges``, ``case_issue_verdict``, ``penalty_execute``,
-``penalty_waive``, ``appeal_file``, ``appeal_decide``). What is here is the part
-the extension used to do and should not have: deciding *whose* name goes on each
-one, and refusing the combinations that make the process meaningless.
+``case_assign_judges``, ``case_issue_verdict``, ``case_transfer``,
+``case_begin_executing``, ``case_close``, ``penalty_execute``,
+``penalty_waive``, ``appeal_file``, ``appeal_decide``, ``appeal_withdraw``).
+What is here is the part the extension used to do and should not have:
+deciding *whose* name goes on each one, and refusing the combinations that
+make the process meaningless.
 
 Three of those refusals are new, and each closes a hole in the in-process version:
 
@@ -17,9 +19,10 @@ Three of those refusals are new, and each closes a hole in the in-process versio
 * **An appeal is filed by a party to the case.** ``file_appeal`` accepted an
   ``appellant_id``, so an appeal could be filed in a stranger's name.
 
-Cross-quarter cases (``defendant_quarter_id`` in metadata) are recorded but not
-executed against: reaching the defendant's home canister needs an inter-canister
-call, which is :mod:`core.async_bridge` territory and not yet wired up here.
+Cross-quarter transfer is a judge act (issue #325): origin Case freezes as
+``transferred`` with a dest canister pointer; dest creates the live Case via
+``justice.transfer``. Restitution uses ``justice.restitution`` after dest
+collects from the defendant. Fine stays in dest treasury.
 """
 
 import json
@@ -156,12 +159,23 @@ def _defendant_metadata(
     private regardless of who it names.
     """
     from _cdk import ic
+    from core.justice.federation import parse_user_address
     from ggg import Department, User
 
     try:
         own_canister = ic.id().to_str()
     except Exception:
         own_canister = ""
+
+    address = parse_user_address(defendant_id) if defendant_kind != "department" else {
+        "principal": "", "canister_id": "", "ref": "",
+    }
+    if address["principal"]:
+        defendant_id = address["principal"]
+    # realm:// canister is an address (issue #156 / #325), not a venue.
+    if not quarter_id and address["canister_id"]:
+        quarter_id = address["canister_id"]
+
     is_cross_quarter = bool(quarter_id and quarter_id != own_canister)
 
     if defendant_kind == "department":
@@ -186,6 +200,8 @@ def _defendant_metadata(
             {"defendant_kind": "user", "defendant_principal": defendant_id}
             if defendant_id else {}
         )
+        if address.get("ref"):
+            meta["defendant_ref"] = address["ref"]
 
     if is_cross_quarter:
         meta["defendant_quarter_id"] = quarter_id
@@ -208,6 +224,10 @@ def create_litigation(
     The case is created with no plaintext title or description; the encrypted
     content is attached by :func:`set_litigation_content`. Two steps because the
     key scope embeds the case id, which does not exist until the case does.
+
+    ``defendant_id`` may be a local principal or a ``realm://`` User
+    address (issue #156 / #325). That address is not a venue and does not
+    skip judge Transfer.
 
     Returns the scope and the recipient principals the client must wrap the DEK
     for — the submitter plus the justice department.
@@ -262,9 +282,15 @@ def create_litigation(
         "message": f"Litigation {new_case.case_number} opened",
     }
     if is_cross_quarter:
-        result["defendant_quarter_id"] = str(defendant_quarter_id or "").strip()
+        meta = json.loads(metadata) if metadata else {}
+        result["defendant_quarter_id"] = str(
+            meta.get("defendant_quarter_id") or defendant_quarter_id or ""
+        )
         result["scope_tag"] = "cross_quarter"
-        _warn_cross_quarter(new_case, "create_litigation")
+        logger.info(
+            f"Litigation {new_case.case_number} records defendant address "
+            f"{result['defendant_quarter_id']}; venue is still judge Transfer"
+        )
 
     logger.info(f"Litigation {new_case.case_number} opened by {caller}")
     return result
@@ -511,12 +537,45 @@ def record_penalty_revenue(penalty) -> int:
 
 
 def execute_penalty(caller: str, penalty_id) -> object:
-    from ggg import penalty_execute
+    from core.justice.federation import (
+        collect_from_defendant,
+        notify_restitution,
+        _penalty_meta,
+        _write_penalty_meta,
+    )
+    from ggg import PenaltyType, penalty_execute
 
     penalty = find_penalty(penalty_id)
     case = case_of_penalty(penalty)
     if case is not None:
         _warn_cross_quarter(case, "execute_penalty")
+
+    if getattr(penalty, "penalty_type", None) == PenaltyType.RESTITUTION:
+        if not collect_from_defendant(penalty):
+            logger.info(
+                f"Penalty {penalty_id} restitution still pending: "
+                "defendant not collected"
+            )
+            return penalty
+        ack = notify_restitution(penalty, case)
+        meta = _penalty_meta(penalty)
+        meta["collected"] = True
+        if ack.get("success"):
+            meta["restitution_awaiting_ack"] = False
+            meta["restitution_acked"] = True
+            _write_penalty_meta(penalty, meta)
+            updated = penalty_execute(penalty)
+            logger.info(f"Penalty {penalty_id} restitution executed after ack")
+            return updated
+        meta["restitution_awaiting_ack"] = True
+        meta["restitution_acked"] = False
+        if ack.get("error"):
+            meta["restitution_error"] = str(ack["error"])[:200]
+        _write_penalty_meta(penalty, meta)
+        logger.info(
+            f"Penalty {penalty_id} restitution still pending: no home-quarter ack"
+        )
+        return penalty
 
     updated = penalty_execute(penalty)
     try:
@@ -597,6 +656,18 @@ def file_appeal(
     if appellate_court_id and appellate_court is None:
         raise ValueError(f"Court {appellate_court_id} not found")
 
+    # Party right on the live case. Supreme sits in Capital; if we are
+    # already there, appeal only changes court level (no hop).
+    if appellate_court is None:
+        try:
+            from core.federal_vote_runtime import is_capital
+
+            on_capital = is_capital()
+        except Exception:
+            on_capital = False
+        if on_capital:
+            appellate_court = courts.preferred_appellate_court()
+
     appeal = appeal_file(
         case=case,
         appellant=appellant,
@@ -623,4 +694,101 @@ def decide_appeal(caller: str, appeal_id, decision: str, reasoning: str = ""):
 
     updated = appeal_decide(appeal, str(decision), str(reasoning or ""))
     logger.info(f"Appeal {appeal_id} decided {decision!r} by {caller}")
+    return updated
+
+
+def withdraw_appeal(caller: str, appeal_id):
+    """Appellant (or a party / admin) withdraws a pending appeal."""
+    from ggg import Appeal, appeal_withdraw
+
+    appeal = Appeal[appeal_id]
+    if not appeal:
+        raise ValueError(f"Appeal {appeal_id} not found")
+
+    case = getattr(appeal, "original_case", None)
+    appellant_is_caller = (
+        roles.principal_of(getattr(appeal, "appellant", None)) == caller
+    )
+    party = case is not None and is_party(case, caller)
+    if not (appellant_is_caller or party or roles.is_realm_admin(caller)):
+        raise PermissionError("only the appellant or a party may withdraw this appeal")
+
+    updated = appeal_withdraw(appeal)
+    logger.info(f"Appeal {appeal_id} withdrawn by {caller}")
+    return updated
+
+
+def _require_judge_or_admin(case, caller: str, what: str):
+    judge = judge_for_caller(case, caller)
+    if judge is None and not roles.is_realm_admin(caller):
+        raise PermissionError(
+            f"only a judge assigned to case {case.case_number} may {what}"
+        )
+    return judge
+
+
+def transfer_case(
+    caller: str,
+    case_id,
+    dest=None,
+    ciphertext: str = "",
+    wrapped_deks=None,
+    origin_scope: str = "",
+) -> object:
+    """Judge-only Transfer: freeze origin, pointer dest canister, send pipe.
+
+    Dest is a canister id (or ``realm://`` address). Not a filer venue picker.
+    Ciphertext (already encrypted title/description) travels; re-wrap DEKs
+    for dest Justice + filer are passed through, never unwrapped here.
+    """
+    from core.justice.federation import dest_canister_id, notify_transfer
+    from ggg import case_transfer
+
+    case = require_case(case_id)
+    _require_judge_or_admin(case, caller, "transfer it")
+
+    if isinstance(dest, str) and dest.strip():
+        try:
+            dest = json.loads(dest)
+        except (TypeError, ValueError):
+            dest = {"id": dest}
+
+    # Judge dest only. A filer ``realm://`` address / defendant_quarter_id
+    # must not become the transfer target or skip this verb.
+    canister = dest_canister_id(dest)
+    pointer = dest if isinstance(dest, dict) else {}
+    if canister:
+        pointer = dict(pointer)
+        pointer["id"] = canister
+
+    updated = case_transfer(case, dest=pointer or dest)
+    if canister:
+        notify_transfer(
+            updated,
+            canister,
+            ciphertext=ciphertext,
+            wrapped_deks=wrapped_deks,
+            origin_scope=origin_scope,
+        )
+    logger.info(f"Case {case.case_number} marked transferred by {caller}")
+    return updated
+
+
+def begin_executing(caller: str, case_id) -> object:
+    """Declare the verdict final (no appeal / cannot appeal / window closed)."""
+    from ggg import case_begin_executing
+
+    case = require_case(case_id)
+    _require_judge_or_admin(case, caller, "begin execution")
+    updated = case_begin_executing(case)
+    logger.info(f"Case {case.case_number} began executing by {caller}")
+    return updated
+
+
+def close_case(caller: str, case_id) -> object:
+    from ggg import case_close
+
+    case = require_case(case_id)
+    updated = case_close(case)
+    logger.info(f"Case {case.case_number} closed by {caller}")
     return updated

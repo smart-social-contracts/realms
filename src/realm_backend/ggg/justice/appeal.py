@@ -163,9 +163,14 @@ def appeal_decide(
     
     if decision in ("upheld", "denied"):
         appeal.status = AppealStatus.DENIED
+        _set_case_after_appeal(appeal, granted=False)
+    elif decision == "withdrawn":
+        appeal.status = AppealStatus.WITHDRAWN
+        _set_case_after_appeal(appeal, granted=False)
     elif decision in ("reversed", "modified", "remanded"):
         appeal.status = AppealStatus.GRANTED
-        
+        _set_case_after_appeal(appeal, granted=True)
+
         # Create new verdict if data provided
         if new_verdict_data:
             new_verdict = Verdict(
@@ -175,6 +180,37 @@ def appeal_decide(
                 case=appeal.original_case
             )
             appeal.new_verdict = new_verdict
-    
+
     Appeal.appeal_decided_posthook(appeal)
+    return appeal
+
+
+def _set_case_after_appeal(appeal: "Appeal", granted: bool) -> None:
+    """Move the original Case after an appeal is no longer pending.
+
+    Granted: proceedings resume (``in_progress``). Denied or withdrawn: the
+    verdict is final, so the Case enters ``executing``.
+    """
+    from .case import CaseStatus
+
+    case = getattr(appeal, "original_case", None)
+    if case is None:
+        return
+    if case.status != CaseStatus.APPEALED:
+        return
+    case.status = CaseStatus.IN_PROGRESS if granted else CaseStatus.EXECUTING
+
+
+def appeal_withdraw(appeal: "Appeal") -> "Appeal":
+    """Appellant withdraws a pending Appeal; the Case enters executing."""
+    if not appeal.is_pending():
+        raise ValueError(f"Cannot withdraw appeal in status {appeal.status}")
+
+    appeal.status = AppealStatus.WITHDRAWN
+    appeal.decision = "withdrawn"
+    appeal.decided_date = _now_dt().isoformat()
+    _set_case_after_appeal(appeal, granted=False)
+
+    Appeal.appeal_decided_posthook(appeal)
+    logger.info(f"Appeal {appeal.id} withdrawn")
     return appeal

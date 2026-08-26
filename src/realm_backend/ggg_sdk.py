@@ -955,6 +955,9 @@ class _Justice:
         """Open a private litigation. Returns ``{"id", "scope", "recipients"}``;
         the ciphertext is attached separately.
 
+        ``defendant_principal`` may be a local principal or a ``realm://``
+        User address. That address is not a venue.
+
         Only fields the caller actually set are sent: the host reads an absent key
         as "not specified" and falls back to the default court and an individual
         defendant.
@@ -1022,6 +1025,32 @@ class _Justice:
             "appeal_id": appeal_id, "decision": decision,
             "reasoning": reasoning,
         })
+
+    def withdraw_appeal(self, appeal_id):
+        return _require_rpc("justice.withdraw_appeal", {"appeal_id": appeal_id})
+
+    def transfer_case(
+        self, case_id, dest=None, ciphertext="", wrapped_deks=None, origin_scope="",
+    ):
+        """Judge Transfer: freeze origin and send ``justice.transfer``.
+
+        ``dest`` is a dest canister id (not a filer venue picker).
+        """
+        payload = {"case_id": case_id, "dest": dest}
+        if ciphertext:
+            payload["ciphertext"] = ciphertext
+        if wrapped_deks is not None:
+            payload["wrapped_deks"] = wrapped_deks
+        if origin_scope:
+            payload["origin_scope"] = origin_scope
+        return _require_rpc("justice.transfer_case", payload)
+
+    def begin_executing(self, case_id):
+        """Declare the verdict final so penalties may run."""
+        return _require_rpc("justice.begin_executing", {"case_id": case_id})
+
+    def close_case(self, case_id):
+        return _require_rpc("justice.close_case", {"case_id": case_id})
 
     def statistics(self):
         """Realm-wide counts. Aggregates only, so not filtered per caller."""
