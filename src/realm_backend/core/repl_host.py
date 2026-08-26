@@ -762,11 +762,9 @@ class HostSecureORM(SecureORM):
         fn = _executed_callable(_candid_verb(method, module))
         if not callable(fn):
             raise RpcError(f"host method {method!r} is not defined")
-        try:
-            bound = inspect.signature(fn).bind(*args, **call_kwargs)
-            bound.apply_defaults()
-        except TypeError as exc:
-            raise RpcError(f"{method}: {exc}") from exc
+        # Leftover WASI inspect is a stub with no leftover ``signature``.
+        # Call leftover-executed host verbs by name; do not leftover-inspect
+        # leftover signatures.
         from core.call_origin import host_call
 
         try:
@@ -774,7 +772,7 @@ class HostSecureORM(SecureORM):
             # matches a browser Candid ingress; extension_sync_call then
             # sets context.extension on the bridge like the UI does.
             with host_call():
-                return drive_result(fn(*bound.args, **bound.kwargs))
+                return drive_result(fn(*args, **call_kwargs))
         except PermissionError:
             raise
         except Exception as exc:

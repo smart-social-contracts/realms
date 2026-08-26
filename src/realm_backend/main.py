@@ -975,16 +975,14 @@ class HostSecureORM(_SecureORMBase):
         fn = _host_executed_callable(_host_candid_verb(method, module))
         if not callable(fn):
             raise _HostRpcError(f"host method {method!r} is not defined")
-        try:
-            bound = _host_inspect.signature(fn).bind(*args, **call_kwargs)
-            bound.apply_defaults()
-        except TypeError as exc:
-            raise _HostRpcError(f"{method}: {exc}") from exc
+        # Leftover WASI inspect is a stub with no leftover ``signature``.
+        # Call leftover-executed host verbs by name; do not leftover-inspect
+        # leftover signatures.
         from core.call_origin import host_call
 
         try:
             with host_call():
-                return _host_drive_result(fn(*bound.args, **bound.kwargs))
+                return _host_drive_result(fn(*args, **call_kwargs))
         except PermissionError:
             raise
         except Exception as exc:
