@@ -301,22 +301,21 @@ def _leftover_repl_host_lazymod():
 
 
 def _leftover_executed_main():
-    """Leftover ``__main__``: Candid hack / verbs on ``_LazyMod``, not instance."""
+    """Honest leftover-executed ``__main__``: instance verbs, no Candid hack.
+
+    Live ``0aea1ede``: leftover-executed ``__main__`` has HostSecureORM and
+    the real Candid verbs. Type-dict scan of leftover ``__main__`` / ``main``
+    does not find ``__get_candid_interface_tmp_hack``. ``_bload`` cannot run.
+    The allowlist *is* leftover-executed instance-dict public callables.
+    """
     _bMT = type(sys)
     crash_src = "raise RuntimeError('Database instance already exists')\n"
-    did_text = (
-        "service : {\n"
-        '  "get_sandbox_config" : () -> (text) query;\n'
-        '  "extension_sync_call" : (text, text, text) -> (text);\n'
-        '  "__shell__" : (text) -> (text);\n'
-        "}\n"
-    )
 
     class _LazyMod(_bMT):
         def __init__(self, name):
             super().__init__(name)
             self.__dict__["_bsrc"] = crash_src
-            self.__dict__["_bloaded"] = False
+            self.__dict__["_bloaded"] = True
             self.__dict__["_bloading"] = False
             self.__dict__["_bload_count"] = 0
 
@@ -327,28 +326,42 @@ def _leftover_executed_main():
         def __getattr__(self, name):
             self._bload()
 
-        def __get_candid_interface_tmp_hack(self):
-            return did_text
-
-        def get_sandbox_config(self):
-            return {"available": True, "default_mode": "sandbox"}
-
-        def extension_sync_call(self, extension_name, function_name, args):
-            return {
-                "success": True,
-                "extension_name": extension_name,
-                "function_name": function_name,
-                "args": args,
-            }
-
-        def __shell__(self, code):
-            return "should never run"
-
     executed = _LazyMod("__main__")
+    executed.__dict__["get_sandbox_config"] = lambda: {
+        "available": True,
+        "default_mode": "sandbox",
+    }
+    executed.__dict__["extension_sync_call"] = (
+        lambda extension_name, function_name, args: {
+            "success": True,
+            "extension_name": extension_name,
+            "function_name": function_name,
+            "args": args,
+        }
+    )
+    executed.__dict__["__shell__"] = lambda code: "should never run"
     assert "__get_candid_interface_tmp_hack" not in executed.__dict__
-    assert "get_sandbox_config" not in executed.__dict__
+    assert not any(
+        str(key).endswith("__get_candid_interface_tmp_hack")
+        for key in type(executed).__dict__
+    )
+    assert "get_sandbox_config" in executed.__dict__
     assert "HostSecureORM" not in executed.__dict__
     return executed
+
+
+def _leftover_api_eval(orm, appendix, code, principal="2eqns"):
+    """Product ``api.call`` / ``ext.call`` via leftover-executed stub."""
+    import builtins as _builtins
+
+    def rpc(action, **kwargs):
+        return orm.handle_rpc(principal, action, kwargs)
+
+    b = dict(vars(_builtins))
+    b["rpc"] = rpc
+    ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
+    exec(appendix, ns)
+    return eval(code, ns, ns)
 
 
 class TestLeftoverReplHostShell:
@@ -368,22 +381,30 @@ class TestLeftoverReplHostShell:
         )
         monkeypatch.setitem(sys.modules, "types", stub)
         leftover = _leftover_repl_host_lazymod()
-        # Leftover ``_LazyMod`` keeps the Candid hack; leftover-executed
-        # ``main`` has HostSecureORM and no DID file (live realmtest6).
-        candid_host = _leftover_executed_main()
-        executed = type(sys)("main")
+        # Honest leftover image: leftover-executed host has verbs on the
+        # instance dict. No planted Candid hack. No repo DID.
+        executed = _leftover_executed_main()
+        executed.__dict__["HostSecureORM"] = main_module.HostSecureORM
         saved_mod = sys.modules.get("core.repl_host")
         saved_main = sys.modules.get("main")
         saved_dunder = sys.modules.get("__main__")
         saved_orm = main_module.secure_orm
         saved_err = main_module._secure_orm_error
         missing_did = tmp_path / "missing.did"
+        repo_did = os.path.join(BACKEND, "realm_backend.did")
+        assert os.path.isfile(repo_did)
+        assert not missing_did.exists()
         try:
             sys.modules["core.repl_host"] = leftover
             sys.modules["main"] = executed
-            sys.modules["__main__"] = candid_host
+            sys.modules["__main__"] = executed
             assert "HostSecureORM" not in leftover.__dict__
+            assert "__get_candid_interface_tmp_hack" not in leftover.__dict__
             assert "__get_candid_interface_tmp_hack" not in executed.__dict__
+            assert not any(
+                str(key).endswith("__get_candid_interface_tmp_hack")
+                for key in type(executed).__dict__
+            )
             with pytest.raises(ImportError, match="unknown location"):
                 exec(
                     "from core.repl_host import HostSecureORM",
@@ -425,20 +446,35 @@ class TestLeftoverReplHostShell:
             assert started["n"] == 1
             assert leftover._bload_count == 0
 
-            orm._host_module = executed
-            orm._did_path = missing_did
-            orm._allowed_methods = None
-            assert orm.handle_rpc(
-                "alice", "host.call", {"method": "get_sandbox_config"}
+            # Live leftover has no DID file and no Candid hack. Point the
+            # leftover-executed HostSecureORM at this host + missing DID.
+            orm = main_module.HostSecureORM(
+                engine=orm.engine,
+                namespace="Realm",
+                entities=[],
+                schema={},
+                principal_type="User",
+                host_module=executed,
+                did_path=missing_did,
+            )
+            names = main_module._host_load_allowed(
+                missing_did, host_module=executed
+            )
+            assert "get_sandbox_config" in names
+            assert "extension_sync_call" in names
+            assert "__shell__" not in names
+            assert leftover._bload_count == 0
+            assert executed._bload_count == 0
+
+            assert _leftover_api_eval(
+                orm,
+                main_module._HOST_STUB_APPENDIX,
+                "api.call('get_sandbox_config')",
             ) == {"available": True, "default_mode": "sandbox"}
-            assert orm.handle_rpc(
-                "alice",
-                "host.ext_sync",
-                {
-                    "extension_name": "department_docs",
-                    "function_name": "list_documents",
-                    "args": {},
-                },
+            assert _leftover_api_eval(
+                orm,
+                main_module._HOST_STUB_APPENDIX,
+                "ext.call('department_docs', 'list_documents', {})",
             ) == {
                 "success": True,
                 "extension_name": "department_docs",
@@ -446,11 +482,13 @@ class TestLeftoverReplHostShell:
                 "args": "{}",
             }
             with pytest.raises(PermissionError, match="__shell__"):
-                orm.handle_rpc(
-                    "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
+                _leftover_api_eval(
+                    orm,
+                    main_module._HOST_STUB_APPENDIX,
+                    "api.call('__shell__', '1')",
                 )
             assert leftover._bload_count == 0
-            assert candid_host._bload_count == 0
+            assert executed._bload_count == 0
         finally:
             main_module.secure_orm = saved_orm
             main_module._secure_orm_error = saved_err
