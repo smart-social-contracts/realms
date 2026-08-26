@@ -302,14 +302,86 @@ def setup_gate_error(caller: str):
     return _setup.setup_gate_error(caller)
 
 
+def _leftover_safe_attr(obj, name, default=None):
+    """Read ``name`` from instance / type dict. Never getattr leftover ``_LazyMod``.
+
+    Leftover ``core.repl_host`` is a Basilisk ``_LazyMod`` at an unknown
+    location. ``from core.repl_host import HostSecureORM`` and getattr both
+    ``_bload`` (``Database instance already exists``) or raise ImportError.
+    Prefer the already-loaded ``_module_attr`` helper; otherwise walk the
+    type dict the same way as leftover allowlist reads (no Mapping).
+    """
+    if obj is None:
+        return default
+    helper = None
+    rh = sys.modules.get("core.repl_host")
+    if rh is not None:
+        try:
+            rns = object.__getattribute__(rh, "__dict__")
+        except AttributeError:
+            rns = None
+        if isinstance(rns, dict) and callable(rns.get("_module_attr")):
+            helper = rns["_module_attr"]
+    if helper is not None:
+        return helper(obj, name, default)
+    try:
+        ns = object.__getattribute__(obj, "__dict__")
+    except AttributeError:
+        ns = None
+    if isinstance(ns, dict) and name in ns:
+        return ns[name]
+    try:
+        mro = type(obj).__mro__
+    except Exception:
+        return default
+    skip = {object, type, type(sys)}
+    for cls in mro:
+        if cls in skip:
+            continue
+        try:
+            tns = object.__getattribute__(cls, "__dict__")
+        except AttributeError:
+            continue
+        contains = getattr(tns, "__contains__", None)
+        if not callable(contains) or name not in tns:
+            continue
+        return tns[name]
+    return default
+
+
+def _resolve_host_secure_orm():
+    """Late-bind ``HostSecureORM`` leftover-safely. No top-level from-import."""
+    rh = sys.modules.get("core.repl_host")
+    if rh is None:
+        import core.repl_host as rh  # fresh load only; leftover already occupies sys.modules
+    cls = _leftover_safe_attr(rh, "HostSecureORM")
+    if isinstance(cls, type):
+        return cls
+    resolver = _leftover_safe_attr(rh, "resolve_host_secure_orm")
+    if callable(resolver):
+        resolved = resolver()
+        if isinstance(resolved, type):
+            return resolved
+    for mod in list(sys.modules.values()):
+        if mod is None or mod is rh:
+            continue
+        cls = _leftover_safe_attr(mod, "HostSecureORM")
+        if isinstance(cls, type) and cls.__name__ == "HostSecureORM":
+            return cls
+    raise ImportError(
+        "cannot import name 'HostSecureORM' from 'core.repl_host' "
+        "(unknown location)"
+    )
+
+
 def _init_secure_orm():
     """Build the Cedar-gated ORM singleton for the sandboxed REPL (realms#313)."""
     from core.cedar_schema_runtime import collect_ggg_schema_entities
-    from core.repl_host import HostSecureORM
 
     import ggg
     from core import cedar_authz
 
+    HostSecureORM = _resolve_host_secure_orm()
     included, schema = collect_ggg_schema_entities()
     return HostSecureORM(
         engine=cedar_authz._get_engine(),
