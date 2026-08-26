@@ -1122,6 +1122,7 @@ export interface _SERVICE {
     [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
     Array<string>
   >,
+  'get_codex_overlay_status' : ActorMethod<[], string>,
   'get_extension_frontend_info' : ActorMethod<[string], string>,
   'get_extensions' : ActorMethod<[], RealmResponse>,
   'get_federal_vote' : ActorMethod<[string], string>,
@@ -1202,6 +1203,7 @@ export interface _SERVICE {
   'resolve_ref' : ActorMethod<[string], string>,
   'resolve_token_ledger' : ActorMethod<[string], string>,
   'resync_extension_frontends' : ActorMethod<[string], string>,
+  'revert_codex' : ActorMethod<[string], string>,
   'revoke_delegation_json' : ActorMethod<[string], string>,
   'send_realm_message' : ActorMethod<[string, string, string, string], string>,
   'set_canister_config' : ActorMethod<
@@ -1218,6 +1220,7 @@ export interface _SERVICE {
     RealmResponse
   >,
   'set_canister_config_json' : ActorMethod<[string], string>,
+  'set_codex_safe_mode' : ActorMethod<[string], string>,
   'set_menu_category_order' : ActorMethod<[string], string>,
   'set_menu_item_config' : ActorMethod<[string], string>,
   'set_menu_visibility' : ActorMethod<[string], string>,

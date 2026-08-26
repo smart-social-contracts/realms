@@ -32,6 +32,7 @@ import {
 	IconWand,
 	IconBug,
 	IconWorld,
+	IconAdjustments,
 } from '@tabler/icons-svelte';
 
 const tablerIconMap: Record<string, any> = {
@@ -64,6 +65,7 @@ const tablerIconMap: Record<string, any> = {
 	'ti-bug': IconBug,
 	'ti-world': IconWorld,
 	'ti-shield-dollar': IconShieldDollar,
+	'ti-adjustments': IconAdjustments,
 };
 
 /**

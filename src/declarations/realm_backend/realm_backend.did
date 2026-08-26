@@ -369,6 +369,9 @@ service : {
   "uninstall_codex" : (text) -> (text);
   "reload_codex" : (text) -> (text);
   "list_codex_packages" : () -> (text) query;
+  "revert_codex" : (text) -> (text);
+  "set_codex_safe_mode" : (text) -> (text);
+  "get_codex_overlay_status" : () -> (text) query;
   "resync_extension_frontends" : (text) -> (text);
   "install_extension_from_registry" : (text) -> (text);
   "install_codex_from_registry" : (text) -> (text);

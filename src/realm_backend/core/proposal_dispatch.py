@@ -15,7 +15,7 @@ from ic_python_logging import get_logger
 logger = get_logger("core.proposal_dispatch")
 
 PROPOSAL_TYPES = frozenset({"transaction", "upgrade", "poll", "code_execution"})
-UPGRADE_TARGETS = frozenset({"codex", "extension", "core"})
+UPGRADE_TARGETS = frozenset({"codex", "extension", "core", "codex_revert"})
 HIGH_RISK_VERBS = frozenset(
     {
         "treasury.transfer",
@@ -44,6 +44,8 @@ def submit_gate(proposal_type: str, action: dict) -> str:
         target = (action or {}).get("target")
         if target == "codex":
             return "codex.install"
+        if target == "codex_revert":
+            return "codex.revert"
         if target == "extension":
             return "extension.install"
         if target == "core":
@@ -149,9 +151,11 @@ def freeze_action(
         target = str(action.get("target") or "").strip()
         if target not in UPGRADE_TARGETS:
             return {}, [], {
-                "error": "upgrade target must be codex, extension, or core",
+                "error": "upgrade target must be codex, extension, core, or codex_revert",
                 "error_code": "invalid_action",
             }
+        if target == "codex_revert":
+            return {"target": "codex_revert"}, [], None
         if target == "core":
             if not baton_configured():
                 return {}, [], {
@@ -368,6 +372,16 @@ def dispatch_proposal(proposal):
         target = action.get("target")
         if target == "core":
             raw = yield from _approve_orchestration(action)
+            ok, err, code = _json_ok(raw)
+            if not ok:
+                _fail(proposal, metadata, err, code)
+                return
+            proposal.status = "executed"
+            return
+        if target == "codex_revert":
+            from core.codex_overlay import revert
+
+            raw = json.dumps(revert(authorized_by_vote=True))
             ok, err, code = _json_ok(raw)
             if not ok:
                 _fail(proposal, metadata, err, code)

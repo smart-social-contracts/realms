@@ -4164,7 +4164,7 @@ def refresh_invoice(args: text) -> Async[text]:
 # Bump the version suffix whenever the default profile baselines in
 # Profiles.ALL_PROFILES gain operations that already-deployed realms must
 # receive on upgrade (e.g. the permission-based entry_access cutover).
-_PROFILE_BASELINE_FLAG = "profile_baseline:v2"
+_PROFILE_BASELINE_FLAG = "profile_baseline:v3"
 
 
 def _sync_profile_baseline() -> void:
@@ -4196,6 +4196,12 @@ def _sync_profile_baseline() -> void:
                 )
         db.save("_system", _PROFILE_BASELINE_FLAG, "done")
         logger.info("✅ Profile baseline sync complete")
+        try:
+            from core.codex_overlay import ensure_codex_revert_grants
+
+            ensure_codex_revert_grants()
+        except Exception as grant_err:
+            logger.warning(f"codex.revert host grant after baseline sync failed: {grant_err}")
     except Exception as e:
         logger.error(f"❌ Profile baseline sync failed: {e}")
 
@@ -4378,6 +4384,12 @@ def _ensure_root_organization() -> void:
         ensure_root_org()
         grant_root_authority_over_local_orgs()
         logger.info("Ensured root organization (issue #240)")
+        try:
+            from core.codex_overlay import ensure_codex_revert_grants
+
+            ensure_codex_revert_grants()
+        except Exception as grant_err:
+            logger.warning(f"codex.revert host grant failed: {grant_err}")
     except Exception as e:
         logger.warning(f"Could not ensure root organization: {e}\n{traceback.format_exc()}")
 
@@ -6423,6 +6435,7 @@ DEFAULT_ITEM_ORDER = {
     "people_access": ["role_manager", "access_manager", "member_manager", "department_docs"],
     "finances": ["vault", "metrics"],
     "realm_management": [
+        "_core_system",
         "realm_settings",
         "package_manager",
         "managed_services",
@@ -6583,6 +6596,20 @@ def get_sidebar(args: text) -> text:
                 continue
 
             grouped.setdefault(cat_id, []).append((ext_id, item))
+
+        # Core System UI is not an extension (issue #328). Safe mode and
+        # revert live here for whoever holds codex.revert (root / Congress).
+        grouped.setdefault("realm_management", []).append(
+            (
+                "_core_system",
+                {
+                    "label": "System",
+                    "icon": "ti-adjustments",
+                    "href": "/ggg",
+                    "tooltip": "Core System: safe mode and codex revert",
+                },
+            )
+        )
 
         # Sort items within each category: DB position > hardcoded default > alphabetical
         categories_out = []
@@ -6969,6 +6996,53 @@ def list_codex_packages() -> text:
             "codex_packages": installed,
             "manifests": manifests,
         })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_REVERT)
+def revert_codex(args: text) -> text:
+    """Revert the realm codex overlay to the previous package (issue #328).
+
+    Callable from the core System UI and from ``__shell__`` via
+    ``api.call('revert_codex', '{}')`` or
+    ``from core.codex_overlay import revert``.
+    """
+    try:
+        from core.codex_overlay import revert
+
+        return json.dumps(revert())
+    except Exception as e:
+        logger.error(f"revert_codex error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_REVERT)
+def set_codex_safe_mode(args: text) -> text:
+    """Enable or disable hook-skipping safe mode (issue #328).
+
+    Args (JSON): {"enabled": bool}
+    """
+    try:
+        params = json.loads(args) if args else {}
+        enabled = bool(params.get("enabled"))
+        from core.codex_overlay import set_safe_mode
+
+        return json.dumps(set_safe_mode(enabled))
+    except Exception as e:
+        logger.error(f"set_codex_safe_mode error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_codex_overlay_status() -> text:
+    """Current / previous overlay slots and safe-mode flag."""
+    try:
+        from core.codex_overlay import status
+
+        return json.dumps(status())
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 

@@ -305,6 +305,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Text)],
         ['query'],
       ),
+    'get_codex_overlay_status' : IDL.Func([], [IDL.Text], ['query']),
     'get_extension_frontend_info' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_extensions' : IDL.Func([], [RealmResponse], ['query']),
     'get_federal_vote' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
@@ -400,6 +401,7 @@ export const idlFactory = ({ IDL }) => {
     'resolve_ref' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'resolve_token_ledger' : IDL.Func([IDL.Text], [IDL.Text], []),
     'resync_extension_frontends' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'revert_codex' : IDL.Func([IDL.Text], [IDL.Text], []),
     'revoke_delegation_json' : IDL.Func([IDL.Text], [IDL.Text], []),
     'send_realm_message' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -421,6 +423,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'set_canister_config_json' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'set_codex_safe_mode' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_menu_category_order' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_menu_item_config' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_menu_visibility' : IDL.Func([IDL.Text], [IDL.Text], []),

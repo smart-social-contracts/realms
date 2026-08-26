@@ -4,6 +4,7 @@
   
   import GenericEntityTable from '$lib/components/ggg/GenericEntityTable.svelte';
   import CodexViewer from '$lib/components/ggg/CodexViewer.svelte';
+  import CodexOverlayPanel from '$lib/components/ggg/CodexOverlayPanel.svelte';
   
   let activeTab = 'dashboard';
   let loading = false;
@@ -411,6 +412,8 @@
         {:else}
           <h2 class="text-2xl font-bold mb-6">System Overview</h2>
         {/if}
+
+        <CodexOverlayPanel />
         
         <!-- Treasury Budget Metrics section removed - install metrics extension for visualization -->
 

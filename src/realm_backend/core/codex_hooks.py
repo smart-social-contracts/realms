@@ -222,11 +222,22 @@ def get_active_codex() -> Optional[str]:
     """Extension id of the installed hook-API codex, or None.
 
     Exactly one codex may be installed per realm (enforced at install), so
-    the first match wins.
+    the first match wins. Overlay ``current`` is preferred when present
+    (issue #328); a live kind=codex scan is the fallback until the first
+    overlay-aware activate.
     """
     global _active_codex_cache
     if _active_codex_cache is not None:
         return _active_codex_cache[0] if _active_codex_cache else None
+    try:
+        from core.codex_overlay import active_codex_id
+
+        overlay_id = active_codex_id()
+        if overlay_id:
+            _active_codex_cache = [overlay_id]
+            return overlay_id
+    except Exception:
+        pass
     try:
         from core.runtime_extensions import get_all_extension_manifests
 
@@ -307,7 +318,17 @@ def call_hook(hook_name: str, args: Optional[dict] = None, default: Any = None) 
     both support it, otherwise in-process. Returns the parsed result (hooks
     return JSON strings or plain dicts), or ``default`` when no codex
     implements the hook or the call fails.
+
+    Safe mode and an empty current overlay skip hooks entirely (issue #328).
+    Hooks are not on the path to vote or revert.
     """
+    try:
+        from core.codex_overlay import is_safe_mode
+
+        if is_safe_mode():
+            return default
+    except Exception:
+        pass
     codex_id = get_active_codex()
     if codex_id and _hook_runs_sandboxed(hook_name):
         handled, result = _call_hook_sandboxed(codex_id, hook_name, args or {})
@@ -478,6 +499,9 @@ def get_extension_overrides() -> Dict[str, str]:
                             overrides[str(base)] = override
             except Exception:
                 pass
+    from core.codex_overlay import filter_protected_overrides
+
+    overrides = filter_protected_overrides(overrides)
     _overrides_cache = dict(overrides)
     return overrides
 
