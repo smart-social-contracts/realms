@@ -1,9 +1,8 @@
-"""Defendant directory lookup (issue #325 addendum).
+"""Local realm directory (issue #325).
 
-``directory_list`` is this canister only. An optional ``lives_in`` quarter is a
-**lookup hint**: it scopes the local list, or tells the filer to paste a
-principal. It does **not** federate autocomplete across every quarter (that
-would saturate gossip; see #156), choose a court, or skip judge Transfer.
+``directory_list`` is this canister only. Do not federate defendant
+autocomplete across quarters — that saturates gossip (issue #156).
+Cross-Mundus defendants are a ``realm://`` address, not a directory walk.
 """
 
 from typing import Any, Dict, List
@@ -11,15 +10,6 @@ from typing import Any, Dict, List
 from ic_python_logging import get_logger
 
 logger = get_logger("core.justice.directory")
-
-
-def self_canister_id() -> str:
-    try:
-        from _cdk import ic
-
-        return ic.id().to_str()
-    except Exception:
-        return ""
 
 
 def list_local_entries() -> List[Dict[str, Any]]:
@@ -48,7 +38,6 @@ def list_local_entries() -> List[Dict[str, Any]]:
                 "kind": "user",
                 "principal": str(principal),
                 "label": human_name or (getattr(u, "nickname", "") or "") or str(principal),
-                "home_quarter": (getattr(u, "home_quarter", None) or "") or "",
             }
         )
 
@@ -71,40 +60,3 @@ def list_local_entries() -> List[Dict[str, Any]]:
             }
         )
     return entries
-
-
-def lookup(lives_in: str = "") -> Dict[str, Any]:
-    """Scope a defendant search to one quarter, or require a pasted principal.
-
-    A remote ``lives_in`` does **not** call that quarter (or every quarter).
-    Saturation lock: no multi-quarter directory fan-out.
-    """
-    hint = (lives_in or "").strip()
-    self_id = self_canister_id()
-    if hint and self_id and hint != self_id:
-        return {
-            "entries": [],
-            "lives_in": hint,
-            "self": self_id,
-            "federated": False,
-            "paste_principal": True,
-            "scoped": True,
-        }
-
-    entries = list_local_entries()
-    if hint:
-        entries = [
-            e
-            for e in entries
-            if e.get("kind") == "department"
-            or not e.get("home_quarter")
-            or e.get("home_quarter") == hint
-        ]
-    return {
-        "entries": entries,
-        "lives_in": hint,
-        "self": self_id,
-        "federated": False,
-        "paste_principal": False,
-        "scoped": bool(hint),
-    }

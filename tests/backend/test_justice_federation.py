@@ -265,45 +265,55 @@ class TestHostDispatch:
         assert "No codex handler" in result["error"]
 
 
-class TestLivesInLookupHint:
-    """Optional lives_in scopes search. It is not a venue and does not Transfer."""
+class TestRealmRefDefendantAddress:
+    """Cross-Mundus defendant is a ``realm://`` address, not a venue."""
 
-    def test_remote_hint_does_not_federate(self):
-        from core.justice.directory import lookup
+    REF = "realm://q0-cai/User/z32zf-ic72u-hae"
 
-        result = lookup("other-quarter-cai")
-        assert result["federated"] is False
-        assert result["paste_principal"] is True
-        assert result["entries"] == []
-        assert result["scoped"] is True
+    def test_parse_user_address_realm_ref(self):
+        parsed = jfed.parse_user_address(self.REF)
+        assert parsed["principal"] == "z32zf-ic72u-hae"
+        assert parsed["canister_id"] == "q0-cai"
+        assert parsed["ref"] == self.REF
 
-    def test_empty_hint_lists_local_only(self, monkeypatch):
-        from core.justice import directory as jdir
+    def test_local_principal_paste(self):
+        parsed = jfed.parse_user_address("aaaaa-aa")
+        assert parsed["principal"] == "aaaaa-aa"
+        assert parsed["canister_id"] == ""
+        assert parsed["ref"] == ""
 
-        local = [
-            {"kind": "user", "principal": "alice", "label": "Alice", "home_quarter": ""},
-        ]
-        monkeypatch.setattr(jdir, "list_local_entries", lambda: local)
-        monkeypatch.setattr(jdir, "self_canister_id", lambda: "self-cai")
-        result = jdir.lookup("")
-        assert result["federated"] is False
-        assert result["paste_principal"] is False
-        assert result["entries"] == local
+    def test_defendant_metadata_stores_ref_not_court(self):
+        from core.justice import cases
 
-    def test_dest_canister_ignores_lives_in(self):
+        _court, plaintiff, _defendant = _court_and_parties("ref")
+        _user, meta, cross = cases._defendant_metadata(
+            plaintiff.id, "user", self.REF, "", "", "",
+        )
+        parsed = json.loads(meta)
+        assert parsed["defendant_ref"] == self.REF
+        assert parsed["defendant_principal"] == "z32zf-ic72u-hae"
+        assert parsed["defendant_quarter_id"] == "q0-cai"
+        assert parsed.get("scope_tag") == "cross_quarter"
+        assert "court" not in parsed
+        assert "court_id" not in parsed
+        assert "lives_in" not in parsed
+        assert "lookup_hint" not in parsed
+        assert cross is True
+
+    def test_dest_canister_ignores_filer_address_fields(self):
         assert jfed.dest_canister_id({"lives_in": "q0-cai"}) == ""
         assert jfed.dest_canister_id({"defendant_quarter_id": "q0-cai"}) == ""
+        assert jfed.dest_canister_id({"defendant_ref": self.REF}) == ""
 
-    def test_transfer_without_dest_does_not_use_lives_in(self):
+    def test_transfer_without_judge_dest_does_not_send_to_address(self):
         sent = []
         jfed.set_outbound_sender(
             lambda target, topic, body: sent.append(target) or {"success": True}
         )
-        court, plaintiff, defendant = _court_and_parties("hint")
+        court, plaintiff, defendant = _court_and_parties("addr")
         case = case_file(court, plaintiff, defendant, "", "")
         case.metadata = json.dumps({
-            "lives_in": "q0-cai",
-            "lookup_hint": True,
+            "defendant_ref": self.REF,
             "defendant_quarter_id": "q0-cai",
         })
         case_transfer(case, dest=None)
@@ -311,15 +321,8 @@ class TestLivesInLookupHint:
         assert sent == []
         assert case.status == CaseStatus.TRANSFERRED
 
-    def test_lives_in_does_not_choose_court(self):
-        from core.justice import cases
+    def test_directory_is_local_only(self):
+        from core.justice import directory as jdir
 
-        _court, plaintiff, defendant = _court_and_parties("hint-c")
-        _user, meta, _ = cases._defendant_metadata(
-            plaintiff.id, "user", defendant.id, "", "", "q0-other-cai",
-        )
-        parsed = json.loads(meta)
-        assert parsed["lives_in"] == "q0-other-cai"
-        assert parsed["lookup_hint"] is True
-        assert "court" not in parsed
-        assert "court_id" not in parsed
+        assert not hasattr(jdir, "lookup")
+        assert callable(jdir.list_local_entries)

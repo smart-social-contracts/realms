@@ -84,7 +84,9 @@ def handle_justice_topic(topic: str, source: str, body: dict) -> Optional[Dict[s
 def dest_canister_id(dest) -> str:
     """Judge-supplied dest canister id. Not a filer venue picker.
 
-    Filer ``lives_in`` is a lookup hint and is ignored here.
+    Filer address fields (``defendant_ref``, ``defendant_quarter_id``,
+    leftover ``lives_in``) are ignored. A dest *string* may be a canister
+    id or a ``realm://`` dest the judge typed.
     """
     if dest is None:
         return ""

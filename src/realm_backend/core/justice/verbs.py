@@ -51,17 +51,6 @@ def v_roles(caller: str = "", **kwargs) -> dict:
     return roles.describe(caller)
 
 
-def v_directory(caller: str = "", lives_in: str = "", **kwargs) -> dict:
-    """Local defendant directory. ``lives_in`` scopes the search, nothing else.
-
-    A remote hint does not federate across quarters — paste a principal instead.
-    """
-    from core.justice.directory import lookup
-
-    roles.get_user(caller)
-    return lookup(lives_in)
-
-
 def v_audience(caller: str = "", **kwargs) -> dict:
     """The justice department's recipient principals.
 
@@ -356,13 +345,12 @@ def v_create_litigation(
     defendant_department: str = "",
     defendant_department_id: str = "",
     defendant_quarter_id: str = "",
-    lives_in: str = "",
     **kwargs,
 ) -> dict:
     """Open a private litigation. The submitter is the caller.
 
-    ``lives_in`` is an optional lookup hint (which quarter to search). It does
-    not choose the court or skip judge Transfer.
+    Defendant may be a local principal or a ``realm://`` User address
+    (issue #325). That address is not a venue and does not skip Transfer.
     """
     roles.get_user(caller)
     roles.require_operation(caller, roles.OP_CREATE, "opening a litigation")
@@ -374,7 +362,6 @@ def v_create_litigation(
         defendant_department=defendant_department,
         defendant_department_id=defendant_department_id,
         defendant_quarter_id=defendant_quarter_id,
-        lives_in=lives_in,
     )
 
 
@@ -718,7 +705,6 @@ def v_statistics(caller: str = "", **kwargs) -> dict:
 
 VERBS = {
     "justice.roles": v_roles,
-    "justice.directory": v_directory,
     "justice.audience": v_audience,
     "justice.justice_systems": v_justice_systems,
     "justice.courts": v_courts,
@@ -750,7 +736,6 @@ VERBS = {
 
 READ_VERBS = frozenset({
     "justice.roles",
-    "justice.directory",
     "justice.audience",
     "justice.justice_systems",
     "justice.courts",
