@@ -400,11 +400,16 @@ def _host_mapping_like(ns):
 
 
 def _host_module_ns(obj):
+    """Instance / module ns leftover-safely. Leftover ``__dict__`` may be
+    a mappingproxy, not a ``dict`` — ``#342`` missed that and the
+    instance-dict allowlist stayed empty, so leftover still raised
+    ``Candid interface not found; host RPC disabled``.
+    """
     try:
         ns = object.__getattribute__(obj, "__dict__")
     except AttributeError:
         return None
-    return ns if isinstance(ns, dict) else None
+    return ns if _host_mapping_like(ns) else None
 
 
 def _host_is_lazy(obj):
@@ -646,39 +651,110 @@ def _host_find_candid_hack(host_module=None):
     return None, None
 
 
-def _host_callable_names(mod):
-    """Public callables on leftover-executed instance dict. Never getattr."""
-    ns = _host_module_ns(mod)
+def _host_is_verb_value(val):
+    """Leftover ``@query`` / ``@update`` wrappers may not be ``callable``."""
+    if val is None or isinstance(val, type):
+        return False
+    if callable(val) or isinstance(val, (staticmethod, classmethod)):
+        return True
+    cls_name = type(val).__name__
+    if cls_name in {"Query", "Update", "Func", "Async"}:
+        return True
+    ns = _host_module_ns(val)
     if ns is None:
-        return set()
+        return False
+    for key in ("func", "_func", "__wrapped__", "fn", "_fn", "callback"):
+        inner = ns.get(key)
+        if callable(inner):
+            return True
+    return False
+
+
+def _host_unwrap_verb(val):
+    """Leftover-safe unwrap of leftover Query/Update to a callable."""
+    if callable(val) and not isinstance(val, type):
+        return val
+    ns = _host_module_ns(val)
+    if ns is not None:
+        for key in ("func", "_func", "__wrapped__", "fn", "_fn", "callback"):
+            inner = ns.get(key)
+            if callable(inner) and not isinstance(inner, type):
+                return inner
+    return val
+
+
+def _host_ns_verb_names(ns):
     names = set()
+    if ns is None or not _host_mapping_like(ns):
+        return names
     for key, val in ns.items():
         if not isinstance(key, str) or key.startswith("_"):
             continue
         if key in _HOST_LAZY_KEYS:
             continue
-        if isinstance(val, type):
-            continue
-        if callable(val):
+        if _host_is_verb_value(val):
             names.add(key)
     return names
 
 
-def _host_surface_allowlist(host_module, blocked):
-    """The leftover Candid surface *is* leftover-executed ``__main__`` verbs.
+def _host_callable_names(mod):
+    """Public leftover-safe host verbs. Never getattr leftover."""
+    names = _host_ns_verb_names(_host_module_ns(mod))
+    for typed in _host_iter_type_dicts(mod):
+        names |= _host_ns_verb_names(typed)
+    return names
 
-    Live leftover has no DID and no ``__get_candid_interface_tmp_hack`` on
-    leftover ``__main__`` / ``main``. Direct Candid still works because
-    ``get_sandbox_config`` / ``extension_sync_call`` live on the leftover-
-    executed instance dict. Read those leftover-safely.
+
+def _host_bsrc_def_names(mod):
+    """Public ``def name(`` in leftover ``_bsrc``. Never ``_bload``."""
+    ns = _host_module_ns(mod)
+    if ns is None:
+        return set()
+    src = ns.get("_bsrc")
+    if not isinstance(src, str) or "def " not in src:
+        return set()
+    names = set()
+    i = 0
+    while True:
+        idx = src.find("def ", i)
+        if idx < 0:
+            break
+        if idx > 0 and src[idx - 1] not in "\n\r\t ;":
+            i = idx + 4
+            continue
+        start = idx + 4
+        end = start
+        while end < len(src) and (src[end].isalnum() or src[end] == "_"):
+            end += 1
+        name = src[start:end]
+        rest = src[end:].lstrip()
+        if name and not name.startswith("_") and rest.startswith("("):
+            names.add(name)
+        i = end + 1
+    return names
+
+
+def _host_surface_allowlist(host_module, blocked):
+    """Leftover-safe public host verbs anywhere leftover can see them.
+
+    Live leftover has no DID and no Candid hack. Instance dict may or
+    may not list ``get_sandbox_config``. Direct Candid still works, so
+    the verbs exist leftover-safe on leftover-executed instance ns
+    (mappingproxy), leftover ``_LazyMod`` type dict, leftover Query
+    wrappers, or leftover ``_bsrc`` ``def`` names.
     """
     names = set()
+    seen = []
     for mod in (
         host_module,
         sys.modules.get("__main__"),
         sys.modules.get("main"),
     ):
+        if mod is None or mod in seen:
+            continue
+        seen.append(mod)
         names |= _host_callable_names(mod)
+        names |= _host_bsrc_def_names(mod)
     names -= set(blocked)
     return frozenset(names)
 
@@ -859,13 +935,13 @@ class HostSecureORM(_SecureORMBase):
         module = self.host_module()
         if module is None:
             raise _HostRpcError("host module is not loaded")
-        fn = _host_module_attr(module, method)
+        fn = _host_unwrap_verb(_host_module_attr(module, method))
         if not callable(fn):
             for key in ("__main__", "main"):
                 other = sys.modules.get(key)
                 if other is None or other is module:
                     continue
-                fn = _host_module_attr(other, method)
+                fn = _host_unwrap_verb(_host_module_attr(other, method))
                 if callable(fn):
                     break
         if not callable(fn):

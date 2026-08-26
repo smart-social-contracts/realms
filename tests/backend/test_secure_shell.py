@@ -301,20 +301,20 @@ def _leftover_repl_host_lazymod():
 
 
 def _leftover_executed_main():
-    """Honest leftover-executed ``__main__``: instance verbs, no Candid hack.
+    """Live leftover: verbs on leftover type / leftover ``_bsrc``, not instance.
 
-    Live ``0aea1ede``: leftover-executed ``__main__`` has HostSecureORM and
-    the real Candid verbs. Type-dict scan of leftover ``__main__`` / ``main``
-    does not find ``__get_candid_interface_tmp_hack``. ``_bload`` cannot run.
-    The allowlist *is* leftover-executed instance-dict public callables.
+    Instance dict may omit ``get_sandbox_config``. No Candid hack. ``_bload``
+    cannot run. ``#342`` still raised Candid-not-found on this layout.
     """
     _bMT = type(sys)
-    crash_src = "raise RuntimeError('Database instance already exists')\n"
 
     class _LazyMod(_bMT):
         def __init__(self, name):
             super().__init__(name)
-            self.__dict__["_bsrc"] = crash_src
+            self.__dict__["_bsrc"] = (
+                "def get_sandbox_config():\n    pass\n"
+                "def extension_sync_call(a, b, c):\n    pass\n"
+            )
             self.__dict__["_bloaded"] = True
             self.__dict__["_bloading"] = False
             self.__dict__["_bload_count"] = 0
@@ -326,26 +326,27 @@ def _leftover_executed_main():
         def __getattr__(self, name):
             self._bload()
 
+        def get_sandbox_config(self):
+            return {"available": True, "default_mode": "sandbox"}
+
+        def extension_sync_call(self, extension_name, function_name, args):
+            return {
+                "success": True,
+                "extension_name": extension_name,
+                "function_name": function_name,
+                "args": args,
+            }
+
+        def __shell__(self, code):
+            return "should never run"
+
     executed = _LazyMod("__main__")
-    executed.__dict__["get_sandbox_config"] = lambda: {
-        "available": True,
-        "default_mode": "sandbox",
-    }
-    executed.__dict__["extension_sync_call"] = (
-        lambda extension_name, function_name, args: {
-            "success": True,
-            "extension_name": extension_name,
-            "function_name": function_name,
-            "args": args,
-        }
-    )
-    executed.__dict__["__shell__"] = lambda code: "should never run"
+    assert "get_sandbox_config" not in executed.__dict__
     assert "__get_candid_interface_tmp_hack" not in executed.__dict__
     assert not any(
         str(key).endswith("__get_candid_interface_tmp_hack")
         for key in type(executed).__dict__
     )
-    assert "get_sandbox_config" in executed.__dict__
     assert "HostSecureORM" not in executed.__dict__
     return executed
 
