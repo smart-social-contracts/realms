@@ -34,6 +34,7 @@ if os.path.isdir(TOOLKIT) and TOOLKIT not in sys.path:
 
 from ic_basilisk_toolkit.secure_orm import RpcError  # noqa: E402
 
+import core.repl_host as _repl_host  # noqa: E402
 from core.repl_host import (  # noqa: E402
     BLOCKED_METHODS,
     HOST_ACTIONS,
@@ -47,6 +48,35 @@ from core.repl_host import (  # noqa: E402
     _module_attr,
     _resolve_host_module,
 )
+
+
+def _patch_candid_globals(get_sandbox_config, extension_sync_call):
+    """Leftover Candid ``get_global(name)`` lives in leftover-executed globals."""
+    saved = (
+        getattr(_repl_host, "get_sandbox_config", None),
+        getattr(_repl_host, "extension_sync_call", None),
+    )
+    _repl_host.get_sandbox_config = get_sandbox_config
+    _repl_host.extension_sync_call = extension_sync_call
+    return saved
+
+
+def _restore_candid_globals(saved):
+    gsc, esc = saved
+    if gsc is None:
+        try:
+            del _repl_host.get_sandbox_config
+        except AttributeError:
+            pass
+    else:
+        _repl_host.get_sandbox_config = gsc
+    if esc is None:
+        try:
+            del _repl_host.extension_sync_call
+        except AttributeError:
+            pass
+    else:
+        _repl_host.extension_sync_call = esc
 
 
 DID_PATH = Path(BACKEND) / "realm_backend.did"
@@ -591,27 +621,39 @@ class TestLazyModReimport:
             allowed_methods=None,
             did_path=missing_did,
         )
-        assert orm.handle_rpc(
-            "alice", "host.call", {"method": "get_sandbox_config"}
-        ) == {"available": True, "default_mode": "sandbox"}
-        assert orm.handle_rpc(
-            "alice",
-            "host.ext_sync",
-            {
+        saved = _patch_candid_globals(
+            lambda: {"available": True, "default_mode": "sandbox"},
+            lambda extension_name, function_name, args: {
+                "success": True,
+                "extension_name": extension_name,
+                "function_name": function_name,
+                "args": args,
+            },
+        )
+        try:
+            assert orm.handle_rpc(
+                "alice", "host.call", {"method": "get_sandbox_config"}
+            ) == {"available": True, "default_mode": "sandbox"}
+            assert orm.handle_rpc(
+                "alice",
+                "host.ext_sync",
+                {
+                    "extension_name": "department_docs",
+                    "function_name": "list_documents",
+                    "args": {},
+                },
+            ) == {
+                "success": True,
                 "extension_name": "department_docs",
                 "function_name": "list_documents",
-                "args": {},
-            },
-        ) == {
-            "success": True,
-            "extension_name": "department_docs",
-            "function_name": "list_documents",
-            "args": "{}",
-        }
-        with pytest.raises(PermissionError, match="__shell__"):
-            orm.handle_rpc(
-                "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
-            )
+                "args": "{}",
+            }
+            with pytest.raises(PermissionError, match="__shell__"):
+                orm.handle_rpc(
+                    "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
+                )
+        finally:
+            _restore_candid_globals(saved)
         assert executed._bload_count == 0
         # A name that is not on the class still _bload-crashes.
         with pytest.raises(RuntimeError, match="Database instance already exists"):
@@ -628,12 +670,7 @@ class TestLazyModReimport:
         ``_bsrc`` ``def`` names. No planted hack. No repo DID.
         """
         class Query:
-            """Leftover Query: not callable; leftover ``func`` is a slot."""
-
-            __slots__ = ("func",)
-
-            def __init__(self, func):
-                object.__setattr__(self, "func", func)
+            """Live leftover Query: not callable and no leftover slots."""
 
         class _ProxyHost:
             _bsrc = (
@@ -643,18 +680,9 @@ class TestLazyModReimport:
                 "def __shell__(code):\n    return 'no'\n"
             )
             _bloaded = True
-            get_sandbox_config = Query(
-                lambda: {"available": True, "default_mode": "sandbox"}
-            )
-            extension_sync_call = Query(
-                lambda extension_name, function_name, args: {
-                    "success": True,
-                    "extension_name": extension_name,
-                    "function_name": function_name,
-                    "args": args,
-                }
-            )
-            __shell__ = Query(lambda code: "should never run")
+            get_sandbox_config = Query()
+            extension_sync_call = Query()
+            __shell__ = Query()
 
         executed = _ProxyHost
         ns = object.__getattribute__(executed, "__dict__")
@@ -664,6 +692,9 @@ class TestLazyModReimport:
         assert not callable(leftover_query)
         with pytest.raises(AttributeError):
             object.__getattribute__(leftover_query, "__dict__")
+        for slot in ("func", "fn", "_fn", "handler"):
+            with pytest.raises(AttributeError):
+                object.__getattribute__(leftover_query, slot)
         assert "__get_candid_interface_tmp_hack" not in ns
         missing_did = tmp_path / "missing.did"
         names = load_allowed_methods(missing_did, host_module=executed)
@@ -685,30 +716,37 @@ class TestLazyModReimport:
         b["rpc"] = rpc
         ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
         exec(HOST_STUB_APPENDIX, ns)
-        assert ns["api"].call("get_sandbox_config") == {
-            "available": True,
-            "default_mode": "sandbox",
-        }
-        assert ns["ext"].call("department_docs", "list_documents", {}) == {
-            "success": True,
-            "extension_name": "department_docs",
-            "function_name": "list_documents",
-            "args": "{}",
-        }
-        with pytest.raises(PermissionError, match="__shell__"):
-            ns["api"].call("__shell__", "1")
+        saved = _patch_candid_globals(
+            lambda: {"available": True, "default_mode": "sandbox"},
+            lambda extension_name, function_name, args: {
+                "success": True,
+                "extension_name": extension_name,
+                "function_name": function_name,
+                "args": args,
+            },
+        )
+        try:
+            assert ns["api"].call("get_sandbox_config") == {
+                "available": True,
+                "default_mode": "sandbox",
+            }
+            assert ns["ext"].call("department_docs", "list_documents", {}) == {
+                "success": True,
+                "extension_name": "department_docs",
+                "function_name": "list_documents",
+                "args": "{}",
+            }
+            with pytest.raises(PermissionError, match="__shell__"):
+                ns["api"].call("__shell__", "1")
+        finally:
+            _restore_candid_globals(saved)
 
     def test_allowlist_from_type_dict_when_instance_has_no_verbs(self, tmp_path):
         """Live leftover: instance dict may omit ``get_sandbox_config``."""
         _bMT = type(sys)
 
         class Query:
-            """Leftover Query: not callable; leftover ``func`` is a slot."""
-
-            __slots__ = ("func",)
-
-            def __init__(self, func):
-                object.__setattr__(self, "func", func)
+            """Live leftover Query: not callable and no leftover slots."""
 
         class _LazyMod(_bMT):
             def __init__(self, name):
@@ -728,18 +766,9 @@ class TestLazyModReimport:
             def __getattr__(self, name):
                 self._bload()
 
-            get_sandbox_config = Query(
-                lambda: {"available": True, "default_mode": "sandbox"}
-            )
-            extension_sync_call = Query(
-                lambda extension_name, function_name, args: {
-                    "success": True,
-                    "extension_name": extension_name,
-                    "function_name": function_name,
-                    "args": args,
-                }
-            )
-            __shell__ = Query(lambda code: "should never run")
+            get_sandbox_config = Query()
+            extension_sync_call = Query()
+            __shell__ = Query()
 
         executed = _LazyMod("__main__")
         assert "get_sandbox_config" not in executed.__dict__
@@ -747,6 +776,9 @@ class TestLazyModReimport:
         assert not callable(leftover_query)
         with pytest.raises(AttributeError):
             object.__getattribute__(leftover_query, "__dict__")
+        for slot in ("func", "fn", "_fn", "handler"):
+            with pytest.raises(AttributeError):
+                object.__getattribute__(leftover_query, slot)
         assert "__get_candid_interface_tmp_hack" not in executed.__dict__
         assert not any(
             str(key).endswith("__get_candid_interface_tmp_hack")
@@ -773,18 +805,30 @@ class TestLazyModReimport:
         b["rpc"] = rpc
         ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
         exec(HOST_STUB_APPENDIX, ns)
-        assert ns["api"].call("get_sandbox_config") == {
-            "available": True,
-            "default_mode": "sandbox",
-        }
-        assert ns["ext"].call("department_docs", "list_documents", {}) == {
-            "success": True,
-            "extension_name": "department_docs",
-            "function_name": "list_documents",
-            "args": "{}",
-        }
-        with pytest.raises(PermissionError, match="__shell__"):
-            ns["api"].call("__shell__", "1")
+        saved = _patch_candid_globals(
+            lambda: {"available": True, "default_mode": "sandbox"},
+            lambda extension_name, function_name, args: {
+                "success": True,
+                "extension_name": extension_name,
+                "function_name": function_name,
+                "args": args,
+            },
+        )
+        try:
+            assert ns["api"].call("get_sandbox_config") == {
+                "available": True,
+                "default_mode": "sandbox",
+            }
+            assert ns["ext"].call("department_docs", "list_documents", {}) == {
+                "success": True,
+                "extension_name": "department_docs",
+                "function_name": "list_documents",
+                "args": "{}",
+            }
+            with pytest.raises(PermissionError, match="__shell__"):
+                ns["api"].call("__shell__", "1")
+        finally:
+            _restore_candid_globals(saved)
         assert executed._bload_count == 0
 
 
