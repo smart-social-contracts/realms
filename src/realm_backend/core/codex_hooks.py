@@ -81,6 +81,9 @@ _NON_CONFIG_MANIFEST_KEYS = frozenset(
         "ggg_api_version",
         "capabilities",
         "sandbox_module",
+        # Opt-in allow-list of backend/modules/*.py stems to seed as Codex
+        # entities (absent = seed every module file; [] = seed none).
+        "codex_modules",
     }
 )
 

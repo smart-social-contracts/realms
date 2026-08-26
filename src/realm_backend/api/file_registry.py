@@ -12,7 +12,7 @@ Refs: https://github.com/smart-social-contracts/realms/issues/168
 
 import base64
 import json
-from typing import Dict
+from typing import Dict, List, Optional, Tuple
 
 from _cdk import (
     Async,
@@ -656,13 +656,81 @@ def _install_codex_dependencies(
     return installed_deps, failed_deps
 
 
-def _seed_codex_module_entities(ext_id: str, files: Dict[str, str]) -> list:
+def _codex_module_stem(path: str) -> Optional[str]:
+    """Return the file stem if ``path`` is a top-level governance module.
+
+    Registry/runtime install flattens ``backend/``, so package path
+    ``backend/modules/<name>.py`` arrives as ``modules/<name>.py``. Nested
+    paths are ignored — only the top-level stem becomes a Codex entity.
+    """
+    if not (path.startswith("modules/") and path.endswith(".py")):
+        return None
+    name = path[len("modules/") : -3]
+    if not name or "/" in name:
+        return None
+    return name
+
+
+def _codex_modules_to_seed(
+    files: Dict[str, str], manifest: Optional[dict] = None
+) -> List[Tuple[str, str]]:
+    """Pick which ``modules/*.py`` stems become Codex entities.
+
+    Optional manifest key ``codex_modules`` is an allow-list of file stems:
+    - absent: seed every top-level ``modules/*.py`` (legacy default so
+      Dominion and unpublished packages keep working).
+    - present list: seed only those stems; each must exist as
+      ``backend/modules/<name>.py`` (flattened here to ``modules/<name>.py``).
+    - empty list ``[]``: seed none.
+
+    Listed stems that are missing from the package are skipped (logged).
+    A non-list ``codex_modules`` value is treated as an empty allow-list so
+    leftover helper files are never auto-seeded by accident.
+    """
+    available: Dict[str, str] = {}
+    for path, content in files.items():
+        name = _codex_module_stem(path)
+        if name is not None:
+            available[name] = content
+
+    if not isinstance(manifest, dict) or "codex_modules" not in manifest:
+        return [(name, available[name]) for name in available]
+
+    allow = manifest.get("codex_modules")
+    if not isinstance(allow, list):
+        logger.warning(
+            "codex_modules must be a list of module stems; "
+            f"got {type(allow).__name__}, seeding none"
+        )
+        return []
+
+    selected: List[Tuple[str, str]] = []
+    for stem in allow:
+        if not isinstance(stem, str) or not stem:
+            continue
+        content = available.get(stem)
+        if content is None:
+            logger.warning(
+                f"codex_modules lists '{stem}' but modules/{stem}.py is missing"
+            )
+            continue
+        selected.append((stem, content))
+    return selected
+
+
+def _seed_codex_module_entities(
+    ext_id: str, files: Dict[str, str], manifest: Optional[dict] = None
+) -> list:
     """Create/update Codex DB entities from a codex package's module files.
 
     Governance modules (proposal targets, TaskManager shims) ship under
-    ``modules/`` in the package; each becomes a ``Codex`` entity named after
-    its file stem — same contract the legacy /codex_packages path provided,
-    so ``codex_change`` proposals and scheduled tasks keep working.
+    ``backend/modules/`` in the package (flattened to ``modules/`` at
+    install); selected stems become a ``Codex`` entity named after the
+    file — same contract the legacy /codex_packages path provided, so
+    ``codex_change`` proposals and scheduled tasks keep working.
+
+    Seeding is opt-in via manifest ``codex_modules`` when that key is
+    present; see ``_codex_modules_to_seed``.
     """
     seeded = []
     try:
@@ -671,12 +739,7 @@ def _seed_codex_module_entities(ext_id: str, files: Dict[str, str]) -> list:
         logger.warning(f"Codex {ext_id}: cannot seed module entities — {e}")
         return seeded
 
-    for path, content in files.items():
-        if not (path.startswith("modules/") and path.endswith(".py")):
-            continue
-        name = path[len("modules/") : -3]
-        if not name or "/" in name:
-            continue
+    for name, content in _codex_modules_to_seed(files, manifest):
         try:
             existing = Codex[name]
             if existing:
@@ -941,7 +1004,8 @@ def install_extension_from_registry(
         from core import codex_hooks
 
         # Governance module files become Codex DB entities (proposal targets).
-        seeded_modules = _seed_codex_module_entities(ext_id, files)
+        # Honor optional manifest ``codex_modules`` allow-list when present.
+        seeded_modules = _seed_codex_module_entities(ext_id, files, manifest)
         # Post-install realm setup — the codex enforces its realm settings
         # server-side here, so no wizard bug can contradict the codex.
         init_error = codex_hooks.run_init(ext_id)

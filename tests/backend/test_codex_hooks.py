@@ -146,6 +146,7 @@ class TestGetConfig:
             "kind": "codex",
             "codex_api_version": 1,
             "dependencies": ["voting"],
+            "codex_modules": ["membership"],
             "fees": {"registration": 1.0},
             "governance": {"quorum_percent": 20},
         })
@@ -153,6 +154,7 @@ class TestGetConfig:
             "fees": {"registration": 1.0},
             "governance": {"quorum_percent": 20},
         }
+        assert "codex_modules" not in blocks
 
     def test_codex_manifest_config_over_manifest_data(self):
         _mock_ggg(manifest_data=json.dumps({
