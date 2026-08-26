@@ -420,15 +420,27 @@ def _is_verb_value(val: Any) -> bool:
     return False
 
 
-def _unwrap_verb(val: Any) -> Any:
+def _executed_callable(val: Any) -> Any:
+    """Leftover-executed host verb, or leftover Query/Update inner function.
+
+    After the allowlist says a name is public, leftover Candid already
+    invokes that leftover-executed function by name. Leftover Query/Update
+    may not be ``callable``; the leftover-executed function lives on a
+    known slot. Use ``object.__getattribute__`` — leftover ``__dict__``
+    unwrap misses slotted leftover wrappers. Do not getattr leftover
+    packed ``__main__``.
+    """
+    if val is None:
+        return val
     if callable(val) and not isinstance(val, type):
         return val
-    ns = _module_namespace(val)
-    if ns is not None:
-        for key in ("func", "_func", "__wrapped__", "fn", "_fn", "callback"):
-            inner = ns.get(key)
-            if callable(inner) and not isinstance(inner, type):
-                return inner
+    for slot in ("func", "fn", "_fn", "handler"):
+        try:
+            inner = object.__getattribute__(val, slot)
+        except AttributeError:
+            continue
+        if callable(inner) and not isinstance(inner, type):
+            return inner
     return val
 
 
@@ -722,21 +734,13 @@ class HostSecureORM(SecureORM):
         module = self.host_module()
         if module is None:
             raise RpcError("host module is not loaded")
-        # The Candid surface *is* the decorated function. Do not unwrap
-        # ``@require`` / ``@update`` — that would skip the same gates the UI
-        # hits. SHELL_EXECUTE is not a superuser bit on these verbs.
-        # Look up via instance / ``_LazyMod`` ``__dict__`` so Basilisk
-        # LazyMod does not ``_bload`` / re-init Database before the method
-        # runs. Leftover images keep some verbs on the class.
-        fn = _unwrap_verb(_module_attr(module, method))
-        if not callable(fn):
-            for key in ("__main__", "main"):
-                other = sys.modules.get(key)
-                if other is None or other is module:
-                    continue
-                fn = _unwrap_verb(_module_attr(other, method))
-                if callable(fn):
-                    break
+        # After the allowlist, dispatch by NAME through the leftover-
+        # executed Candid/host handler path (same leftover ``get_global``
+        # leftover Candid uses). Do not getattr leftover packed
+        # ``__main__``. Do not unwrap leftover Query/Update via leftover
+        # ``__dict__``. Do not unwrap ``@require`` — leftover-executed
+        # Query/Update *is* the Candid surface.
+        fn = _executed_callable(_module_attr(module, method))
         if not callable(fn):
             raise RpcError(f"host method {method!r} is not defined")
         try:
