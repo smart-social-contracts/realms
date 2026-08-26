@@ -129,12 +129,17 @@ def parse_candid_methods(did_text: str) -> FrozenSet[str]:
 
 
 def _module_namespace(obj: Any) -> Optional[dict]:
-    """Module/instance ``__dict__`` without going through ``__getattr__``."""
+    """Module/instance ``__dict__`` without going through ``__getattr__``.
+
+    Leftover ``__dict__`` may be a mappingproxy, not a ``dict``. ``#342``
+    required ``isinstance(..., dict)`` so the instance-dict allowlist
+    stayed empty and leftover still raised Candid-not-found.
+    """
     try:
         ns = object.__getattribute__(obj, "__dict__")
     except AttributeError:
         return None
-    return ns if isinstance(ns, dict) else None
+    return ns if _mapping_like(ns) else None
 
 
 _LAZY_KEYS = frozenset(
@@ -398,33 +403,100 @@ def _find_candid_hack(host_module: Any = None) -> tuple[Any, Any]:
     return None, None
 
 
-def _callable_names(mod: Any) -> set:
-    """Public callables on leftover-executed instance dict. Never getattr."""
-    ns = _module_namespace(mod)
+def _is_verb_value(val: Any) -> bool:
+    """Leftover ``@query`` / ``@update`` wrappers may not be ``callable``."""
+    if val is None or isinstance(val, type):
+        return False
+    if callable(val) or isinstance(val, (staticmethod, classmethod)):
+        return True
+    if type(val).__name__ in {"Query", "Update", "Func", "Async"}:
+        return True
+    ns = _module_namespace(val)
     if ns is None:
-        return set()
+        return False
+    for key in ("func", "_func", "__wrapped__", "fn", "_fn", "callback"):
+        if callable(ns.get(key)):
+            return True
+    return False
+
+
+def _unwrap_verb(val: Any) -> Any:
+    if callable(val) and not isinstance(val, type):
+        return val
+    ns = _module_namespace(val)
+    if ns is not None:
+        for key in ("func", "_func", "__wrapped__", "fn", "_fn", "callback"):
+            inner = ns.get(key)
+            if callable(inner) and not isinstance(inner, type):
+                return inner
+    return val
+
+
+def _ns_verb_names(ns: Any) -> set:
     names = set()
+    if ns is None or not _mapping_like(ns):
+        return names
     for key, val in ns.items():
         if not isinstance(key, str) or key.startswith("_"):
             continue
         if key in _LAZY_KEYS:
             continue
-        if isinstance(val, type):
-            continue
-        if callable(val):
+        if _is_verb_value(val):
             names.add(key)
     return names
 
 
-def _surface_allowlist(host_module: Any, blocked: Iterable[str]) -> FrozenSet[str]:
-    """Leftover-executed ``__main__`` verbs *are* the Candid surface."""
+def _callable_names(mod: Any) -> set:
+    """Public leftover-safe host verbs. Never getattr leftover."""
+    names = _ns_verb_names(_module_namespace(mod))
+    for typed in _iter_type_dicts(mod):
+        names |= _ns_verb_names(typed)
+    return names
+
+
+def _bsrc_def_names(mod: Any) -> set:
+    """Public ``def name(`` in leftover ``_bsrc``. Never ``_bload``."""
+    ns = _module_namespace(mod)
+    if ns is None:
+        return set()
+    src = ns.get("_bsrc")
+    if not isinstance(src, str) or "def " not in src:
+        return set()
     names = set()
+    i = 0
+    while True:
+        idx = src.find("def ", i)
+        if idx < 0:
+            break
+        if idx > 0 and src[idx - 1] not in "\n\r\t ;":
+            i = idx + 4
+            continue
+        start = idx + 4
+        end = start
+        while end < len(src) and (src[end].isalnum() or src[end] == "_"):
+            end += 1
+        name = src[start:end]
+        rest = src[end:].lstrip()
+        if name and not name.startswith("_") and rest.startswith("("):
+            names.add(name)
+        i = end + 1
+    return names
+
+
+def _surface_allowlist(host_module: Any, blocked: Iterable[str]) -> FrozenSet[str]:
+    """Leftover-safe public host verbs anywhere leftover can see them."""
+    names = set()
+    seen = []
     for mod in (
         host_module,
         sys.modules.get("__main__"),
         sys.modules.get("main"),
     ):
+        if mod is None or mod in seen:
+            continue
+        seen.append(mod)
         names |= _callable_names(mod)
+        names |= _bsrc_def_names(mod)
     names -= set(blocked)
     return frozenset(names)
 
@@ -656,13 +728,13 @@ class HostSecureORM(SecureORM):
         # Look up via instance / ``_LazyMod`` ``__dict__`` so Basilisk
         # LazyMod does not ``_bload`` / re-init Database before the method
         # runs. Leftover images keep some verbs on the class.
-        fn = _module_attr(module, method)
+        fn = _unwrap_verb(_module_attr(module, method))
         if not callable(fn):
             for key in ("__main__", "main"):
                 other = sys.modules.get(key)
                 if other is None or other is module:
                     continue
-                fn = _module_attr(other, method)
+                fn = _unwrap_verb(_module_attr(other, method))
                 if callable(fn):
                     break
         if not callable(fn):

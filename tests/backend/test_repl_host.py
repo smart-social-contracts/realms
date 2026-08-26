@@ -618,21 +618,94 @@ class TestLazyModReimport:
             getattr(executed, "not_on_lazymod")
         assert executed._bload_count >= 1
 
-    def test_allowlist_from_leftover_executed_instance_verbs(self, tmp_path):
-        """Live leftover: no DID, no Candid hack, verbs on leftover-executed instance.
+    def test_allowlist_when_instance_dict_is_not_a_dict(self, tmp_path):
+        """Live leftover after ``#342``: instance ns is mappingproxy, not dict.
 
-        ``#341`` type-dict scan of leftover ``__main__`` / ``main`` did not
-        find ``__get_candid_interface_tmp_hack``. Tests that planted the
-        hack on leftover ``_LazyMod`` or pointed ``host_module`` at that
-        leftover were lying. Direct Candid still works because the verbs
-        live on leftover-executed instance dict.
+        ``#342`` required ``isinstance(ns, dict)``. Leftover ``__dict__`` is
+        mapping-like, so the instance-dict fallback stayed empty and leftover
+        still raised ``Candid interface not found; host RPC disabled``.
+        Verbs are leftover ``@query`` wrappers (not ``callable``) plus leftover
+        ``_bsrc`` ``def`` names. No planted hack. No repo DID.
         """
+        class Query:
+            def __init__(self, func):
+                self.func = func
+
+        class _ProxyHost:
+            _bsrc = (
+                "def get_sandbox_config():\n    return {}\n"
+                "def extension_sync_call(extension_name, function_name, args):\n"
+                "    return {}\n"
+                "def __shell__(code):\n    return 'no'\n"
+            )
+            _bloaded = True
+            get_sandbox_config = Query(
+                lambda: {"available": True, "default_mode": "sandbox"}
+            )
+            extension_sync_call = Query(
+                lambda extension_name, function_name, args: {
+                    "success": True,
+                    "extension_name": extension_name,
+                    "function_name": function_name,
+                    "args": args,
+                }
+            )
+            __shell__ = Query(lambda code: "should never run")
+
+        executed = _ProxyHost
+        ns = object.__getattribute__(executed, "__dict__")
+        assert not isinstance(ns, dict)
+        assert "get_sandbox_config" in ns
+        assert not callable(ns["get_sandbox_config"])
+        assert "__get_candid_interface_tmp_hack" not in ns
+        missing_did = tmp_path / "missing.did"
+        names = load_allowed_methods(missing_did, host_module=executed)
+        assert "get_sandbox_config" in names
+        assert "extension_sync_call" in names
+        assert "__shell__" not in names
+
+        orm = _orm(
+            host_module=executed,
+            allowed_methods=None,
+            did_path=missing_did,
+        )
+        import builtins as _builtins
+
+        def rpc(action, **kwargs):
+            return orm.handle_rpc("2eqns", action, kwargs)
+
+        b = dict(vars(_builtins))
+        b["rpc"] = rpc
+        ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
+        exec(HOST_STUB_APPENDIX, ns)
+        assert ns["api"].call("get_sandbox_config") == {
+            "available": True,
+            "default_mode": "sandbox",
+        }
+        assert ns["ext"].call("department_docs", "list_documents", {}) == {
+            "success": True,
+            "extension_name": "department_docs",
+            "function_name": "list_documents",
+            "args": "{}",
+        }
+        with pytest.raises(PermissionError, match="__shell__"):
+            ns["api"].call("__shell__", "1")
+
+    def test_allowlist_from_type_dict_when_instance_has_no_verbs(self, tmp_path):
+        """Live leftover: instance dict may omit ``get_sandbox_config``."""
         _bMT = type(sys)
+
+        class Query:
+            def __init__(self, func):
+                self.func = func
 
         class _LazyMod(_bMT):
             def __init__(self, name):
                 super().__init__(name)
-                self.__dict__["_bsrc"] = _LAZY_MAIN_SRC
+                self.__dict__["_bsrc"] = (
+                    "def get_sandbox_config():\n    pass\n"
+                    "def extension_sync_call(a, b, c):\n    pass\n"
+                )
                 self.__dict__["_bloaded"] = True
                 self.__dict__["_bloading"] = False
                 self.__dict__["_bload_count"] = 0
@@ -644,85 +717,61 @@ class TestLazyModReimport:
             def __getattr__(self, name):
                 self._bload()
 
+            def get_sandbox_config(self):
+                return {"available": True, "default_mode": "sandbox"}
+
+            def extension_sync_call(self, extension_name, function_name, args):
+                return {
+                    "success": True,
+                    "extension_name": extension_name,
+                    "function_name": function_name,
+                    "args": args,
+                }
+
+            def __shell__(self, code):
+                return "should never run"
+
         executed = _LazyMod("__main__")
-        leftover_host = _LazyMod("core.repl_host")
-        executed.__dict__["get_sandbox_config"] = lambda: {
-            "available": True,
-            "default_mode": "sandbox",
-        }
-        executed.__dict__["extension_sync_call"] = (
-            lambda extension_name, function_name, args: {
-                "success": True,
-                "extension_name": extension_name,
-                "function_name": function_name,
-                "args": args,
-            }
-        )
-        executed.__dict__["__shell__"] = lambda code: "should never run"
+        assert "get_sandbox_config" not in executed.__dict__
         assert "__get_candid_interface_tmp_hack" not in executed.__dict__
         assert not any(
             str(key).endswith("__get_candid_interface_tmp_hack")
             for key in type(executed).__dict__
         )
-        assert "__get_candid_interface_tmp_hack" not in leftover_host.__dict__
         missing_did = tmp_path / "missing.did"
-        assert DID_PATH.is_file()
-        assert not missing_did.exists()
-        saved_dunder = sys.modules.get("__main__")
-        saved_named = sys.modules.get("main")
-        saved_rh = sys.modules.get("core.repl_host")
-        try:
-            sys.modules["__main__"] = executed
-            sys.modules["main"] = executed
-            sys.modules["core.repl_host"] = leftover_host
-            names = load_allowed_methods(missing_did, host_module=executed)
-            assert "get_sandbox_config" in names
-            assert "extension_sync_call" in names
-            assert "__shell__" not in names
-            assert executed._bload_count == 0
-            assert leftover_host._bload_count == 0
+        names = load_allowed_methods(missing_did, host_module=executed)
+        assert "get_sandbox_config" in names
+        assert "extension_sync_call" in names
+        assert "__shell__" not in names
+        assert executed._bload_count == 0
 
-            orm = _orm(
-                host_module=executed,
-                allowed_methods=None,
-                did_path=missing_did,
-            )
-            import builtins as _builtins
+        orm = _orm(
+            host_module=executed,
+            allowed_methods=None,
+            did_path=missing_did,
+        )
+        import builtins as _builtins
 
-            def rpc(action, **kwargs):
-                return orm.handle_rpc("2eqns", action, kwargs)
+        def rpc(action, **kwargs):
+            return orm.handle_rpc("2eqns", action, kwargs)
 
-            b = dict(vars(_builtins))
-            b["rpc"] = rpc
-            ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
-            exec(HOST_STUB_APPENDIX, ns)
-            assert ns["api"].call("get_sandbox_config") == {
-                "available": True,
-                "default_mode": "sandbox",
-            }
-            assert ns["ext"].call("department_docs", "list_documents", {}) == {
-                "success": True,
-                "extension_name": "department_docs",
-                "function_name": "list_documents",
-                "args": "{}",
-            }
-            with pytest.raises(PermissionError, match="__shell__"):
-                ns["api"].call("__shell__", "1")
-            assert executed._bload_count == 0
-            assert leftover_host._bload_count == 0
-        finally:
-            if saved_dunder is None:
-                sys.modules.pop("__main__", None)
-            else:
-                sys.modules["__main__"] = saved_dunder
-            if saved_named is None:
-                sys.modules.pop("main", None)
-            else:
-                sys.modules["main"] = saved_named
-            if saved_rh is None:
-                sys.modules.pop("core.repl_host", None)
-            else:
-                sys.modules["core.repl_host"] = saved_rh
+        b = dict(vars(_builtins))
+        b["rpc"] = rpc
+        ns = {"eval_repl": lambda _c: "", "__builtins__": b, "rpc": rpc}
+        exec(HOST_STUB_APPENDIX, ns)
+        assert ns["api"].call("get_sandbox_config") == {
+            "available": True,
+            "default_mode": "sandbox",
+        }
+        assert ns["ext"].call("department_docs", "list_documents", {}) == {
+            "success": True,
+            "extension_name": "department_docs",
+            "function_name": "list_documents",
+            "args": "{}",
+        }
+        with pytest.raises(PermissionError, match="__shell__"):
+            ns["api"].call("__shell__", "1")
+        assert executed._bload_count == 0
 
 
 class TestWasiCollectionsAbc:
