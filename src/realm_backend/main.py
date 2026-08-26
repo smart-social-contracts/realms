@@ -311,7 +311,6 @@ from ic_basilisk_toolkit.secure_orm import RpcError as _HostRpcError
 from ic_basilisk_toolkit.secure_orm import SecureORM as _SecureORMBase
 import inspect as _host_inspect
 from pathlib import Path as _HostPath
-import types as _host_types
 
 _HOST_ACTIONS = (
     "host.call",
@@ -379,7 +378,9 @@ def eval_repl(code):
     return _eval_repl_inner(code)
 '''
 _HOST_LAZY_KEYS = frozenset({"_bsrc", "_bloaded", "_bloading", "_bload_count", "_bload"})
-_HOST_SKIP_MRO = frozenset({object, type, _host_types.ModuleType})
+# Basilisk WASI ``types`` has no ``ModuleType`` — same class of stub as
+# ``collections.abc.Mapping``. ``type(sys)`` is the module type.
+_HOST_SKIP_MRO = frozenset({object, type, type(sys)})
 _HOST_MISSING = object()
 
 

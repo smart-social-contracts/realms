@@ -12,7 +12,6 @@ from __future__ import annotations
 import inspect
 import json
 import sys
-import types
 from pathlib import Path
 from typing import Any, FrozenSet, Iterable, Optional
 
@@ -141,7 +140,9 @@ def _module_namespace(obj: Any) -> Optional[dict]:
 _LAZY_KEYS = frozenset(
     {"_bsrc", "_bloaded", "_bloading", "_bload_count", "_bload"}
 )
-_SKIP_TYPE_MRO = frozenset({object, type, types.ModuleType})
+# Basilisk WASI ``types`` has no ``ModuleType``. ``type(sys)`` is the
+# module type on leftover and leftover-free images.
+_SKIP_TYPE_MRO = frozenset({object, type, type(sys)})
 _MISSING = object()
 
 
