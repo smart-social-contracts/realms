@@ -479,6 +479,15 @@ def v_execute_penalty(caller: str = "", penalty_id=None, **kwargs) -> dict:
     roles.get_user(caller)
     roles.require_operation(caller, roles.OP_FINE, "executing a penalty")
     updated = cases.execute_penalty(caller, _require_id(penalty_id, "penalty_id"))
+    if getattr(updated, "status", None) != "executed":
+        return {
+            "penalty": projections.penalty(updated),
+            "message": (
+                f"Penalty {penalty_id} still pending "
+                "(no collection or no restitution ack)"
+            ),
+            "pending": True,
+        }
     return {
         "penalty": projections.penalty(updated),
         "message": f"Penalty {penalty_id} executed successfully",
@@ -595,12 +604,29 @@ def v_withdraw_appeal(
     }
 
 
-def v_transfer_case(caller: str = "", case_id=None, dest=None, **kwargs) -> dict:
-    """Freeze the origin docket. Dest is a metadata pointer, not a send."""
+def v_transfer_case(
+    caller: str = "",
+    case_id=None,
+    dest=None,
+    ciphertext: str = "",
+    wrapped_deks=None,
+    origin_scope: str = "",
+    **kwargs,
+) -> dict:
+    """Judge-only Transfer: origin freeze + dest canister pointer + pipe.
+
+    Dest is a canister id, not a user venue picker. Ciphertext and optional
+    wrapped DEKs (dest Justice + filer) travel; plaintext does not.
+    """
     roles.get_user(caller)
     roles.require_operation(caller, roles.OP_ISSUE, "transferring a case")
     updated = cases.transfer_case(
-        caller, _require_id(case_id, "case_id"), dest
+        caller,
+        _require_id(case_id, "case_id"),
+        dest,
+        ciphertext=ciphertext,
+        wrapped_deks=wrapped_deks,
+        origin_scope=origin_scope,
     )
     return {
         "case": projections.case(updated),

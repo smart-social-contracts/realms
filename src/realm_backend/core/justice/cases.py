@@ -19,9 +19,10 @@ Three of those refusals are new, and each closes a hole in the in-process versio
 * **An appeal is filed by a party to the case.** ``file_appeal`` accepted an
   ``appellant_id``, so an appeal could be filed in a stranger's name.
 
-Cross-quarter cases (``defendant_quarter_id`` in metadata) are recorded but not
-executed against: reaching the defendant's home canister needs an inter-canister
-call, which is :mod:`core.async_bridge` territory and not yet wired up here.
+Cross-quarter transfer is a judge act (issue #325): origin Case freezes as
+``transferred`` with a dest canister pointer; dest creates the live Case via
+``justice.transfer``. Restitution uses ``justice.restitution`` after dest
+collects from the defendant. Fine stays in dest treasury.
 """
 
 import json
@@ -158,12 +159,23 @@ def _defendant_metadata(
     private regardless of who it names.
     """
     from _cdk import ic
+    from core.justice.federation import parse_user_address
     from ggg import Department, User
 
     try:
         own_canister = ic.id().to_str()
     except Exception:
         own_canister = ""
+
+    address = parse_user_address(defendant_id) if defendant_kind != "department" else {
+        "principal": "", "canister_id": "", "ref": "",
+    }
+    if address["principal"]:
+        defendant_id = address["principal"]
+    # Address hint only — not a venue picker (issue #325).
+    if not quarter_id and address["canister_id"]:
+        quarter_id = address["canister_id"]
+
     is_cross_quarter = bool(quarter_id and quarter_id != own_canister)
 
     if defendant_kind == "department":
@@ -188,6 +200,8 @@ def _defendant_metadata(
             {"defendant_kind": "user", "defendant_principal": defendant_id}
             if defendant_id else {}
         )
+        if address.get("ref"):
+            meta["defendant_ref"] = address["ref"]
 
     if is_cross_quarter:
         meta["defendant_quarter_id"] = quarter_id
@@ -266,7 +280,10 @@ def create_litigation(
     if is_cross_quarter:
         result["defendant_quarter_id"] = str(defendant_quarter_id or "").strip()
         result["scope_tag"] = "cross_quarter"
-        _warn_cross_quarter(new_case, "create_litigation")
+        logger.info(
+            f"Litigation {new_case.case_number} records defendant address "
+            f"{defendant_quarter_id}; venue is still judge Transfer"
+        )
 
     logger.info(f"Litigation {new_case.case_number} opened by {caller}")
     return result
@@ -513,12 +530,45 @@ def record_penalty_revenue(penalty) -> int:
 
 
 def execute_penalty(caller: str, penalty_id) -> object:
-    from ggg import penalty_execute
+    from core.justice.federation import (
+        collect_from_defendant,
+        notify_restitution,
+        _penalty_meta,
+        _write_penalty_meta,
+    )
+    from ggg import PenaltyType, penalty_execute
 
     penalty = find_penalty(penalty_id)
     case = case_of_penalty(penalty)
     if case is not None:
         _warn_cross_quarter(case, "execute_penalty")
+
+    if getattr(penalty, "penalty_type", None) == PenaltyType.RESTITUTION:
+        if not collect_from_defendant(penalty):
+            logger.info(
+                f"Penalty {penalty_id} restitution still pending: "
+                "defendant not collected"
+            )
+            return penalty
+        ack = notify_restitution(penalty, case)
+        meta = _penalty_meta(penalty)
+        meta["collected"] = True
+        if ack.get("success"):
+            meta["restitution_awaiting_ack"] = False
+            meta["restitution_acked"] = True
+            _write_penalty_meta(penalty, meta)
+            updated = penalty_execute(penalty)
+            logger.info(f"Penalty {penalty_id} restitution executed after ack")
+            return updated
+        meta["restitution_awaiting_ack"] = True
+        meta["restitution_acked"] = False
+        if ack.get("error"):
+            meta["restitution_error"] = str(ack["error"])[:200]
+        _write_penalty_meta(penalty, meta)
+        logger.info(
+            f"Penalty {penalty_id} restitution still pending: no home-quarter ack"
+        )
+        return penalty
 
     updated = penalty_execute(penalty)
     try:
@@ -599,6 +649,18 @@ def file_appeal(
     if appellate_court_id and appellate_court is None:
         raise ValueError(f"Court {appellate_court_id} not found")
 
+    # Party right on the live case. Supreme sits in Capital; if we are
+    # already there, appeal only changes court level (no hop).
+    if appellate_court is None:
+        try:
+            from core.federal_vote_runtime import is_capital
+
+            on_capital = is_capital()
+        except Exception:
+            on_capital = False
+        if on_capital:
+            appellate_court = courts.preferred_appellate_court()
+
     appeal = appeal_file(
         case=case,
         appellant=appellant,
@@ -658,8 +720,21 @@ def _require_judge_or_admin(case, caller: str, what: str):
     return judge
 
 
-def transfer_case(caller: str, case_id, dest=None) -> object:
-    """Mark the origin docket transferred. Dest is metadata only — no send."""
+def transfer_case(
+    caller: str,
+    case_id,
+    dest=None,
+    ciphertext: str = "",
+    wrapped_deks=None,
+    origin_scope: str = "",
+) -> object:
+    """Judge-only Transfer: freeze origin, pointer dest canister, send pipe.
+
+    Dest is a canister id (or ``realm://`` address). Not a filer venue picker.
+    Ciphertext (already encrypted title/description) travels; re-wrap DEKs
+    for dest Justice + filer are passed through, never unwrapped here.
+    """
+    from core.justice.federation import dest_canister_id, notify_transfer
     from ggg import case_transfer
 
     case = require_case(case_id)
@@ -671,7 +746,21 @@ def transfer_case(caller: str, case_id, dest=None) -> object:
         except (TypeError, ValueError):
             dest = {"id": dest}
 
-    updated = case_transfer(case, dest=dest)
+    canister = dest_canister_id(dest)
+    pointer = dest if isinstance(dest, dict) else {}
+    if canister:
+        pointer = dict(pointer)
+        pointer["id"] = canister
+
+    updated = case_transfer(case, dest=pointer or dest)
+    if canister:
+        notify_transfer(
+            updated,
+            canister,
+            ciphertext=ciphertext,
+            wrapped_deks=wrapped_deks,
+            origin_scope=origin_scope,
+        )
     logger.info(f"Case {case.case_number} marked transferred by {caller}")
     return updated
 

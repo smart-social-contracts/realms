@@ -1026,11 +1026,21 @@ class _Justice:
     def withdraw_appeal(self, appeal_id):
         return _require_rpc("justice.withdraw_appeal", {"appeal_id": appeal_id})
 
-    def transfer_case(self, case_id, dest=None):
-        """Mark the origin docket transferred. ``dest`` is metadata only."""
-        return _require_rpc("justice.transfer_case", {
-            "case_id": case_id, "dest": dest,
-        })
+    def transfer_case(
+        self, case_id, dest=None, ciphertext="", wrapped_deks=None, origin_scope="",
+    ):
+        """Judge Transfer: freeze origin and send ``justice.transfer``.
+
+        ``dest`` is a dest canister id (not a filer venue picker).
+        """
+        payload = {"case_id": case_id, "dest": dest}
+        if ciphertext:
+            payload["ciphertext"] = ciphertext
+        if wrapped_deks is not None:
+            payload["wrapped_deks"] = wrapped_deks
+        if origin_scope:
+            payload["origin_scope"] = origin_scope
+        return _require_rpc("justice.transfer_case", payload)
 
     def begin_executing(self, case_id):
         """Declare the verdict final so penalties may run."""
