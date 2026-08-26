@@ -12,6 +12,8 @@ from __future__ import annotations
 import inspect
 import json
 import sys
+import types
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, FrozenSet, Iterable, Optional
 
@@ -140,6 +142,8 @@ def _module_namespace(obj: Any) -> Optional[dict]:
 _LAZY_KEYS = frozenset(
     {"_bsrc", "_bloaded", "_bloading", "_bload_count", "_bload"}
 )
+_SKIP_TYPE_MRO = frozenset({object, type, types.ModuleType})
+_MISSING = object()
 
 
 def _is_lazy_mod(obj: Any) -> bool:
@@ -148,20 +152,134 @@ def _is_lazy_mod(obj: Any) -> bool:
     return bool(ns is not None and "_bsrc" in ns)
 
 
-def _has_host_callables(ns: dict) -> bool:
+def _iter_type_dicts(obj: Any) -> Iterable[Mapping]:
+    """Class ``__dict__`` along ``type(obj).__mro__``, no instance getattr.
+
+    Leftover Cedar images keep the Candid hack / host verbs on ``_LazyMod``
+    itself. Instance ``__dict__`` does not have them; ``getattr`` would
+    ``_bload``. Walk the type dicts only — skip ``module`` / ``object``.
+    """
+    try:
+        mro = type(obj).__mro__
+    except Exception:
+        return
+    for cls in mro:
+        if cls in _SKIP_TYPE_MRO:
+            continue
+        try:
+            ns = object.__getattribute__(cls, "__dict__")
+        except AttributeError:
+            continue
+        if isinstance(ns, Mapping):
+            yield ns
+
+
+def _bind_from_class(val: Any, obj: Any, owner: Any) -> Any:
+    """Unwrap a class-dict value without going through instance getattr."""
+    if isinstance(val, (staticmethod, classmethod)):
+        return val.__get__(obj, owner)
+    if inspect.isfunction(val):
+        try:
+            params = list(inspect.signature(val).parameters.values())
+        except (TypeError, ValueError):
+            return val
+        if (
+            params
+            and params[0].kind
+            in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            and params[0].default is inspect.Parameter.empty
+            and params[0].name in {"self", "cls"}
+        ):
+            return val.__get__(obj, owner)
+        return val
+    getter = getattr(type(val), "__get__", None)
+    if getter is not None and not isinstance(val, type):
+        try:
+            return val.__get__(obj, owner)
+        except Exception:
+            return val
+    return val
+
+
+def _type_lookup_names(obj: Any, name: str) -> tuple[str, ...]:
+    """Instance name plus Python name-mangled class-body forms.
+
+    ``__get_candid_interface_tmp_hack`` defined on ``_LazyMod`` is stored as
+    ``_LazyMod__get_candid_interface_tmp_hack``. Leftover images keep that
+    method on the class; ``setattr`` style keeps the unmangled name.
+    """
+    names = [name]
+    if name.startswith("__") and not name.endswith("__"):
+        try:
+            mro = type(obj).__mro__
+        except Exception:
+            return (name,)
+        for cls in mro:
+            if cls in _SKIP_TYPE_MRO:
+                continue
+            names.append(f"_{cls.__name__.lstrip('_')}{name}")
+    return tuple(dict.fromkeys(names))
+
+
+def _type_attr(obj: Any, name: str) -> Any:
+    """``name`` from ``_LazyMod`` (or another owner class), or ``_MISSING``."""
+    try:
+        mro = type(obj).__mro__
+    except Exception:
+        return _MISSING
+    candidates = _type_lookup_names(obj, name)
+    for cls in mro:
+        if cls in _SKIP_TYPE_MRO:
+            continue
+        try:
+            ns = object.__getattribute__(cls, "__dict__")
+        except AttributeError:
+            continue
+        if not isinstance(ns, Mapping):
+            continue
+        for candidate in candidates:
+            if candidate in ns:
+                return _bind_from_class(ns[candidate], obj, cls)
+    return _MISSING
+
+
+def _is_class_host_value(key: str, val: Any) -> bool:
+    if key.endswith("__get_candid_interface_tmp_hack"):
+        return True
+    if key in _LAZY_KEYS or key.startswith("_"):
+        return False
+    return callable(val) or isinstance(val, (staticmethod, classmethod))
+
+
+def _has_host_callables(ns: Mapping) -> bool:
     return any(
         key not in _LAZY_KEYS and callable(val) for key, val in ns.items()
     )
 
 
+def _class_has_host_surface(obj: Any) -> bool:
+    """Candid hack or public host verbs live on ``_LazyMod``, not the instance."""
+    for ns in _iter_type_dicts(obj):
+        if any(_is_class_host_value(key, val) for key, val in ns.items()):
+            return True
+    return False
+
+
+def _has_host_surface(mod: Any) -> bool:
+    ns = _module_namespace(mod)
+    if ns is not None and _has_host_callables(ns):
+        return True
+    return _class_has_host_surface(mod)
+
+
 def _is_unloaded_lazy(mod: Any) -> bool:
-    """Unloaded LazyMod: has source, not marked loaded, no host callables."""
+    """Unloaded LazyMod: has source, not marked loaded, no host surface."""
     if not _is_lazy_mod(mod):
         return False
     ns = _module_namespace(mod)
     if ns is None or ns.get("_bloaded") is True:
         return False
-    return not _has_host_callables(ns)
+    return not _has_host_surface(mod)
 
 
 def _module_attr(obj: Any, name: str, default: Any = None) -> Any:
@@ -171,10 +289,18 @@ def _module_attr(obj: Any, name: str, default: Any = None) -> Any:
     is missing from ``__dict__``. ``_bload`` re-execs the module source. For
     the canister entry that re-runs ``Database.init`` and raises
     ``Database instance already exists`` before the host method runs.
+
+    Leftover images put the Candid hack and some host verbs on ``_LazyMod``
+    (the class), not the instance dict. Read those from the type dict.
     """
+    if obj is None:
+        return default
     ns = _module_namespace(obj)
     if ns is not None and name in ns:
         return ns[name]
+    typed = _type_attr(obj, name)
+    if typed is not _MISSING:
+        return typed
     if _is_lazy_mod(obj):
         return default
     try:
@@ -184,14 +310,14 @@ def _module_attr(obj: Any, name: str, default: Any = None) -> Any:
 
 
 def _is_executed_host(mod: Any) -> bool:
-    """True if ``mod`` already has host callables (do not ``_bload`` it)."""
+    """True if ``mod`` already has a host surface (do not ``_bload`` it)."""
     if mod is None:
         return False
     ns = _module_namespace(mod)
     if ns is None:
         return False
     if _is_lazy_mod(mod) and ns.get("_bloaded") is False:
-        return _has_host_callables(ns)
+        return _has_host_surface(mod)
     return True
 
 
@@ -231,10 +357,13 @@ def load_allowed_methods(
         did_text = None
     module = _resolve_host_module(host_module)
     if not did_text:
-        # ``__dict__`` only — getattr on LazyMod re-execs ``__main__``.
+        # Instance ``__dict__`` or ``_LazyMod`` type dict — never getattr.
         hack = _module_attr(module, "__get_candid_interface_tmp_hack") if module else None
         if callable(hack):
-            did_text = hack()
+            try:
+                did_text = hack()
+            except TypeError:
+                did_text = hack(module)
     if did_text:
         names = parse_candid_methods(did_text) - blocked_set
         if names:
@@ -370,8 +499,9 @@ class HostSecureORM(SecureORM):
         # The Candid surface *is* the decorated function. Do not unwrap
         # ``@require`` / ``@update`` — that would skip the same gates the UI
         # hits. SHELL_EXECUTE is not a superuser bit on these verbs.
-        # Look up via ``__dict__`` so Basilisk LazyMod does not ``_bload``
-        # / re-init Database before the method runs.
+        # Look up via instance / ``_LazyMod`` ``__dict__`` so Basilisk
+        # LazyMod does not ``_bload`` / re-init Database before the method
+        # runs. Leftover images keep some verbs on the class.
         fn = _module_attr(module, method)
         if not callable(fn) and module is not sys.modules.get("__main__"):
             fn = _module_attr(sys.modules.get("__main__"), method)
