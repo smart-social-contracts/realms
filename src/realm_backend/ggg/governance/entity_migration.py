@@ -20,6 +20,8 @@ subject's principal so a malicious canister cannot forge a redirect.
 
 Only mobile entities get chains. Immutable records (Vote, Case, LedgerEntry)
 never move and are referenced by plain absolute URIs with no forwarding.
+A Case marked ``transferred`` stays on this canister; the dest pointer lives
+in ``Case.metadata``, not an EntityMigration stub.
 """
 
 from ic_python_db import Entity, String, TimestampedMixin

@@ -146,8 +146,10 @@ class CaseStatus:
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
     VERDICT_ISSUED = "verdict_issued"
-    CLOSED = "closed"
     APPEALED = "appealed"
+    EXECUTING = "executing"
+    TRANSFERRED = "transferred"
+    CLOSED = "closed"
     DISMISSED = "dismissed"
 
 

@@ -1023,6 +1023,22 @@ class _Justice:
             "reasoning": reasoning,
         })
 
+    def withdraw_appeal(self, appeal_id):
+        return _require_rpc("justice.withdraw_appeal", {"appeal_id": appeal_id})
+
+    def transfer_case(self, case_id, dest=None):
+        """Mark the origin docket transferred. ``dest`` is metadata only."""
+        return _require_rpc("justice.transfer_case", {
+            "case_id": case_id, "dest": dest,
+        })
+
+    def begin_executing(self, case_id):
+        """Declare the verdict final so penalties may run."""
+        return _require_rpc("justice.begin_executing", {"case_id": case_id})
+
+    def close_case(self, case_id):
+        return _require_rpc("justice.close_case", {"case_id": case_id})
+
     def statistics(self):
         """Realm-wide counts. Aggregates only, so not filtered per caller."""
         return _require_rpc("justice.statistics", {})

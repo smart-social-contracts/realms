@@ -1992,8 +1992,10 @@ class CaseStatus:
     ASSIGNED: str
     IN_PROGRESS: str
     VERDICT_ISSUED: str
-    CLOSED: str
     APPEALED: str
+    EXECUTING: str
+    TRANSFERRED: str
+    CLOSED: str
     DISMISSED: str
 
 

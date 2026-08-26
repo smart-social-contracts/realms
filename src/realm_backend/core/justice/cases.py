@@ -1,10 +1,12 @@
 """Case lifecycle: filing, judges, verdicts, penalties, appeals.
 
 The state changes themselves are :mod:`ggg.justice`'s (``case_file``,
-``case_assign_judges``, ``case_issue_verdict``, ``penalty_execute``,
-``penalty_waive``, ``appeal_file``, ``appeal_decide``). What is here is the part
-the extension used to do and should not have: deciding *whose* name goes on each
-one, and refusing the combinations that make the process meaningless.
+``case_assign_judges``, ``case_issue_verdict``, ``case_transfer``,
+``case_begin_executing``, ``case_close``, ``penalty_execute``,
+``penalty_waive``, ``appeal_file``, ``appeal_decide``, ``appeal_withdraw``).
+What is here is the part the extension used to do and should not have:
+deciding *whose* name goes on each one, and refusing the combinations that
+make the process meaningless.
 
 Three of those refusals are new, and each closes a hole in the in-process version:
 
@@ -623,4 +625,72 @@ def decide_appeal(caller: str, appeal_id, decision: str, reasoning: str = ""):
 
     updated = appeal_decide(appeal, str(decision), str(reasoning or ""))
     logger.info(f"Appeal {appeal_id} decided {decision!r} by {caller}")
+    return updated
+
+
+def withdraw_appeal(caller: str, appeal_id):
+    """Appellant (or a party / admin) withdraws a pending appeal."""
+    from ggg import Appeal, appeal_withdraw
+
+    appeal = Appeal[appeal_id]
+    if not appeal:
+        raise ValueError(f"Appeal {appeal_id} not found")
+
+    case = getattr(appeal, "original_case", None)
+    appellant_is_caller = (
+        roles.principal_of(getattr(appeal, "appellant", None)) == caller
+    )
+    party = case is not None and is_party(case, caller)
+    if not (appellant_is_caller or party or roles.is_realm_admin(caller)):
+        raise PermissionError("only the appellant or a party may withdraw this appeal")
+
+    updated = appeal_withdraw(appeal)
+    logger.info(f"Appeal {appeal_id} withdrawn by {caller}")
+    return updated
+
+
+def _require_judge_or_admin(case, caller: str, what: str):
+    judge = judge_for_caller(case, caller)
+    if judge is None and not roles.is_realm_admin(caller):
+        raise PermissionError(
+            f"only a judge assigned to case {case.case_number} may {what}"
+        )
+    return judge
+
+
+def transfer_case(caller: str, case_id, dest=None) -> object:
+    """Mark the origin docket transferred. Dest is metadata only — no send."""
+    from ggg import case_transfer
+
+    case = require_case(case_id)
+    _require_judge_or_admin(case, caller, "transfer it")
+
+    if isinstance(dest, str) and dest.strip():
+        try:
+            dest = json.loads(dest)
+        except (TypeError, ValueError):
+            dest = {"id": dest}
+
+    updated = case_transfer(case, dest=dest)
+    logger.info(f"Case {case.case_number} marked transferred by {caller}")
+    return updated
+
+
+def begin_executing(caller: str, case_id) -> object:
+    """Declare the verdict final (no appeal / cannot appeal / window closed)."""
+    from ggg import case_begin_executing
+
+    case = require_case(case_id)
+    _require_judge_or_admin(case, caller, "begin execution")
+    updated = case_begin_executing(case)
+    logger.info(f"Case {case.case_number} began executing by {caller}")
+    return updated
+
+
+def close_case(caller: str, case_id) -> object:
+    from ggg import case_close
+
+    case = require_case(case_id)
+    updated = case_close(case)
+    logger.info(f"Case {case.case_number} closed by {caller}")
     return updated

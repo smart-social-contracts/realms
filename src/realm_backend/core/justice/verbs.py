@@ -583,6 +583,52 @@ def v_decide_appeal(
     }
 
 
+def v_withdraw_appeal(
+    caller: str = "", appeal_id=None, **kwargs
+) -> dict:
+    roles.get_user(caller)
+    roles.require_operation(caller, roles.OP_CREATE, "withdrawing an appeal")
+    updated = cases.withdraw_appeal(caller, _require_id(appeal_id, "appeal_id"))
+    return {
+        "appeal": projections.appeal(updated),
+        "message": f"Appeal {appeal_id} withdrawn",
+    }
+
+
+def v_transfer_case(caller: str = "", case_id=None, dest=None, **kwargs) -> dict:
+    """Freeze the origin docket. Dest is a metadata pointer, not a send."""
+    roles.get_user(caller)
+    roles.require_operation(caller, roles.OP_ISSUE, "transferring a case")
+    updated = cases.transfer_case(
+        caller, _require_id(case_id, "case_id"), dest
+    )
+    return {
+        "case": projections.case(updated),
+        "message": f"Case {updated.case_number} transferred",
+    }
+
+
+def v_begin_executing(caller: str = "", case_id=None, **kwargs) -> dict:
+    """Verdict is final: no appeal, cannot appeal, or the window closed."""
+    roles.get_user(caller)
+    roles.require_operation(caller, roles.OP_ISSUE, "beginning execution")
+    updated = cases.begin_executing(caller, _require_id(case_id, "case_id"))
+    return {
+        "case": projections.case(updated),
+        "message": f"Case {updated.case_number} is executing",
+    }
+
+
+def v_close_case(caller: str = "", case_id=None, **kwargs) -> dict:
+    roles.get_user(caller)
+    roles.require_operation(caller, roles.OP_ISSUE, "closing a case")
+    updated = cases.close_case(caller, _require_id(case_id, "case_id"))
+    return {
+        "case": projections.case(updated),
+        "message": f"Case {updated.case_number} closed",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Statistics
 # ---------------------------------------------------------------------------
@@ -652,6 +698,10 @@ VERBS = {
     "justice.waive_penalty": v_waive_penalty,
     "justice.file_appeal": v_file_appeal,
     "justice.decide_appeal": v_decide_appeal,
+    "justice.withdraw_appeal": v_withdraw_appeal,
+    "justice.transfer_case": v_transfer_case,
+    "justice.begin_executing": v_begin_executing,
+    "justice.close_case": v_close_case,
 }
 
 READ_VERBS = frozenset({

@@ -29,8 +29,10 @@ class CaseStatus:
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
     VERDICT_ISSUED = "verdict_issued"
-    CLOSED = "closed"
     APPEALED = "appealed"
+    EXECUTING = "executing"
+    TRANSFERRED = "transferred"
+    CLOSED = "closed"
     DISMISSED = "dismissed"
 
 
@@ -45,8 +47,14 @@ class Case(Entity, TimestampedMixin):
     1. filed → Case created, fees collected
     2. assigned → Judges assigned to case
     3. in_progress → Proceedings underway
-    4. verdict_issued → Verdict rendered
-    5. closed → Case finalized (or appealed)
+    4. verdict_issued → Verdict rendered (appeal still possible)
+    5. appealed → An appeal is pending
+    6. executing → Verdict is final; penalties may run
+    7. closed → Penalties resolved (or dismissed)
+
+    A judge may freeze a pre-verdict docket as transferred (dest pointer in
+    ``metadata`` only — Case is not an EntityMigration subject). Transferred
+    is not open: no verdicts, appeals, or penalties on this record.
     """
     
     __alias__ = "case_number"
@@ -69,8 +77,16 @@ class Case(Entity, TimestampedMixin):
         return f"Case(case_number={self.case_number!r}, status={self.status!r})"
 
     def is_open(self) -> bool:
-        """Check if this Case is still open."""
-        return self.status not in (CaseStatus.CLOSED, CaseStatus.DISMISSED)
+        """Check if this Case is still open.
+
+        ``executing`` stays open (penalties may still run). ``transferred``
+        is a frozen origin docket and is not open.
+        """
+        return self.status not in (
+            CaseStatus.CLOSED,
+            CaseStatus.DISMISSED,
+            CaseStatus.TRANSFERRED,
+        )
 
     def get_judges(self) -> list:
         """Get all Judges assigned to this Case."""
@@ -280,21 +296,104 @@ def case_issue_verdict(
     return verdict
 
 
+def _parse_metadata(case: "Case") -> dict:
+    raw = getattr(case, "metadata", None) or ""
+    if not raw:
+        return {}
+    try:
+        import json
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {"_raw": raw}
+    except (TypeError, ValueError):
+        return {"_raw": raw}
+
+
+def _write_metadata(case: "Case", data: dict) -> None:
+    import json
+    case.metadata = json.dumps(data)
+
+
+def case_penalties(case: "Case") -> list:
+    """Penalties hanging off this Case's current Verdict."""
+    verdict = getattr(case, "verdict", None)
+    if verdict is None:
+        return []
+    try:
+        return list(getattr(verdict, "penalties", None) or [])
+    except Exception:
+        return []
+
+
+def case_penalties_resolved(case: "Case") -> bool:
+    """True when every penalty is executed or waived (or there are none)."""
+    penalties = case_penalties(case)
+    if not penalties:
+        return True
+    return all(getattr(p, "status", None) in ("executed", "waived") for p in penalties)
+
+
+def case_transfer(case: "Case", dest=None) -> "Case":
+    """Freeze the origin docket as transferred.
+
+    Dest lives in ``Case.metadata`` (``transfer_dest``). Case is immutable
+    across canisters — do not create an EntityMigration for it. This function
+    does not send a federation message or open a remote case.
+    """
+    if case.status not in (
+        CaseStatus.FILED,
+        CaseStatus.ASSIGNED,
+        CaseStatus.IN_PROGRESS,
+    ):
+        raise ValueError(f"Cannot transfer case in status {case.status}")
+
+    if getattr(case, "verdict", None) is not None:
+        raise ValueError("Cannot transfer a case that already has a verdict")
+
+    pointer = dest if isinstance(dest, dict) else ({"id": dest} if dest else {})
+    data = _parse_metadata(case)
+    data["transferred"] = True
+    data["transfer_dest"] = pointer
+    data["transferred_at"] = _now_dt().isoformat()
+    _write_metadata(case, data)
+
+    case.status = CaseStatus.TRANSFERRED
+    logger.info(f"Case {case.case_number} marked transferred (dest={pointer})")
+    return case
+
+
+def case_begin_executing(case: "Case") -> "Case":
+    """Mark a verdict final and open the penalty window.
+
+    Explicit and testable: there is no appeal-window clock. Call this when
+    the verdict cannot be appealed, nobody appealed, or the window is closed.
+    """
+    if case.status != CaseStatus.VERDICT_ISSUED:
+        raise ValueError(
+            f"Cannot begin executing case in status {case.status}; "
+            "only verdict_issued may become executing this way"
+        )
+    case.status = CaseStatus.EXECUTING
+    logger.info(f"Case {case.case_number} entered executing (verdict is final)")
+    return case
+
+
 def case_close(case: "Case") -> "Case":
+    """Close a Case after the verdict is final and penalties are resolved.
+
+    Only ``executing`` may close. Pending penalties block close; call
+    ``penalty_execute`` / ``penalty_waive`` first (those auto-close when
+    the last pending penalty is resolved).
     """
-    Close a Case after Verdict.
-    
-    Args:
-        case: The Case to close
-        
-    Returns:
-        The updated Case
-    """
-    if case.status not in (CaseStatus.VERDICT_ISSUED, CaseStatus.APPEALED):
+    if case.status != CaseStatus.EXECUTING:
         raise ValueError(f"Cannot close case in status {case.status}")
-    
+
+    if not case_penalties_resolved(case):
+        raise ValueError(
+            f"Cannot close case {case.case_number} while penalties are pending"
+        )
+
     case.status = CaseStatus.CLOSED
     case.closed_date = _now_dt().isoformat()
-    
+
     Case.case_closed_posthook(case)
     return case

@@ -166,6 +166,10 @@ ENTRY_POINTS = [
     ("file_appeal", {"case_id": "1", "grounds": "unfair"}, "justice.file_appeal"),
     ("decide_appeal", {"appeal_id": "a1", "decision": "upheld"},
      "justice.decide_appeal"),
+    ("withdraw_appeal", {"appeal_id": "a1"}, "justice.withdraw_appeal"),
+    ("transfer_case", {"case_id": "1"}, "justice.transfer_case"),
+    ("begin_executing", {"case_id": "1"}, "justice.begin_executing"),
+    ("close_case", {"case_id": "1"}, "justice.close_case"),
     ("get_statistics", {}, "justice.statistics"),
 ]
 
