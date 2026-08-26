@@ -128,17 +128,91 @@ def parse_candid_methods(did_text: str) -> FrozenSet[str]:
     return frozenset(names)
 
 
+def _module_namespace(obj: Any) -> Optional[dict]:
+    """Module/instance ``__dict__`` without going through ``__getattr__``."""
+    try:
+        ns = object.__getattribute__(obj, "__dict__")
+    except AttributeError:
+        return None
+    return ns if isinstance(ns, dict) else None
+
+
+_LAZY_KEYS = frozenset(
+    {"_bsrc", "_bloaded", "_bloading", "_bload_count", "_bload"}
+)
+
+
+def _is_lazy_mod(obj: Any) -> bool:
+    """Basilisk ``_LazyMod`` instances stash source on ``_bsrc``."""
+    ns = _module_namespace(obj)
+    return bool(ns is not None and "_bsrc" in ns)
+
+
+def _has_host_callables(ns: dict) -> bool:
+    return any(
+        key not in _LAZY_KEYS and callable(val) for key, val in ns.items()
+    )
+
+
+def _is_unloaded_lazy(mod: Any) -> bool:
+    """Unloaded LazyMod: has source, not marked loaded, no host callables."""
+    if not _is_lazy_mod(mod):
+        return False
+    ns = _module_namespace(mod)
+    if ns is None or ns.get("_bloaded") is True:
+        return False
+    return not _has_host_callables(ns)
+
+
+def _module_attr(obj: Any, name: str, default: Any = None) -> Any:
+    """Look up ``name`` without triggering Basilisk ``_LazyMod._bload``.
+
+    ``getattr`` on a LazyMod calls ``__getattr__`` → ``_bload`` when the name
+    is missing from ``__dict__``. ``_bload`` re-execs the module source. For
+    the canister entry that re-runs ``Database.init`` and raises
+    ``Database instance already exists`` before the host method runs.
+    """
+    ns = _module_namespace(obj)
+    if ns is not None and name in ns:
+        return ns[name]
+    if _is_lazy_mod(obj):
+        return default
+    try:
+        return getattr(obj, name)
+    except AttributeError:
+        return default
+
+
+def _is_executed_host(mod: Any) -> bool:
+    """True if ``mod`` already has host callables (do not ``_bload`` it)."""
+    if mod is None:
+        return False
+    ns = _module_namespace(mod)
+    if ns is None:
+        return False
+    if _is_lazy_mod(mod) and ns.get("_bloaded") is False:
+        return _has_host_callables(ns)
+    return True
+
+
 def _resolve_host_module(host_module: Any = None) -> Any:
+    """The already-executed canister entry. Never ``import main``.
+
+    Basilisk registers ``main`` as an unloaded LazyMod for the same file as
+    ``__main__``. ``import main`` / ``getattr`` on that LazyMod re-execs
+    ``__main__.py`` and re-inits the Database singleton.
+    """
+    if host_module is not None and not _is_unloaded_lazy(host_module):
+        return host_module
+    main = sys.modules.get("__main__")
+    named = sys.modules.get("main")
+    if _is_executed_host(main):
+        return main
+    if _is_executed_host(named):
+        return named
     if host_module is not None:
         return host_module
-    mod = sys.modules.get("main") or sys.modules.get("__main__")
-    if mod is not None:
-        return mod
-    try:
-        import main as mod  # type: ignore
-        return mod
-    except Exception:
-        return None
+    return main or named
 
 
 def load_allowed_methods(
@@ -155,9 +229,10 @@ def load_allowed_methods(
             did_text = path.read_text()
     except OSError:
         did_text = None
+    module = _resolve_host_module(host_module)
     if not did_text:
-        module = _resolve_host_module(host_module)
-        hack = getattr(module, "__get_candid_interface_tmp_hack", None) if module else None
+        # ``__dict__`` only — getattr on LazyMod re-execs ``__main__``.
+        hack = _module_attr(module, "__get_candid_interface_tmp_hack") if module else None
         if callable(hack):
             did_text = hack()
     if did_text:
@@ -236,9 +311,9 @@ class HostSecureORM(SecureORM):
         return self._allowed_methods - self._blocked_methods
 
     def host_module(self) -> Any:
-        if self._host_module is not None:
+        if self._host_module is not None and not _is_unloaded_lazy(self._host_module):
             return self._host_module
-        resolved = _resolve_host_module()
+        resolved = _resolve_host_module(self._host_module)
         if resolved is not None:
             self._host_module = resolved
         return resolved
@@ -295,7 +370,11 @@ class HostSecureORM(SecureORM):
         # The Candid surface *is* the decorated function. Do not unwrap
         # ``@require`` / ``@update`` — that would skip the same gates the UI
         # hits. SHELL_EXECUTE is not a superuser bit on these verbs.
-        fn = getattr(module, method, None)
+        # Look up via ``__dict__`` so Basilisk LazyMod does not ``_bload``
+        # / re-init Database before the method runs.
+        fn = _module_attr(module, method)
+        if not callable(fn) and module is not sys.modules.get("__main__"):
+            fn = _module_attr(sys.modules.get("__main__"), method)
         if not callable(fn):
             raise RpcError(f"host method {method!r} is not defined")
         try:

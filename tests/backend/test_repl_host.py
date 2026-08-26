@@ -42,6 +42,8 @@ from core.repl_host import (  # noqa: E402
     load_allowed_methods,
     parse_candid_methods,
     _default_did_path,
+    _module_attr,
+    _resolve_host_module,
 )
 
 
@@ -303,3 +305,199 @@ class TestSandboxSurface:
         assert json_args(None) == "{}"
         assert json_args({"a": 1}) == '{"a": 1}'
         assert json_args('{"a": 1}') == '{"a": 1}'
+
+
+# Basilisk ``_LazyMod`` (see tests/backend/test_federal_vote_runtime.py).
+# ``__getattr__`` always ``_bload``s; ``_bload`` re-execs source. The canister
+# entry is often exec'd as ``__main__`` *without* setting ``_bloaded``, so a
+# later ``getattr`` for a missing name re-runs ``Database.init``.
+_LAZY_MAIN_SRC = """
+class DatabaseAlreadyExists(RuntimeError):
+    pass
+
+raise DatabaseAlreadyExists("Database instance already exists")
+"""
+
+
+def _make_lazy_mod_class():
+    _bMT = type(sys)
+
+    class _LazyMod(_bMT):
+        def __init__(self, name, source, already=None):
+            super().__init__(name)
+            self.__dict__["_bsrc"] = source
+            self.__dict__["_bloaded"] = False
+            self.__dict__["_bloading"] = False
+            self.__dict__["_bload_count"] = 0
+            if already:
+                self.__dict__.update(already)
+
+        def _bload(self):
+            self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+            if self._bloading or self._bloaded:
+                return
+            self.__dict__["_bloading"] = True
+            try:
+                if self._bsrc:
+                    exec(
+                        compile(
+                            self._bsrc,
+                            self.__name__.replace(".", "/") + ".py",
+                            "exec",
+                        ),
+                        self.__dict__,
+                    )
+                self.__dict__["_bloaded"] = True
+            finally:
+                self.__dict__["_bloading"] = False
+
+        def __getattr__(self, name):
+            self._bload()
+            try:
+                return self.__dict__[name]
+            except KeyError:
+                raise AttributeError(
+                    f"module '{self.__name__}' has no attribute '{name}'"
+                )
+
+    return _LazyMod
+
+
+class TestLazyModReimport:
+    """api.call / ext.call must not re-import ``__main__`` / re-init Database."""
+
+    def test_module_attr_does_not_bload_executed_entry(self):
+        Lazy = _make_lazy_mod_class()
+
+        def get_sandbox_config():
+            return {"available": True, "default_mode": "sandbox"}
+
+        executed = Lazy(
+            "__main__",
+            _LAZY_MAIN_SRC,
+            already={"get_sandbox_config": get_sandbox_config},
+        )
+        assert _module_attr(executed, "get_sandbox_config") is get_sandbox_config
+        assert _module_attr(executed, "__get_candid_interface_tmp_hack") is None
+        assert executed._bload_count == 0
+        # The naive getattr the host used to use re-execs and crashes.
+        with pytest.raises(RuntimeError, match="Database instance already exists"):
+            getattr(executed, "__get_candid_interface_tmp_hack", None)
+        assert executed._bload_count >= 1
+
+    def test_host_call_uses_bound_fn_without_reimport(self):
+        Lazy = _make_lazy_mod_class()
+
+        def get_sandbox_config():
+            return {"available": True, "default_mode": "sandbox"}
+
+        def extension_sync_call(extension_name, function_name, args):
+            return {
+                "success": True,
+                "extension_name": extension_name,
+                "function_name": function_name,
+                "args": args,
+            }
+
+        executed = Lazy(
+            "__main__",
+            _LAZY_MAIN_SRC,
+            already={
+                "get_sandbox_config": get_sandbox_config,
+                "extension_sync_call": extension_sync_call,
+            },
+        )
+        orm = _orm(
+            host_module=executed,
+            allowed_methods=["get_sandbox_config", "extension_sync_call"],
+        )
+        assert orm.handle_rpc(
+            "alice", "host.call", {"method": "get_sandbox_config"}
+        ) == {"available": True, "default_mode": "sandbox"}
+        assert orm.handle_rpc(
+            "alice",
+            "host.ext_sync",
+            {
+                "extension_name": "department_docs",
+                "function_name": "list_documents",
+                "args": {},
+            },
+        ) == {
+            "success": True,
+            "extension_name": "department_docs",
+            "function_name": "list_documents",
+            "args": "{}",
+        }
+        assert executed._bload_count == 0
+
+    def test_missing_did_hack_lookup_does_not_reimport(self, tmp_path):
+        Lazy = _make_lazy_mod_class()
+        did_text = (
+            "service : {\n"
+            '  "get_sandbox_config" : () -> (text) query;\n'
+            '  "__shell__" : (text) -> (text);\n'
+            "}\n"
+        )
+        executed = Lazy(
+            "__main__",
+            _LAZY_MAIN_SRC,
+            already={"__get_candid_interface_tmp_hack": lambda: did_text},
+        )
+        names = load_allowed_methods(tmp_path / "missing.did", host_module=executed)
+        assert "get_sandbox_config" in names
+        assert "__shell__" not in names
+        assert executed._bload_count == 0
+
+    def test_missing_did_and_hack_does_not_reimport(self, tmp_path):
+        Lazy = _make_lazy_mod_class()
+        executed = Lazy("__main__", _LAZY_MAIN_SRC, already={"ping": lambda: "pong"})
+        with pytest.raises(RpcError, match="Candid interface not found"):
+            load_allowed_methods(tmp_path / "missing.did", host_module=executed)
+        assert executed._bload_count == 0
+
+    def test_resolve_prefers_executed_main_and_never_imports(self, monkeypatch):
+        Lazy = _make_lazy_mod_class()
+
+        def get_sandbox_config():
+            return {"available": True}
+
+        executed = Lazy(
+            "__main__",
+            _LAZY_MAIN_SRC,
+            already={"get_sandbox_config": get_sandbox_config},
+        )
+        unloaded = Lazy("main", _LAZY_MAIN_SRC)
+        monkeypatch.setitem(sys.modules, "__main__", executed)
+        monkeypatch.setitem(sys.modules, "main", unloaded)
+
+        resolved = _resolve_host_module()
+        assert resolved is executed
+        assert executed._bload_count == 0
+        assert unloaded._bload_count == 0
+
+        orm = _orm(
+            host_module=None,
+            allowed_methods=["get_sandbox_config"],
+        )
+        # Stored host is None; dispatch must pick executed __main__, not
+        # ``import main`` / getattr on the unloaded LazyMod.
+        orm._host_module = None
+        assert orm.handle_rpc(
+            "alice", "host.call", {"method": "get_sandbox_config"}
+        ) == {"available": True}
+        assert executed._bload_count == 0
+        assert unloaded._bload_count == 0
+
+    def test_blocked_shell_still_denied_on_lazy_host(self):
+        Lazy = _make_lazy_mod_class()
+
+        def __shell__(code):
+            return "should never run"
+
+        executed = Lazy("__main__", _LAZY_MAIN_SRC, already={"__shell__": __shell__})
+        orm = _orm(host_module=executed, allowed_methods=["__shell__"])
+        with pytest.raises(PermissionError, match="__shell__"):
+            orm.handle_rpc(
+                "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
+            )
+        assert executed._bload_count == 0
