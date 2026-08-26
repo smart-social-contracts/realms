@@ -3680,51 +3680,13 @@ def directory_list() -> RealmResponse:
     """
     _t0 = ic.performance_counter(0)
     try:
-        from ggg import Department, User
+        from core.justice.directory import list_local_entries
 
-        entries = []
-
-        user_count = 0
-        for u in User.instances():
-            principal = getattr(u, "id", None)
-            if not principal:
-                continue
-            user_count += 1
-            human = getattr(u, "human", None)
-            human_name = ""
-            if human is not None:
-                human_name = (
-                    getattr(human, "name", None)
-                    or getattr(human, "full_name", None)
-                    or ""
-                )
-            entries.append(
-                {
-                    "kind": "user",
-                    "principal": str(principal),
-                    "label": human_name or (getattr(u, "nickname", "") or "") or str(principal),
-                }
-            )
-
-        dept_count = 0
-        for d in Department.instances():
-            name = getattr(d, "name", "") or ""
-            if not name:
-                continue
-            dept_count += 1
-            head = getattr(d, "head", None)
-            head_principal = str(getattr(head, "id", "")) if head is not None else ""
-            entries.append(
-                {
-                    "kind": "department",
-                    "principal": head_principal,
-                    "label": name,
-                    # Stable department identifier so callers can record the
-                    # department itself as a target (e.g. litigation defendant),
-                    # independent of whoever currently heads it.
-                    "id": str(getattr(d, "_id", "") or ""),
-                }
-            )
+        # This canister only. Do not loop this query over federation members
+        # (issue #325: all-quarters autocomplete saturates gossip).
+        entries = list_local_entries()
+        user_count = sum(1 for e in entries if e.get("kind") == "user")
+        dept_count = sum(1 for e in entries if e.get("kind") == "department")
 
         instructions = ic.performance_counter(0) - _t0
         logger.info(

@@ -949,9 +949,14 @@ class _Justice:
             "from_id": from_id, "page_size": page_size,
         })
 
+    def directory(self, lives_in=""):
+        """Local defendant directory. ``lives_in`` is a lookup hint only."""
+        return _require_rpc("justice.directory", {"lives_in": lives_in or ""})
+
     def create_litigation(self, defendant_principal=None, court_id=None,
                           defendant_kind="", defendant_department="",
-                          defendant_department_id="", defendant_quarter_id=""):
+                          defendant_department_id="", defendant_quarter_id="",
+                          lives_in=""):
         """Open a private litigation. Returns ``{"id", "scope", "recipients"}``;
         the ciphertext is attached separately.
 
@@ -966,6 +971,7 @@ class _Justice:
             "defendant_department": defendant_department,
             "defendant_department_id": defendant_department_id,
             "defendant_quarter_id": defendant_quarter_id,
+            "lives_in": lives_in,
         }
         return _require_rpc("justice.create_litigation", {
             key: value for key, value in fields.items() if value

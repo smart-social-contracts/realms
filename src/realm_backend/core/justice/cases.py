@@ -203,6 +203,10 @@ def _defendant_metadata(
         if address.get("ref"):
             meta["defendant_ref"] = address["ref"]
 
+    if quarter_id:
+        # Lookup hint only — does not choose court or skip judge Transfer.
+        meta["lives_in"] = quarter_id
+        meta["lookup_hint"] = True
     if is_cross_quarter:
         meta["defendant_quarter_id"] = quarter_id
         meta["scope_tag"] = "cross_quarter"
@@ -218,6 +222,7 @@ def create_litigation(
     defendant_department: str = "",
     defendant_department_id: str = "",
     defendant_quarter_id: str = "",
+    lives_in: str = "",
 ) -> Dict[str, Any]:
     """Open a private litigation: step 1 of 2.
 
@@ -245,9 +250,9 @@ def create_litigation(
     if not kind:
         kind = "department" if (department_name or department_id) else "user"
 
+    hint = str(lives_in or defendant_quarter_id or "").strip()
     defendant, metadata, is_cross_quarter = _defendant_metadata(
-        caller, kind, defendant_id, department_name, department_id,
-        str(defendant_quarter_id or "").strip(),
+        caller, kind, defendant_id, department_name, department_id, hint,
     )
 
     from ggg import User
@@ -277,12 +282,15 @@ def create_litigation(
         "recipients": recipients,
         "message": f"Litigation {new_case.case_number} opened",
     }
+    if hint:
+        result["lives_in"] = hint
+        result["lookup_hint"] = True
     if is_cross_quarter:
-        result["defendant_quarter_id"] = str(defendant_quarter_id or "").strip()
+        result["defendant_quarter_id"] = hint
         result["scope_tag"] = "cross_quarter"
         logger.info(
-            f"Litigation {new_case.case_number} records defendant address "
-            f"{defendant_quarter_id}; venue is still judge Transfer"
+            f"Litigation {new_case.case_number} records lives_in={hint} "
+            "as a lookup hint; venue is still judge Transfer"
         )
 
     logger.info(f"Litigation {new_case.case_number} opened by {caller}")
@@ -746,11 +754,14 @@ def transfer_case(
         except (TypeError, ValueError):
             dest = {"id": dest}
 
+    # Judge dest only. Filer ``lives_in`` / ``defendant_quarter_id`` must not
+    # become the transfer target or skip this verb.
     canister = dest_canister_id(dest)
     pointer = dest if isinstance(dest, dict) else {}
     if canister:
         pointer = dict(pointer)
         pointer["id"] = canister
+        pointer.pop("lives_in", None)
 
     updated = case_transfer(case, dest=pointer or dest)
     if canister:

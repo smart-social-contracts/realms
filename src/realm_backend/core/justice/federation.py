@@ -82,7 +82,10 @@ def handle_justice_topic(topic: str, source: str, body: dict) -> Optional[Dict[s
 
 
 def dest_canister_id(dest) -> str:
-    """Judge-supplied dest canister id. Not a filer venue picker."""
+    """Judge-supplied dest canister id. Not a filer venue picker.
+
+    Filer ``lives_in`` is a lookup hint and is ignored here.
+    """
     if dest is None:
         return ""
     if isinstance(dest, dict):

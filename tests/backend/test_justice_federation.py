@@ -263,3 +263,63 @@ class TestHostDispatch:
         result = core_fed.dispatch_message("tax.remit", "q1-cai", {})
         assert result["success"] is False
         assert "No codex handler" in result["error"]
+
+
+class TestLivesInLookupHint:
+    """Optional lives_in scopes search. It is not a venue and does not Transfer."""
+
+    def test_remote_hint_does_not_federate(self):
+        from core.justice.directory import lookup
+
+        result = lookup("other-quarter-cai")
+        assert result["federated"] is False
+        assert result["paste_principal"] is True
+        assert result["entries"] == []
+        assert result["scoped"] is True
+
+    def test_empty_hint_lists_local_only(self, monkeypatch):
+        from core.justice import directory as jdir
+
+        local = [
+            {"kind": "user", "principal": "alice", "label": "Alice", "home_quarter": ""},
+        ]
+        monkeypatch.setattr(jdir, "list_local_entries", lambda: local)
+        monkeypatch.setattr(jdir, "self_canister_id", lambda: "self-cai")
+        result = jdir.lookup("")
+        assert result["federated"] is False
+        assert result["paste_principal"] is False
+        assert result["entries"] == local
+
+    def test_dest_canister_ignores_lives_in(self):
+        assert jfed.dest_canister_id({"lives_in": "q0-cai"}) == ""
+        assert jfed.dest_canister_id({"defendant_quarter_id": "q0-cai"}) == ""
+
+    def test_transfer_without_dest_does_not_use_lives_in(self):
+        sent = []
+        jfed.set_outbound_sender(
+            lambda target, topic, body: sent.append(target) or {"success": True}
+        )
+        court, plaintiff, defendant = _court_and_parties("hint")
+        case = case_file(court, plaintiff, defendant, "", "")
+        case.metadata = json.dumps({
+            "lives_in": "q0-cai",
+            "lookup_hint": True,
+            "defendant_quarter_id": "q0-cai",
+        })
+        case_transfer(case, dest=None)
+        assert jfed.dest_canister_id(None) == ""
+        assert sent == []
+        assert case.status == CaseStatus.TRANSFERRED
+
+    def test_lives_in_does_not_choose_court(self):
+        from core.justice import cases
+
+        _court, plaintiff, defendant = _court_and_parties("hint-c")
+        _user, meta, _ = cases._defendant_metadata(
+            plaintiff.id, "user", defendant.id, "", "", "q0-other-cai",
+        )
+        parsed = json.loads(meta)
+        assert parsed["lives_in"] == "q0-other-cai"
+        assert parsed["lookup_hint"] is True
+        assert "court" not in parsed
+        assert "court_id" not in parsed

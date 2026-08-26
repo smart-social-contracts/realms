@@ -139,6 +139,7 @@ def test_the_module_is_a_thin_shell():
 
 ENTRY_POINTS = [
     ("get_my_roles", {}, "justice.roles"),
+    ("get_directory", {}, "justice.directory"),
     ("get_justice_audience", {}, "justice.audience"),
     ("initialize", {}, "justice.initialize"),
     ("get_justice_systems", {}, "justice.justice_systems"),
