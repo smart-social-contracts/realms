@@ -234,25 +234,31 @@ def _type_lookup_names(obj: Any, name: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(names))
 
 
-def _type_attr(obj: Any, name: str) -> Any:
+def _type_attr(obj: Any, name: str, skip_module_type: bool = True) -> Any:
     """``name`` from ``_LazyMod`` (or another owner class), or ``_MISSING``."""
     try:
         mro = type(obj).__mro__
     except Exception:
         return _MISSING
     candidates = _type_lookup_names(obj, name)
+    skip = set(_SKIP_TYPE_MRO) if skip_module_type else {object, type}
     for cls in mro:
-        if cls in _SKIP_TYPE_MRO:
+        if cls in skip:
             continue
         try:
             ns = object.__getattribute__(cls, "__dict__")
         except AttributeError:
             continue
-        if not _mapping_like(ns):
+        contains = getattr(ns, "__contains__", None)
+        if not callable(contains):
             continue
         for candidate in candidates:
             if candidate in ns:
                 return _bind_from_class(ns[candidate], obj, cls)
+        if name == "__get_candid_interface_tmp_hack" and _mapping_like(ns):
+            for key, val in ns.items():
+                if key.endswith("__get_candid_interface_tmp_hack"):
+                    return _bind_from_class(val, obj, cls)
     return _MISSING
 
 
@@ -354,6 +360,44 @@ def _resolve_host_module(host_module: Any = None) -> Any:
     return main or named
 
 
+def _invoke_candid_hack(hack: Any, module: Any) -> Any:
+    if not callable(hack):
+        return None
+    try:
+        return hack()
+    except TypeError:
+        try:
+            return hack(module)
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+
+def _find_candid_hack(host_module: Any = None) -> tuple[Any, Any]:
+    """Leftover Candid hack on host / ``__main__`` / ``main``. Never getattr."""
+    seen: list[Any] = []
+    for mod in (
+        host_module,
+        sys.modules.get("__main__"),
+        sys.modules.get("main"),
+    ):
+        if mod is None or mod in seen:
+            continue
+        seen.append(mod)
+        ns = _module_namespace(mod)
+        if ns is not None:
+            hack = ns.get("__get_candid_interface_tmp_hack")
+            if callable(hack):
+                return hack, mod
+        typed = _type_attr(
+            mod, "__get_candid_interface_tmp_hack", skip_module_type=False
+        )
+        if typed is not _MISSING and callable(typed):
+            return typed, mod
+    return None, None
+
+
 def load_allowed_methods(
     did_path: Optional[Path] = None,
     blocked: Iterable[str] = BLOCKED_METHODS,
@@ -368,15 +412,13 @@ def load_allowed_methods(
             did_text = path.read_text()
     except OSError:
         did_text = None
+    if did_text:
+        names = parse_candid_methods(did_text) - blocked_set
+        if names:
+            return names
     module = _resolve_host_module(host_module)
-    if not did_text:
-        # Instance ``__dict__`` or ``_LazyMod`` type dict — never getattr.
-        hack = _module_attr(module, "__get_candid_interface_tmp_hack") if module else None
-        if callable(hack):
-            try:
-                did_text = hack()
-            except TypeError:
-                did_text = hack(module)
+    hack, hack_mod = _find_candid_hack(module)
+    did_text = _invoke_candid_hack(hack, hack_mod or module)
     if did_text:
         names = parse_candid_methods(did_text) - blocked_set
         if names:
@@ -551,8 +593,14 @@ class HostSecureORM(SecureORM):
         # LazyMod does not ``_bload`` / re-init Database before the method
         # runs. Leftover images keep some verbs on the class.
         fn = _module_attr(module, method)
-        if not callable(fn) and module is not sys.modules.get("__main__"):
-            fn = _module_attr(sys.modules.get("__main__"), method)
+        if not callable(fn):
+            for key in ("__main__", "main"):
+                other = sys.modules.get(key)
+                if other is None or other is module:
+                    continue
+                fn = _module_attr(other, method)
+                if callable(fn):
+                    break
         if not callable(fn):
             raise RpcError(f"host method {method!r} is not defined")
         try:
