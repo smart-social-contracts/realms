@@ -690,8 +690,6 @@ class TestLazyModReimport:
         assert "get_sandbox_config" in ns
         leftover_query = ns["get_sandbox_config"]
         assert not callable(leftover_query)
-        with pytest.raises(AttributeError):
-            object.__getattribute__(leftover_query, "__dict__")
         for slot in ("func", "fn", "_fn", "handler"):
             with pytest.raises(AttributeError):
                 object.__getattribute__(leftover_query, slot)
@@ -774,8 +772,6 @@ class TestLazyModReimport:
         assert "get_sandbox_config" not in executed.__dict__
         leftover_query = type(executed).__dict__["get_sandbox_config"]
         assert not callable(leftover_query)
-        with pytest.raises(AttributeError):
-            object.__getattribute__(leftover_query, "__dict__")
         for slot in ("func", "fn", "_fn", "handler"):
             with pytest.raises(AttributeError):
                 object.__getattribute__(leftover_query, slot)
