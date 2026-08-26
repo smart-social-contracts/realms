@@ -618,10 +618,11 @@ def _host_invoke_hack(hack, module):
 def _host_find_candid_hack(host_module=None):
     """Leftover Candid hack: instance / type dict on host, ``__main__``, ``main``.
 
-    Leftover-executed ``__main__`` has HostSecureORM (shell starts) but the
-    injected ``__get_candid_interface_tmp_hack`` stays on leftover
-    ``_LazyMod``. Never getattr leftover. Include ``type(sys)`` — live
-    leftover may store the hack on the module type itself.
+    Live leftover has HostSecureORM and the Candid verbs on leftover-
+    executed ``__main__``, but no ``__get_candid_interface_tmp_hack`` on
+    leftover ``__main__`` / ``main``. Still look leftover-safely. Never
+    getattr leftover. Include ``type(sys)`` — some leftover images store
+    the hack on the module type itself.
     """
     seen = []
     for mod in (
@@ -645,6 +646,73 @@ def _host_find_candid_hack(host_module=None):
     return None, None
 
 
+def _host_callable_names(mod):
+    """Public callables on leftover-executed instance dict. Never getattr."""
+    ns = _host_module_ns(mod)
+    if ns is None:
+        return set()
+    names = set()
+    for key, val in ns.items():
+        if not isinstance(key, str) or key.startswith("_"):
+            continue
+        if key in _HOST_LAZY_KEYS:
+            continue
+        if isinstance(val, type):
+            continue
+        if callable(val):
+            names.add(key)
+    return names
+
+
+def _host_surface_allowlist(host_module, blocked):
+    """The leftover Candid surface *is* leftover-executed ``__main__`` verbs.
+
+    Live leftover has no DID and no ``__get_candid_interface_tmp_hack`` on
+    leftover ``__main__`` / ``main``. Direct Candid still works because
+    ``get_sandbox_config`` / ``extension_sync_call`` live on the leftover-
+    executed instance dict. Read those leftover-safely.
+    """
+    names = set()
+    for mod in (
+        host_module,
+        sys.modules.get("__main__"),
+        sys.modules.get("main"),
+    ):
+        names |= _host_callable_names(mod)
+    names -= set(blocked)
+    return frozenset(names)
+
+
+def _host_did_from_leftover_bsrc(host_module=None):
+    """Packed leftover ``_bsrc`` may embed a DID. Never ``_bload``.
+
+    Leftover-executed ``main.py`` also contains the ``service :`` marker as
+    a string literal in these helpers. Only treat ``_bsrc`` as a DID
+    document — not leftover Python source.
+    """
+    seen = []
+    for mod in (
+        host_module,
+        sys.modules.get("__main__"),
+        sys.modules.get("main"),
+    ):
+        if mod is None or mod in seen:
+            continue
+        seen.append(mod)
+        ns = _host_module_ns(mod)
+        if ns is None:
+            continue
+        src = ns.get("_bsrc")
+        if not isinstance(src, str) or "service :" not in src:
+            continue
+        if "def " in src or "class " in src:
+            continue
+        names = _host_parse_candid(src)
+        if names:
+            return src
+    return None
+
+
 def _host_load_allowed(did_path=None, blocked=_HOST_BLOCKED, host_module=None):
     blocked_set = frozenset(blocked)
     path = _HostPath(did_path) if did_path is not None else _host_did_path()
@@ -661,10 +729,15 @@ def _host_load_allowed(did_path=None, blocked=_HOST_BLOCKED, host_module=None):
     module = _host_resolve_module(host_module)
     hack, hack_mod = _host_find_candid_hack(module)
     did_text = _host_invoke_hack(hack, hack_mod or module)
+    if not did_text:
+        did_text = _host_did_from_leftover_bsrc(module)
     if did_text:
         names = _host_parse_candid(did_text) - blocked_set
         if names:
             return names
+    names = _host_surface_allowlist(module, blocked_set)
+    if names:
+        return names
     raise _HostRpcError("Candid interface not found; host RPC disabled")
 
 

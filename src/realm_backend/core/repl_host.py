@@ -398,12 +398,71 @@ def _find_candid_hack(host_module: Any = None) -> tuple[Any, Any]:
     return None, None
 
 
+def _callable_names(mod: Any) -> set:
+    """Public callables on leftover-executed instance dict. Never getattr."""
+    ns = _module_namespace(mod)
+    if ns is None:
+        return set()
+    names = set()
+    for key, val in ns.items():
+        if not isinstance(key, str) or key.startswith("_"):
+            continue
+        if key in _LAZY_KEYS:
+            continue
+        if isinstance(val, type):
+            continue
+        if callable(val):
+            names.add(key)
+    return names
+
+
+def _surface_allowlist(host_module: Any, blocked: Iterable[str]) -> FrozenSet[str]:
+    """Leftover-executed ``__main__`` verbs *are* the Candid surface."""
+    names = set()
+    for mod in (
+        host_module,
+        sys.modules.get("__main__"),
+        sys.modules.get("main"),
+    ):
+        names |= _callable_names(mod)
+    names -= set(blocked)
+    return frozenset(names)
+
+
+def _did_from_leftover_bsrc(host_module: Any = None) -> Any:
+    """Packed leftover ``_bsrc`` may embed a DID. Never ``_bload``.
+
+    Leftover-executed ``main.py`` also contains the ``service :`` marker as
+    a string literal. Only treat ``_bsrc`` as a DID document.
+    """
+    seen = []
+    for mod in (
+        host_module,
+        sys.modules.get("__main__"),
+        sys.modules.get("main"),
+    ):
+        if mod is None or mod in seen:
+            continue
+        seen.append(mod)
+        ns = _module_namespace(mod)
+        if ns is None:
+            continue
+        src = ns.get("_bsrc")
+        if not isinstance(src, str) or "service :" not in src:
+            continue
+        if "def " in src or "class " in src:
+            continue
+        if parse_candid_methods(src):
+            return src
+    return None
+
+
 def load_allowed_methods(
     did_path: Optional[Path] = None,
     blocked: Iterable[str] = BLOCKED_METHODS,
     host_module: Any = None,
 ) -> FrozenSet[str]:
-    """Allowlist from the DID file, or from the injected Candid hack on-canister."""
+    """Allowlist from DID, leftover Candid hack, leftover ``_bsrc``, or verbs."""
     blocked_set = frozenset(blocked)
     path = Path(did_path) if did_path is not None else _DID_PATH
     did_text = None
@@ -419,10 +478,15 @@ def load_allowed_methods(
     module = _resolve_host_module(host_module)
     hack, hack_mod = _find_candid_hack(module)
     did_text = _invoke_candid_hack(hack, hack_mod or module)
+    if not did_text:
+        did_text = _did_from_leftover_bsrc(module)
     if did_text:
         names = parse_candid_methods(did_text) - blocked_set
         if names:
             return names
+    names = _surface_allowlist(module, blocked_set)
+    if names:
+        return names
     raise RpcError("Candid interface not found; host RPC disabled")
 
 
