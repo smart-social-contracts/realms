@@ -41,6 +41,7 @@ from core.repl_host import (  # noqa: E402
     json_args,
     load_allowed_methods,
     parse_candid_methods,
+    resolve_host_secure_orm,
     _default_did_path,
     _module_attr,
     _resolve_host_module,
@@ -684,3 +685,69 @@ class TestWasiCollectionsAbc:
         assert "get_sandbox_config" in names
         assert "__shell__" not in names
         assert executed._bload_count == 0
+
+
+class TestLeftoverReplHostSecureORM:
+    def test_resolve_when_from_import_unknown_location(self):
+        """Leftover ``core.repl_host``: from-import dies; type-dict still works."""
+        _bMT = type(sys)
+        live = HostSecureORM
+
+        class _LazyMod(_bMT):
+            HostSecureORM = live
+
+            def __init__(self, name):
+                super().__init__(name)
+                self.__dict__["_bsrc"] = _LAZY_MAIN_SRC
+                self.__dict__["_bloaded"] = True
+                self.__dict__["_bloading"] = False
+                self.__dict__["_bload_count"] = 0
+
+            def _bload(self):
+                self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+                if self.__dict__.get("_bloading") or self.__dict__.get("_bloaded"):
+                    return
+                raise RuntimeError("Database instance already exists")
+
+            def __getattribute__(self, name):
+                ns = object.__getattribute__(self, "__dict__")
+                if name in ns:
+                    return ns[name]
+                if name in {"__getattr__", "__getattribute__", "_bload"} or (
+                    name.startswith("__") and name.endswith("__")
+                ):
+                    return object.__getattribute__(self, name)
+                return object.__getattribute__(self, "__getattr__")(name)
+
+            def __getattr__(self, name):
+                object.__getattribute__(self, "_bload")()
+                ns = object.__getattribute__(self, "__dict__")
+                try:
+                    return ns[name]
+                except KeyError:
+                    raise AttributeError(
+                        f"module '{self.__name__}' has no attribute '{name}'"
+                    )
+
+        leftover = _LazyMod("core.repl_host")
+        saved = sys.modules.get("core.repl_host")
+        try:
+            sys.modules["core.repl_host"] = leftover
+            assert "HostSecureORM" not in leftover.__dict__
+            with pytest.raises(ImportError, match="unknown location"):
+                exec(
+                    "from core.repl_host import HostSecureORM",
+                    {"__name__": "leftover_import"},
+                )
+            leftover.__dict__["_bloaded"] = False
+            with pytest.raises(RuntimeError, match="Database instance already exists"):
+                leftover._bload()
+            leftover.__dict__["_bloaded"] = True
+            leftover.__dict__["_bload_count"] = 0
+            assert resolve_host_secure_orm() is live
+            assert leftover._bload_count == 0
+        finally:
+            if saved is None:
+                sys.modules.pop("core.repl_host", None)
+            else:
+                sys.modules["core.repl_host"] = saved

@@ -413,6 +413,28 @@ def _as_permission(exc: BaseException) -> PermissionError:
     return PermissionError(str(exc))
 
 
+def resolve_host_secure_orm() -> type:
+    """``HostSecureORM`` without ``from … import`` / getattr / ``_bload``.
+
+    Leftover Cedar keeps ``core.repl_host`` as a Basilisk ``_LazyMod`` at an
+    unknown location. ``from core.repl_host import HostSecureORM`` uses
+    getattr, so the name is invisible unless ``_bload`` re-execs (and that
+    re-exec can raise ``Database instance already exists``). Read the
+    already-loaded module and leftover type dict instead.
+    """
+    here = sys.modules.get(__name__) or sys.modules.get("core.repl_host")
+    cls = _module_attr(here, "HostSecureORM") if here is not None else None
+    if isinstance(cls, type):
+        return cls
+    cls = globals().get("HostSecureORM")
+    if isinstance(cls, type):
+        return cls
+    raise ImportError(
+        "cannot import name 'HostSecureORM' from 'core.repl_host' "
+        "(unknown location)"
+    )
+
+
 class HostSecureORM(SecureORM):
     """SecureORM plus host-method RPCs (``api`` / ``ext`` in the REPL)."""
 

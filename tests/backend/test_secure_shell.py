@@ -255,3 +255,109 @@ class TestSecureOrmLazyInit:
         finally:
             main_module.secure_orm = saved
             main_module._secure_orm_error = saved_err
+
+
+class TestLeftoverReplHostShell:
+    def test_shell_starts_when_repl_host_is_leftover_lazymod(self, main_module):
+        """Leftover ``core.repl_host``: from-import / ``_bload`` die; ``__shell__`` starts."""
+        from core.repl_host import HostSecureORM as LiveHostSecureORM
+
+        _bMT = type(sys)
+        crash_src = (
+            "raise RuntimeError('Database instance already exists')\n"
+        )
+
+        class _LazyMod(_bMT):
+            HostSecureORM = LiveHostSecureORM
+
+            def __init__(self, name):
+                super().__init__(name)
+                self.__dict__["_bsrc"] = crash_src
+                self.__dict__["_bloaded"] = True
+                self.__dict__["_bloading"] = False
+                self.__dict__["_bload_count"] = 0
+
+            def _bload(self):
+                self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+                if self.__dict__.get("_bloading") or self.__dict__.get("_bloaded"):
+                    return
+                raise RuntimeError("Database instance already exists")
+
+            def __getattribute__(self, name):
+                ns = object.__getattribute__(self, "__dict__")
+                if name in ns:
+                    return ns[name]
+                if name in {"__getattr__", "__getattribute__", "_bload"} or (
+                    name.startswith("__") and name.endswith("__")
+                ):
+                    return object.__getattribute__(self, name)
+                return object.__getattribute__(self, "__getattr__")(name)
+
+            def __getattr__(self, name):
+                object.__getattribute__(self, "_bload")()
+                ns = object.__getattribute__(self, "__dict__")
+                try:
+                    return ns[name]
+                except KeyError:
+                    raise AttributeError(
+                        f"module '{self.__name__}' has no attribute '{name}'"
+                    )
+
+        leftover = _LazyMod("core.repl_host")
+        saved_mod = sys.modules.get("core.repl_host")
+        saved_orm = main_module.secure_orm
+        saved_err = main_module._secure_orm_error
+        try:
+            sys.modules["core.repl_host"] = leftover
+            assert "HostSecureORM" not in leftover.__dict__
+            with pytest.raises(ImportError, match="unknown location"):
+                exec(
+                    "from core.repl_host import HostSecureORM",
+                    {"__name__": "leftover_import"},
+                )
+            leftover.__dict__["_bloaded"] = False
+            with pytest.raises(RuntimeError, match="Database instance already exists"):
+                leftover._bload()
+            leftover.__dict__["_bloaded"] = True
+            leftover.__dict__["_bload_count"] = 0
+
+            main_module.secure_orm = None
+            main_module._secure_orm_error = ""
+            orm = main_module._try_init_secure_orm()
+            assert orm is not None
+            assert main_module._secure_orm_error == ""
+            assert leftover._bload_count == 0
+
+            started = {"n": 0}
+
+            def _started(code):
+                started["n"] += 1
+                return "started\n"
+
+            orm.shell = _started
+
+            def _start_shell(code):
+                bound = main_module._try_init_secure_orm()
+                if bound is None:
+                    raise RuntimeError(
+                        f"secure_orm is not available: "
+                        f"{main_module._secure_orm_error or 'unknown init failure'}"
+                    )
+                return bound.shell(code)
+
+            out = _start_shell("1")
+            assert out == "started\n"
+            assert started["n"] == 1
+            assert leftover._bload_count == 0
+
+            with pytest.raises(PermissionError, match="__shell__"):
+                orm.handle_rpc(
+                    "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
+                )
+        finally:
+            main_module.secure_orm = saved_orm
+            main_module._secure_orm_error = saved_err
+            if saved_mod is None:
+                sys.modules.pop("core.repl_host", None)
+            else:
+                sys.modules["core.repl_host"] = saved_mod
