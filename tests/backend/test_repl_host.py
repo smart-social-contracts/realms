@@ -615,3 +615,67 @@ class TestLazyModReimport:
         with pytest.raises(RuntimeError, match="Database instance already exists"):
             getattr(executed, "not_on_lazymod")
         assert executed._bload_count >= 1
+
+
+class TestWasiCollectionsAbc:
+    def test_import_without_collections_abc_mapping(self, monkeypatch, tmp_path):
+        """Basilisk WASI stub has no ``collections.abc.Mapping``.
+
+        ``#336`` imported ``Mapping`` at module load, so leftover-free
+        ``__shell__`` died before any ``api.call``. Import must succeed and
+        leftover type-dict allowlist reads must still work.
+        """
+        import collections.abc as abc_mod
+        import types as _types
+
+        stub = _types.ModuleType("collections.abc")
+        stub.__dict__.update(
+            {name: value for name, value in vars(abc_mod).items() if name != "Mapping"}
+        )
+        monkeypatch.setitem(sys.modules, "collections.abc", stub)
+
+        with pytest.raises(ImportError, match="Mapping"):
+            exec("from collections.abc import Mapping")
+
+        sys.modules.pop("core.repl_host", None)
+        imported = __import__("core.repl_host", fromlist=["load_allowed_methods"])
+
+        assert imported.BLOCKED_METHODS == BLOCKED_METHODS
+        assert callable(imported.load_allowed_methods)
+
+        _bMT = type(sys)
+        did_text = (
+            "service : {\n"
+            '  "get_sandbox_config" : () -> (text) query;\n'
+            '  "__shell__" : (text) -> (text);\n'
+            "}\n"
+        )
+
+        class _LazyMod(_bMT):
+            def __init__(self, name):
+                super().__init__(name)
+                self.__dict__["_bsrc"] = _LAZY_MAIN_SRC
+                self.__dict__["_bloaded"] = False
+                self.__dict__["_bloading"] = False
+                self.__dict__["_bload_count"] = 0
+
+            def _bload(self):
+                self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+                raise RuntimeError("Database instance already exists")
+
+            def __getattr__(self, name):
+                self._bload()
+
+            def __get_candid_interface_tmp_hack(self):
+                return did_text
+
+            def get_sandbox_config(self):
+                return {"available": True}
+
+        executed = _LazyMod("__main__")
+        names = imported.load_allowed_methods(
+            tmp_path / "missing.did", host_module=executed
+        )
+        assert "get_sandbox_config" in names
+        assert "__shell__" not in names
+        assert executed._bload_count == 0
