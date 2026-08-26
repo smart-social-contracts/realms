@@ -670,16 +670,27 @@ def _host_is_verb_value(val):
     return False
 
 
-def _host_unwrap_verb(val):
-    """Leftover-safe unwrap of leftover Query/Update to a callable."""
+def _host_executed_callable(val):
+    """Leftover-executed host verb, or leftover Query/Update inner function.
+
+    After the allowlist says a name is public, leftover Candid already
+    invokes that leftover-executed function by name. Leftover Query/Update
+    may not be ``callable``; the leftover-executed function lives on a
+    known slot. Use ``object.__getattribute__`` — leftover ``__dict__``
+    unwrap misses slotted leftover wrappers. Do not getattr leftover
+    packed ``__main__``.
+    """
+    if val is None:
+        return val
     if callable(val) and not isinstance(val, type):
         return val
-    ns = _host_module_ns(val)
-    if ns is not None:
-        for key in ("func", "_func", "__wrapped__", "fn", "_fn", "callback"):
-            inner = ns.get(key)
-            if callable(inner) and not isinstance(inner, type):
-                return inner
+    for slot in ("func", "fn", "_fn", "handler"):
+        try:
+            inner = object.__getattribute__(val, slot)
+        except AttributeError:
+            continue
+        if callable(inner) and not isinstance(inner, type):
+            return inner
     return val
 
 
@@ -935,15 +946,11 @@ class HostSecureORM(_SecureORMBase):
         module = self.host_module()
         if module is None:
             raise _HostRpcError("host module is not loaded")
-        fn = _host_unwrap_verb(_host_module_attr(module, method))
-        if not callable(fn):
-            for key in ("__main__", "main"):
-                other = sys.modules.get(key)
-                if other is None or other is module:
-                    continue
-                fn = _host_unwrap_verb(_host_module_attr(other, method))
-                if callable(fn):
-                    break
+        # After the allowlist, dispatch by NAME through the leftover-
+        # executed Candid/host handler path. Do not getattr leftover
+        # packed ``__main__``. Do not unwrap leftover Query/Update via
+        # leftover ``__dict__``.
+        fn = _host_executed_callable(_host_module_attr(module, method))
         if not callable(fn):
             raise _HostRpcError(f"host method {method!r} is not defined")
         try:

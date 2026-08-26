@@ -628,8 +628,12 @@ class TestLazyModReimport:
         ``_bsrc`` ``def`` names. No planted hack. No repo DID.
         """
         class Query:
+            """Leftover Query: not callable; leftover ``func`` is a slot."""
+
+            __slots__ = ("func",)
+
             def __init__(self, func):
-                self.func = func
+                object.__setattr__(self, "func", func)
 
         class _ProxyHost:
             _bsrc = (
@@ -656,7 +660,10 @@ class TestLazyModReimport:
         ns = object.__getattribute__(executed, "__dict__")
         assert not isinstance(ns, dict)
         assert "get_sandbox_config" in ns
-        assert not callable(ns["get_sandbox_config"])
+        leftover_query = ns["get_sandbox_config"]
+        assert not callable(leftover_query)
+        with pytest.raises(AttributeError):
+            object.__getattribute__(leftover_query, "__dict__")
         assert "__get_candid_interface_tmp_hack" not in ns
         missing_did = tmp_path / "missing.did"
         names = load_allowed_methods(missing_did, host_module=executed)
@@ -696,8 +703,12 @@ class TestLazyModReimport:
         _bMT = type(sys)
 
         class Query:
+            """Leftover Query: not callable; leftover ``func`` is a slot."""
+
+            __slots__ = ("func",)
+
             def __init__(self, func):
-                self.func = func
+                object.__setattr__(self, "func", func)
 
         class _LazyMod(_bMT):
             def __init__(self, name):
@@ -717,22 +728,25 @@ class TestLazyModReimport:
             def __getattr__(self, name):
                 self._bload()
 
-            def get_sandbox_config(self):
-                return {"available": True, "default_mode": "sandbox"}
-
-            def extension_sync_call(self, extension_name, function_name, args):
-                return {
+            get_sandbox_config = Query(
+                lambda: {"available": True, "default_mode": "sandbox"}
+            )
+            extension_sync_call = Query(
+                lambda extension_name, function_name, args: {
                     "success": True,
                     "extension_name": extension_name,
                     "function_name": function_name,
                     "args": args,
                 }
-
-            def __shell__(self, code):
-                return "should never run"
+            )
+            __shell__ = Query(lambda code: "should never run")
 
         executed = _LazyMod("__main__")
         assert "get_sandbox_config" not in executed.__dict__
+        leftover_query = type(executed).__dict__["get_sandbox_config"]
+        assert not callable(leftover_query)
+        with pytest.raises(AttributeError):
+            object.__getattribute__(leftover_query, "__dict__")
         assert "__get_candid_interface_tmp_hack" not in executed.__dict__
         assert not any(
             str(key).endswith("__get_candid_interface_tmp_hack")

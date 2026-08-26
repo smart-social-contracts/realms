@@ -300,11 +300,22 @@ def _leftover_repl_host_lazymod():
     return leftover
 
 
+class Query:
+    """Honest leftover ``@query`` / ``@update``: not callable, no ``__dict__``."""
+
+    __slots__ = ("func",)
+
+    def __init__(self, func):
+        object.__setattr__(self, "func", func)
+
+
 def _leftover_executed_main():
-    """Live leftover: verbs on leftover type / leftover ``_bsrc``, not instance.
+    """Live leftover: slotted leftover Query on leftover type, not instance.
 
     Instance dict may omit ``get_sandbox_config``. No Candid hack. ``_bload``
-    cannot run. ``#342`` still raised Candid-not-found on this layout.
+    cannot run. Leftover Query is not ``callable`` and leftover ``__dict__``
+    unwrap cannot see ``func`` (slots). Name-dispatch must invoke the
+    leftover-executed function via ``object.__getattribute__``.
     """
     _bMT = type(sys)
 
@@ -326,19 +337,18 @@ def _leftover_executed_main():
         def __getattr__(self, name):
             self._bload()
 
-        def get_sandbox_config(self):
-            return {"available": True, "default_mode": "sandbox"}
-
-        def extension_sync_call(self, extension_name, function_name, args):
-            return {
+        get_sandbox_config = Query(
+            lambda: {"available": True, "default_mode": "sandbox"}
+        )
+        extension_sync_call = Query(
+            lambda extension_name, function_name, args: {
                 "success": True,
                 "extension_name": extension_name,
                 "function_name": function_name,
                 "args": args,
             }
-
-        def __shell__(self, code):
-            return "should never run"
+        )
+        __shell__ = Query(lambda code: "should never run")
 
     executed = _LazyMod("__main__")
     assert "get_sandbox_config" not in executed.__dict__
@@ -348,6 +358,10 @@ def _leftover_executed_main():
         for key in type(executed).__dict__
     )
     assert "HostSecureORM" not in executed.__dict__
+    leftover_query = type(executed).__dict__["get_sandbox_config"]
+    assert not callable(leftover_query)
+    with pytest.raises(AttributeError):
+        object.__getattribute__(leftover_query, "__dict__")
     return executed
 
 
