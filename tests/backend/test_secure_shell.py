@@ -352,8 +352,21 @@ def _leftover_executed_main():
 
 
 class TestLeftoverReplHostShell:
-    def test_shell_starts_when_repl_host_is_leftover_lazymod(self, main_module):
+    def test_shell_starts_when_repl_host_is_leftover_lazymod(
+        self, main_module, monkeypatch
+    ):
         """Leftover ``core.repl_host``: from-import / ``_bload`` die; ``__shell__`` starts."""
+        import types as types_mod
+
+        stub = type(sys)("types")
+        stub.__dict__.update(
+            {
+                name: value
+                for name, value in vars(types_mod).items()
+                if name != "ModuleType"
+            }
+        )
+        monkeypatch.setitem(sys.modules, "types", stub)
         leftover = _leftover_repl_host_lazymod()
         host = _leftover_executed_main()
         saved_mod = sys.modules.get("core.repl_host")

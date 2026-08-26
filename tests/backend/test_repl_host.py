@@ -688,6 +688,114 @@ class TestWasiCollectionsAbc:
         assert executed._bload_count == 0
 
 
+class TestWasiTypes:
+    def test_import_without_types_moduletype(self, monkeypatch, tmp_path):
+        """Basilisk WASI stub has no ``types.ModuleType``.
+
+        ``#339`` imported ``types.ModuleType`` at leftover ``__main__``
+        bind, so ``post_upgrade`` trapped before the new image went live.
+        Import must succeed and leftover allowlist / HostSecureORM bind
+        must still work.
+        """
+        import types as types_mod
+
+        stub = type(sys)("types")
+        stub.__dict__.update(
+            {
+                name: value
+                for name, value in vars(types_mod).items()
+                if name != "ModuleType"
+            }
+        )
+        monkeypatch.setitem(sys.modules, "types", stub)
+
+        def _import_moduletype():
+            from types import ModuleType  # noqa: F401
+
+            return ModuleType
+
+        with pytest.raises(ImportError, match="ModuleType"):
+            _import_moduletype()
+
+        main_src = Path(BACKEND, "main.py").read_text()
+        assert "types.ModuleType" not in main_src
+        assert "_host_types.ModuleType" not in main_src
+        assert "import types as _host_types" not in main_src
+
+        sys.modules.pop("core.repl_host", None)
+        imported = __import__(
+            "core.repl_host", fromlist=["load_allowed_methods", "HostSecureORM"]
+        )
+
+        assert imported.BLOCKED_METHODS == BLOCKED_METHODS
+        assert callable(imported.load_allowed_methods)
+        assert imported._SKIP_TYPE_MRO == frozenset({object, type, type(sys)})
+
+        _bMT = type(sys)
+        did_text = (
+            "service : {\n"
+            '  "get_sandbox_config" : () -> (text) query;\n'
+            '  "__shell__" : (text) -> (text);\n'
+            "}\n"
+        )
+
+        class _LazyMod(_bMT):
+            def __init__(self, name):
+                super().__init__(name)
+                self.__dict__["_bsrc"] = _LAZY_MAIN_SRC
+                self.__dict__["_bloaded"] = False
+                self.__dict__["_bloading"] = False
+                self.__dict__["_bload_count"] = 0
+
+            def _bload(self):
+                self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+                raise RuntimeError("Database instance already exists")
+
+            def __getattr__(self, name):
+                self._bload()
+
+            def __get_candid_interface_tmp_hack(self):
+                return did_text
+
+            def get_sandbox_config(self):
+                return {"available": True}
+
+        executed = _LazyMod("__main__")
+        names = imported.load_allowed_methods(
+            tmp_path / "missing.did", host_module=executed
+        )
+        assert "get_sandbox_config" in names
+        assert "__shell__" not in names
+        assert executed._bload_count == 0
+
+        host = _bMT("__main__")
+        host.HostSecureORM = imported.HostSecureORM
+        saved_main = sys.modules.get("main")
+        saved_dunder = sys.modules.get("__main__")
+        leftover = _LazyMod("core.repl_host")
+        leftover.__dict__["_bloaded"] = True
+        saved_rh = sys.modules.get("core.repl_host")
+        try:
+            sys.modules["core.repl_host"] = leftover
+            sys.modules["__main__"] = host
+            sys.modules["main"] = host
+            assert imported.resolve_host_secure_orm() is imported.HostSecureORM
+            assert leftover._bload_count == 0
+        finally:
+            if saved_rh is None:
+                sys.modules.pop("core.repl_host", None)
+            else:
+                sys.modules["core.repl_host"] = saved_rh
+            if saved_main is None:
+                sys.modules.pop("main", None)
+            else:
+                sys.modules["main"] = saved_main
+            if saved_dunder is None:
+                sys.modules.pop("__main__", None)
+            else:
+                sys.modules["__main__"] = saved_dunder
+
+
 class TestLeftoverReplHostSecureORM:
     def test_resolve_when_from_import_unknown_location(self):
         """Leftover ``core.repl_host`` has no class; ``__main__`` leftover already does."""
