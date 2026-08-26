@@ -501,3 +501,117 @@ class TestLazyModReimport:
                 "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
             )
         assert executed._bload_count == 0
+
+    def test_leftover_layout_allowlist_lives_on_lazymod(self, tmp_path):
+        """No DID file; hack/verbs live on ``_LazyMod``, not instance ``__dict__``.
+
+        Leftover Cedar images look like this: the running module is a LazyMod
+        whose instance dict has no Candid hack, ``_bload`` would re-exec
+        ``Database.init``, and host verbs sit on the class. ``api.call`` /
+        ``ext.call`` must still get a usable allowlist without ``_bload``.
+        """
+        _bMT = type(sys)
+        did_text = (
+            "service : {\n"
+            '  "get_sandbox_config" : () -> (text) query;\n'
+            '  "extension_sync_call" : (text, text, text) -> (text);\n'
+            '  "__shell__" : (text) -> (text);\n'
+            "}\n"
+        )
+
+        class _LazyMod(_bMT):
+            def __init__(self, name, source):
+                super().__init__(name)
+                self.__dict__["_bsrc"] = source
+                self.__dict__["_bloaded"] = False
+                self.__dict__["_bloading"] = False
+                self.__dict__["_bload_count"] = 0
+
+            def _bload(self):
+                self.__dict__["_bload_count"] = self.__dict__.get("_bload_count", 0) + 1
+                if self._bloading or self._bloaded:
+                    return
+                self.__dict__["_bloading"] = True
+                try:
+                    if self._bsrc:
+                        exec(
+                            compile(
+                                self._bsrc,
+                                self.__name__.replace(".", "/") + ".py",
+                                "exec",
+                            ),
+                            self.__dict__,
+                        )
+                    self.__dict__["_bloaded"] = True
+                finally:
+                    self.__dict__["_bloading"] = False
+
+            def __getattr__(self, name):
+                self._bload()
+                try:
+                    return self.__dict__[name]
+                except KeyError:
+                    raise AttributeError(
+                        f"module '{self.__name__}' has no attribute '{name}'"
+                    )
+
+            def __get_candid_interface_tmp_hack(self):
+                return did_text
+
+            def get_sandbox_config(self):
+                return {"available": True, "default_mode": "sandbox"}
+
+            def extension_sync_call(self, extension_name, function_name, args):
+                return {
+                    "success": True,
+                    "extension_name": extension_name,
+                    "function_name": function_name,
+                    "args": args,
+                }
+
+            def __shell__(self, code):
+                return "should never run"
+
+        executed = _LazyMod("__main__", _LAZY_MAIN_SRC)
+        assert "__get_candid_interface_tmp_hack" not in executed.__dict__
+        assert "get_sandbox_config" not in executed.__dict__
+        assert "extension_sync_call" not in executed.__dict__
+
+        missing_did = tmp_path / "missing.did"
+        names = load_allowed_methods(missing_did, host_module=executed)
+        assert "get_sandbox_config" in names
+        assert "extension_sync_call" in names
+        assert "__shell__" not in names
+        assert executed._bload_count == 0
+
+        orm = _orm(
+            host_module=executed,
+            allowed_methods=None,
+            did_path=missing_did,
+        )
+        assert orm.handle_rpc(
+            "alice", "host.call", {"method": "get_sandbox_config"}
+        ) == {"available": True, "default_mode": "sandbox"}
+        assert orm.handle_rpc(
+            "alice",
+            "host.ext_sync",
+            {
+                "extension_name": "department_docs",
+                "function_name": "list_documents",
+                "args": {},
+            },
+        ) == {
+            "success": True,
+            "extension_name": "department_docs",
+            "function_name": "list_documents",
+            "args": "{}",
+        }
+        with pytest.raises(PermissionError, match="__shell__"):
+            orm.handle_rpc(
+                "alice", "host.call", {"method": "__shell__", "args": ["1+1"]}
+            )
+        assert executed._bload_count == 0
+        # A name that is not on the class still _bload-crashes.
+        with pytest.raises(RuntimeError, match="Database instance already exists"):
+            getattr(executed, "not_on_lazymod")
+        assert executed._bload_count >= 1
