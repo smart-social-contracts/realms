@@ -241,24 +241,29 @@ export function resolveInitialWizardStep(
 	return 'welcome';
 }
 
+function tokenSymbolFromStoredValue(token: unknown): string {
+	if (token == null) return '';
+	if (typeof token === 'string') return token.trim();
+	if (typeof token !== 'object') return '';
+	const rec = token as { symbol?: unknown; id?: unknown; existing?: unknown };
+	for (const key of ['symbol', 'id', 'existing'] as const) {
+		const value = rec[key];
+		if (typeof value === 'string' && value.trim()) return value.trim();
+	}
+	return '';
+}
+
 /**
  * Token label for Launch review. Uses persisted draft / applied token only —
  * never the wizard's UI default (REALMS), so a skipped token stays skipped.
+ * Accepts {symbol}, {id}, {existing}, or a bare "ckEURC" string.
  */
 export function resolveReviewTokenSymbol(setupState: SetupState | null | undefined): string {
 	const draftToken = setupState?.draft?.token;
 	if (draftToken === null) {
 		return '';
 	}
-	if (typeof draftToken?.symbol === 'string' && draftToken.symbol.trim()) {
-		return draftToken.symbol.trim();
-	}
-	const applied = setupState?.token;
-	if (typeof applied?.symbol === 'string' && applied.symbol.trim()) {
-		return applied.symbol.trim();
-	}
-	if (typeof applied?.existing === 'string' && applied.existing.trim()) {
-		return applied.existing.trim();
-	}
-	return '';
+	const fromDraft = tokenSymbolFromStoredValue(draftToken);
+	if (fromDraft) return fromDraft;
+	return tokenSymbolFromStoredValue(setupState?.token);
 }

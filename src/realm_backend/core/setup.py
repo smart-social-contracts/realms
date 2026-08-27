@@ -575,6 +575,8 @@ def get_setup_state_payload() -> dict:
     branding = setup.get("branding")
     identity = setup.get("identity")
     draft = get_setup_draft(realm)
+    if isinstance(token, str) and token.strip():
+        token = {"symbol": token.strip()}
 
     return {
         "success": True,

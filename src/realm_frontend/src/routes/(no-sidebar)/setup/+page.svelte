@@ -271,14 +271,21 @@
 
 		const token = state.draft?.token ?? state.token;
 		if (token) {
-			if (typeof token.symbol === 'string') {
-				tokenSymbol = token.symbol;
-			}
-			if (typeof token.token_canister_id === 'string') {
-				tokenCanisterId = token.token_canister_id;
-			}
-			if (typeof token.existing === 'string') {
-				tokenSymbol = token.existing;
+			if (typeof token === 'string') {
+				tokenSymbol = token.trim();
+			} else {
+				if (typeof token.symbol === 'string') {
+					tokenSymbol = token.symbol;
+				}
+				if (typeof token.token_canister_id === 'string') {
+					tokenCanisterId = token.token_canister_id;
+				}
+				if (typeof token.id === 'string' && !tokenSymbol) {
+					tokenSymbol = token.id;
+				}
+				if (typeof token.existing === 'string') {
+					tokenSymbol = token.existing;
+				}
 			}
 			const matched = matchSharedToken({
 				symbol: tokenSymbol,
@@ -727,6 +734,14 @@
 		busy = true;
 		error = '';
 		try {
+			const reviewSymbol = resolveReviewTokenSymbol(setupState);
+			const completedToken = completeCatalogTokenDraft(
+				setupState?.draft?.token ?? setupState?.token
+			);
+			if (reviewSymbol && completedToken && String(completedToken.token_canister_id || '').trim()) {
+				const ok = await persistDraft({ token: completedToken }, { refresh: false });
+				if (!ok) return;
+			}
 			const normalized = normalizeLanguages(selectedLanguages, primaryLanguage);
 			if (!('error' in normalized)) {
 				await persistDraft(
