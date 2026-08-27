@@ -114,6 +114,35 @@ describe('resolveSetupGate', () => {
 		).toEqual({ kind: 'normal' });
 	});
 
+	it('does not hold the bootstrap gate on remount of live extension routes', () => {
+		for (const pathname of ['/extensions/member_dashboard', '/extensions/voting']) {
+			expect(
+				resolveSetupGate({
+					loading: true,
+					status: null,
+					unknownStatusFailures: 0,
+					isAuthenticated: false,
+					isCallerAuthorized: false,
+					authChannelSettled: false,
+					setupStateLoaded: false,
+					pathname
+				})
+			).toEqual({ kind: 'normal' });
+			expect(
+				shouldShowSetupLoading({
+					loading: true,
+					status: null,
+					unknownStatusFailures: 0,
+					isAuthenticated: false,
+					isCallerAuthorized: false,
+					authChannelSettled: false,
+					setupStateLoaded: false,
+					pathname
+				})
+			).toBe(false);
+		}
+	});
+
 	it('shows loading on /setup while gate input is probing', () => {
 		expect(
 			resolveSetupGate({
