@@ -373,6 +373,14 @@ service : {
   "revert_codex" : (text) -> (text);
   "set_codex_safe_mode" : (text) -> (text);
   "get_codex_overlay_status" : () -> (text) query;
+  "list_packages" : () -> (text) query;
+  "lock_package" : (text) -> (text);
+  "unlock_package" : (text) -> (text);
+  "transfer_package" : (text) -> (text);
+  "list_packages" : () -> (text) query;
+  "lock_package" : (text) -> (text);
+  "unlock_package" : (text) -> (text);
+  "transfer_package" : (text) -> (text);
   "resync_extension_frontends" : (text) -> (text);
   "install_extension_from_registry" : (text) -> (text);
   "install_codex_from_registry" : (text) -> (text);

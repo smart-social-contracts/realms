@@ -760,6 +760,7 @@ def install_extension_from_registry(
     version: str = None,
     frontend_canister_id: str = None,
     install_dependencies: bool = True,
+    owner: str = None,
 ) -> Async[str]:
     """Pull extension backend files from the file registry and install them.
     Frontend bundles are copied to the realm's frontend asset canister before
@@ -786,6 +787,15 @@ def install_extension_from_registry(
         f"Installing extension '{ext_id}' (version={version or 'latest'}) "
         f"from registry {registry_canister_id}"
     )
+
+    try:
+        from core.package_manager import replace_denied
+
+        denied = replace_denied(ext_id)
+        if denied:
+            return json.dumps({"success": False, "error": denied})
+    except Exception as exc:
+        logger.warning(f"Extension '{ext_id}': lock check failed — {exc}")
 
     registry = FileRegistryService(Principal.from_str(registry_canister_id))
 
@@ -996,6 +1006,7 @@ def install_extension_from_registry(
         files,
         source_registry_id=registry_canister_id,
         source_version=resolved_version,
+        owner=owner,
     )
     if not ok:
         return json.dumps(

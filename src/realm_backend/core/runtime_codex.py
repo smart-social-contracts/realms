@@ -144,6 +144,16 @@ def install_codex_package(codex_id: str, files: Dict[str, str]) -> bool:
     Returns:
         True if installation succeeded.
     """
+    try:
+        from core.package_manager import replace_denied
+
+        denied = replace_denied(codex_id)
+        if denied:
+            logger.error(f"Codex package {codex_id}: {denied}")
+            return False
+    except Exception as exc:
+        logger.warning(f"Codex package {codex_id}: lock check failed — {exc}")
+
     _ensure_packages_dir()
     pkg_path = _pkg_dir(codex_id)
     os.makedirs(pkg_path, exist_ok=True)

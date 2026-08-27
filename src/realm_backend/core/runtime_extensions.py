@@ -272,8 +272,15 @@ def install_extension(
     files: Dict[str, str],
     source_registry_id: Optional[str] = None,
     source_version: Optional[str] = None,
+    owner: Optional[str] = None,
+    bypass_lock: bool = False,
 ) -> bool:
     """Install an extension from a dict of {filename: content}.
+
+    Re-install of the same id is replace, not merge (issue #351): leftover
+    files and unclaimed declared-entity rows are pruned. A locked package
+    rejects replace unless the caller is the owner or root / Congress /
+    ``codex.revert``.
 
     Args:
         ext_id: Extension identifier (e.g. "voting", "vault")
@@ -283,10 +290,23 @@ def install_extension(
             extension was pulled from. When set, written to ``_source.json``
             so the realm can discover where to pull frontend assets from.
         source_version: (optional) Resolved version string from the registry.
+        owner: Optional transfer of package ownership on this install.
+        bypass_lock: Skip the lock gate (codex revert / overlay apply).
 
     Returns:
         True if installation succeeded.
     """
+    if not bypass_lock:
+        try:
+            from core.package_manager import replace_denied
+
+            denied = replace_denied(ext_id)
+            if denied:
+                logger.error(f"Extension {ext_id}: {denied}")
+                return False
+        except Exception as exc:
+            logger.warning(f"Extension {ext_id}: lock check failed — {exc}")
+
     _ensure_extensions_dir()
     ext_path = _ext_dir(ext_id)
     os.makedirs(ext_path, exist_ok=True)
@@ -366,6 +386,31 @@ def install_extension(
         logger.error(f"Extension {ext_id}: invalid 'entities' declaration — {e}")
         return False
 
+    try:
+        from core.codex_overlay import package_hash
+        from core.package_manager import (
+            claimed_for_files,
+            prune_unclaimed_extension_entities,
+            prune_unclaimed_files,
+            record_install,
+        )
+
+        prune_unclaimed_files(ext_path, list(files.keys()) + ["_source.json"])
+        kind = "codex" if manifest.get("kind") == "codex" else "extension"
+        claimed = claimed_for_files(files, manifest)
+        if kind != "codex":
+            prune_unclaimed_extension_entities(ext_id, claimed)
+        record_install(
+            ext_id,
+            kind=kind,
+            version=str(manifest.get("version") or source_version or ""),
+            package_hash=package_hash(files),
+            claimed=claimed,
+            transfer_owner=owner,
+        )
+    except Exception as exc:
+        logger.warning(f"Extension {ext_id}: package record/prune failed — {exc}")
+
     has_entry = os.path.exists(os.path.join(ext_path, "entry.py"))
     if has_entry:
         # Backend-bearing extension — entry.py MUST load cleanly, otherwise
@@ -414,6 +459,13 @@ def uninstall_extension(ext_id: str) -> bool:
         os.rmdir(path)
 
     _rmtree(ext_path)
+
+    try:
+        from core.package_manager import drop_package
+
+        drop_package(ext_id)
+    except Exception:
+        pass
 
     # Clear caches
     _loaded_modules.pop(ext_id, None)
