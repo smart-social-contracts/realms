@@ -253,6 +253,93 @@ def test_api_call_set_canister_config_names_inner_permission(monkeypatch):
     assert "call on Host" not in out
 
 
+def test_create_department_off_allowlist_is_require_not_allowlist(monkeypatch):
+    """Leftover DID allowlist miss must not hide ``organization.add``."""
+    import core.access as access
+
+    monkeypatch.setattr(access, "_check_access", _member_check)
+    _cdk.ic.caller.return_value = _Principal(MEMBER)
+    _cdk.ic.is_controller.return_value = False
+
+    orm = HostSecureORM(
+        engine=SimpleNamespace(status=lambda: {}),
+        namespace="Realm",
+        entities=[],
+        schema={},
+        host_module=SimpleNamespace(create_department=create_department),
+        # Leftover allowlist from an incomplete DID — verb exists with @require.
+        allowed_methods=["set_canister_config", "status"],
+    )
+    with pytest.raises(AccessDenied) as denied:
+        _eval_api(orm, MEMBER, "api.call('create_department', '{}')")
+    out = quiet_access_denied(denied.value)
+    assert out == (
+        "✗ access denied: organization.add from api.call('create_department')"
+    )
+    assert "allowlist" not in out
+    assert "allowlist" not in str(denied.value)
+    assert "call on Host" not in out
+    assert "call on Host" not in str(denied.value)
+    assert "shell.execute" not in out
+    assert MEMBER not in out
+
+    def _escaped():
+        _eval_api(orm, MEMBER, "api.call('create_department', '{}')")
+
+    guarded = product_shell_guard(_escaped)
+    assert guarded == (
+        "✗ access denied: organization.add from api.call('create_department')"
+    )
+    assert "allowlist" not in guarded
+    assert "call on Host" not in guarded
+
+
+def test_leftover_query_off_allowlist_still_names_require(monkeypatch):
+    """Leftover Query is not callable; still surface the inner ``@require``."""
+    import core.access as access
+
+    monkeypatch.setattr(access, "_check_access", _member_check)
+    _cdk.ic.caller.return_value = _Principal(MEMBER)
+    _cdk.ic.is_controller.return_value = False
+
+    class _LeftoverQuery:
+        _require_operation = "organization.add"
+
+    orm = HostSecureORM(
+        engine=SimpleNamespace(status=lambda: {}),
+        namespace="Realm",
+        entities=[],
+        schema={},
+        host_module=SimpleNamespace(create_department=_LeftoverQuery()),
+        allowed_methods=["status"],
+    )
+    with pytest.raises(AccessDenied) as denied:
+        _eval_api(orm, MEMBER, "api.call('create_department', '{}')")
+    out = quiet_access_denied(denied.value)
+    assert out == (
+        "✗ access denied: organization.add from api.call('create_department')"
+    )
+    assert "allowlist" not in str(denied.value)
+    assert "call on Host" not in str(denied.value)
+
+
+def test_unknown_method_still_allowlist(monkeypatch):
+    import core.access as access
+
+    monkeypatch.setattr(access, "_check_access", _member_check)
+    _cdk.ic.caller.return_value = _Principal(MEMBER)
+    orm = HostSecureORM(
+        engine=SimpleNamespace(status=lambda: {}),
+        namespace="Realm",
+        entities=[],
+        schema={},
+        host_module=SimpleNamespace(create_department=create_department),
+        allowed_methods=["create_department"],
+    )
+    with pytest.raises(PermissionError, match="allowlist"):
+        _eval_api(orm, MEMBER, "api.call('not_a_real_verb', '{}')")
+
+
 def test_api_call_create_department_is_one_quiet_line(monkeypatch):
     """Member with shell.execute, without organization.add — one ``✗`` line."""
     import core.access as access

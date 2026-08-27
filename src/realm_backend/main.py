@@ -83,13 +83,16 @@ from api.vetkeys import (
 )
 from api.zones import get_zone_aggregation
 from core.access import (
+    AccessDenied,
     _check_access,
     api_call_source,
     ext_call_source,
+    format_quiet_denied,
     product_shell_guard,
     raise_quiet_access_denied,
     require,
     require_controller,
+    require_operation_of,
     set_controller,
 )
 from core.cross_quarter import (
@@ -975,19 +978,28 @@ class HostSecureORM(_SecureORMBase):
             raise PermissionError(
                 f"host method {method!r} is not callable from the REPL"
             )
-        allowed = self.allowed_methods()
-        if method not in allowed:
-            raise PermissionError(f"host method {method!r} is not on the allowlist")
         module = self.host_module()
         if module is None:
             raise _HostRpcError("host module is not loaded")
-        # After the allowlist, leftover Candid name-dispatch
-        # (``get_global(name)``). Do not getattr leftover packed
-        # ``__main__``. Do not leftover ``__dict__`` unwrap. Live leftover
-        # Query is not callable and has no leftover slots; leftover
-        # executed host verbs live in leftover-executed globals.
+        # Leftover Candid name-dispatch (``get_global(name)``). Do not
+        # getattr leftover packed ``__main__``. Do not leftover ``__dict__``
+        # unwrap. Resolve before the leftover DID allowlist so a real
+        # ``@require`` verb is not hidden as ``not on the allowlist``.
         fn = _host_executed_callable(_host_candid_verb(method, module))
-        if not callable(fn):
+        allowed = self.allowed_methods()
+        if method not in allowed:
+            op = require_operation_of(fn)
+            if not op:
+                raise PermissionError(
+                    f"host method {method!r} is not on the allowlist"
+                )
+            if not callable(fn):
+                raise AccessDenied(
+                    format_quiet_denied(op, source),
+                    permission=op,
+                    source=source,
+                ) from None
+        elif not callable(fn):
             raise _HostRpcError(f"host method {method!r} is not defined")
         # Leftover WASI inspect is a stub. Call leftover-executed host
         # verbs by name. Do not leftover-import or leftover-call leftover
@@ -2116,6 +2128,28 @@ def set_canister_config(
         network,
         test_flags_json,
     )
+
+
+@update
+@require(Operations.ORGANIZATION_ADD)
+def create_department(spec: text) -> text:
+    """Create a department. Gate is ``organization.add`` (realms#349)."""
+    try:
+        data = json.loads(spec or "{}") if spec else {}
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    name = str(data.get("name") or "").strip()
+    if not name:
+        return json.dumps({"success": False, "error": "name is required"})
+    from ggg import Department
+
+    existing = Department[name]
+    if existing:
+        return json.dumps({"success": False, "error": "exists", "name": name})
+    dept = Department(name=name, description=str(data.get("description") or ""))
+    return json.dumps({"success": True, "name": dept.name})
 
 
 @update

@@ -48,6 +48,32 @@ class AccessDenied(PermissionError):
         self.source = source or ""
 
 
+def require_operation_of(fn) -> str:
+    """``@require`` operation on a host verb, including leftover Query slots.
+
+    Leftover WASI inspect is a stub. Walk ``func`` / ``fn`` / ``__wrapped__``
+    only. Never leftover-import leftover inspect.
+    """
+    seen = []
+    cur = fn
+    while cur is not None and cur not in seen:
+        seen.append(cur)
+        named = getattr(cur, "_require_operation", "") or ""
+        if named:
+            return named
+        nxt = None
+        for slot in ("func", "fn", "_fn", "handler", "__wrapped__"):
+            try:
+                inner = object.__getattribute__(cur, slot)
+            except Exception:
+                continue
+            if inner is not None and inner not in seen:
+                nxt = inner
+                break
+        cur = nxt
+    return ""
+
+
 def api_call_source(method) -> str:
     if not method:
         return "api.call"
@@ -384,6 +410,7 @@ def require(operation: str):
                         permission=operation,
                     )
                 return (yield from fn(*args, **kwargs))
+            async_wrapper._require_operation = operation
             return async_wrapper
         else:
             @wraps(fn)
@@ -395,6 +422,7 @@ def require(operation: str):
                         permission=operation,
                     )
                 return fn(*args, **kwargs)
+            wrapper._require_operation = operation
             return wrapper
 
     return decorator
