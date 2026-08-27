@@ -39,9 +39,32 @@ export function shouldUseTestModeAuth(
 /** Join page may opt into test identities even inside the portal iframe. */
 export function shouldPreferTestModeLogin(
 	preferTestMode: boolean,
-	testModeIIBypass: boolean
+	_testModeIIBypass?: boolean
 ): boolean {
-	return preferTestMode && testModeIIBypass;
+	// The picker is already gated on the live bypass flag. Requiring a second
+	// canister_ids hint dropped Continue clicks in the portal iframe.
+	return !!preferTestMode;
+}
+
+/**
+ * True when login() must mint a deterministic test identity instead of
+ * waiting on Internet Identity or a portal delegation.
+ *
+ * An explicit picker index (including 0) always wins — that is the Continue
+ * as Identity N path. `preferTestMode` is the join page opt-in for portal
+ * embeds. Ambient test auth still applies only to standalone bypass realms.
+ */
+export function shouldLoginWithTestIdentity(options: {
+	identityIndex?: number | null;
+	preferTestMode?: boolean;
+	testModeIIBypass?: boolean;
+	embeddedInPortal?: boolean;
+} = {}): boolean {
+	const { identityIndex = null, preferTestMode = false, testModeIIBypass = false, embeddedInPortal = false } =
+		options;
+	if (identityIndex != null && Number.isFinite(identityIndex)) return true;
+	if (preferTestMode) return true;
+	return shouldUseTestModeAuth(!!embeddedInPortal, !!testModeIIBypass);
 }
 
 /** Test sessions may be restored after iframe reloads when II bypass is on. */

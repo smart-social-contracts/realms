@@ -4,11 +4,12 @@
   import { get } from 'svelte/store';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, logout, restoreAuthSession, resetAuthSessionRestore } from '$lib/auth';
-  import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
+  import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge.ts';
   import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor } from '$lib/canisters.js';
   import { loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { resolve } from '$app/paths';
   import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmManifesto, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
@@ -24,7 +25,9 @@
     testIdentityNumber,
     TEST_IDENTITY_FIXED_PICKER_MAX_INDEX,
     TEST_IDENTITY_MAX_INDEX,
+    normalizeTestIdentityIndex,
   } from '$lib/test-identities.js';
+  import { parseTestIdentitySearch, applyTestIdentitySearch } from '$lib/test-identity-query.ts';
   import { _ } from 'svelte-i18n';
   
   // Step management: 'auth' | 'already_joined' | 'terms' | 'profile' | 'success'
@@ -62,8 +65,15 @@
   let forgotError = '';
   /** @type {ReturnType<typeof listTestIdentities>} */
   let testIdentities = listTestIdentities();
-  let selectedTestIdentityIndex = 0;
-  let customIdentityNumber = 3;
+  function readSelectedTestIdentityIndex() {
+    if (typeof window === 'undefined') return 0;
+    const parsed = parseTestIdentitySearch(window.location.search);
+    return parsed.identityIndex ?? 0;
+  }
+  let selectedTestIdentityIndex = readSelectedTestIdentityIndex();
+  let customIdentityNumber = selectedTestIdentityIndex > TEST_IDENTITY_FIXED_PICKER_MAX_INDEX
+    ? testIdentityNumber(selectedTestIdentityIndex)
+    : 3;
   /** Quarters skipped this session after assignable join errors (e.g. still bootstrapping). */
   let skippedJoinQuarters = [];
 
@@ -73,6 +83,16 @@
   $: customPersona = customIdentityIndex != null ? getTestIdentityPersona(customIdentityIndex) : null;
   $: maxCustomIdentityNumber = testIdentityNumber(TEST_IDENTITY_MAX_INDEX);
   $: selectedIdentityLabel = testIdentityLabel(selectedTestIdentityIndex);
+  // Host nav:sync may add `?ti=` after mount without remounting this page.
+  $: {
+    const parsed = parseTestIdentitySearch($page.url.search);
+    if (parsed.identityIndex != null && parsed.identityIndex !== selectedTestIdentityIndex) {
+      selectedTestIdentityIndex = parsed.identityIndex;
+      if (selectedTestIdentityIndex > TEST_IDENTITY_FIXED_PICKER_MAX_INDEX) {
+        customIdentityNumber = testIdentityNumber(selectedTestIdentityIndex);
+      }
+    }
+  }
   // The granted profile is resolved by the backend (issue #242): the invite
   // code's profile when a code is used, otherwise the codex-defined default.
   // There is no profile picker — user types are gone; only profiles exist.
@@ -264,6 +284,10 @@
       const urlParams = new URLSearchParams(window.location.search);
       inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
       const quarterParam = urlParams.get('quarter') || '';
+      const fromQuery = parseTestIdentitySearch(urlParams);
+      if (fromQuery.identityIndex != null) {
+        persistSelectedTestIdentity(fromQuery.identityIndex);
+      }
 
       await resolveJoinTarget(quarterParam);
       if (disposed) return;
@@ -476,6 +500,37 @@
     }
   }
 
+  function persistSelectedTestIdentity(index) {
+    selectedTestIdentityIndex = normalizeTestIdentityIndex(index);
+    if (selectedTestIdentityIndex > TEST_IDENTITY_FIXED_PICKER_MAX_INDEX) {
+      customIdentityNumber = testIdentityNumber(selectedTestIdentityIndex);
+    }
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const nextSearch = applyTestIdentitySearch(url.search, {
+      identityIndex: selectedTestIdentityIndex,
+    });
+    const qs = nextSearch ? `?${nextSearch}` : '';
+    const nextPath = `${url.pathname}${qs}${url.hash}`;
+    if (`${url.pathname}${url.search}${url.hash}` === nextPath) return;
+    history.replaceState(history.state, '', nextPath);
+    if (isEmbeddedInPortal()) {
+      const share = new URLSearchParams(nextSearch);
+      share.delete('portal');
+      share.delete('slug');
+      const shareQs = share.toString();
+      portalNavPush(`${url.pathname}${shareQs ? `?${shareQs}` : ''}${url.hash}`, { replace: true });
+    }
+  }
+
+  async function continueAsSelectedTestIdentity() {
+    persistSelectedTestIdentity(selectedTestIdentityIndex);
+    await handleLogin({
+      identityIndex: selectedTestIdentityIndex,
+      preferTestMode: true,
+    });
+  }
+
   async function completeAuthAfterLogin(userPrincipal, identity) {
     isAuthenticated.set(true);
     principal.set(userPrincipal.toText());
@@ -486,7 +541,7 @@
     loading = true;
     error = '';
     try {
-      const preferTestMode = get(testModeIIBypass);
+      const preferTestMode = options.preferTestMode ?? get(testModeIIBypass);
       const { principal: userPrincipal, identity } = await login({ ...options, preferTestMode });
       if (userPrincipal && identity) {
         await completeAuthAfterLogin(userPrincipal, identity);
@@ -765,7 +820,7 @@
               {#each testIdentities as persona (persona.index)}
                 <button
                   type="button"
-                  on:click={() => { selectedTestIdentityIndex = persona.index; }}
+                  on:click={() => persistSelectedTestIdentity(persona.index)}
                   class={cn(
                     'w-full text-left p-4 rounded-xl border-2 transition-all',
                     selectedTestIdentityIndex === persona.index
@@ -813,7 +868,7 @@
                     bind:value={customIdentityNumber}
                     disabled={loading}
                     on:change={() => {
-                      if (customIdentityIndex != null) selectedTestIdentityIndex = customIdentityIndex;
+                      if (customIdentityIndex != null) persistSelectedTestIdentity(customIdentityIndex);
                     }}
                   />
                   <button
@@ -821,7 +876,7 @@
                     class="px-3 py-2 text-sm font-medium border border-gray-900 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                     disabled={loading || customIdentityIndex == null}
                     on:click={() => {
-                      if (customIdentityIndex != null) selectedTestIdentityIndex = customIdentityIndex;
+                      if (customIdentityIndex != null) persistSelectedTestIdentity(customIdentityIndex);
                     }}
                   >
                     Select
@@ -837,7 +892,8 @@
                 {/if}
               </div>
               <button
-                on:click={() => handleLogin({ identityIndex: selectedTestIdentityIndex })}
+                type="button"
+                on:click={continueAsSelectedTestIdentity}
                 disabled={loading}
                 class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
               >
