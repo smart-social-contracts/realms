@@ -6,6 +6,7 @@
 	import { sidebarConfig } from '$lib/stores/sidebar';
 	import { isEmbeddedInPortal } from '$lib/portal-bridge.ts';
 	import { restoreAuthSession } from '$lib/auth';
+	import { hrefWithPreservedTestIdentityParams } from '$lib/test-identity-query.ts';
 	import { get } from 'svelte/store';
 
 	onMount(async () => {
@@ -18,14 +19,15 @@
 				await new Promise((r) => setTimeout(r, 50));
 			}
 		}
+		const search = typeof window !== 'undefined' ? window.location.search : '';
 		if (get(isAuthenticated) && hasJoined()) {
 			const config = get(sidebarConfig);
-			goto(config?.defaultPath || '/');
+			goto(hrefWithPreservedTestIdentityParams(search, config?.defaultPath || '/'));
 		} else {
 			// Anonymous / not-yet-joined visitors see the public dashboard
 			// (same on portal embeds and standalone). Join remains available
 			// from the sidebar / CTA.
-			goto('/extensions/public_dashboard');
+			goto(hrefWithPreservedTestIdentityParams(search, '/extensions/public_dashboard'));
 		}
 	});
 </script>

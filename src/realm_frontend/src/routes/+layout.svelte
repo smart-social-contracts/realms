@@ -31,9 +31,13 @@
 		if (!browser || !isEmbeddedInPortal()) return;
 		const url = navigation.to?.url;
 		if (!url) return;
+		// Initial enter: the host already has the user-facing URL (including
+		// `?ti=` / `skip_ii` / `test_mode`). Pushing the iframe path here used
+		// to replace `/join?ti=1` with `/join` when the embed src omitted them.
+		if (navigation.type === 'enter') return;
 		// Drop iframe-only query params (portal=1, slug=…) — those belong on
 		// the iframe src, not the shareable portal URL. Keep other search
-		// params (e.g. invite codes) and the hash.
+		// params (e.g. invite codes, ti) and the hash.
 		const params = new URLSearchParams(url.search);
 		params.delete('portal');
 		params.delete('slug');

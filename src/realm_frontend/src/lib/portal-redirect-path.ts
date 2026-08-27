@@ -15,6 +15,9 @@ export function normalizePortalRedirectPath(pathname: string): string {
 }
 
 const IFRAME_ONLY_PARAMS = ['portal', 'slug'];
+/** Kept on iframe + portal URLs so `/join?ti=1` survives host pathname-only syncs. */
+const TEST_IDENTITY_PARAMS = ['ti', 'skip_ii', 'test_mode'];
+const STICKY_PARAMS = [...IFRAME_ONLY_PARAMS, ...TEST_IDENTITY_PARAMS];
 
 function meaningfulSearch(params: URLSearchParams): string {
   const copy = new URLSearchParams(params);
@@ -38,9 +41,10 @@ export function resolvePortalNavSyncHref(
   const current = new URL(currentPathSearchHash, 'https://portal.invalid');
   const target = new URL(syncPath, 'https://portal.invalid');
   const nextParams = new URLSearchParams(target.search);
-  for (const key of IFRAME_ONLY_PARAMS) {
+  for (const key of STICKY_PARAMS) {
+    if (nextParams.has(key)) continue;
     const value = current.searchParams.get(key);
-    if (value && !nextParams.has(key)) nextParams.set(key, value);
+    if (value != null) nextParams.set(key, value);
   }
   // Host syncs are pathname-only (`/join`). Do not clobber iframe-only params,
   // invite codes, or hashes the embed already has.

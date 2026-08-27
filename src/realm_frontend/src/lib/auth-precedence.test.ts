@@ -3,6 +3,7 @@ import {
 	resolveAuthChannel,
 	resolveEffectiveAuthChannel,
 	shouldAttemptPortalAuth,
+	shouldLoginWithTestIdentity,
 	shouldPreferTestModeLogin,
 	shouldRestoreTestModeSession,
 	shouldUseTestModeAuth
@@ -28,7 +29,7 @@ describe('auth-precedence', () => {
 
 	it('allows join page to prefer test identities inside portal iframe', () => {
 		expect(shouldPreferTestModeLogin(true, true)).toBe(true);
-		expect(shouldPreferTestModeLogin(true, false)).toBe(false);
+		expect(shouldPreferTestModeLogin(true, false)).toBe(true);
 		expect(shouldPreferTestModeLogin(false, true)).toBe(false);
 	});
 
@@ -50,5 +51,44 @@ describe('auth-precedence', () => {
 		expect(resolveEffectiveAuthChannel(true, true, null)).toBe('portal');
 		expect(resolveEffectiveAuthChannel(false, true, null)).toBe('test');
 		expect(resolveEffectiveAuthChannel(false, false, null)).toBe('ii');
+	});
+
+	it('Continue as Identity N uses test login even inside the portal iframe', () => {
+		expect(
+			shouldLoginWithTestIdentity({
+				identityIndex: 1,
+				preferTestMode: true,
+				testModeIIBypass: true,
+				embeddedInPortal: true
+			})
+		).toBe(true);
+		expect(
+			shouldLoginWithTestIdentity({
+				identityIndex: 0,
+				preferTestMode: false,
+				testModeIIBypass: false,
+				embeddedInPortal: true
+			})
+		).toBe(true);
+	});
+
+	it('does not wait on portal II when the join page opts into bypass login', () => {
+		expect(
+			shouldLoginWithTestIdentity({
+				preferTestMode: true,
+				testModeIIBypass: false,
+				embeddedInPortal: true
+			})
+		).toBe(true);
+	});
+
+	it('keeps portal II for a normal embed with no picker index', () => {
+		expect(
+			shouldLoginWithTestIdentity({
+				preferTestMode: false,
+				testModeIIBypass: true,
+				embeddedInPortal: true
+			})
+		).toBe(false);
 	});
 });

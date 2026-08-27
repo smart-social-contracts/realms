@@ -6,9 +6,8 @@ import { isEmbeddedInPortal, getPortalDelegationIdentity } from '$lib/portal-bri
 import { normalizePortalRedirectPath } from '$lib/portal-redirect-path.ts';
 import {
   resolveEffectiveAuthChannel,
-  shouldUseTestModeAuth,
-  shouldPreferTestModeLogin,
-  shouldRestoreTestModeSession
+  shouldRestoreTestModeSession,
+  shouldLoginWithTestIdentity
 } from '$lib/auth-precedence.ts';
 
 const II_URL = globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app';
@@ -284,9 +283,18 @@ export async function initializeAuthClient() {
 
 export async function login({ random = false, identityIndex = null, preferTestMode = false } = {}) {
   const testBypass = getTestModeIIBypass();
-  const useTestAuth =
-    shouldUseTestModeAuth(isEmbeddedInPortal(), testBypass) ||
-    shouldPreferTestModeLogin(preferTestMode, testBypass);
+  let resolvedIndex = identityIndex;
+  if ((resolvedIndex == null || !Number.isFinite(Number(resolvedIndex))) && typeof window !== 'undefined') {
+    const { parseTestIdentitySearch } = await import('$lib/test-identity-query.ts');
+    const fromUrl = parseTestIdentitySearch(window.location.search).identityIndex;
+    if (fromUrl != null) resolvedIndex = fromUrl;
+  }
+  const useTestAuth = shouldLoginWithTestIdentity({
+    identityIndex: resolvedIndex,
+    preferTestMode,
+    testModeIIBypass: testBypass,
+    embeddedInPortal: isEmbeddedInPortal(),
+  });
 
   if (useTestAuth) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -307,7 +315,7 @@ export async function login({ random = false, identityIndex = null, preferTestMo
       }
       identity = await _createTestIdentity({
         random,
-        identityIndex: identityIndex ?? (random ? null : 0),
+        identityIndex: resolvedIndex ?? (random ? null : 0),
       });
     }
     _testLoggedIn = true;
