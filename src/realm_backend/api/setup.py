@@ -15,6 +15,7 @@ from core.setup import (
     SETUP_LAUNCH_STEP_CODE,
     SETUP_LAUNCH_TASK_NAME,
     SETUP_LAUNCH_TICK_SECONDS,
+    advance_setup_launch,
     begin_setup_launch,
     draft_for_response,
     get_realm_registry_canister_id,
@@ -24,6 +25,7 @@ from core.setup import (
     get_launch_state,
     is_setup_stage,
     launch_state_for_response,
+    _next_pending_launch_step,
     merge_setup_draft,
     notify_registry_setup_completed,
     require_setup_authorized,
@@ -234,7 +236,7 @@ def setup_save_draft(args_json: str) -> str:
     return json.dumps({"success": True, "draft": draft_for_response(draft)})
 
 
-def setup_launch() -> str:
+def setup_launch() -> Async[str]:
     auth_err = require_setup_authorized()
     if auth_err:
         return json.dumps(auth_err)
@@ -254,7 +256,15 @@ def setup_launch() -> str:
         SETUP_LAUNCH_STEP_CODE,
         SETUP_LAUNCH_TICK_SECONDS,
     )
+
+    # Founder is on the line: drive configure_token now so Retry is not a
+    # no-op if the recurring tick is disabled or still showing a stale row.
     launch = get_launch_state(realm)
+    step = _next_pending_launch_step(launch)
+    if step and step.get("name") == "configure_token":
+        yield from advance_setup_launch()
+        realm = _load_realm()
+        launch = get_launch_state(realm)
     return json.dumps({"success": True, "launch": launch})
 
 
@@ -293,6 +303,11 @@ def run_setup_launch_phase(realm, phase_name: str) -> Async[dict]:
     if phase_name == "install_codex":
         outcome = _launch_phase_install_codex(realm, draft)
     elif phase_name == "configure_token":
+        draft = dict(draft)
+        draft["token"] = _complete_catalog_token_draft(
+            draft.get("token"),
+            getattr(realm, "network", "") or "",
+        )
         outcome = _launch_phase_configure_token(realm, draft)
     elif phase_name == "upload_branding":
         outcome = _launch_phase_upload_branding(realm, draft)
@@ -526,6 +541,12 @@ def _apply_configured_token(realm, params: dict) -> Async[dict]:
 
 def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
     from core.realm_currency import realm_currency
+
+    draft = dict(draft or {})
+    draft["token"] = _complete_catalog_token_draft(
+        draft.get("token"),
+        getattr(realm, "network", "") or "",
+    )
 
     token_canister_id = _configured_token_canister_id(realm, draft)
     if not token_canister_id:

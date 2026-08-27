@@ -8229,12 +8229,15 @@ def get_setup_launch_status() -> text:
 
 
 @update
-def setup_launch() -> text:
-    """Validate draft and enqueue deferred multi-phase setup launch."""
+def setup_launch() -> Async[text]:
+    """Validate draft, reset a failed step, and run configure_token if pending."""
     try:
         from api.setup import setup_launch as _launch
 
-        return _launch()
+        result = _launch()
+        if hasattr(result, "send"):
+            return (yield from result)
+        return result
     except Exception as e:
         logger.error(f"setup_launch error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})

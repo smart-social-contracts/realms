@@ -393,6 +393,13 @@ def validate_draft_for_launch(draft: dict) -> Optional[str]:
     return None
 
 
+def _first_failed_launch_step(launch: dict) -> Optional[dict]:
+    for step in launch.get("steps") or []:
+        if step.get("status") == "failed":
+            return step
+    return None
+
+
 def begin_setup_launch(realm) -> Optional[dict]:
     draft = get_setup_draft(realm)
     err = validate_draft_for_launch(draft)
@@ -404,6 +411,20 @@ def begin_setup_launch(realm) -> Optional[dict]:
 
     if status == "completed":
         return {"success": False, "error": "setup launch already completed"}
+
+    # Explicit Retry must always reset a failed step — even if the parent
+    # status is still "running" or the launch is not stale. A no-op here
+    # leaves the old configure_token Settings error in place (Valencia:
+    # draft already had pe5t5, updated_at never moved).
+    failed_step = _first_failed_launch_step(launch)
+    if failed_step is not None:
+        failed_step["status"] = "pending"
+        failed_step["error"] = None
+        launch["status"] = "running"
+        launch["phase"] = None
+        launch["updated_at"] = str(ic.time())
+        save_launch_state(realm, launch)
+        return None
 
     if status == "running":
         if not _launch_is_stale(launch):
@@ -419,15 +440,7 @@ def begin_setup_launch(realm) -> Optional[dict]:
             launch = default_launch_state()
 
     elif status == "failed":
-        resumed = False
-        for step in launch.get("steps") or []:
-            if step.get("status") == "failed":
-                step["status"] = "pending"
-                step["error"] = None
-                resumed = True
-                break
-        if not resumed:
-            launch = default_launch_state()
+        launch = default_launch_state()
     else:
         launch = default_launch_state()
 
