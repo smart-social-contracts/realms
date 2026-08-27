@@ -23,9 +23,71 @@ logger = get_logger("core.citizen_import")
 
 CITIZEN_IMPORT_KIND = "citizen_import"
 MAX_BATCH = 200
+# Letter mint returns plaintext codes + addresses; keep the host chunk small.
+LETTER_BATCH = 50
 
 # Citizen invites are long-lived: a census migration can take months.
 DEFAULT_EXPIRES_HOURS = 24 * 365
+
+
+def postal_address(rec: dict) -> str:
+    """Postal address from a citizen JSON row (issue #359).
+
+    Accepts ``address``, ``postal_address``, or ``postalAddress`` as a string,
+    a list of lines, or a small object of address parts. Also reads the same
+    keys under ``extra``. Empty when the row has no postal address.
+    """
+    if not isinstance(rec, dict):
+        return ""
+
+    def _from_value(raw) -> str:
+        if isinstance(raw, str):
+            return raw.strip()
+        if isinstance(raw, list):
+            return "\n".join(str(x).strip() for x in raw if str(x).strip())
+        if isinstance(raw, dict):
+            parts = []
+            for key in (
+                "line1", "line2", "street", "street2", "city", "region",
+                "state", "postal_code", "postcode", "zip", "country",
+            ):
+                val = str(raw.get(key) or "").strip()
+                if val:
+                    parts.append(val)
+            if parts:
+                return "\n".join(parts)
+            return "\n".join(
+                str(v).strip() for v in raw.values() if str(v).strip()
+            )
+        return ""
+
+    for key in ("address", "postal_address", "postalAddress"):
+        text = _from_value(rec.get(key))
+        if text:
+            return text
+    extra = rec.get("extra") if isinstance(rec.get("extra"), dict) else {}
+    for key in ("address", "postal_address", "postalAddress"):
+        text = _from_value(extra.get(key))
+        if text:
+            return text
+    return ""
+
+
+def _citizen_code_for(user_id: str):
+    """Existing citizen-import RegistrationCode for *user_id*, if any.
+
+    Prefers a non-revoked code. A revoked or already-redeemed code still
+    counts as "already minted" so resume does not issue a second secret.
+    """
+    found = None
+    for code, meta in _citizen_codes():
+        if code.user_id != user_id:
+            continue
+        if code.revoked != 1:
+            return code, meta
+        if found is None:
+            found = (code, meta)
+    return found if found else (None, None)
 
 
 def _citizen_codes():
@@ -95,11 +157,13 @@ def import_citizens(
         quarter = str(rec.get("quarter") or "").strip()
         email = str(rec.get("email") or "").strip()
         extra = rec.get("extra") if isinstance(rec.get("extra"), dict) else {}
+        address = postal_address(rec)
 
         metadata = json.dumps({
             "kind": CITIZEN_IMPORT_KIND,
             "name": name,
             "quarter": quarter,
+            "address": address,
             "extra": extra,
         })
         if len(metadata) > 1024:
@@ -174,7 +238,11 @@ def bind_citizen(user, consume_data: dict) -> str:
             current = {}
     except (json.JSONDecodeError, TypeError):
         current = {}
-    current["citizen_import"] = {"id": citizen_id, "name": name, **extra}
+    bound = {"id": citizen_id, "name": name, **extra}
+    address = (meta.get("address") or "").strip()
+    if address and "address" not in bound:
+        bound["address"] = address
+    current["citizen_import"] = bound
     user.private_data = json.dumps(current)
 
     logger.info(f"Bound imported citizen '{citizen_id}' to principal {user.id}")
@@ -197,4 +265,145 @@ def import_status() -> dict:
         "claimed": claimed,
         "revoked": revoked,
         "pending": total - claimed - revoked,
+    }
+
+
+def _join_path(frontend_url: str) -> str:
+    """Public join path. The one-use code is the secret, not this URL."""
+    base = (frontend_url or "").rstrip("/")
+    return f"{base}/join" if base else "/join"
+
+
+def _letter_payload(code, meta: dict, frontend_url: str, reused: bool) -> dict:
+    address = (meta.get("address") or "").strip()
+    name = (meta.get("name") or "").strip()
+    return {
+        "id": code.user_id or "",
+        "name": name,
+        "address": address,
+        "code": code.code or "",
+        "join_path": _join_path(code.frontend_url or frontend_url),
+        "reused": reused,
+    }
+
+
+def ensure_letter_codes(
+    records: list,
+    created_by: str = "admin",
+    frontend_url: str = "",
+    expires_in_hours: int = DEFAULT_EXPIRES_HOURS,
+) -> dict:
+    """Mint one-use registration codes for postal letters (issue #359).
+
+    Host chunk only — callers must send at most ``LETTER_BATCH`` rows.
+    Postal address is required. A row that already has a citizen-import
+    code is reused (idempotent resume). Does not email the code.
+    """
+    from ggg import RegistrationCode
+
+    if not isinstance(records, list):
+        return {"success": False, "error": "records must be a JSON array"}
+    if len(records) > LETTER_BATCH:
+        return {
+            "success": False,
+            "error": (
+                f"Too many records ({len(records)}). "
+                f"Mint letter codes in batches of {LETTER_BATCH}."
+            ),
+        }
+
+    letters = []
+    errors = []
+    created_count = 0
+    reused_count = 0
+
+    for i, rec in enumerate(records):
+        if not isinstance(rec, dict):
+            errors.append({"index": i, "error": "record is not an object"})
+            continue
+
+        cid = str(rec.get("id") or "").strip()
+        if not cid:
+            errors.append({"index": i, "error": "missing required field 'id'"})
+            continue
+
+        address = postal_address(rec)
+        existing, existing_meta = _citizen_code_for(cid)
+        if existing is not None:
+            meta = dict(existing_meta or {})
+            if address and not (meta.get("address") or "").strip():
+                meta["address"] = address
+                try:
+                    existing.metadata = json.dumps(meta)
+                except Exception:
+                    pass
+            if not (meta.get("address") or "").strip():
+                errors.append({
+                    "index": i,
+                    "id": cid,
+                    "error": "postal address is required for a registration letter",
+                })
+                continue
+            letters.append(_letter_payload(existing, meta, frontend_url, True))
+            reused_count += 1
+            continue
+
+        if not address:
+            errors.append({
+                "index": i,
+                "id": cid,
+                "error": "postal address is required for a registration letter",
+            })
+            continue
+
+        name = str(rec.get("name") or "").strip()
+        quarter = str(rec.get("quarter") or "").strip()
+        email = str(rec.get("email") or "").strip()
+        extra = rec.get("extra") if isinstance(rec.get("extra"), dict) else {}
+        metadata = json.dumps({
+            "kind": CITIZEN_IMPORT_KIND,
+            "name": name,
+            "quarter": quarter,
+            "address": address,
+            "extra": extra,
+        })
+        if len(metadata) > 1024:
+            errors.append({
+                "index": i,
+                "id": cid,
+                "error": "record too large (metadata > 1024 chars)",
+            })
+            continue
+
+        code = RegistrationCode.create(
+            user_id=cid,
+            created_by=created_by,
+            frontend_url=frontend_url,
+            email=email,
+            expires_in_hours=expires_in_hours,
+            profile="member",
+            max_uses=1,
+            metadata=metadata,
+        )
+        letters.append(_letter_payload(
+            code,
+            {"name": name, "address": address},
+            frontend_url,
+            False,
+        ))
+        created_count += 1
+
+    logger.info(
+        f"Letter codes by {created_by}: {created_count} minted, "
+        f"{reused_count} reused, {len(errors)} errors"
+    )
+    return {
+        "success": True,
+        "data": {
+            "letters": letters,
+            "created_count": created_count,
+            "reused_count": reused_count,
+            "errors": errors,
+            "error_count": len(errors),
+        },
     }
