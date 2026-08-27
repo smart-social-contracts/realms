@@ -805,6 +805,7 @@ def test_get_setup_state_payload_includes_identity_and_realm_fields():
     assert payload["realm_name"] == "My Realm"
     assert payload["realm_manifesto"] == "Live manifesto"
     assert payload["realm_welcome_message"] == "Live welcome"
+    assert payload["realm_token_canister_id"] is None
     assert payload["languages"] == ["en"]
     assert payload["primary_language"] == "en"
 
@@ -2059,6 +2060,9 @@ def test_setup_save_draft_with_pe5t5_writes_realm_token_canister_id(monkeypatch)
     assert "Realm Settings" not in (saved.get("error") or "")
     setup_cfg = json.loads(realm.manifest_data)["setup"]
     assert setup_cfg["token"]["token_canister_id"] == ck_eurc
+    after_save = setup_core.get_setup_state_payload()
+    assert after_save["realm_token_canister_id"] == ck_eurc
+    assert after_save["token"]["token_canister_id"] == ck_eurc
 
 
 def test_fossil_failed_launch_save_draft_apply_does_not_return_settings(monkeypatch):
@@ -2123,8 +2127,12 @@ def test_fossil_failed_launch_save_draft_apply_does_not_return_settings(monkeypa
     assert applied.get("error_code") != "no_treasury_token"
     assert applied.get("error") != settings_err
     assert "Realm Settings" not in (applied.get("error") or "")
+    assert applied["token"]["token_canister_id"] == ck_eurc
     assert realm.token_canister_id == ck_eurc
     assert realm.accounting_currency != "REALMS"
+    state = setup_core.get_setup_state_payload()
+    assert state["realm_token_canister_id"] == ck_eurc
+    assert state["token"]["token_canister_id"] == ck_eurc
 
 
 def test_setup_apply_draft_token_null_token_fail_closed(monkeypatch):

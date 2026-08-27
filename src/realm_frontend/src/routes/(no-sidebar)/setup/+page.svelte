@@ -28,7 +28,7 @@
 		isSetupCatalogCodex,
 		reconcileCodexVersion,
 		resolveInitialWizardStep,
-		firstFailedLaunchStepError,
+		applyDraftTokenDidPersist,
 		founderConfigureTokenFromSetupState,
 		resolveReviewTokenSymbol,
 		resolveSelectedCodexVersion,
@@ -433,8 +433,6 @@
 				void goto('/', { replaceState: true });
 			} else if (launch.status === 'failed') {
 				stopLaunchPolling();
-				const fossil = firstFailedLaunchStepError(launch);
-				if (fossil) error = fossil;
 			}
 		} catch {
 			// ignore transient poll errors
@@ -620,11 +618,8 @@
 			// setup_apply_draft_token (leftover cannot intercept that name).
 			const ok = await persistDraft({ step: 'branding', token });
 			if (!ok) return;
-			const draftApplied = await applySetupDraftToken();
-			if (!draftApplied.success) {
-				error = draftApplied.error || 'Could not apply treasury ledger';
-				return;
-			}
+			const persisted = await applyAndConfirmDraftToken(String(payload.token_canister_id));
+			if (!persisted) return;
 			const applied = await configureSetupToken(payload);
 			if (!applied.success) {
 				error = applied.error || 'Could not apply treasury ledger';
@@ -750,24 +745,59 @@
 		}
 	}
 
+	async function applyAndConfirmDraftToken(expectedLedger: string): Promise<boolean> {
+		const expected = expectedLedger.trim();
+		if (!expected) {
+			error = 'Could not apply treasury ledger';
+			return false;
+		}
+		let draftApplied;
+		try {
+			draftApplied = await applySetupDraftToken();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Could not apply treasury ledger';
+			return false;
+		}
+		if (!draftApplied.success) {
+			error = draftApplied.error || 'Could not apply treasury ledger';
+			return false;
+		}
+		let refreshed: SetupState;
+		try {
+			refreshed = await fetchSetupState();
+		} catch {
+			error = 'Could not apply treasury ledger';
+			return false;
+		}
+		applySetupState(refreshed);
+		if (!applyDraftTokenDidPersist(expected, draftApplied, refreshed)) {
+			error = 'Could not apply treasury ledger';
+			return false;
+		}
+		return true;
+	}
+
 	async function handleLaunch() {
 		busy = true;
 		error = '';
 		try {
 			const reviewSymbol = resolveReviewTokenSymbol(setupState);
 			const payload = founderConfigureTokenFromSetupState(setupState);
-			if (reviewSymbol) {
-				if (!payload) {
-					error = 'Choose a token, or enter a custom symbol and ledger canister';
-					return;
-				}
-				const completedToken = completeCatalogTokenDraft(
-					setupState?.draft?.token ?? setupState?.token
-				);
-				if (completedToken) {
-					const saved = await persistDraft({ token: completedToken }, { refresh: false });
-					if (!saved) return;
-				}
+			const expectedLedger = String(payload?.token_canister_id || '').trim();
+			if (reviewSymbol && !expectedLedger) {
+				error = 'Choose a token, or enter a custom symbol and ledger canister';
+				return;
+			}
+			if (!expectedLedger) {
+				error = 'Could not apply treasury ledger';
+				return;
+			}
+			const completedToken = completeCatalogTokenDraft(
+				setupState?.draft?.token ?? setupState?.token
+			);
+			if (completedToken) {
+				const saved = await persistDraft({ token: completedToken }, { refresh: false });
+				if (!saved) return;
 			}
 			const normalized = normalizeLanguages(selectedLanguages, primaryLanguage);
 			if (!('error' in normalized)) {
@@ -781,11 +811,10 @@
 					{ refresh: false }
 				);
 			}
-			const draftApplied = await applySetupDraftToken();
-			if (!draftApplied.success) {
-				error = draftApplied.error || 'Could not apply treasury ledger';
-				return;
-			}
+			// Leftover setup_launch can return success:true with the fossil row.
+			// Retry must persist via setup_apply_draft_token and fail at the top
+			// if realm.token_canister_id is still empty.
+			if (!(await applyAndConfirmDraftToken(expectedLedger))) return;
 			if (payload) {
 				const applied = await configureSetupToken(payload);
 				if (!applied.success) {
@@ -799,8 +828,6 @@
 			}
 			if (result.launch) {
 				launchState = result.launch;
-				const fossil = firstFailedLaunchStepError(result.launch);
-				if (fossil) error = fossil;
 			}
 			startLaunchPolling();
 			void pollLaunchStatus();

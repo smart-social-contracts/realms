@@ -10,6 +10,7 @@ import {
 	isCodexChosen,
 	isCodexInstalled,
 	isCodexPrimaryActionDisabled,
+	applyDraftTokenDidPersist,
 	firstFailedLaunchStepError,
 	founderConfigureTokenFromSetupState,
 	isFailedOrRunningLaunch,
@@ -309,6 +310,39 @@ describe('wizardLogic', () => {
 		it('treats an explicit skipped token as empty so review can say Skipped', () => {
 			expect(resolveReviewTokenSymbol({ ...freshState, draft: { token: null } })).toBe('');
 			expect(resolveReviewTokenSymbol(freshState)).toBe('');
+		});
+
+		it('Retry persist check rejects leftover success:true without a realm ledger', () => {
+			const fossilState: SetupState = {
+				...freshState,
+				token: null,
+				realm_token_canister_id: null
+			};
+			expect(
+				applyDraftTokenDidPersist(
+					'pe5t5-diaaa-aaaar-qahwa-cai',
+					{ success: true },
+					fossilState
+				)
+			).toBe(false);
+			expect(
+				applyDraftTokenDidPersist(
+					'pe5t5-diaaa-aaaar-qahwa-cai',
+					{ success: true, token: { token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai' } },
+					{ ...fossilState, token: null, realm_token_canister_id: '' }
+				)
+			).toBe(false);
+			expect(
+				applyDraftTokenDidPersist(
+					'pe5t5-diaaa-aaaar-qahwa-cai',
+					{ success: true, token: { token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai' } },
+					{
+						...fossilState,
+						token: { token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai' },
+						realm_token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai'
+					}
+				)
+			).toBe(true);
 		});
 
 		it('Launch / Token Continue founder payload writes pe5t5 from draft', () => {
