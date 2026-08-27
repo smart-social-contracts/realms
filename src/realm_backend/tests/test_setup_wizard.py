@@ -210,6 +210,43 @@ def _run_async(gen):
         return stop.value
 
 
+def _settings_treasury_message() -> str:
+    from core.realm_currency import no_treasury_token_error
+
+    return no_treasury_token_error()["error"]
+
+
+def _ensure_tokens_cdk():
+    import typing
+
+    _cdk = sys.modules["_cdk"]
+
+    class _TypedDict(dict):
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__()
+
+    _cdk.Opt = getattr(_cdk, "Opt", typing.Optional)
+    _cdk.Record = getattr(_cdk, "Record", _TypedDict)
+    _cdk.Variant = getattr(_cdk, "Variant", _TypedDict)
+    _cdk.blob = getattr(_cdk, "blob", bytes)
+    _cdk.nat = getattr(_cdk, "nat", int)
+    _cdk.nat8 = getattr(_cdk, "nat8", int)
+    _cdk.null = getattr(_cdk, "null", None)
+    _cdk.service_query = getattr(_cdk, "service_query", lambda fn: fn)
+
+
+def _load_real_tokens(monkeypatch):
+    import importlib.util
+
+    _ensure_tokens_cdk()
+    path = Path(__file__).resolve().parents[1] / "api" / "tokens.py"
+    spec = importlib.util.spec_from_file_location("api.tokens", path)
+    tokens_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tokens_mod)
+    monkeypatch.setitem(sys.modules, "api.tokens", tokens_mod)
+    return tokens_mod
+
+
 def test_realm_status_default_is_setup():
     assert RealmStatus.SETUP == "setup"
     realm = _FakeRealm()
@@ -1127,6 +1164,9 @@ def test_launch_configure_token_refused_without_treasury_ledger():
     result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
     assert result["success"] is False
     assert result["error_code"] == "no_treasury_token"
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
+    assert "REALMS" not in (result.get("error") or "")
 
 
 def test_launch_configure_token_refused_when_ledger_unresolvable(monkeypatch):
@@ -1162,9 +1202,82 @@ def test_launch_configure_token_refused_when_ledger_unresolvable(monkeypatch):
 
     result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
     assert result["success"] is False
-    assert result["error_code"] == "no_treasury_token"
+    assert result["error_code"] == "ledger_unresolvable"
+    assert result["error"] == "offline"
+    assert result["error"] != _settings_treasury_message()
     assert realm.token_canister_id == ""
     assert realm.accounting_currency == ""
+
+
+def test_setup_configure_token_denies_non_founder():
+    setup_api = _import_setup_api()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _FakeRealm.reset(realm)
+    assert mock_ic.caller.return_value.to_str.return_value == "stranger-principal"
+
+    result = json.loads(
+        _run_async(
+            setup_api.setup_configure_token(
+                json.dumps({"token_canister_id": "pe5t5-diaaa-aaaar-qahwa-cai"})
+            )
+        )
+    )
+    assert result["success"] is False
+    assert "Access denied" in result["error"]
+    assert result.get("error_code") != "no_treasury_token"
+    assert result["error"] != _settings_treasury_message()
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
+
+
+def test_launch_configure_token_applies_draft_pe5t5_without_founder_caller(monkeypatch):
+    """Launch-phase task (canister caller) applies draft pe5t5 via catalog fallback."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {
+                            "token_canister_id": ck_eurc,
+                            "symbol": "ckEURC",
+                        },
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _FakeRealm.reset(realm)
+    assert mock_ic.caller.return_value.to_str.return_value == "stranger-principal"
+
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
+
+    result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert result["success"] is True
+    assert "Realm Settings" not in (result.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+    assert realm.accounting_currency != "REALMS"
+    setup_cfg = json.loads(realm.manifest_data)["setup"]
+    assert setup_cfg["token"]["symbol"] == "ckEURC"
+    assert setup_cfg["token"]["token_canister_id"] == ck_eurc
 
 
 def test_launch_configure_token_proceeds_when_ledger_resolves(monkeypatch):
