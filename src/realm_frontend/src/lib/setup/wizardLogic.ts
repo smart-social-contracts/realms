@@ -18,6 +18,7 @@ export const WIZARD_STEP_URL_TOKENS: WizardStepUrlToken[] = [
 	'codex',
 	'token',
 	'branding',
+	'languages',
 	'launch'
 ];
 
