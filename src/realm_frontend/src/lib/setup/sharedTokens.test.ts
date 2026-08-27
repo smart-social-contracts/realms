@@ -8,13 +8,24 @@ import {
 
 describe('sharedTokens', () => {
 	it('lists the registry wizard tokens', () => {
-		expect(SHARED_TOKEN_CATALOG.map((token) => token.id)).toEqual(['REALMS', 'ckBTC', 'ckUSDC']);
+		expect(SHARED_TOKEN_CATALOG.map((token) => token.id)).toEqual([
+			'REALMS',
+			'ckBTC',
+			'ckUSDC',
+			'ckEURC'
+		]);
+		expect(SHARED_TOKEN_CATALOG.map((token) => token.symbol)).not.toContain('ckEUR');
+		expect(SHARED_TOKEN_CATALOG.map((token) => token.name)).not.toContain('ckEUR');
 	});
 
 	it('matches a saved symbol or ledger to a catalog token', () => {
 		expect(matchSharedToken({ symbol: 'realms' })?.id).toBe('REALMS');
 		expect(matchSharedToken({ token_canister_id: 'mxzaz-hqaaa-aaaar-qaada-cai' })?.id).toBe(
 			'ckBTC'
+		);
+		expect(matchSharedToken({ symbol: 'ckeuroc' })?.id).toBe('ckEURC');
+		expect(matchSharedToken({ token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai' })?.id).toBe(
+			'ckEURC'
 		);
 		expect(matchSharedToken({ symbol: 'MINE', token_canister_id: 'aaaaa-aa' })).toBeUndefined();
 	});
@@ -23,6 +34,11 @@ describe('sharedTokens', () => {
 		expect(tokenDraftFromChoice('ckUSDC', { symbol: '', token_canister_id: '' }, 'test')).toEqual({
 			symbol: 'ckUSDC',
 			token_canister_id: 'xevnm-gaaaa-aaaar-qafnq-cai',
+			decimals: 6
+		});
+		expect(tokenDraftFromChoice('ckEURC', { symbol: '', token_canister_id: '' }, 'test')).toEqual({
+			symbol: 'ckEURC',
+			token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
 			decimals: 6
 		});
 	});

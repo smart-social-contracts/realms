@@ -56,6 +56,27 @@ def test_resolve_ckbtc_case_insensitive():
     assert cfg["ledger"] == "mxzaz-hqaaa-aaaar-qaada-cai"
 
 
+def test_resolve_ckeurc_official_ledger_on_all_catalog_networks():
+    """ckEURC uses the official mainnet ICRC ledger on test/staging/demo."""
+    official = "pe5t5-diaaa-aaaar-qahwa-cai"
+    for network in ("staging", "demo", "test"):
+        cfg = resolve_shared_token("ckEURC", network)
+        assert cfg is not None, network
+        assert cfg["ledger"] == official
+        assert cfg["indexer"] == official
+        assert cfg["decimals"] == 6
+        assert cfg["name"] == "ckEURC"
+        assert "ckEUR" not in cfg["name"]
+        assert resolve_shared_token("ckeuroc", network)["ledger"] == official
+
+
+def test_resolve_ckeurc_by_ledger():
+    cfg = resolve_shared_token_by_ledger("pe5t5-diaaa-aaaar-qahwa-cai", "test")
+    assert cfg is not None
+    assert cfg["symbol"] == "ckEURC"
+    assert cfg["indexer"] == "pe5t5-diaaa-aaaar-qahwa-cai"
+
+
 def test_resolve_realms_by_ledger_staging():
     cfg = resolve_shared_token_by_ledger("2rqin-xaaaa-aaaah-qunsq-cai", "staging")
     assert cfg is not None
