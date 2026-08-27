@@ -8193,14 +8193,32 @@ def setup_set_branding(args: text) -> text:
 
 
 @update
-def setup_save_draft(args: text) -> text:
-    """Persist partial setup wizard draft without installing anything."""
+def setup_save_draft(args: text) -> Async[text]:
+    """Persist partial setup wizard draft and apply draft.token ledger now."""
     try:
         from api.setup import setup_save_draft as _save
 
-        return _save(args)
+        result = _save(args)
+        if hasattr(result, "send"):
+            return (yield from result)
+        return result
     except Exception as e:
         logger.error(f"setup_save_draft error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def setup_apply_draft_token() -> Async[text]:
+    """Apply persisted draft.token to realm.token_canister_id (leftover-safe name)."""
+    try:
+        from api.setup import setup_apply_draft_token as _apply
+
+        result = _apply()
+        if hasattr(result, "send"):
+            return (yield from result)
+        return result
+    except Exception as e:
+        logger.error(f"setup_apply_draft_token error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

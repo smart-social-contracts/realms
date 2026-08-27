@@ -132,6 +132,7 @@ export interface SetupBackendActor {
 	setup_set_branding: (json: string) => Promise<string>;
 	complete_setup: () => Promise<string>;
 	setup_save_draft: (json: string) => Promise<string>;
+	setup_apply_draft_token: () => Promise<string>;
 	get_setup_draft_asset: (kind: string) => Promise<string>;
 	get_setup_launch_status: () => Promise<string>;
 	setup_launch: () => Promise<string>;

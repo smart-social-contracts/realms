@@ -440,6 +440,7 @@ export const idlFactory = ({ IDL }) => {
     'set_quarter_provisioning_config' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_sandbox_config' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_test_flags_json' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'setup_apply_draft_token' : IDL.Func([], [IDL.Text], []),
     'setup_configure_token' : IDL.Func([IDL.Text], [IDL.Text], []),
     'setup_install_codex' : IDL.Func([IDL.Text], [IDL.Text], []),
     'setup_launch' : IDL.Func([], [IDL.Text], []),

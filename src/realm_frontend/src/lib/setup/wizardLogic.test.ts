@@ -10,6 +10,7 @@ import {
 	isCodexChosen,
 	isCodexInstalled,
 	isCodexPrimaryActionDisabled,
+	firstFailedLaunchStepError,
 	founderConfigureTokenFromSetupState,
 	isFailedOrRunningLaunch,
 	reconcileCodexVersion,
@@ -213,6 +214,12 @@ describe('wizardLogic', () => {
 			expect(resolveInitialWizardStep(runningLaunchState, null)).toBe('review');
 			expect(resolveInitialWizardStep(failedLaunchState, null)).toBe('review');
 			expect(isFailedOrRunningLaunch(failedLaunchState)).toBe(true);
+		});
+
+		it('surfaces the fossil configure_token error for the top banner', () => {
+			expect(firstFailedLaunchStepError(failedLaunchState.launch)).toContain('Realm Settings');
+			expect(firstFailedLaunchStepError(runningLaunchState.launch)).toBe('');
+			expect(firstFailedLaunchStepError(null)).toBe('');
 		});
 
 		it('does not trap a failed launch on review when the URL asks for token', () => {

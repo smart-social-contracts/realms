@@ -1226,6 +1226,7 @@ export interface _SERVICE {
   'set_quarter_provisioning_config' : ActorMethod<[string], string>,
   'set_sandbox_config' : ActorMethod<[string], string>,
   'set_test_flags_json' : ActorMethod<[string], string>,
+  'setup_apply_draft_token' : ActorMethod<[], string>,
   'setup_configure_token' : ActorMethod<[string], string>,
   'setup_install_codex' : ActorMethod<[string], string>,
   'setup_launch' : ActorMethod<[], string>,

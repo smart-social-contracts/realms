@@ -210,13 +210,26 @@ def _run_async(gen):
         return stop.value
 
 
-def _call_setup_launch(setup_api):
-    result = setup_api.setup_launch()
+def _call_json(result):
     if hasattr(result, "send"):
         result = _run_async(result)
     if isinstance(result, str):
         return json.loads(result)
     return result
+
+
+def _call_setup_launch(setup_api):
+    return _call_json(setup_api.setup_launch())
+
+
+def _call_setup_save_draft(setup_api, payload):
+    if not isinstance(payload, str):
+        payload = json.dumps(payload)
+    return _call_json(setup_api.setup_save_draft(payload))
+
+
+def _call_setup_apply_draft_token(setup_api):
+    return _call_json(setup_api.setup_apply_draft_token())
 
 
 def _settings_treasury_message() -> str:
@@ -253,6 +266,16 @@ def _load_real_tokens(monkeypatch):
     tokens_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(tokens_mod)
     monkeypatch.setitem(sys.modules, "api.tokens", tokens_mod)
+    return tokens_mod
+
+
+def _load_tokens_offline(monkeypatch):
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
     return tokens_mod
 
 
@@ -793,7 +816,7 @@ def test_setup_save_draft_persists_languages_and_requires_primary_in_list():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     _authorized_creator(realm)
 
-    rejected = json.loads(
+    rejected = _call_json(
         setup_api.setup_save_draft(
             json.dumps(
                 {
@@ -809,7 +832,7 @@ def test_setup_save_draft_persists_languages_and_requires_primary_in_list():
     assert rejected["success"] is False
     assert "primary_language" in rejected["error"]
 
-    saved = json.loads(
+    saved = _call_json(
         setup_api.setup_save_draft(
             json.dumps(
                 {
@@ -863,7 +886,7 @@ def test_setup_save_draft_merges_partial_updates():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     _authorized_creator(realm)
 
-    first = json.loads(
+    first = _call_json(
         setup_api.setup_save_draft(
             json.dumps({"step": "codex", "codex": {"package": "agora", "version": "1.0.0"}})
         )
@@ -872,7 +895,7 @@ def test_setup_save_draft_merges_partial_updates():
     assert first["draft"]["step"] == "codex"
     assert first["draft"]["codex"]["package"] == "agora"
 
-    second = json.loads(
+    second = _call_json(
         setup_api.setup_save_draft(
             json.dumps({"step": "token", "token": {"symbol": "REALM", "decimals": 8}})
         )
@@ -892,7 +915,7 @@ def test_setup_save_draft_stores_images_outside_manifest():
 
     logo = "data:image/png;base64,QUJD"
     background = "data:image/png;base64,REVGRw=="
-    result = json.loads(
+    result = _call_json(
         setup_api.setup_save_draft(
             json.dumps(
                 {
@@ -929,12 +952,11 @@ def test_setup_save_draft_does_not_install_or_mutate_realm():
     )
     _authorized_creator(realm)
 
-    result = json.loads(
+    result = _call_json(
         setup_api.setup_save_draft(
             json.dumps(
                 {
                     "codex": {"package": "syntropia", "version": "2.0.0"},
-                    "token": {"token_canister_id": "token-abc", "symbol": "SYN"},
                     "identity": {
                         "manifesto": "Draft manifesto",
                         "welcome_message": "Draft welcome",
@@ -1765,7 +1787,7 @@ def test_launch_configure_token_applies_ckeurc_from_symbol_only_draft(monkeypatc
 
 def test_setup_save_draft_fills_ckeurc_ledger_from_symbol(monkeypatch):
     setup_api = _import_setup_api()
-    _load_real_tokens(monkeypatch)
+    _load_tokens_offline(monkeypatch)
     ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
     realm = _FakeRealm(
         status=RealmStatus.SETUP,
@@ -1776,7 +1798,7 @@ def test_setup_save_draft_fills_ckeurc_ledger_from_symbol(monkeypatch):
     )
     _authorized_creator(realm)
 
-    saved = json.loads(
+    saved = _call_json(
         setup_api.setup_save_draft(json.dumps({"step": "branding", "token": {"symbol": "ckEURC"}}))
     )
     assert saved["success"] is True
@@ -1784,8 +1806,9 @@ def test_setup_save_draft_fills_ckeurc_ledger_from_symbol(monkeypatch):
     assert saved["draft"]["token"]["token_canister_id"] == ck_eurc
     assert saved["draft"]["token"]["decimals"] == 6
     assert saved["draft"]["token"]["indexer_canister_id"] == ck_eurc
-    assert realm.token_canister_id == ""
-    assert realm.accounting_currency == ""
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+    assert "Realm Settings" not in (saved.get("error") or "")
 
 
 @pytest.mark.parametrize(
@@ -1794,7 +1817,7 @@ def test_setup_save_draft_fills_ckeurc_ledger_from_symbol(monkeypatch):
 )
 def test_setup_save_draft_coerces_realistic_ckeurc_shapes(monkeypatch, token_payload):
     setup_api = _import_setup_api()
-    _load_real_tokens(monkeypatch)
+    _load_tokens_offline(monkeypatch)
     ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
     realm = _FakeRealm(
         status=RealmStatus.SETUP,
@@ -1805,7 +1828,7 @@ def test_setup_save_draft_coerces_realistic_ckeurc_shapes(monkeypatch, token_pay
     )
     _authorized_creator(realm)
 
-    saved = json.loads(
+    saved = _call_json(
         setup_api.setup_save_draft(json.dumps({"step": "branding", "token": token_payload}))
     )
     assert saved["success"] is True
@@ -1813,8 +1836,8 @@ def test_setup_save_draft_coerces_realistic_ckeurc_shapes(monkeypatch, token_pay
     assert saved["draft"]["token"]["token_canister_id"] == ck_eurc
     assert saved["draft"]["token"]["decimals"] == 6
     assert saved["draft"]["token"]["indexer_canister_id"] == ck_eurc
-    assert realm.token_canister_id == ""
-    assert realm.accounting_currency == ""
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
 
 
 @pytest.mark.parametrize(
@@ -1878,7 +1901,7 @@ def test_setup_save_draft_skipped_token_does_not_invent_realms(monkeypatch):
     )
     _authorized_creator(realm)
 
-    saved = json.loads(
+    saved = _call_json(
         setup_api.setup_save_draft(json.dumps({"step": "branding", "token": None}))
     )
     assert saved["success"] is True
@@ -1937,6 +1960,7 @@ def test_failed_launch_token_draft_persists_for_configure_token(monkeypatch):
     ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
     realm = _FakeRealm(
         status=RealmStatus.SETUP,
+        network="staging",
         manifest_data=json.dumps(
             {
                 "setup": {
@@ -1973,8 +1997,9 @@ def test_failed_launch_token_draft_persists_for_configure_token(monkeypatch):
         accounting_currency="",
     )
     _authorized_creator(realm)
+    _load_tokens_offline(monkeypatch)
 
-    saved = json.loads(
+    saved = _call_json(
         setup_api.setup_save_draft(
             json.dumps(
                 {
@@ -1987,31 +2012,182 @@ def test_failed_launch_token_draft_persists_for_configure_token(monkeypatch):
     assert saved["success"] is True
     assert saved["draft"]["token"]["token_canister_id"] == ck_eurc
     assert saved["draft"]["token"]["symbol"] == "ckEURC"
-    assert realm.token_canister_id == ""
+    assert "Realm Settings" not in (saved.get("error") or "")
+    assert saved.get("error_code") != "no_treasury_token"
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
 
     draft = setup_core.get_setup_draft(realm)
     assert setup_api._configured_token_canister_id(realm, draft) == ck_eurc
 
-    def _resolved(ledger, _network):
-        assert ledger == ck_eurc
-        result = {
-            "success": True,
-            "symbol": "ckEURC",
-            "decimals": 6,
-            "indexer_canister_id": ck_eurc,
-        }
-        yield result
-        return result
-
-    tokens_mod = types.ModuleType("api.tokens")
-    tokens_mod.resolve_ledger_token_info = _resolved
-    tokens_mod.register_treasury_token = lambda *_args, **_kwargs: None
-    monkeypatch.setitem(sys.modules, "api.tokens", tokens_mod)
-
     result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
     assert result["success"] is True
+    assert "Realm Settings" not in (result.get("error") or "")
     assert realm.token_canister_id == ck_eurc
     assert realm.accounting_currency == "ckEURC"
+
+
+def test_setup_save_draft_with_pe5t5_writes_realm_token_canister_id(monkeypatch):
+    """save_draft is the leftover-safe path: persist + apply ledger now."""
+    setup_api = _import_setup_api()
+    _load_tokens_offline(monkeypatch)
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+
+    saved = _call_setup_save_draft(
+        setup_api,
+        {
+            "step": "branding",
+            "token": {
+                "symbol": "ckEURC",
+                "token_canister_id": ck_eurc,
+                "decimals": 6,
+            },
+        },
+    )
+    assert saved["success"] is True
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+    assert realm.accounting_currency != "REALMS"
+    assert "Realm Settings" not in (saved.get("error") or "")
+    setup_cfg = json.loads(realm.manifest_data)["setup"]
+    assert setup_cfg["token"]["token_canister_id"] == ck_eurc
+
+
+def test_fossil_failed_launch_save_draft_apply_does_not_return_settings(monkeypatch):
+    """Valencia fossil Settings row + save_draft/apply writes pe5t5, no Settings."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    settings_err = _settings_treasury_message()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "step": "review",
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                    },
+                    "launch": {
+                        "status": "failed",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "install_codex", "status": "completed", "error": None},
+                            {
+                                "name": "configure_token",
+                                "status": "failed",
+                                "error": settings_err,
+                            },
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": "1787858624611611294",
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    _load_tokens_offline(monkeypatch)
+
+    saved = _call_setup_save_draft(
+        setup_api,
+        {
+            "token": {
+                "symbol": "ckEURC",
+                "token_canister_id": ck_eurc,
+                "decimals": 6,
+            }
+        },
+    )
+    assert saved["success"] is True
+    assert saved.get("error") != settings_err
+    assert "Realm Settings" not in (saved.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+
+    applied = _call_setup_apply_draft_token(setup_api)
+    assert applied["success"] is True
+    assert applied.get("error_code") != "no_treasury_token"
+    assert applied.get("error") != settings_err
+    assert "Realm Settings" not in (applied.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency != "REALMS"
+
+
+def test_setup_apply_draft_token_null_token_fail_closed(monkeypatch):
+    setup_api = _import_setup_api()
+    _load_tokens_offline(monkeypatch)
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+
+    saved = _call_setup_save_draft(setup_api, {"step": "branding", "token": None})
+    assert saved["success"] is True
+    assert "token" not in saved["draft"]
+
+    applied = _call_setup_apply_draft_token(setup_api)
+    assert applied["success"] is False
+    assert applied["error"] == "token_canister_id is required"
+    assert applied.get("error_code") != "no_treasury_token"
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
+    assert realm.accounting_currency != "REALMS"
+
+
+def test_apply_draft_token_now_hard_errors_when_symbol_cannot_apply(monkeypatch):
+    """Draft token with a symbol/ledger must not fall through to the Settings tick."""
+    setup_api = _import_setup_api()
+    _load_tokens_offline(monkeypatch)
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {"symbol": "NOT_A_CATALOG_TOKEN"},
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+
+    apply_now = _run_async(setup_api._apply_draft_token_now(realm))
+    assert apply_now["success"] is False
+    assert apply_now["error_code"] == "draft_token_unapplied"
+    assert apply_now["error"] != _settings_treasury_message()
+    assert "Realm Settings" not in apply_now["error"]
+    assert realm.token_canister_id == ""
+
+    launched = _call_setup_launch(setup_api)
+    assert launched["success"] is False
+    assert launched["error_code"] == "draft_token_unapplied"
+    assert launched["error"] != _settings_treasury_message()
+    assert realm.token_canister_id == ""
+    assert json.loads(realm.manifest_data)["setup"].get("launch") is None
 
 
 def test_draft_realm_saveable_without_treasury_ledger():
@@ -2024,7 +2200,7 @@ def test_draft_realm_saveable_without_treasury_ledger():
     )
     _authorized_creator(realm)
 
-    result = json.loads(
+    result = _call_json(
         setup_api.setup_save_draft(
             json.dumps(
                 {

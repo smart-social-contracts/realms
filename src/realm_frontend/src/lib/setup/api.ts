@@ -262,6 +262,11 @@ export async function configureSetupToken(payload: Record<string, unknown>): Pro
 	);
 }
 
+export async function applySetupDraftToken(): Promise<SetupActionResult> {
+	const actor = await getActor();
+	return parseJson<SetupActionResult>(await actor.setup_apply_draft_token());
+}
+
 export async function setSetupBranding(payload: {
 	logo_data_url?: string;
 	background_data_url?: string;

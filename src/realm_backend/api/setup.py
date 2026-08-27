@@ -139,7 +139,7 @@ def get_setup_draft_asset(kind: str) -> str:
     return json.dumps({"success": True, "kind": kind, "data_url": data_url})
 
 
-def setup_save_draft(args_json: str) -> str:
+def setup_save_draft(args_json: str) -> Async[str]:
     auth_err = require_setup_authorized()
     if auth_err:
         return json.dumps(auth_err)
@@ -233,23 +233,52 @@ def setup_save_draft(args_json: str) -> str:
         if persist_err:
             return json.dumps({"success": False, "error": persist_err})
 
+    # Leftover-safe apply: Valencia's setup_save_draft already runs. Write
+    # realm.token_canister_id now so configure_token does not depend on
+    # setup_launch (which leftover candid/UI/auth can swallow).
+    if "token" in params:
+        apply_result = yield from _apply_persisted_draft_token(realm, params.get("token"))
+        if isinstance(apply_result, dict) and not apply_result.get("success"):
+            return json.dumps(apply_result)
+
     return json.dumps({"success": True, "draft": draft_for_response(draft)})
 
 
-def _apply_draft_token_now(realm) -> Async[Optional[dict]]:
-    """Write realm.token_canister_id from draft now. Does not wait for the tick.
+def _draft_token_unapplied_error() -> dict:
+    """Hard error when draft.token has a symbol/ledger that cannot be applied.
 
-    Returns None when the draft has no ledger (launch stays fail-closed).
+    Must not use the Settings treasury message — that paints the fossil row.
     """
-    draft = dict(get_setup_draft(realm))
-    draft["token"] = _complete_catalog_token_draft(
-        draft.get("token"),
+    return {
+        "success": False,
+        "error": "Could not apply treasury ledger from draft token",
+        "error_code": "draft_token_unapplied",
+    }
+
+
+def _apply_persisted_draft_token(realm, token_value: Any) -> Async[Optional[dict]]:
+    """Apply a just-persisted draft.token when it has a resolvable ledger.
+
+    Catalog symbols (ckEURC → pe5t5) are completed first. Explicit skip/null
+    returns None and does not invent REALMS.
+    """
+    completed = _complete_catalog_token_draft(
+        token_value,
         getattr(realm, "network", "") or "",
     )
-    token_canister_id = _configured_token_canister_id(realm, draft)
+    token = _token_record(completed)
+    if token is None:
+        return None
+    token_canister_id = (token.get("token_canister_id") or "").strip()
+    if not token_canister_id:
+        catalog = _catalog_token_for_symbol(
+            str(token.get("symbol") or ""),
+            getattr(realm, "network", "") or "",
+        )
+        if catalog:
+            token_canister_id = (catalog.get("ledger") or "").strip()
     if not token_canister_id:
         return None
-    token = _token_record(draft.get("token")) or {}
     result = yield from _apply_configured_token(
         realm,
         {
@@ -261,6 +290,53 @@ def _apply_draft_token_now(realm) -> Async[Optional[dict]]:
         },
     )
     return result
+
+
+def _apply_draft_token_now(realm) -> Async[Optional[dict]]:
+    """Write realm.token_canister_id from draft now. Does not wait for the tick.
+
+    Returns None only when draft.token is null/empty (launch stays fail-closed).
+    If draft.token has a symbol or ledger and apply cannot run, return a hard
+    error — do not proceed to a tick that paints the Settings fossil.
+    """
+    draft = dict(get_setup_draft(realm))
+    draft["token"] = _complete_catalog_token_draft(
+        draft.get("token"),
+        getattr(realm, "network", "") or "",
+    )
+    token = _token_record(draft.get("token"))
+    token_canister_id = _configured_token_canister_id(realm, draft)
+    if not token_canister_id:
+        if token is not None:
+            return _draft_token_unapplied_error()
+        return None
+    result = yield from _apply_configured_token(
+        realm,
+        {
+            "token_canister_id": token_canister_id,
+            "symbol": token.get("symbol") if token else None,
+            "decimals": token.get("decimals") if token else None,
+            "indexer_canister_id": token.get("indexer_canister_id") if token else None,
+            "token_type": token.get("token_type") if token else None,
+        },
+    )
+    return result
+
+
+def setup_apply_draft_token() -> Async[str]:
+    """Leftover-unshadowed apply: draft.token → realm ledger. New Candid name."""
+    auth_err = require_setup_authorized()
+    if auth_err:
+        return json.dumps(auth_err)
+
+    realm = _load_realm()
+    if not realm:
+        return json.dumps({"success": False, "error": "Realm not found"})
+
+    result = yield from _apply_draft_token_now(realm)
+    if result is None:
+        return json.dumps({"success": False, "error": "token_canister_id is required"})
+    return json.dumps(result)
 
 
 def setup_launch() -> Async[str]:

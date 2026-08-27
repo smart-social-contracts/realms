@@ -6,6 +6,7 @@
 	import { Button, Heading, Input, Label, P } from 'flowbite-svelte';
 	import {
 		LAUNCH_STATUS_POLL_MS,
+		applySetupDraftToken,
 		configureSetupToken,
 		fetchSetupDraftAsset,
 		fetchSetupLaunchStatus,
@@ -27,6 +28,7 @@
 		isSetupCatalogCodex,
 		reconcileCodexVersion,
 		resolveInitialWizardStep,
+		firstFailedLaunchStepError,
 		founderConfigureTokenFromSetupState,
 		resolveReviewTokenSymbol,
 		resolveSelectedCodexVersion,
@@ -431,6 +433,8 @@
 				void goto('/', { replaceState: true });
 			} else if (launch.status === 'failed') {
 				stopLaunchPolling();
+				const fossil = firstFailedLaunchStepError(launch);
+				if (fossil) error = fossil;
 			}
 		} catch {
 			// ignore transient poll errors
@@ -611,16 +615,20 @@
 		busy = true;
 		error = '';
 		try {
-			// Founder-auth apply writes realm.token_canister_id NOW. Do not
-			// wait for the canister-identity launch tick — Retry may leave a
-			// stale failed configure_token row in place.
+			// save_draft is the leftover-safe path that already runs on Valencia.
+			// It now writes realm.token_canister_id. Then call the new Candid
+			// setup_apply_draft_token (leftover cannot intercept that name).
+			const ok = await persistDraft({ step: 'branding', token });
+			if (!ok) return;
+			const draftApplied = await applySetupDraftToken();
+			if (!draftApplied.success) {
+				error = draftApplied.error || 'Could not apply treasury ledger';
+				return;
+			}
 			const applied = await configureSetupToken(payload);
 			if (!applied.success) {
 				error = applied.error || 'Could not apply treasury ledger';
-				return;
 			}
-			const ok = await persistDraft({ step: 'branding', token });
-			if (!ok) return;
 			tokenSymbol = String(token?.symbol || payload.symbol || '');
 			tokenCanisterId = String(payload.token_canister_id);
 			navigateToStep('branding');
@@ -753,16 +761,12 @@
 					error = 'Choose a token, or enter a custom symbol and ledger canister';
 					return;
 				}
-				const applied = await configureSetupToken(payload);
-				if (!applied.success) {
-					error = applied.error || 'Could not apply treasury ledger';
-					return;
-				}
 				const completedToken = completeCatalogTokenDraft(
 					setupState?.draft?.token ?? setupState?.token
 				);
 				if (completedToken) {
-					await persistDraft({ token: completedToken }, { refresh: false });
+					const saved = await persistDraft({ token: completedToken }, { refresh: false });
+					if (!saved) return;
 				}
 			}
 			const normalized = normalizeLanguages(selectedLanguages, primaryLanguage);
@@ -777,6 +781,17 @@
 					{ refresh: false }
 				);
 			}
+			const draftApplied = await applySetupDraftToken();
+			if (!draftApplied.success) {
+				error = draftApplied.error || 'Could not apply treasury ledger';
+				return;
+			}
+			if (payload) {
+				const applied = await configureSetupToken(payload);
+				if (!applied.success) {
+					error = applied.error || 'Could not apply treasury ledger';
+				}
+			}
 			const result = await startSetupLaunch();
 			if (!result.success) {
 				error = result.error || 'Could not start launch';
@@ -784,6 +799,8 @@
 			}
 			if (result.launch) {
 				launchState = result.launch;
+				const fossil = firstFailedLaunchStepError(result.launch);
+				if (fossil) error = fossil;
 			}
 			startLaunchPolling();
 			void pollLaunchStatus();

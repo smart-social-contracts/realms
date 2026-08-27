@@ -42,6 +42,19 @@ export const LAUNCH_PHASES = [
 	{ name: 'complete', label: 'Complete setup' }
 ] as const;
 
+export function firstFailedLaunchStepError(
+	launch?: {
+		status?: string;
+		steps?: Array<{ status?: string; error?: string | null }>;
+	} | null
+): string {
+	if (!launch || launch.status !== 'failed' || !Array.isArray(launch.steps)) {
+		return '';
+	}
+	const failed = launch.steps.find((step) => step.status === 'failed' && step.error);
+	return String(failed?.error || '');
+}
+
 export function stepToUrlToken(step: WizardStep): WizardStepUrlToken {
 	if (step === 'review') return 'launch';
 	return step;
