@@ -5,7 +5,7 @@
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, logout, restoreAuthSession, resetAuthSessionRestore } from '$lib/auth';
   import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge.ts';
-  import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor } from '$lib/canisters.js';
+  import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor, asJoinSafeActor } from '$lib/canisters.js';
   import { loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
   import { goto } from '$app/navigation';
@@ -644,7 +644,7 @@
       // is resolved server-side (invite code profile or codex default); the
       // first argument is only a consistency check.
       const inviteChecksum = await resolveInviteChecksum();
-      const actor = targetActor || backend;
+      const actor = await asJoinSafeActor(targetActor || backend);
       const response = await actor.join_realm(inviteValid ? inviteProfile : '', '', inviteChecksum);
       if (response.success) {
         // Point the app at the quarter we just joined and remember it.
