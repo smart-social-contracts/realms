@@ -82,7 +82,16 @@ from api.vetkeys import (
     get_vetkey_public_key,
 )
 from api.zones import get_zone_aggregation
-from core.access import _check_access, require, require_controller, set_controller
+from core.access import (
+    _check_access,
+    api_call_source,
+    ext_call_source,
+    product_shell_guard,
+    raise_quiet_access_denied,
+    require,
+    require_controller,
+    set_controller,
+)
 from core.cross_quarter import (
     ResolutionStatus,
     classify_ref,
@@ -932,34 +941,34 @@ class HostSecureORM(_SecureORMBase):
         if action == "host.list_methods":
             return sorted(self.allowed_methods())
         if action == "host.call":
+            method = kwargs.get("method")
             return self._call_host(
-                kwargs.get("method"),
+                method,
                 list(kwargs.get("args") or []),
                 dict(kwargs.get("kwargs") or {}),
+                source=api_call_source(method),
             )
         if action == "host.ext_sync":
+            ext_name = kwargs.get("extension_name")
+            fn_name = kwargs.get("function_name")
             return self._call_host(
                 "extension_sync_call",
-                [
-                    kwargs.get("extension_name"),
-                    kwargs.get("function_name"),
-                    _host_json_args(kwargs.get("args")),
-                ],
+                [ext_name, fn_name, _host_json_args(kwargs.get("args"))],
                 {},
+                source=ext_call_source(ext_name, fn_name),
             )
         if action == "host.ext_async":
+            ext_name = kwargs.get("extension_name")
+            fn_name = kwargs.get("function_name")
             return self._call_host(
                 "extension_async_call",
-                [
-                    kwargs.get("extension_name"),
-                    kwargs.get("function_name"),
-                    _host_json_args(kwargs.get("args")),
-                ],
+                [ext_name, fn_name, _host_json_args(kwargs.get("args"))],
                 {},
+                source=ext_call_source(ext_name, fn_name, async_call=True),
             )
         raise _HostRpcError(f"unknown action {action!r}")
 
-    def _call_host(self, method, args, call_kwargs):
+    def _call_host(self, method, args, call_kwargs, source=""):
         if not isinstance(method, str) or not method:
             raise _HostRpcError("host.call requires a method name")
         if method in self._blocked_methods:
@@ -988,11 +997,11 @@ class HostSecureORM(_SecureORMBase):
         try:
             with host_call():
                 return _host_drive_result(fn(*args, **call_kwargs))
-        except PermissionError:
-            raise
+        except PermissionError as exc:
+            raise_quiet_access_denied(exc, source=source)
         except Exception as exc:
             if type(exc).__name__ == "AccessDenied":
-                raise PermissionError(str(exc)) from exc
+                raise_quiet_access_denied(exc, source=source)
             raise
 
 
@@ -5797,11 +5806,21 @@ def http_transform(args: HttpTransformArgs) -> HttpResponse:
 
 
 @update
-@require(Operations.SHELL_EXECUTE)
 def __shell__(code: str) -> str:
     """Sandboxed REPL. Product surface is ``api.call`` / ``ext.call`` (same
     host methods and gates as the UI). Entity stubs remain Cedar-gated.
+
+    Missing ``shell.execute`` (opening the REPL) returns
+    ``✗ access denied: shell.execute``. In-REPL denials name the inner
+    ``@require`` permission and the call, e.g.
+    ``✗ access denied: realm.admin from api.call('set_canister_config')``.
+    No principal, no traceback (realms#349).
     """
+    return product_shell_guard(lambda: _shell_execute(code))
+
+
+@require(Operations.SHELL_EXECUTE)
+def _shell_execute(code: str) -> str:
     orm = _try_init_secure_orm()
     if orm is None:
         raise RuntimeError(

@@ -63,7 +63,7 @@ sys.modules["_cdk"] = _cdk
 
 from ggg.system.user_profile import Operations, Profiles  # noqa: E402
 
-from core.access import AccessDenied, require  # noqa: E402
+from core.access import AccessDenied, quiet_access_denied, require  # noqa: E402
 from core.call_origin import current as cedar_origin  # noqa: E402
 from core.extension_access import gate_extension_call  # noqa: E402
 from core.repl_host import HOST_STUB_APPENDIX, HostSecureORM  # noqa: E402
@@ -239,6 +239,15 @@ class TestReplUiParity:
         assert type(via_shell.value) is AccessDenied
         assert type(direct.value) is type(via_shell.value)
         assert isinstance(via_shell.value, PermissionError)
+        # Candid has no REPL source. api.call names the verb, not the pipe.
+        assert quiet_access_denied(direct.value) == "✗ access denied: realm.admin"
+        assert quiet_access_denied(via_shell.value) == (
+            "✗ access denied: realm.admin from api.call('set_canister_config')"
+        )
+        assert "shell.execute" not in quiet_access_denied(via_shell.value)
+        assert MEMBER not in quiet_access_denied(via_shell.value)
+        assert "Traceback" not in str(via_shell.value)
+        assert MEMBER not in str(via_shell.value)
 
     def test_ext_call_matches_extension_sync_call_gate(self):
         """``ext.call`` is the UI button: same ``gate_extension_call`` denial."""
