@@ -1540,6 +1540,81 @@ def test_setup_launch_retry_drives_configure_token_when_draft_has_pe5t5(monkeypa
     assert realm.accounting_currency == "ckEURC"
 
 
+def test_setup_launch_writes_realm_ledger_when_tick_is_dead(monkeypatch):
+    """Retry applies pe5t5 even if seed/advance are dead; second Launch is not Settings."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    stale_updated_at = "1787858624611611294"
+    settings_err = _settings_treasury_message()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {
+                            "symbol": "ckEURC",
+                            "token_canister_id": ck_eurc,
+                            "decimals": 6,
+                        },
+                    },
+                    "launch": {
+                        "status": "failed",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "install_codex", "status": "completed", "error": None},
+                            {
+                                "name": "configure_token",
+                                "status": "failed",
+                                "error": settings_err,
+                            },
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": stale_updated_at,
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
+    monkeypatch.setattr(
+        "core.quarter_bootstrap.seed_recurring_codex_task",
+        MagicMock(side_effect=RuntimeError("seed dead")),
+    )
+    monkeypatch.setattr("core.quarter_bootstrap.disable_recurring_task", lambda *_a, **_k: None)
+
+    def _dead_advance():
+        raise RuntimeError("tick dead")
+
+    monkeypatch.setattr(setup_api, "advance_setup_launch", _dead_advance)
+
+    result = _call_setup_launch(setup_api)
+    assert result["success"] is True
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+    assert result.get("error_code") != "no_treasury_token"
+    assert settings_err not in (result.get("error") or "")
+
+    second = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert second["success"] is True
+    assert second.get("error_code") != "no_treasury_token"
+    assert "Realm Settings" not in (second.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
+
+
 def test_setup_configure_token_denies_non_founder():
     setup_api = _import_setup_api()
     realm = _FakeRealm(

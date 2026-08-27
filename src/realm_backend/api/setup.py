@@ -236,6 +236,33 @@ def setup_save_draft(args_json: str) -> str:
     return json.dumps({"success": True, "draft": draft_for_response(draft)})
 
 
+def _apply_draft_token_now(realm) -> Async[Optional[dict]]:
+    """Write realm.token_canister_id from draft now. Does not wait for the tick.
+
+    Returns None when the draft has no ledger (launch stays fail-closed).
+    """
+    draft = dict(get_setup_draft(realm))
+    draft["token"] = _complete_catalog_token_draft(
+        draft.get("token"),
+        getattr(realm, "network", "") or "",
+    )
+    token_canister_id = _configured_token_canister_id(realm, draft)
+    if not token_canister_id:
+        return None
+    token = _token_record(draft.get("token")) or {}
+    result = yield from _apply_configured_token(
+        realm,
+        {
+            "token_canister_id": token_canister_id,
+            "symbol": token.get("symbol"),
+            "decimals": token.get("decimals"),
+            "indexer_canister_id": token.get("indexer_canister_id"),
+            "token_type": token.get("token_type"),
+        },
+    )
+    return result
+
+
 def setup_launch() -> Async[str]:
     auth_err = require_setup_authorized()
     if auth_err:
@@ -245,24 +272,35 @@ def setup_launch() -> Async[str]:
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
 
+    # Founder apply first. seed_recurring_codex_task / advance_setup_launch
+    # may be dead on a non-leftover-free canister; the ledger must still
+    # land on realm.token_canister_id before this call returns.
+    apply_result = yield from _apply_draft_token_now(realm)
+    if isinstance(apply_result, dict) and not apply_result.get("success"):
+        return json.dumps(apply_result)
+
     err = begin_setup_launch(realm)
     if err:
         return json.dumps(err)
 
     from core.quarter_bootstrap import seed_recurring_codex_task
 
-    seed_recurring_codex_task(
-        SETUP_LAUNCH_TASK_NAME,
-        SETUP_LAUNCH_STEP_CODE,
-        SETUP_LAUNCH_TICK_SECONDS,
-    )
+    try:
+        seed_recurring_codex_task(
+            SETUP_LAUNCH_TASK_NAME,
+            SETUP_LAUNCH_STEP_CODE,
+            SETUP_LAUNCH_TICK_SECONDS,
+        )
+    except Exception as seed_err:
+        logger.warning("setup_launch: seed_recurring_codex_task failed: %s", seed_err)
 
-    # Founder is on the line: drive configure_token now so Retry is not a
-    # no-op if the recurring tick is disabled or still showing a stale row.
     launch = get_launch_state(realm)
     step = _next_pending_launch_step(launch)
     if step and step.get("name") == "configure_token":
-        yield from advance_setup_launch()
+        try:
+            yield from advance_setup_launch()
+        except Exception as tick_err:
+            logger.warning("setup_launch: advance_setup_launch failed: %s", tick_err)
         realm = _load_realm()
         launch = get_launch_state(realm)
     return json.dumps({"success": True, "launch": launch})
