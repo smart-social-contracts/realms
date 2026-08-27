@@ -3,6 +3,9 @@ import { browser } from '$app/environment';
 import { resolveRealmMarkSrc } from '$lib/branding/realmMark';
 import { backendStore, backendActorReady } from '$lib/canisters';
 import { applyBrandingPrimary, DEFAULT_PRIMARY_COLOR, parsePrimaryColor } from '$lib/theme/brandingPrimary';
+import { applyResolvedLocale } from '$lib/i18n';
+import { coerceRealmLanguages } from '$lib/i18n/realmLocales';
+import { userLocale } from '$lib/stores/userLocale';
 
 const RUNTIME_FLAGS_TIMEOUT_MS = 12_000;
 const STATUS_QUERY_TIMEOUT_MS = 12_000;
@@ -67,6 +70,8 @@ interface RealmInfo {
 	logoUrl: string;
 	backgroundImageUrl: string;
 	primaryColor: string;
+	languages: string[];
+	primaryLanguage: string;
 	testMode: boolean;
 	testModeIIBypass: boolean;
 	testModeUserSelfRegistration: boolean;
@@ -91,6 +96,8 @@ const createRealmInfoStore = () => {
 		logoUrl: resolveRealmMarkSrc(''),
 		backgroundImageUrl: '',
 		primaryColor: DEFAULT_PRIMARY_COLOR,
+		languages: ['en'],
+		primaryLanguage: 'en',
 		testMode: false,
 		testModeIIBypass: false,
 		testModeUserSelfRegistration: false,
@@ -187,6 +194,10 @@ const createRealmInfoStore = () => {
 						parsePrimaryColor(fromFlags?.primary_color) ??
 						parsePrimaryColor(status?.primary_color) ??
 						DEFAULT_PRIMARY_COLOR;
+					const languageConfig = coerceRealmLanguages(
+						fromFlags?.languages ?? status?.languages,
+						fromFlags?.primary_language ?? status?.primary_language
+					);
 					update(state => ({
 						...state,
 						name: (fromFlags?.realm_name as string) || (status?.realm_name as string) || '',
@@ -203,6 +214,8 @@ const createRealmInfoStore = () => {
 						),
 						backgroundImageUrl: (fromFlags?.background_image_url as string) || (status?.background_image_url as string) || '',
 						primaryColor,
+						languages: languageConfig.languages,
+						primaryLanguage: languageConfig.primary,
 						testMode: (fromFlags?.test_mode as boolean) ?? (status?.test_mode as boolean) ?? false,
 						testModeIIBypass: (fromFlags?.test_mode_ii_bypass as boolean) ?? (status?.test_mode_ii_bypass as boolean) ?? false,
 						testModeUserSelfRegistration: (fromFlags?.test_mode_user_self_registration as boolean) ?? (status?.test_mode_user_self_registration as boolean) ?? false,
@@ -213,6 +226,11 @@ const createRealmInfoStore = () => {
 					}));
 					if (browser) {
 						applyBrandingPrimary(primaryColor);
+						applyResolvedLocale({
+							userLocale: get(userLocale),
+							languages: languageConfig.languages,
+							primaryLanguage: languageConfig.primary
+						});
 					}
 				} else {
 					throw new Error('Failed to fetch realm info');
@@ -242,6 +260,10 @@ export const realmManifesto = derived(realmInfo, $realmInfo => $realmInfo.manife
 
 // Derived store for open registration flag
 export const realmOpenRegistration = derived(realmInfo, $realmInfo => $realmInfo.openRegistration);
+
+export const realmLanguages = derived(realmInfo, $realmInfo => $realmInfo.languages);
+
+export const realmPrimaryLanguage = derived(realmInfo, $realmInfo => $realmInfo.primaryLanguage);
 
 export const aiAssistantEnabled = derived(realmInfo, $realmInfo => $realmInfo.aiAssistantEnabled);
 

@@ -135,12 +135,15 @@ describe('wizardLogic', () => {
 	});
 
 	describe('back navigation', () => {
-		it('returns the previous step for steps 2-5', () => {
+		it('returns the previous step for steps after welcome', () => {
 			expect(getPreviousWizardStep('welcome')).toBeNull();
 			expect(getPreviousWizardStep('codex')).toBe('welcome');
 			expect(getPreviousWizardStep('token')).toBe('codex');
 			expect(getPreviousWizardStep('branding')).toBe('token');
-			expect(getPreviousWizardStep('review')).toBe('branding');
+			expect(getPreviousWizardStep('languages')).toBe('branding');
+			expect(getPreviousWizardStep('review')).toBe('languages');
+			expect(getNextWizardStep('branding')).toBe('languages');
+			expect(getNextWizardStep('languages')).toBe('review');
 		});
 	});
 
@@ -155,7 +158,8 @@ describe('wizardLogic', () => {
 
 		it('allows back navigation without the banner', () => {
 			expect(canNavigateToWizardStep('token', 'codex', freshState)).toEqual({ allowed: true });
-			expect(canNavigateToWizardStep('review', 'branding', freshState)).toEqual({ allowed: true });
+			expect(canNavigateToWizardStep('review', 'languages', freshState)).toEqual({ allowed: true });
+			expect(canNavigateToWizardStep('languages', 'branding', freshState)).toEqual({ allowed: true });
 		});
 
 		it('allows forward navigation once codex is chosen', () => {
@@ -196,6 +200,12 @@ describe('wizardLogic', () => {
 					null
 				)
 			).toBe('branding');
+			expect(
+				resolveInitialWizardStep(
+					{ ...draftChosenState, draft: { ...draftChosenState.draft!, step: 'languages' } },
+					null
+				)
+			).toBe('languages');
 		});
 	});
 
@@ -206,6 +216,7 @@ describe('wizardLogic', () => {
 			expect(stepToUrlToken('codex')).toBe('codex');
 			expect(stepToUrlToken('token')).toBe('token');
 			expect(stepToUrlToken('branding')).toBe('branding');
+			expect(stepToUrlToken('languages')).toBe('languages');
 		});
 
 		it('maps launch back to review and rejects unknown tokens', () => {
@@ -214,6 +225,7 @@ describe('wizardLogic', () => {
 			expect(urlTokenToStep('codex')).toBe('codex');
 			expect(urlTokenToStep('token')).toBe('token');
 			expect(urlTokenToStep('branding')).toBe('branding');
+			expect(urlTokenToStep('languages')).toBe('languages');
 			expect(urlTokenToStep('review')).toBeNull();
 			expect(urlTokenToStep('')).toBeNull();
 			expect(urlTokenToStep('unknown')).toBeNull();

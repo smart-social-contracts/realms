@@ -166,11 +166,29 @@ def setup_save_draft(args_json: str) -> str:
         if identity_err:
             return json.dumps({"success": False, "error": identity_err})
 
+    languages_in = params.get("languages")
+    if languages_in is not None:
+        if not isinstance(languages_in, dict):
+            return json.dumps({"success": False, "error": "languages must be an object"})
+        from core.realm_locales import normalize_languages
+
+        _langs, _primary, lang_err = normalize_languages(
+            languages_in.get("languages"),
+            languages_in.get("primary_language"),
+            require_primary=True,
+        )
+        if lang_err:
+            return json.dumps({"success": False, "error": lang_err})
+
     realm = _load_realm()
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
 
-    partial = {k: params[k] for k in ("step", "codex", "token", "identity") if k in params}
+    partial = {
+        k: params[k]
+        for k in ("step", "codex", "token", "identity", "languages")
+        if k in params
+    }
     branding_markers: Dict[str, Any] = {}
     if isinstance(branding_in, dict):
         for asset_key, url_key in (
@@ -193,6 +211,19 @@ def setup_save_draft(args_json: str) -> str:
         draft = merge_setup_draft(realm, partial)
     except ValueError as exc:
         return json.dumps({"success": False, "error": str(exc)})
+
+    languages_to_persist = languages_in if isinstance(languages_in, dict) else None
+    if languages_to_persist is None and isinstance(identity_in, dict):
+        if "languages" in identity_in or "primary_language" in identity_in:
+            languages_to_persist = {
+                key: identity_in[key]
+                for key in ("languages", "primary_language")
+                if key in identity_in
+            }
+    if languages_to_persist:
+        persist_err = _persist_realm_languages(realm, languages_to_persist)
+        if persist_err:
+            return json.dumps({"success": False, "error": persist_err})
 
     return json.dumps({"success": True, "draft": draft_for_response(draft)})
 
@@ -439,24 +470,66 @@ def _launch_phase_upload_branding(realm, draft: dict) -> Async[dict]:
     }
 
 
+def _persist_realm_languages(realm, payload: dict) -> Optional[str]:
+    from core.realm_locales import apply_realm_languages
+
+    _langs, _primary, error = apply_realm_languages(
+        realm,
+        payload.get("languages"),
+        payload.get("primary_language"),
+        replace_languages="languages" in payload,
+    )
+    return error
+
+
+def _languages_payload_from_draft(draft: dict) -> Optional[dict]:
+    languages = draft.get("languages")
+    if isinstance(languages, dict) and (
+        "languages" in languages or "primary_language" in languages
+    ):
+        return languages
+    identity = draft.get("identity")
+    if isinstance(identity, dict) and (
+        "languages" in identity or "primary_language" in identity
+    ):
+        return {
+            key: identity[key]
+            for key in ("languages", "primary_language")
+            if key in identity
+        }
+    return None
+
+
 def _launch_phase_apply_identity(realm, draft: dict) -> dict:
     identity = draft.get("identity") or {}
-    if not isinstance(identity, dict) or not identity:
-        return {"success": True, "skipped": True}
+    if not isinstance(identity, dict):
+        identity = {}
 
     if "manifesto" in identity:
         realm.manifesto = identity["manifesto"] or ""
     if "welcome_message" in identity:
         realm.welcome_message = identity["welcome_message"] or ""
 
-    existing_identity = get_setup_config(realm).get("identity") or {}
-    if isinstance(existing_identity, dict):
-        merged_identity = dict(existing_identity)
-        merged_identity.update(identity)
-    else:
-        merged_identity = identity
-    update_setup_config(realm, {"identity": merged_identity})
-    return {"success": True, "identity": merged_identity}
+    languages_payload = _languages_payload_from_draft(draft)
+    if languages_payload:
+        persist_err = _persist_realm_languages(realm, languages_payload)
+        if persist_err:
+            return {"success": False, "error": persist_err}
+
+    if not identity and not languages_payload:
+        return {"success": True, "skipped": True}
+
+    if identity:
+        existing_identity = get_setup_config(realm).get("identity") or {}
+        if isinstance(existing_identity, dict):
+            merged_identity = dict(existing_identity)
+            merged_identity.update(identity)
+        else:
+            merged_identity = identity
+        update_setup_config(realm, {"identity": merged_identity})
+        return {"success": True, "identity": merged_identity}
+
+    return {"success": True, "identity": identity}
 
 
 def _launch_phase_complete(realm, draft: dict) -> Async[dict]:
@@ -480,6 +553,12 @@ def _launch_phase_complete(realm, draft: dict) -> Async[dict]:
             realm.manifesto = identity["manifesto"] or ""
         if "welcome_message" in identity:
             realm.welcome_message = identity["welcome_message"] or ""
+
+    languages_payload = _languages_payload_from_draft(draft)
+    if languages_payload:
+        persist_err = _persist_realm_languages(realm, languages_payload)
+        if persist_err:
+            return {"success": False, "error": persist_err}
 
     completed_at = str(ic.time())
     update_setup_config(

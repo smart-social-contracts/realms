@@ -1,10 +1,17 @@
 import type { SetupState } from './types';
 
-export type WizardStep = 'welcome' | 'codex' | 'token' | 'branding' | 'review';
+export type WizardStep = 'welcome' | 'codex' | 'token' | 'branding' | 'languages' | 'review';
 
-export type WizardStepUrlToken = 'welcome' | 'codex' | 'token' | 'branding' | 'launch';
+export type WizardStepUrlToken = 'welcome' | 'codex' | 'token' | 'branding' | 'languages' | 'launch';
 
-export const WIZARD_STEPS: WizardStep[] = ['welcome', 'codex', 'token', 'branding', 'review'];
+export const WIZARD_STEPS: WizardStep[] = [
+	'welcome',
+	'codex',
+	'token',
+	'branding',
+	'languages',
+	'review'
+];
 
 export const WIZARD_STEP_URL_TOKENS: WizardStepUrlToken[] = [
 	'welcome',

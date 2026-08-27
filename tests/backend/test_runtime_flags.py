@@ -126,6 +126,21 @@ def test_runtime_flags_payload_includes_realm_stage(fake_ggg):
     assert payload["realm_stage"] == "beta"
 
 
+def test_runtime_flags_payload_includes_languages(fake_ggg):
+    import json
+
+    _set_realm(
+        name="Demo Realm",
+        manifest_data=json.dumps(
+            {"languages": ["en", "ca-valencia"], "primary_language": "ca-valencia"}
+        ),
+    )
+    payload = fake_ggg.get_runtime_flags_payload()
+    assert payload["success"] is True
+    assert payload["languages"] == ["en", "ca-valencia"]
+    assert payload["primary_language"] == "ca-valencia"
+
+
 def test_runtime_flags_payload_includes_primary_color(fake_ggg):
     import json
 

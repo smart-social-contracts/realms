@@ -731,6 +731,78 @@ def test_get_setup_state_payload_includes_identity_and_realm_fields():
     assert payload["realm_name"] == "My Realm"
     assert payload["realm_manifesto"] == "Live manifesto"
     assert payload["realm_welcome_message"] == "Live welcome"
+    assert payload["languages"] == ["en"]
+    assert payload["primary_language"] == "en"
+
+
+def test_setup_save_draft_persists_languages_and_requires_primary_in_list():
+    setup_api = _import_setup_api()
+    _clear_draft_assets(setup_api)
+
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _authorized_creator(realm)
+
+    rejected = json.loads(
+        setup_api.setup_save_draft(
+            json.dumps(
+                {
+                    "step": "languages",
+                    "languages": {
+                        "languages": ["en"],
+                        "primary_language": "ca-valencia",
+                    },
+                }
+            )
+        )
+    )
+    assert rejected["success"] is False
+    assert "primary_language" in rejected["error"]
+
+    saved = json.loads(
+        setup_api.setup_save_draft(
+            json.dumps(
+                {
+                    "step": "languages",
+                    "languages": {
+                        "languages": ["en", "ca-valencia"],
+                        "primary_language": "ca-valencia",
+                    },
+                }
+            )
+        )
+    )
+    assert saved["success"] is True
+    assert saved["draft"]["languages"]["languages"] == ["en", "ca-valencia"]
+    assert saved["draft"]["languages"]["primary_language"] == "ca-valencia"
+    manifest = json.loads(realm.manifest_data)
+    assert manifest["languages"] == ["en", "ca-valencia"]
+    assert manifest["primary_language"] == "ca-valencia"
+
+
+def test_apply_identity_persists_languages_from_draft():
+    setup_api = _import_setup_api()
+
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+    )
+    _FakeRealm.reset(realm)
+
+    result = setup_api._launch_phase_apply_identity(
+        realm,
+        {
+            "identity": {"manifesto": "Hello"},
+            "languages": {
+                "languages": ["en", "es"],
+                "primary_language": "es",
+            },
+        },
+    )
+    assert result["success"] is True
+    manifest = json.loads(realm.manifest_data)
+    assert manifest["languages"] == ["en", "es"]
+    assert manifest["primary_language"] == "es"
+    assert realm.manifesto == "Hello"
 
 
 def test_setup_save_draft_merges_partial_updates():

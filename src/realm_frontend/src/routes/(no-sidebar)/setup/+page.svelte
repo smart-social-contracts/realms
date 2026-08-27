@@ -45,20 +45,20 @@
 	import PublicDashboardPreview from '$lib/setup/PublicDashboardPreview.svelte';
 	import BrandingDropzone from '$lib/setup/BrandingDropzone.svelte';
 	import { get } from 'svelte/store';
-
-	const WELCOME_FOUNDING_LINE =
-		'You are founding a realm — a digital polity whose rules and processes are verifiable and tamper-proof. Choose how it governs, what it values, and how it looks — then bring it to life.';
+	import { _ } from 'svelte-i18n';
+	import { LOCALE_CATALOG, localeLabel, normalizeLanguages } from '$lib/i18n/realmLocales';
 
 	const WELCOME_MESSAGE_MAX = 1024;
 	const MANIFESTO_MAX = 256;
 	const IDENTITY_DRAFT_DEBOUNCE_MS = 500;
 
-	const steps: { id: WizardStep; label: string; skippable: boolean }[] = [
-		{ id: 'welcome', label: 'Welcome', skippable: false },
-		{ id: 'codex', label: 'Codex', skippable: false },
-		{ id: 'token', label: 'Token', skippable: true },
-		{ id: 'branding', label: 'Branding', skippable: true },
-		{ id: 'review', label: 'Launch', skippable: false }
+	const steps: { id: WizardStep; labelKey: string; skippable: boolean }[] = [
+		{ id: 'welcome', labelKey: 'setup.wizard.step_welcome', skippable: false },
+		{ id: 'codex', labelKey: 'setup.wizard.step_codex', skippable: false },
+		{ id: 'token', labelKey: 'setup.wizard.step_token', skippable: true },
+		{ id: 'branding', labelKey: 'setup.wizard.step_branding', skippable: true },
+		{ id: 'languages', labelKey: 'setup.wizard.step_languages', skippable: false },
+		{ id: 'review', labelKey: 'setup.wizard.step_review', skippable: false }
 	];
 
 	const primaryButtonClass =
@@ -100,6 +100,8 @@
 	let brandingCustomized = $state(false);
 	let brandingApplyToken = 0;
 	let brandingApplyInFlight: Promise<void> | null = null;
+	let selectedLanguages = $state<string[]>(['en']);
+	let primaryLanguage = $state('en');
 
 	const stepIndex = $derived(steps.findIndex((s) => s.id === currentStep));
 	const isWelcomeStep = $derived(currentStep === 'welcome');
@@ -148,6 +150,19 @@
 	);
 	const selectedCodexBranding = $derived(
 		selectedCodexId ? defaultCodexBranding(selectedCodexId) : null
+	);
+	const languagesDraftValid = $derived(
+		!('error' in normalizeLanguages(selectedLanguages, primaryLanguage))
+	);
+	const summaryLanguages = $derived(
+		(setupState?.draft?.languages?.languages as string[] | undefined) ||
+			setupState?.languages ||
+			selectedLanguages
+	);
+	const summaryPrimaryLanguage = $derived(
+		(setupState?.draft?.languages?.primary_language as string | undefined) ||
+			setupState?.primary_language ||
+			primaryLanguage
 	);
 	const hasBrandingDraft = $derived(
 		Boolean(
@@ -299,6 +314,22 @@
 		}
 		if (!manifestoTouched) {
 			manifesto = resolveManifestoFromState(state);
+		}
+
+		const draftLanguages = state.draft?.languages;
+		const enabled =
+			(Array.isArray(draftLanguages?.languages) && draftLanguages.languages) ||
+			(Array.isArray(state.identity?.languages) && state.identity.languages) ||
+			(Array.isArray(state.languages) && state.languages) ||
+			null;
+		const primary =
+			(typeof draftLanguages?.primary_language === 'string' && draftLanguages.primary_language) ||
+			(typeof state.identity?.primary_language === 'string' && state.identity.primary_language) ||
+			(typeof state.primary_language === 'string' && state.primary_language) ||
+			'';
+		if (enabled && enabled.length > 0) {
+			selectedLanguages = [...enabled];
+			primaryLanguage = primary && enabled.includes(primary) ? primary : enabled[0];
 		}
 	}
 
@@ -532,7 +563,7 @@
 			if (canAdvanceFromCodexStep(setupState) && setupState?.draft?.codex?.package === selectedCodexId &&
 				setupState?.draft?.codex?.version === versionToSave &&
 				setupState?.draft?.step &&
-				['token', 'branding', 'review'].includes(setupState.draft.step)) {
+				['token', 'branding', 'languages', 'review'].includes(setupState.draft.step)) {
 				if (branding.logo_data_url || branding.background_data_url) {
 					const ok = await persistDraft({ branding });
 					if (!ok) return;
@@ -618,7 +649,7 @@
 		error = '';
 		try {
 			const ok = await persistDraft({
-				step: 'review',
+				step: 'languages',
 				branding: currentBrandingDraft(),
 				identity: {
 					welcome_message: welcomeMessage.trim(),
@@ -626,7 +657,7 @@
 				}
 			});
 			if (!ok) return;
-			navigateToStep('review');
+			navigateToStep('languages');
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not save branding draft';
 		} finally {
@@ -634,12 +665,51 @@
 		}
 	}
 
-	async function handleBrandingSkip() {
+	async function handleLanguagesSave() {
+		const normalized = normalizeLanguages(selectedLanguages, primaryLanguage);
+		if ('error' in normalized) {
+			error = $_('setup.wizard.primary_must_be_enabled');
+			return;
+		}
+		selectedLanguages = normalized.languages;
+		primaryLanguage = normalized.primary;
 		busy = true;
 		error = '';
 		try {
 			const ok = await persistDraft({
 				step: 'review',
+				languages: {
+					languages: selectedLanguages,
+					primary_language: primaryLanguage
+				}
+			});
+			if (!ok) return;
+			navigateToStep('review');
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Could not save languages draft';
+		} finally {
+			busy = false;
+		}
+	}
+
+	function toggleLanguage(id: string) {
+		if (selectedLanguages.includes(id)) {
+			if (selectedLanguages.length === 1) return;
+			selectedLanguages = selectedLanguages.filter((item) => item !== id);
+			if (!selectedLanguages.includes(primaryLanguage)) {
+				primaryLanguage = selectedLanguages[0];
+			}
+			return;
+		}
+		selectedLanguages = [...selectedLanguages, id];
+	}
+
+	async function handleBrandingSkip() {
+		busy = true;
+		error = '';
+		try {
+			const ok = await persistDraft({
+				step: 'languages',
 				branding: currentBrandingDraft(),
 				identity: {
 					welcome_message: welcomeMessage.trim(),
@@ -647,7 +717,7 @@
 				}
 			});
 			if (!ok) return;
-			navigateToStep('review');
+			navigateToStep('languages');
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not save branding draft';
 		} finally {
@@ -659,6 +729,18 @@
 		busy = true;
 		error = '';
 		try {
+			const normalized = normalizeLanguages(selectedLanguages, primaryLanguage);
+			if (!('error' in normalized)) {
+				await persistDraft(
+					{
+						languages: {
+							languages: normalized.languages,
+							primary_language: normalized.primary
+						}
+					},
+					{ refresh: false }
+				);
+			}
 			const result = await startSetupLaunch();
 			if (!result.success) {
 				error = result.error || 'Could not start launch';
@@ -795,7 +877,7 @@
 </script>
 
 <svelte:head>
-	<title>Setup {$realmName || 'Realm'}</title>
+	<title>{$_('setup.wizard.document_title', { values: { name: $realmName || $_('setup.wizard.unnamed_realm') } })}</title>
 </svelte:head>
 
 <div class="setup-wizard" class:setup-wizard--welcome={isWelcomeStep}>
@@ -835,12 +917,14 @@
 			<header class="setup-wizard__header">
 				<img src="/images/logo_sphere_only.svg" alt="" class="setup-wizard__mark" />
 				<div>
-					<p class="setup-wizard__eyebrow">Realm setup</p>
-					<Heading tag="h1" class="setup-wizard__title">Configure {$realmName || 'your realm'}</Heading>
+					<p class="setup-wizard__eyebrow">{$_('setup.wizard.eyebrow')}</p>
+					<Heading tag="h1" class="setup-wizard__title">
+						{$_('setup.wizard.configure', { values: { name: $realmName || $_('setup.wizard.unnamed_realm') } })}
+					</Heading>
 				</div>
 			</header>
 
-			<nav class="setup-wizard__steps" aria-label="Setup steps">
+			<nav class="setup-wizard__steps" aria-label={$_('setup.wizard.steps_label')}>
 				{#each steps as step, index (step.id)}
 					{#if index > 0}
 						<span
@@ -874,7 +958,7 @@
 								{index + 1}
 							{/if}
 						</span>
-						{step.label}
+						{$_(step.labelKey)}
 					</button>
 				{/each}
 			</nav>
@@ -882,12 +966,12 @@
 				<div class="setup-wizard__actions setup-wizard__actions--toolbar">
 					{#if previousStep && !(currentStep === 'review' && launchRunning)}
 						<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={goBack}>
-							Back
+							{$_('setup.wizard.back')}
 						</Button>
 					{/if}
 					{#if currentStep === 'token' || currentStep === 'branding'}
 						<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={skipStep}>
-							Skip
+							{$_('setup.wizard.skip')}
 						</Button>
 					{/if}
 					{#if currentStep === 'codex'}
@@ -897,7 +981,7 @@
 							disabled={codexPrimaryDisabled}
 							onclick={handleCodexContinue}
 						>
-							{codexPrimaryLabel}
+							{busy ? $_('setup.wizard.continuing') : $_('setup.wizard.continue')}
 						</Button>
 					{:else if currentStep === 'token'}
 						<Button
@@ -906,7 +990,7 @@
 							disabled={tokenContinueDisabled}
 							onclick={handleTokenSave}
 						>
-							{busy ? 'Continuing…' : 'Continue'}
+							{busy ? $_('setup.wizard.continuing') : $_('setup.wizard.continue')}
 						</Button>
 					{:else if currentStep === 'branding'}
 						<Button
@@ -915,7 +999,16 @@
 							disabled={busy || brandingTextInvalid}
 							onclick={handleBrandingSave}
 						>
-							{busy ? 'Continuing…' : 'Continue'}
+							{busy ? $_('setup.wizard.continuing') : $_('setup.wizard.continue')}
+						</Button>
+					{:else if currentStep === 'languages'}
+						<Button
+							color="none"
+							class={primaryButtonClass}
+							disabled={busy || !languagesDraftValid}
+							onclick={handleLanguagesSave}
+						>
+							{busy ? $_('setup.wizard.continuing') : $_('setup.wizard.continue')}
 						</Button>
 					{:else if currentStep === 'review'}
 						{#if launchFailed}
@@ -926,12 +1019,12 @@
 								disabled={busy}
 								onclick={handleLaunch}
 							>
-								{busy ? 'Retrying…' : 'Retry launch'}
+								{busy ? $_('setup.wizard.launch_retrying') : $_('setup.wizard.launch_retry')}
 							</Button>
 						{:else if launchCompleted}
-							<Button color="none" class={primaryButtonClass} disabled>Launch complete</Button>
+							<Button color="none" class={primaryButtonClass} disabled>{$_('setup.wizard.launch_complete')}</Button>
 						{:else if launchRunning}
-							<Button color="none" class={primaryButtonClass} disabled>Launching…</Button>
+							<Button color="none" class={primaryButtonClass} disabled>{$_('setup.wizard.launching')}</Button>
 						{:else}
 							<Button
 								color="none"
@@ -940,7 +1033,7 @@
 								disabled={busy || !summaryCodexPackage}
 								onclick={handleLaunch}
 							>
-								{busy ? 'Starting…' : 'Launch realm'}
+								{busy ? $_('setup.wizard.launch_starting') : $_('setup.wizard.launch_start')}
 							</Button>
 						{/if}
 					{/if}
@@ -949,7 +1042,7 @@
 		{/if}
 
 		{#if loading}
-			<P>Loading setup wizard…</P>
+			<P>{$_('setup.wizard.loading')}</P>
 		{:else}
 			{#if error}
 				<div class="setup-wizard__error" role="alert">{error}</div>
@@ -959,10 +1052,10 @@
 			{#if currentStep === 'welcome'}
 				<section class="setup-wizard__panel setup-wizard__panel--welcome setup-wizard__hero">
 					<h1 class="setup-wizard__hero-title">
-						{$realmName || 'Your realm'}
+						{$realmName || $_('setup.wizard.unnamed_realm')}
 					</h1>
 					<p class="setup-wizard__hero-lead">
-						{WELCOME_FOUNDING_LINE}
+						{$_('setup.wizard.founding_line')}
 					</p>
 					<div class="setup-wizard__actions setup-wizard__actions--welcome">
 						<button
@@ -971,7 +1064,7 @@
 							disabled={busy}
 							onclick={handleWelcomeContinue}
 						>
-							{busy ? 'Continuing…' : 'Begin'}
+							{busy ? $_('setup.wizard.continuing') : $_('setup.wizard.begin')}
 						</button>
 					</div>
 				</section>
@@ -1244,6 +1337,53 @@
 						/>
 					</div>
 				</section>
+			{:else if currentStep === 'languages'}
+				<section class="setup-wizard__panel">
+					<Heading tag="h2" class="text-xl font-semibold">{$_('setup.wizard.languages_title')}</Heading>
+					<P class="text-gray-600">{$_('setup.wizard.languages_help')}</P>
+
+					<fieldset class="setup-wizard__field">
+						<legend class="text-sm font-medium text-gray-700 dark:text-gray-300">
+							{$_('setup.wizard.enabled_languages')}
+						</legend>
+						<div class="setup-wizard__codex-list">
+							{#each LOCALE_CATALOG as loc (loc.id)}
+								<label
+									class="setup-wizard__codex-card setup-wizard__codex-card--compact"
+									class:setup-wizard__codex-card--selected={selectedLanguages.includes(loc.id)}
+								>
+									<input
+										type="checkbox"
+										checked={selectedLanguages.includes(loc.id)}
+										onchange={() => toggleLanguage(loc.id)}
+									/>
+									<div class="setup-wizard__codex-card-body">
+										<strong>{loc.name}</strong>
+										<p class="setup-wizard__codex-description text-sm text-gray-600">{loc.id}</p>
+									</div>
+								</label>
+							{/each}
+						</div>
+					</fieldset>
+
+					<div class="setup-wizard__field">
+						<Label for="primary-language">{$_('setup.wizard.primary_language')}</Label>
+						<select
+							id="primary-language"
+							class="setup-wizard__version-select"
+							bind:value={primaryLanguage}
+						>
+							{#each selectedLanguages as loc (loc)}
+								<option value={loc}>{localeLabel(loc)}</option>
+							{/each}
+						</select>
+					</div>
+					{#if !languagesDraftValid}
+						<p class="setup-wizard__field-error" role="alert">
+							{$_('setup.wizard.primary_must_be_enabled')}
+						</p>
+					{/if}
+				</section>
 			{:else}
 				<section class="setup-wizard__panel setup-wizard__panel--review">
 					<div>
@@ -1263,6 +1403,13 @@
 							<li>
 								<span>Token</span>
 								<strong>{summaryTokenSymbol || 'Skipped'}</strong>
+							</li>
+							<li>
+								<span>{$_('setup.wizard.review_languages')}</span>
+								<strong>
+									{summaryLanguages.map((id) => localeLabel(id)).join(', ') || localeLabel('en')}
+								</strong>
+								<em>{$_('setup.wizard.review_primary')}: {localeLabel(summaryPrimaryLanguage)}</em>
 							</li>
 							<li>
 								<span>Color</span>

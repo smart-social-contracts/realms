@@ -19,7 +19,9 @@ WELCOME_MESSAGE_MAX_CHARS = 1024
 SETUP_LAUNCH_TASK_NAME = "setup_launch"
 SETUP_LAUNCH_TICK_SECONDS = 1
 SETUP_LAUNCH_STALE_NANOS = 180 * 1_000_000_000
-SETUP_DRAFT_STEPS = frozenset({"welcome", "codex", "token", "branding", "review"})
+SETUP_DRAFT_STEPS = frozenset(
+    {"welcome", "codex", "token", "branding", "languages", "review"}
+)
 SETUP_LAUNCH_PHASES: List[tuple[str, str]] = [
     ("install_codex", "Install codex"),
     ("configure_token", "Configure token"),
@@ -196,6 +198,17 @@ def validate_identity_payload(identity: dict) -> Optional[str]:
                 f"welcome_message exceeds maximum length "
                 f"({WELCOME_MESSAGE_MAX_CHARS} chars)"
             )
+    if "languages" in identity or "primary_language" in identity:
+        from core.realm_locales import normalize_languages
+
+        _langs, _primary, error = normalize_languages(
+            identity.get("languages"),
+            identity.get("primary_language"),
+            require_primary="primary_language" in identity
+            or "languages" in identity,
+        )
+        if error:
+            return error
     return None
 
 
@@ -302,7 +315,7 @@ def merge_setup_draft(realm, partial: dict) -> dict:
             if step not in SETUP_DRAFT_STEPS:
                 raise ValueError(f"invalid draft step: {step}")
             draft["step"] = step
-    for key in ("codex", "token", "identity"):
+    for key in ("codex", "token", "identity", "languages"):
         if key not in partial:
             continue
         value = partial[key]
@@ -578,6 +591,28 @@ def get_setup_state_payload() -> dict:
         "realm_manifesto": getattr(realm, "manifesto", None) or "",
         "realm_welcome_message": getattr(realm, "welcome_message", None) or "",
         "setup_completed_at": setup.get("setup_completed_at"),
+        **_setup_language_fields(realm, identity if isinstance(identity, dict) else None, draft),
+    }
+
+
+def _setup_language_fields(realm, identity: Optional[dict], draft: dict) -> dict:
+    from core.realm_locales import get_realm_languages
+
+    languages, primary = get_realm_languages(realm)
+    if isinstance(identity, dict):
+        if isinstance(identity.get("languages"), list) and identity.get("languages"):
+            languages = list(identity["languages"])
+        if identity.get("primary_language"):
+            primary = identity["primary_language"]
+    draft_langs = draft.get("languages") if isinstance(draft, dict) else None
+    if isinstance(draft_langs, dict):
+        if isinstance(draft_langs.get("languages"), list) and draft_langs.get("languages"):
+            languages = list(draft_langs["languages"])
+        if draft_langs.get("primary_language"):
+            primary = draft_langs["primary_language"]
+    return {
+        "languages": languages,
+        "primary_language": primary,
     }
 
 
