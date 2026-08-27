@@ -2225,6 +2225,92 @@ def test_draft_realm_saveable_without_treasury_ledger():
     assert "token" not in result["draft"]
 
 
+def test_unshadowed_apply_writes_pe5t5_when_leftover_save_only_persists_draft(monkeypatch):
+    """Leftover api.setup can steal save_draft; core.setup_draft_token still applies."""
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {
+                            "symbol": "ckEURC",
+                            "token_canister_id": ck_eurc,
+                            "decimals": 6,
+                        },
+                    },
+                    "launch": {
+                        "status": "failed",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "configure_token", "status": "failed", "error": _settings_treasury_message()},
+                        ],
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    _load_tokens_offline(monkeypatch)
+    from core.setup_draft_token import (
+        apply_persisted_draft_if_present,
+        apply_setup_draft_token_now,
+    )
+
+    skipped_or_applied = _run_async(apply_persisted_draft_if_present())
+    assert skipped_or_applied.get("success") is True
+    assert "Realm Settings" not in (skipped_or_applied.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+
+    realm.token_canister_id = ""
+    realm.accounting_currency = ""
+    applied = json.loads(_run_async(apply_setup_draft_token_now()))
+    assert applied["success"] is True
+    assert applied["token"]["token_canister_id"] == ck_eurc
+    assert applied.get("error_code") != "no_treasury_token"
+    assert realm.token_canister_id == ck_eurc
+
+
+def test_unshadowed_apply_null_token_fail_closed(monkeypatch):
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1", "draft": {}}}),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    _load_tokens_offline(monkeypatch)
+    from core.setup_draft_token import apply_setup_draft_token_now
+
+    applied = json.loads(_run_async(apply_setup_draft_token_now()))
+    assert applied["success"] is False
+    assert applied["error"] == "token_canister_id is required"
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
+
+
+def test_main_setup_apply_does_not_import_api_setup():
+    main_src = Path(__file__).resolve().parents[1] / "main.py"
+    text = main_src.read_text()
+    apply_start = text.index("def setup_apply_draft_token()")
+    apply_end = text.index("def get_setup_draft_asset", apply_start)
+    body = text[apply_start:apply_end]
+    assert "from core.setup_draft_token import apply_setup_draft_token_now" in body
+    assert "from api.setup import" not in body
+    save_start = text.index("def setup_save_draft(")
+    save_end = text.index("def setup_apply_draft_token()", save_start)
+    save_body = text[save_start:save_end]
+    assert "from core.setup_draft_token import apply_persisted_draft_if_present" in save_body
+
+
 def test_setup_launch_runs_phases_in_order(monkeypatch):
     setup_api = _import_setup_api()
     _clear_draft_assets(setup_api)
