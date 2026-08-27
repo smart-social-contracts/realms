@@ -26,6 +26,7 @@
 		isSetupCatalogCodex,
 		reconcileCodexVersion,
 		resolveInitialWizardStep,
+		resolveReviewTokenSymbol,
 		resolveSelectedCodexVersion,
 		shouldClearCodexAdvanceError,
 		stepToUrlToken,
@@ -135,13 +136,7 @@
 			selectedVersion ||
 			''
 	);
-	const summaryTokenSymbol = $derived(
-		(setupState?.draft?.token?.symbol as string | undefined) ||
-			(setupState?.token?.symbol as string | undefined) ||
-			(setupState?.token?.existing as string | undefined) ||
-			tokenSymbol ||
-			''
-	);
+	const summaryTokenSymbol = $derived(resolveReviewTokenSymbol(setupState));
 	const selectedCodex = $derived(codices.find((codex) => codex.id === selectedCodexId) ?? null);
 	const selectedCodexDescription = $derived(
 		selectedCodex

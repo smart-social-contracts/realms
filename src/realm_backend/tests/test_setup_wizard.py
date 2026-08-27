@@ -49,6 +49,11 @@ mock_ic.id.return_value = "backend-canister-id"
 mock_ic.time.return_value = 1_700_000_000_000_000_000
 sys.modules["_cdk"].ic = mock_ic
 
+if "ic_python_logging" not in sys.modules:
+    _logging = types.ModuleType("ic_python_logging")
+    _logging.get_logger = lambda _name: MagicMock()
+    sys.modules["ic_python_logging"] = _logging
+
 
 class _FakeProfile:
     def __init__(self, allowed_to=""):
@@ -1204,6 +1209,89 @@ def test_launch_configure_token_proceeds_when_ledger_resolves(monkeypatch):
     assert realm.accounting_currency == "AG"
     setup_cfg = json.loads(realm.manifest_data)["setup"]
     assert setup_cfg["token"]["symbol"] == "AG"
+
+
+def test_failed_launch_token_draft_persists_for_configure_token(monkeypatch):
+    """Founder leaves a failed Launch, saves catalog ckEURC, retry reads the ledger."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "codex": {"package": "agora", "version": "1.0.0"},
+                    "draft": {
+                        "step": "review",
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                    },
+                    "launch": {
+                        "status": "failed",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "install_codex", "status": "completed", "error": None},
+                            {
+                                "name": "configure_token",
+                                "status": "failed",
+                                "error": (
+                                    "No treasury currency — set the treasury ledger "
+                                    "canister in Realm Settings so the token symbol "
+                                    "can be resolved"
+                                ),
+                            },
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": "1",
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+
+    saved = json.loads(
+        setup_api.setup_save_draft(
+            json.dumps(
+                {
+                    "step": "branding",
+                    "token": {"symbol": "ckEURC", "token_canister_id": ck_eurc, "decimals": 6},
+                }
+            )
+        )
+    )
+    assert saved["success"] is True
+    assert saved["draft"]["token"]["token_canister_id"] == ck_eurc
+    assert saved["draft"]["token"]["symbol"] == "ckEURC"
+    assert realm.token_canister_id == ""
+
+    draft = setup_core.get_setup_draft(realm)
+    assert setup_api._configured_token_canister_id(realm, draft) == ck_eurc
+
+    def _resolved(ledger, _network):
+        assert ledger == ck_eurc
+        result = {
+            "success": True,
+            "symbol": "ckEURC",
+            "decimals": 6,
+            "indexer_canister_id": ck_eurc,
+        }
+        yield result
+        return result
+
+    tokens_mod = types.ModuleType("api.tokens")
+    tokens_mod.resolve_ledger_token_info = _resolved
+    tokens_mod.register_treasury_token = lambda *_args, **_kwargs: None
+    monkeypatch.setitem(sys.modules, "api.tokens", tokens_mod)
+
+    result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert result["success"] is True
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
 
 
 def test_draft_realm_saveable_without_treasury_ledger():
