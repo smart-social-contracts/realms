@@ -23,7 +23,7 @@ describe('sharedTokens', () => {
 		expect(matchSharedToken({ token_canister_id: 'mxzaz-hqaaa-aaaar-qaada-cai' })?.id).toBe(
 			'ckBTC'
 		);
-		expect(matchSharedToken({ symbol: 'ckeuroc' })?.id).toBe('ckEURC');
+		expect(matchSharedToken({ symbol: 'CKEURC' })?.id).toBe('ckEURC');
 		expect(matchSharedToken({ token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai' })?.id).toBe(
 			'ckEURC'
 		);

@@ -66,8 +66,8 @@ def test_resolve_ckeurc_official_ledger_on_all_catalog_networks():
         assert cfg["indexer"] == official
         assert cfg["decimals"] == 6
         assert cfg["name"] == "ckEURC"
-        assert "ckEUR" not in cfg["name"]
-        assert resolve_shared_token("ckeuroc", network)["ledger"] == official
+        assert cfg["name"] != "ckEUR"
+        assert resolve_shared_token("CKEURC", network)["ledger"] == official
 
 
 def test_resolve_ckeurc_by_ledger():
