@@ -120,6 +120,22 @@ def test_resolve_ledger_token_info_falls_back_to_shared_registry():
     assert result["indexer_canister_id"] == "2rqin-xaaaa-aaaah-qunsq-cai"
 
 
+def test_resolve_ledger_token_info_falls_back_to_ckeurc_catalog():
+    """pe5t5 / ckEURC must resolve from the catalog when ICRC metadata is offline."""
+    official = "pe5t5-diaaa-aaaar-qahwa-cai"
+    for network in ("staging", "demo", "test"):
+        with patch.object(
+            tokens, "Icrc1MetadataService", side_effect=RuntimeError("offline")
+        ):
+            result = _finish_async_gen(resolve_ledger_token_info(official, network))
+        assert result["success"] is True, network
+        assert result["symbol"] == "ckEURC"
+        assert result["decimals"] == 6
+        assert result["source"] == "shared_registry_fallback"
+        assert result["indexer_canister_id"] == official
+        assert result.get("warning")
+
+
 def test_resolve_ledger_token_info_fails_without_registry_symbol():
     """Unknown ledgers must not invent a treasury symbol."""
     with patch.object(tokens, "Icrc1MetadataService", side_effect=RuntimeError("offline")):

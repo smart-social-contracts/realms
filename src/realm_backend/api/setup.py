@@ -369,6 +369,62 @@ def _configured_token_canister_id(realm, draft: dict) -> str:
     return ""
 
 
+def _apply_configured_token(realm, params: dict) -> Async[dict]:
+    """Resolve and persist a treasury ledger. No caller-auth check.
+
+    The candid/UI entry point authorizes first. The launch-phase task runs as
+    the canister (not the founder) and must apply a draft ledger without
+    ``require_setup_authorized``.
+    """
+    token_canister_id = (params.get("token_canister_id") or "").strip()
+    if not token_canister_id:
+        return {"success": False, "error": "token_canister_id is required"}
+
+    token_record = {
+        "token_canister_id": token_canister_id,
+        "symbol": (params.get("symbol") or "").strip(),
+        "decimals": params.get("decimals"),
+        "indexer_canister_id": (params.get("indexer_canister_id") or "").strip(),
+        "token_type": (params.get("token_type") or "realm").strip() or "realm",
+    }
+
+    from api.tokens import register_treasury_token, resolve_ledger_token_info
+
+    network = getattr(realm, "network", "") or ""
+    resolved = yield from resolve_ledger_token_info(token_canister_id, network)
+    if not resolved.get("success"):
+        return {
+            "success": False,
+            "error": resolved.get("error") or "Could not resolve ledger metadata",
+            "error_code": "ledger_unresolvable",
+        }
+
+    sym = str(resolved["symbol"]).strip()
+    decimals = int(resolved["decimals"])
+    indexer = str(resolved.get("indexer_canister_id") or token_canister_id).strip()
+    token_record["symbol"] = sym
+    token_record["decimals"] = decimals
+    token_record["indexer_canister_id"] = indexer
+
+    realm.token_canister_id = token_canister_id
+    realm.accounting_currency = sym[:16]
+    realm.accounting_currency_decimals = decimals
+    update_setup_config(realm, {"token": token_record})
+
+    try:
+        register_treasury_token(
+            symbol=sym,
+            ledger_canister_id=token_canister_id,
+            indexer_canister_id=indexer,
+            decimals=decimals,
+            token_type=token_record["token_type"],
+        )
+    except Exception as token_err:
+        logger.warning("setup_configure_token treasury registration failed: %s", token_err)
+
+    return {"success": True, "token": token_record}
+
+
 def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
     from core.realm_currency import realm_currency
 
@@ -384,21 +440,16 @@ def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
     token = draft.get("token") or {}
     if not isinstance(token, dict):
         token = {}
-    result = json.loads(
-        (yield from setup_configure_token(
-            json.dumps(
-                {
-                    "token_canister_id": token_canister_id,
-                    "symbol": token.get("symbol"),
-                    "decimals": token.get("decimals"),
-                    "indexer_canister_id": token.get("indexer_canister_id"),
-                    "token_type": token.get("token_type"),
-                }
-            )
-        ))
+    result = yield from _apply_configured_token(
+        realm,
+        {
+            "token_canister_id": token_canister_id,
+            "symbol": token.get("symbol"),
+            "decimals": token.get("decimals"),
+            "indexer_canister_id": token.get("indexer_canister_id"),
+            "token_type": token.get("token_type"),
+        },
     )
-    if not result.get("success"):
-        return _treasury_token_refused()
     return result
 
 
@@ -726,56 +777,14 @@ def setup_configure_token(args_json: str) -> Async[str]:
         return json.dumps({"success": False, "error": "token_canister_id is required"})
 
     # TODO(setup-wizard): support provisioning a new token canister from the wizard.
-    token_record = {
-        "token_canister_id": token_canister_id,
-        "symbol": (params.get("symbol") or "").strip(),
-        "decimals": params.get("decimals"),
-        "indexer_canister_id": (params.get("indexer_canister_id") or "").strip(),
-        "token_type": (params.get("token_type") or "realm").strip() or "realm",
-    }
-
     from ggg import Realm
-    from api.tokens import register_treasury_token, resolve_ledger_token_info
 
     realm = Realm.load("1")
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
 
-    network = getattr(realm, "network", "") or ""
-    resolved = yield from resolve_ledger_token_info(token_canister_id, network)
-    if not resolved.get("success"):
-        return json.dumps(
-            {
-                "success": False,
-                "error": resolved.get("error") or "Could not resolve ledger metadata",
-                "error_code": "ledger_unresolvable",
-            }
-        )
-
-    sym = str(resolved["symbol"]).strip()
-    decimals = int(resolved["decimals"])
-    indexer = str(resolved.get("indexer_canister_id") or token_canister_id).strip()
-    token_record["symbol"] = sym
-    token_record["decimals"] = decimals
-    token_record["indexer_canister_id"] = indexer
-
-    realm.token_canister_id = token_canister_id
-    realm.accounting_currency = sym[:16]
-    realm.accounting_currency_decimals = decimals
-    update_setup_config(realm, {"token": token_record})
-
-    try:
-        register_treasury_token(
-            symbol=sym,
-            ledger_canister_id=token_canister_id,
-            indexer_canister_id=indexer,
-            decimals=decimals,
-            token_type=token_record["token_type"],
-        )
-    except Exception as token_err:
-        logger.warning("setup_configure_token treasury registration failed: %s", token_err)
-
-    return json.dumps({"success": True, "token": token_record})
+    result = yield from _apply_configured_token(realm, params)
+    return json.dumps(result)
 
 
 def setup_set_branding(args_json: str) -> str:
