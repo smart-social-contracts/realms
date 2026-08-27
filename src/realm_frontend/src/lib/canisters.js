@@ -278,6 +278,26 @@ export async function createQuarterActor(quarterCanisterId, explicitIdentity = n
 	return createActor(quarterCanisterId, { agent });
 }
 
+/**
+ * Rebuild an actor with the join-safe IDL so ``join_realm`` can decode a
+ * UserGetRecord that omits ``departments`` (or uses an unexpected type).
+ * Same agent / identity / canister as ``strictActor``.
+ */
+export async function asJoinSafeActor(strictActor) {
+	if (!strictActor) return strictActor;
+	const [{ Actor }, { joinIdlFactory }] = await Promise.all([
+		import('@dfinity/agent'),
+		import('$lib/joinIdl.js')
+	]);
+	const canisterIdForJoin = Actor.canisterIdOf(strictActor);
+	const agent = Actor.agentOf(strictActor);
+	if (!agent || !canisterIdForJoin) return strictActor;
+	return Actor.createActor(joinIdlFactory, {
+		agent,
+		canisterId: canisterIdForJoin
+	});
+}
+
 // --- Quarter-aware backend store ---
 // Holds the currently-active actor: main realm backend OR a quarter actor.
 // Import activeQuarterId from quarters store and subscribe to swap actors.

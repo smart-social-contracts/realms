@@ -201,6 +201,28 @@ def _text_vec(values) -> Vec[text]:
     return out
 
 
+def _user_get_record_from_fields(fields, assigned_quarter: str | None = None) -> UserGetRecord:
+    """Build Candid UserGetRecord from a Python payload.
+
+    Always includes ``departments: vec {}`` (empty list is fine). Uses
+    ``assigned_quarter`` — never ``home_quarter`` — so the encoded record
+    matches the frontend DID.
+    """
+    from core.user_get_record import candid_user_get_record_fields
+
+    payload = candid_user_get_record_fields(fields, assigned_quarter=assigned_quarter)
+    principal = payload["principal"]
+    return UserGetRecord(
+        principal=Principal.from_str(principal) if isinstance(principal, str) else principal,
+        profiles=_text_vec(payload["profiles"]),
+        departments=_text_vec(payload["departments"]),
+        nickname=payload["nickname"],
+        avatar=payload["avatar"],
+        private_data=payload["private_data"],
+        assigned_quarter=payload["assigned_quarter"],
+    )
+
+
 class ObjectsListRecordPaginated(Record):
     objects: Vec[text]
     pagination: PaginationInfo
@@ -1634,13 +1656,8 @@ def join_realm(
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                userGet=UserGetRecord(
-                    principal=Principal.from_str(user["principal"]),
-                    profiles=profiles,
-                    departments=_text_vec(user["departments"]),
-                    nickname=user.get("nickname", ""),
-                    avatar=user.get("avatar", ""),
-                    private_data=user.get("private_data", ""),
+                userGet=_user_get_record_from_fields(
+                    {**user, "profiles": list(profiles)},
                     assigned_quarter=assigned_quarter_canister_id,
                 )
             ),
@@ -1695,21 +1712,10 @@ def register_founder(principal: text) -> RealmResponse:
         except Exception as root_err:
             logger.warning(f"Could not seat founder in root org: {root_err}")
 
-        profiles = Vec[text]()
-        for p in user.get("profiles", []):
-            profiles.append(p)
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                userGet=UserGetRecord(
-                    principal=Principal.from_str(user["principal"]),
-                    profiles=profiles,
-                    departments=_text_vec(user["departments"]),
-                    nickname=user.get("nickname", ""),
-                    avatar=user.get("avatar", ""),
-                    private_data=user.get("private_data", ""),
-                    assigned_quarter="",
-                )
+                userGet=_user_get_record_from_fields(user, assigned_quarter="")
             ),
         )
     except Exception as e:
@@ -3828,24 +3834,10 @@ def get_my_user_status() -> RealmResponse:
             )
 
         user = user_get_record_fields(user)
-        profiles = Vec[text]()
-        if "profiles" in user and user["profiles"]:
-            for p in user["profiles"]:
-                profiles.append(p)
-        logger.info(f"Profiles: {profiles}")
+        logger.info(f"Profiles: {user.get('profiles')}")
         return RealmResponse(
             success=True,
-            data=RealmResponseData(
-                userGet=UserGetRecord(
-                    principal=Principal.from_str(user["principal"]),
-                    profiles=profiles,
-                    departments=_text_vec(user["departments"]),
-                    nickname=user.get("nickname", ""),
-                    avatar=user.get("avatar", ""),
-                    private_data=user.get("private_data", ""),
-                    assigned_quarter=user.get("home_quarter", ""),
-                )
-            ),
+            data=RealmResponseData(userGet=_user_get_record_from_fields(user)),
         )
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
@@ -3965,14 +3957,16 @@ def update_my_public_profile(nickname: str, avatar: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                userGet=UserGetRecord(
-                    principal=ic.caller(),
-                    profiles=Vec[text](),
-                    departments=Vec[text](),
-                    nickname=result["nickname"],
-                    avatar=result["avatar"],
-                    private_data="",
-                    assigned_quarter="",
+                userGet=_user_get_record_from_fields(
+                    {
+                        "principal": ic.caller().to_str(),
+                        "profiles": [],
+                        "departments": [],
+                        "nickname": result["nickname"],
+                        "avatar": result["avatar"],
+                        "private_data": "",
+                        "assigned_quarter": "",
+                    }
                 )
             ),
         )
@@ -4002,14 +3996,16 @@ def update_my_private_data(private_data: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                userGet=UserGetRecord(
-                    principal=ic.caller(),
-                    profiles=Vec[text](),
-                    departments=Vec[text](),
-                    nickname="",
-                    avatar="",
-                    private_data=result["private_data"],
-                    assigned_quarter="",
+                userGet=_user_get_record_from_fields(
+                    {
+                        "principal": ic.caller().to_str(),
+                        "profiles": [],
+                        "departments": [],
+                        "nickname": "",
+                        "avatar": "",
+                        "private_data": result["private_data"],
+                        "assigned_quarter": "",
+                    }
                 )
             ),
         )

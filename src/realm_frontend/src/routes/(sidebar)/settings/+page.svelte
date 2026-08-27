@@ -7,7 +7,7 @@
 	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
 	// @ts-ignore
-	import { quarterBackend, createQuarterActor } from '$lib/canisters.js';
+	import { quarterBackend, createQuarterActor, asJoinSafeActor } from '$lib/canisters.js';
 	import { realmInfo } from '$lib/stores/realmInfo';
 	import { activeQuarterId } from '$lib/stores/quarters';
 	import {
@@ -332,7 +332,7 @@
 		registeringCanisterId = canisterId;
 		try {
 			const profile = primaryJoinProfile();
-			const actor = await createQuarterActor(canisterId);
+			const actor = await asJoinSafeActor(await createQuarterActor(canisterId));
 			const response = await actor.join_realm(profile, '', '');
 			if (!response?.success) {
 				const err = response?.data?.error || 'Failed to register in this quarter.';
