@@ -79,6 +79,24 @@ def user_update_private_data(principal: str, private_data: str) -> dict[str, Any
         incoming.pop(key, None)
         if key in existing:
             incoming[key] = existing[key]
+
+    if "locale" in incoming:
+        from core.realm_locales import get_realm_languages, validate_user_locale
+        from ggg import Realm
+
+        locale = incoming.get("locale")
+        if locale is None:
+            incoming["locale"] = ""
+        elif isinstance(locale, str):
+            incoming["locale"] = locale.strip()
+        else:
+            return {"success": False, "error": "locale must be a string"}
+        realm = Realm.load("1")
+        languages, _primary = get_realm_languages(realm) if realm else (["en"], "en")
+        locale_err = validate_user_locale(incoming.get("locale"), languages)
+        if locale_err:
+            return {"success": False, "error": locale_err}
+
     user.private_data = json.dumps(incoming)
     return {
         "success": True,

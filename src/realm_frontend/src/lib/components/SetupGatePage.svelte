@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Button, P } from 'flowbite-svelte';
+	import { _ } from 'svelte-i18n';
 	import type { SetupGateVariant } from '$lib/setup/gateLogic';
 
 	interface Props {
@@ -7,18 +8,19 @@
 		realmName?: string;
 	}
 
-	let { variant, realmName = 'This realm' }: Props = $props();
+	let { variant, realmName = '' }: Props = $props();
+	const displayName = $derived(realmName || $_('setup.gate.unnamed_realm'));
 
 	const title = $derived(
 		variant === 'anonymous'
-			? `${realmName} is being set up.`
-			: `${realmName} is being set up by its creator.`
+			? $_('setup.gate.anonymous_title', { values: { name: displayName } })
+			: $_('setup.gate.creator_title', { values: { name: displayName } })
 	);
 
 	const description = $derived(
 		variant === 'anonymous'
-			? 'Check back soon. If you are the creator, sign in to continue setup.'
-			: 'The creator is finishing initial configuration. Please check back later.'
+			? $_('setup.gate.anonymous_body')
+			: $_('setup.gate.creator_body')
 	);
 
 	const LOGO_SVG = '/images/logo_sphere_only.svg';
@@ -48,7 +50,7 @@
 				color="none"
 				class="setup-gate__button bg-gray-900 text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900"
 			>
-				Log in
+				{$_('setup.gate.log_in')}
 			</Button>
 		{/if}
 	</div>

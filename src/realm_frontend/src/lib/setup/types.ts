@@ -1,6 +1,6 @@
 export type SetupLifecycleStatus = 'setup' | 'alpha' | string;
 
-export type SetupDraftStep = 'welcome' | 'codex' | 'token' | 'branding' | 'review';
+export type SetupDraftStep = 'welcome' | 'codex' | 'token' | 'branding' | 'languages' | 'review';
 
 export interface SetupCodexSelection {
 	package: string;
@@ -11,6 +11,13 @@ export interface SetupCodexSelection {
 export interface SetupIdentity {
 	manifesto?: string;
 	welcome_message?: string;
+	languages?: string[];
+	primary_language?: string;
+}
+
+export interface SetupLanguages {
+	languages?: string[];
+	primary_language?: string;
 }
 
 export interface SetupDraftToken {
@@ -35,6 +42,7 @@ export interface SetupDraft {
 	token?: SetupDraftToken | null;
 	branding?: SetupDraftBranding | null;
 	identity?: SetupIdentity | null;
+	languages?: SetupLanguages | null;
 }
 
 export type SetupLaunchStatus = 'idle' | 'running' | 'failed' | 'completed';
@@ -61,6 +69,8 @@ export interface SetupState {
 	token: Record<string, unknown> | null;
 	branding: Record<string, unknown> | null;
 	identity?: SetupIdentity | null;
+	languages?: string[];
+	primary_language?: string;
 	draft?: SetupDraft | null;
 	launch?: SetupLaunchState;
 	realm_name?: string;
@@ -94,6 +104,7 @@ export type SetupDraftPartial = {
 	token?: SetupDraftToken | null;
 	branding?: SetupDraftSaveBranding | null;
 	identity?: SetupIdentity | null;
+	languages?: SetupLanguages | null;
 };
 
 export interface SetupDraftSaveResult {

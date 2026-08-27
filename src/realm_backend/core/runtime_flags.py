@@ -98,4 +98,15 @@ def get_runtime_flags_payload() -> dict:
             "test_mode_skip_passport_zkproof", False
         ),
         "primary_color": _setup.get_primary_color(realm),
+        **_realm_language_flags(realm),
+    }
+
+
+def _realm_language_flags(realm) -> dict:
+    from core.realm_locales import get_realm_languages
+
+    languages, primary = get_realm_languages(realm)
+    return {
+        "languages": languages,
+        "primary_language": primary,
     }

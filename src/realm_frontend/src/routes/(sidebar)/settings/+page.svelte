@@ -17,6 +17,10 @@
 	} from '$lib/utils/federatedMembership';
 	import { formatQuarterLabel } from '$lib/utils/quarterLabels';
 	import { showBridgeAlert, showBridgeNotice } from '$lib/stores/bridge-modal';
+	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import { applyResolvedLocale } from '$lib/i18n';
+	import { localeLabel } from '$lib/i18n/realmLocales';
+	import { localeFromPrivateData, userLocale } from '$lib/stores/userLocale';
 
 	const path: string = '/settings';
 	const description: string = 'Settings example - Smart Social Contracts';
@@ -38,6 +42,8 @@
 	let loadingUserStatus = $state(true);
 	let userStatusError = $state('');
 	let savingEmail = $state(false);
+	let selectedLocale = $state('');
+	let savingLocale = $state(false);
 
 	const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -129,6 +135,13 @@
 			emailNotificationsEnabled = privateData.email_notifications_enabled !== false;
 			emailVerified = privateData.email_verified === true;
 			verificationPending = Boolean(email) && !emailVerified;
+			selectedLocale = localeFromPrivateData(privateData);
+			userLocale.set(selectedLocale);
+			applyResolvedLocale({
+				userLocale: selectedLocale,
+				languages: $realmInfo.languages,
+				primaryLanguage: $realmInfo.primaryLanguage
+			});
 		} else {
 			throw new Error(
 				(response && !response.success && response.data?.error) ||
@@ -218,6 +231,43 @@
 			void showBridgeAlert({ body: e.message || 'Failed to verify code.' });
 		} finally {
 			verifyingCode = false;
+		}
+	}
+
+	async function saveLocalePreference() {
+		savingLocale = true;
+		try {
+			const allowed = $realmInfo.languages || [];
+			if (selectedLocale && !allowed.includes(selectedLocale)) {
+				throw new Error('Locale must be one of the realm languages.');
+			}
+			const updated = {
+				...privateData,
+				locale: selectedLocale
+			};
+			const response = await quarterBackend.update_my_private_data(JSON.stringify(updated));
+			if (response && response.success) {
+				privateData = updated;
+				userLocale.set(selectedLocale);
+				applyResolvedLocale({
+					userLocale: selectedLocale,
+					languages: $realmInfo.languages,
+					primaryLanguage: $realmInfo.primaryLanguage
+				});
+				void showBridgeNotice({
+					title: $_('buttons.save', { default: 'Saved' }),
+					body: $_('settings.locale_saved', { default: 'Language preference saved.' })
+				});
+			} else {
+				throw new Error(
+					(response && !response.success && response.data?.error) ||
+						'Could not save language preference.'
+				);
+			}
+		} catch (e: any) {
+			void showBridgeAlert({ body: e.message || 'Failed to save language preference.' });
+		} finally {
+			savingLocale = false;
 		}
 	}
 
@@ -408,6 +458,39 @@
 					{/if}
 				</div>
 			{/if}
+		</div>
+
+		<!-- Personal locale (issue #361) -->
+		<div class="col-span-full mt-6">
+			<Heading tag="h2" class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+				{$_('settings.select_language', { default: 'Language' })}
+			</Heading>
+			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+				<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+					{$_('settings.language_description')}
+				</p>
+				<div class="flex flex-wrap items-center gap-3">
+					<LanguageSwitcher
+						locales={$realmInfo.languages}
+						value={selectedLocale}
+						allowEmpty={true}
+						emptyLabel={$_('settings.locale_use_primary', {
+							default: 'Use realm primary language'
+						}) + ` (${localeLabel($realmInfo.primaryLanguage)})`}
+						onchange={(next) => (selectedLocale = next)}
+					/>
+					<button
+						type="button"
+						onclick={saveLocalePreference}
+						disabled={savingLocale || loadingUserStatus}
+						class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					>
+						{savingLocale
+							? $_('common.loading', { default: 'Loading...' })
+							: $_('settings.locale_save', { default: 'Save language' })}
+					</button>
+				</div>
+			</div>
 		</div>
 
 		<!-- Email notifications (issue #266) -->

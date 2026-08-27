@@ -1,14 +1,9 @@
 import { browser } from "$app/environment";
-import { init, register, isLoading, addMessages } from "svelte-i18n";
+import { init, register, isLoading, addMessages, locale } from "svelte-i18n";
+import { LOCALE_CATALOG, resolveUiLocale } from "./realmLocales";
 
-export const supportedLocales = [
-  { id: "en", name: "English" },
-  { id: "es", name: "Español" },
-  { id: "de", name: "Deutsch" },
-  { id: "fr", name: "Français" },
-  { id: "zh-CN", name: "中文 (简体)" },
-  { id: "it", name: "Italiano" }
-];
+export { LOCALE_CATALOG };
+export const supportedLocales = [...LOCALE_CATALOG];
 
 // Use the correct path for imports in realm_frontend
 register("en", () => import("./locales/en.json"));
@@ -17,6 +12,7 @@ register("de", () => import("./locales/de.json"));
 register("fr", () => import("./locales/fr.json"));
 register("zh-CN", () => import("./locales/zh-CN.json"));
 register("it", () => import("./locales/it.json"));
+register("ca-valencia", () => import("./locales/ca-valencia.json"));
 
 // Helper function to wait for locale to be ready
 export function waitLocale(): Promise<void> {
@@ -30,65 +26,22 @@ export function waitLocale(): Promise<void> {
   });
 }
 
-function getPreferredLocale(): string {
-  if (!browser) return "en";
-  
-  const targetLanguages = ["en", "de", "fr", "es", "zh-CN"];
-  
-  // Check URL parameters first
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlLocale = urlParams.get('locale');
-    if (urlLocale && targetLanguages.includes(urlLocale)) {
-      console.log('Using locale from URL parameter:', urlLocale);
-      return urlLocale;
-    }
-  } catch (e) {
-    console.error('Error reading URL parameters:', e);
+export function applyResolvedLocale(input: {
+  userLocale?: string | null;
+  languages?: readonly string[] | null;
+  primaryLanguage?: string | null;
+}): string {
+  const next = resolveUiLocale(input.userLocale, input.languages, input.primaryLanguage);
+  locale.set(next);
+  if (browser && typeof document !== "undefined") {
+    document.documentElement.lang = next;
   }
-  
-  // Check localStorage
-  try {
-    const storedLocale = localStorage.getItem('preferredLocale');
-    if (storedLocale && targetLanguages.includes(storedLocale)) {
-      console.log('Using locale from localStorage:', storedLocale);
-      return storedLocale;
-    }
-  } catch (e) {
-    console.error('Error accessing localStorage:', e);
-  }
+  return next;
+}
 
-  // Check locale cookie (set by hooks.server or prior visit)
-  try {
-    const localeCookie = document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('locale='));
-    if (localeCookie) {
-      const cookieLocale = localeCookie.split('=')[1];
-      if (targetLanguages.includes(cookieLocale)) {
-        console.log('Using locale from cookie:', cookieLocale);
-        return cookieLocale;
-      }
-    }
-  } catch (e) {
-    console.error('Error reading locale cookie:', e);
-  }
-  
-  // Fall back to browser language preferences
-  const browserLanguages = navigator.languages || [navigator.language];
-  
-  for (const browserLang of browserLanguages) {
-    if (targetLanguages.includes(browserLang)) {
-      return browserLang;
-    }
-    
-    const langCode = browserLang.split('-')[0];
-    if (langCode === 'zh') return 'zh-CN';
-    if (targetLanguages.includes(langCode)) {
-      return langCode;
-    }
-  }
-  
+function getPreferredLocale(): string {
+  // Host chrome has no language switcher. Until realm + user settings load,
+  // start from English; applyResolvedLocale then uses user → primary → en.
   return "en";
 }
 
@@ -169,7 +122,8 @@ export async function loadExtensionTranslations() {
       { code: 'de', modules: import.meta.glob('./locales/extensions/*/de.json') },
       { code: 'fr', modules: import.meta.glob('./locales/extensions/*/fr.json') },
       { code: 'it', modules: import.meta.glob('./locales/extensions/*/it.json') },
-      { code: 'zh-CN', modules: import.meta.glob('./locales/extensions/*/zh-CN.json') }
+      { code: 'zh-CN', modules: import.meta.glob('./locales/extensions/*/zh-CN.json') },
+      { code: 'ca-valencia', modules: import.meta.glob('./locales/extensions/*/ca-valencia.json') }
     ];
 
     // Process all locales

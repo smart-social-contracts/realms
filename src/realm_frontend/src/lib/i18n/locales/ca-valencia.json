@@ -1,0 +1,76 @@
+{
+  "common": {
+    "welcome": "Benvingut a Realms",
+    "loading": "Carregant...",
+    "error": "S'ha produït un error",
+    "home": "Inici",
+    "settings": "Ajustos",
+    "login": "Inicia sessió",
+    "sign_in": "Inicia sessió",
+    "assistant": "Assistent",
+    "logout": "Tanca la sessió",
+    "profile": "Perfil",
+    "search": "Cerca",
+    "join": "Uneix-te",
+    "main_menu": "Menú principal"
+  },
+  "buttons": {
+    "save": "Guardar",
+    "cancel": "Cancel·lar",
+    "login": "Inicia sessió",
+    "join": "Uneix-te"
+  },
+  "settings": {
+    "title": "Ajustos d'usuari",
+    "select_language": "Idioma",
+    "language_description": "Tria l'idioma de la interfície. Ha de ser un dels idiomes activats en este reialme. Deixa'l buit per a usar l'idioma principal del reialme.",
+    "locale_use_primary": "Usa l'idioma principal del reialme",
+    "locale_save": "Guardar idioma",
+    "locale_saved": "S'ha guardat la preferència d'idioma."
+  },
+  "setup": {
+    "loading": "Carregant la configuració…",
+    "still_working": "Encara s'està treballant…",
+    "gate": {
+      "unnamed_realm": "Este reialme",
+      "anonymous_title": "{name} s'està configurant.",
+      "anonymous_body": "Torna més tard. Si n'ets el creador, inicia sessió per a continuar la configuració.",
+      "creator_title": "{name} l'està configurant el seu creador.",
+      "creator_body": "El creador està acabant la configuració inicial. Torna més tard.",
+      "log_in": "Inicia sessió"
+    },
+    "wizard": {
+      "document_title": "Configura {name}",
+      "eyebrow": "Configuració del reialme",
+      "configure": "Configura {name}",
+      "steps_label": "Passos de configuració",
+      "step_welcome": "Benvinguda",
+      "step_codex": "Codex",
+      "step_token": "Token",
+      "step_branding": "Imatge",
+      "step_languages": "Idiomes",
+      "step_review": "Llançament",
+      "back": "Arrere",
+      "skip": "Omet",
+      "continue": "Continua",
+      "continuing": "Continuant…",
+      "begin": "Comença",
+      "loading": "Carregant l'assistent de configuració…",
+      "founding_line": "Estàs fundant un reialme — una politia digital les normes i processos de la qual són verificables i a prova de manipulació. Tria com es governa, què valora i com es veu — i després dona-li vida.",
+      "languages_title": "Idiomes",
+      "languages_help": "Tria els idiomes que este reialme admet. L'idioma principal és el predeterminat per a tothom que no n'haja triat un de propi.",
+      "enabled_languages": "Idiomes activats",
+      "primary_language": "Idioma principal",
+      "primary_must_be_enabled": "L'idioma principal ha de ser un dels idiomes activats.",
+      "review_languages": "Idiomes",
+      "review_primary": "Principal",
+      "unnamed_realm": "El teu reialme",
+      "launch_retry": "Torna a llançar",
+      "launch_retrying": "Reintentant…",
+      "launch_complete": "Llançament complet",
+      "launching": "Llançant…",
+      "launch_start": "Llança el reialme",
+      "launch_starting": "Començant…"
+    }
+  }
+}

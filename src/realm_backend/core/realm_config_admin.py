@@ -50,6 +50,20 @@ def apply_realm_config(config: dict) -> dict:
             f"welcome_message={config['welcome_message'][:50] if config['welcome_message'] else ''}..."
         )
 
+    if "languages" in config or "primary_language" in config:
+        from core.realm_locales import apply_realm_languages
+
+        languages, primary, error = apply_realm_languages(
+            realm,
+            config.get("languages"),
+            config.get("primary_language"),
+            replace_languages="languages" in config,
+        )
+        if error:
+            return {"success": False, "error": error}
+        updated_fields.append(f"languages={languages}")
+        updated_fields.append(f"primary_language={primary}")
+
     if "open_registration" in config:
         # Codex init owns registration when manifest_data carries a policy
         # (issue #244). Ignore wizard/installer overrides in that case.

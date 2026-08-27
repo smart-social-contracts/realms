@@ -15,6 +15,9 @@
 		shouldPollSetupState
 	} from '$lib/setup/gateLogic';
 	import SetupGatePage from '$lib/components/SetupGatePage.svelte';
+	import { _ } from 'svelte-i18n';
+	import { refreshUserLocale } from '$lib/stores/userLocale';
+	import { backendStore } from '$lib/canisters';
 
 	let uiReadySignalled = false;
 
@@ -116,6 +119,10 @@
 		}
 
 		authChannelSettled = true;
+		const actor = get(backendStore);
+		if (actor) {
+			void refreshUserLocale(actor);
+		}
 	}
 
 	async function handlePortalAuth() {
@@ -194,14 +201,14 @@
 				<div class="setup-shell__block setup-shell__block--md setup-shell__pulse"></div>
 				<div class="setup-shell__block setup-shell__block--sm setup-shell__pulse"></div>
 			</div>
-			<p class="setup-shell__label">Loading setup…</p>
+			<p class="setup-shell__label">{$_('setup.loading')}</p>
 			{#if showStillWorking}
-				<p class="setup-shell__sublabel">Still working…</p>
+				<p class="setup-shell__sublabel">{$_('setup.still_working')}</p>
 			{/if}
 		</div>
 	</div>
 {:else if decision.kind === 'gate'}
-	<SetupGatePage variant={decision.variant} realmName={$realmName || 'This realm'} />
+	<SetupGatePage variant={decision.variant} realmName={$realmName} />
 {:else}
 	{@render children()}
 {/if}
