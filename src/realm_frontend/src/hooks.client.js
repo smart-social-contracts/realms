@@ -1,3 +1,6 @@
+// Must run before route modules call $_() — see $lib/i18n/boot.ts.
+import '$lib/i18n';
+
 /** @type {import('@sveltejs/kit').HandleClientError} */
 export function handleError({ error }) {
 	const msg = error instanceof Error ? error.message : String(error ?? '');

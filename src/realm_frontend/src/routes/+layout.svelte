@@ -10,10 +10,17 @@
 	import { restoreAuthSession, resetAuthSessionRestore, getPortalRedirectUrl } from '$lib/auth';
 	import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge.ts';
 	import { resolvePortalNavSyncHref } from '$lib/portal-redirect-path.ts';
+	import { dismissAppSplash } from '$lib/app-splash';
 	import SetupStageGate from '$lib/components/SetupStageGate.svelte';
 	import BridgeModalHost from '$lib/components/BridgeModalHost.svelte';
 
 	export const SITE_NAME = "Realms GOS";
+
+	// Drop the globe as soon as this module evaluates. If a child throw
+	// aborts hydration, onMount never runs — leaving splash up forever.
+	if (browser) {
+		dismissAppSplash();
+	}
 
 	// Debug locale changes
 	if (browser) {
@@ -50,7 +57,7 @@
 	});
 
 	onMount(async () => {
-		document.getElementById('app-splash')?.remove();
+		dismissAppSplash();
 
 		// Standalone visit to the raw canister origin → bounce to the federation
 		// portal (https://…/r/<slug>/<same-path>), where the single II login is

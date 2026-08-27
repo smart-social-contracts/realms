@@ -1,12 +1,16 @@
 import { browser } from "$app/environment";
-import { init, register, isLoading, addMessages, locale } from "svelte-i18n";
+import { get } from "svelte/store";
+import { register, isLoading, addMessages, locale } from "svelte-i18n";
 import { LOCALE_CATALOG, resolveUiLocale } from "./realmLocales";
+import { bootI18n } from "./boot";
 
 export { LOCALE_CATALOG };
+export { bootI18n } from "./boot";
 export const supportedLocales = [...LOCALE_CATALOG];
 
-// Use the correct path for imports in realm_frontend
-register("en", () => import("./locales/en.json"));
+// English is seeded synchronously in bootI18n() — do not register() it.
+// A register() loader keeps locale=null until the dynamic import resolves,
+// which is what made $_() throw and left the loading globe up on reload.
 register("es", () => import("./locales/es.json"));
 register("de", () => import("./locales/de.json"));
 register("fr", () => import("./locales/fr.json"));
@@ -17,6 +21,10 @@ register("ca-valencia", () => import("./locales/ca-valencia.json"));
 // Helper function to wait for locale to be ready
 export function waitLocale(): Promise<void> {
   return new Promise<void>((resolve) => {
+    if (get(locale) && !get(isLoading)) {
+      resolve();
+      return;
+    }
     const unsubscribe = isLoading.subscribe(($isLoading) => {
       if (!$isLoading) {
         unsubscribe();
@@ -154,12 +162,8 @@ export async function loadExtensionTranslations() {
   }
 }
 
-// Synchronous init at import time so $_ never throws; dictionaries load async
-// via register()ed loaders and stores update reactively when they arrive.
-init({
-  fallbackLocale: "en",
-  initialLocale: browser ? getPreferredLocale() : "en",
-});
+// Seed English + set locale before any component can call $_().
+bootI18n(browser ? getPreferredLocale() : "en");
 
 if (browser) {
   void waitLocale().then(async () => {
