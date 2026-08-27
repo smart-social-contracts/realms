@@ -149,6 +149,26 @@ class User(Entity, TimestampedMixin):
         )
 
 
+def user_to_get_record(user) -> dict[str, Any]:
+    """Public user fields for Candid ``UserGetRecord``.
+
+    ``departments`` is always a list (empty when the user has no org
+    memberships). Omitting it makes the JS actor fail closed with
+    ``Cannot find required field departments`` on join / user_get.
+    """
+    from core.membership import user_department_names
+
+    return {
+        "principal": user.id,
+        "profiles": [profile.name for profile in user.profiles],
+        "departments": list(user_department_names(user)),
+        "nickname": user.nickname or "",
+        "avatar": user.avatar or "",
+        "private_data": user.private_data or "",
+        "home_quarter": user.home_quarter or "",
+    }
+
+
 def user_register(principal: str, profile: str) -> dict[str, Any]:
     logger.info(f"Registering user {principal} with profile {profile}")
 
@@ -159,7 +179,9 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
     user = User[principal]
     is_new_user = user is None
     if is_new_user:
-        user = User(id=principal, profiles=[user_profi])
+        # Explicit empty departments so Candid UserGetRecord can always
+        # encode ``vec {}`` for a brand-new member (no invented membership).
+        user = User(id=principal, profiles=[user_profi], departments=[])
         logger.info(f"Created new user {principal} with profile {profile}")
     else:
         # Add profile only if not already assigned
@@ -183,11 +205,4 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
         except Exception as e:
             logger.error(f"Auto-scale evaluation failed for {principal}: {e}")
 
-    return {
-        "principal": user.id,
-        "profiles": [profile.name for profile in user.profiles],
-        "nickname": user.nickname or "",
-        "avatar": user.avatar or "",
-        "private_data": user.private_data or "",
-        "home_quarter": user.home_quarter or "",
-    }
+    return user_to_get_record(user)

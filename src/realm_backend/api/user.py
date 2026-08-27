@@ -3,10 +3,20 @@ from typing import Any
 
 from ggg import User
 from ggg.system.user import user_register as ggg_user_register
-from core.membership import user_department_names
+from ggg.system.user import user_to_get_record
+from core.user_get_record import user_get_record_fields
 from ic_python_logging import get_logger
 
 logger = get_logger("api.user")
+
+__all__ = [
+    "user_get",
+    "user_get_record_fields",
+    "user_list",
+    "user_register",
+    "user_update_private_data",
+    "user_update_public_profile",
+]
 
 
 def user_get(principal: str) -> dict[str, Any]:
@@ -14,16 +24,7 @@ def user_get(principal: str) -> dict[str, Any]:
     user = User[principal]
     if not user:
         return {"success": False, "error": f"User with principal {principal} not found"}
-    return {
-        "success": True,
-        "principal": user.id,
-        "profiles": [profile.name for profile in user.profiles],
-        "departments": user_department_names(user),
-        "nickname": user.nickname or "",
-        "avatar": user.avatar or "",
-        "private_data": user.private_data or "",
-        "home_quarter": user.home_quarter or "",
-    }
+    return {"success": True, **user_to_get_record(user)}
 
 
 def user_list() -> dict[str, Any]:
@@ -113,6 +114,7 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
         profile: Profile name to assign to the user
 
     Returns:
-        Dictionary with user data including principal, profiles, nickname, avatar, and private_data
+        Dictionary with user data including principal, profiles, departments,
+        nickname, avatar, and private_data. ``departments`` is always a list.
     """
     return ggg_user_register(principal, profile)
