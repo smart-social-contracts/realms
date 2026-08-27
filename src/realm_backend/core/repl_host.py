@@ -17,7 +17,14 @@ from typing import Any, FrozenSet, Iterable, Optional
 
 from ic_basilisk_toolkit.secure_orm import RpcError, SecureORM
 
-from core.access import api_call_source, ext_call_source, raise_quiet_access_denied
+from core.access import (
+    AccessDenied,
+    api_call_source,
+    ext_call_source,
+    format_quiet_denied,
+    raise_quiet_access_denied,
+    require_operation_of,
+)
 
 HOST_ACTIONS = (
     "host.call",
@@ -769,19 +776,30 @@ class HostSecureORM(SecureORM):
             raise PermissionError(
                 f"host method {method!r} is not callable from the REPL"
             )
-        allowed = self.allowed_methods()
-        if method not in allowed:
-            raise PermissionError(f"host method {method!r} is not on the allowlist")
         module = self.host_module()
         if module is None:
             raise RpcError("host module is not loaded")
-        # After the allowlist, leftover Candid name-dispatch
-        # (``get_global(name)``). Do not getattr leftover packed
-        # ``__main__``. Do not leftover ``__dict__`` unwrap. Live leftover
-        # Query is not callable and has no leftover slots; leftover
-        # executed host verbs live in leftover-executed globals.
+        # Leftover Candid name-dispatch (``get_global(name)``). Do not
+        # getattr leftover packed ``__main__``. Do not leftover ``__dict__``
+        # unwrap. Live leftover Query is not callable and has no leftover
+        # slots; leftover executed host verbs live in leftover-executed
+        # globals. Resolve before the leftover DID allowlist so a real
+        # ``@require`` verb is not hidden as ``not on the allowlist``.
         fn = _executed_callable(_candid_verb(method, module))
-        if not callable(fn):
+        allowed = self.allowed_methods()
+        if method not in allowed:
+            op = require_operation_of(fn)
+            if not op:
+                raise PermissionError(
+                    f"host method {method!r} is not on the allowlist"
+                )
+            if not callable(fn):
+                raise AccessDenied(
+                    format_quiet_denied(op, source),
+                    permission=op,
+                    source=source,
+                ) from None
+        elif not callable(fn):
             raise RpcError(f"host method {method!r} is not defined")
         # Leftover WASI inspect is a stub. Call leftover-executed host
         # verbs by name. Do not leftover-import or leftover-call leftover
