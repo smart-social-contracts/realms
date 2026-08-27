@@ -369,7 +369,10 @@ def _catalog_token_for_symbol(symbol: str, network: str = "") -> Optional[dict]:
     symbol = (symbol or "").strip()
     if not symbol:
         return None
-    from api.tokens import resolve_catalog_token
+    try:
+        from api.tokens import resolve_catalog_token
+    except ImportError:
+        return None
 
     return resolve_catalog_token(symbol, network)
 
