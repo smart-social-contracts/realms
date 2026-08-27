@@ -32,9 +32,194 @@ class AccessDenied(PermissionError):
     A ``PermissionError`` so Candid ``@require`` and REPL ``api.call`` /
     ``ext.call`` deny with the same exception class. ``SHELL_EXECUTE`` is
     not a superuser bit — this is still the verb's own gate.
+
+    ``permission`` is the exact operation that failed (realms#349).
+    ``source`` is the REPL call that caused it (``api.call('…')`` /
+    ``ext.call('…')``). Host / REPL surfaces print
+    ``quiet_access_denied`` — never the principal, never a traceback.
+    ``shell.execute`` is only for opening ``__shell__`` itself.
     """
 
-    pass
+    def __init__(
+        self, message: str = "Access denied", permission: str = "", source: str = ""
+    ):
+        super().__init__(message)
+        self.permission = permission or ""
+        self.source = source or ""
+
+
+def api_call_source(method) -> str:
+    if not method:
+        return "api.call"
+    return f"api.call({method!r})"
+
+
+def ext_call_source(extension_name, function_name, async_call=False) -> str:
+    verb = "ext.call_async" if async_call else "ext.call"
+    parts = []
+    if extension_name:
+        parts.append(repr(extension_name))
+    if function_name:
+        parts.append(repr(function_name))
+    return f"{verb}({', '.join(parts)})"
+
+
+def _trim_wrap(text: str) -> str:
+    chunk = text.strip()
+    while chunk.endswith(")") and chunk.count("(") < chunk.count(")"):
+        chunk = chunk[:-1].rstrip()
+    return chunk.split("\n", 1)[0].strip()
+
+
+def permission_name(exc_or_permission) -> str:
+    """Exact failed operation. Never invent ``shell.execute``.
+
+    No ``re`` module — leftover WASI ships only a stub.
+    """
+    if isinstance(exc_or_permission, str):
+        text = exc_or_permission
+        named = ""
+    else:
+        named = getattr(exc_or_permission, "permission", "") or ""
+        if named:
+            return named
+        text = str(exc_or_permission)
+    marker = "lacks permission '"
+    idx = text.find(marker)
+    if idx >= 0:
+        start = idx + len(marker)
+        end = text.find("'", start)
+        if end > start:
+            return text[start:end]
+    quiet = "✗ access denied:"
+    found = text.find(quiet)
+    if found >= 0:
+        rest = text[found + len(quiet) :].strip()
+        rest = _trim_wrap(rest)
+        from_at = rest.find(" from ")
+        if from_at > 0:
+            rest = rest[:from_at].strip()
+        if rest and rest != "call on Host":
+            return rest
+    return named
+
+
+def call_source(exc_or_text) -> str:
+    """``api.call('…')`` / ``ext.call('…')`` from an exception or leftover line."""
+    named = getattr(exc_or_text, "source", "") or ""
+    if named:
+        return named
+    text = exc_or_text if isinstance(exc_or_text, str) else str(exc_or_text)
+    for needle in (" from api.call", " from ext.call"):
+        idx = text.find(needle)
+        if idx >= 0:
+            return _trim_wrap(text[idx + len(" from ") :])
+    return ""
+
+
+def format_quiet_denied(permission: str, source: str = "") -> str:
+    """One host/REPL line. Permission + call. No principal. No stack.
+
+    ``shell.execute`` only when there is no inner verb source (opening
+    ``__shell__``). Never default an in-REPL deny to ``shell.execute``.
+    """
+    perm = (permission or "").strip()
+    src = (source or "").strip()
+    if src:
+        if not perm:
+            return f"✗ access denied: from {src}"
+        return f"✗ access denied: {perm} from {src}"
+    if perm:
+        return f"✗ access denied: {perm}"
+    return "✗ access denied"
+
+
+def quiet_access_denied(exc_or_permission, source: str = "") -> str:
+    """One host/REPL line: exact permission and the call that failed."""
+    if isinstance(exc_or_permission, str):
+        extracted = _extract_quiet_line(exc_or_permission)
+        if extracted:
+            return extracted
+    perm = permission_name(exc_or_permission)
+    src = source or call_source(exc_or_permission)
+    return format_quiet_denied(perm, src)
+
+
+def _extract_quiet_line(text: str) -> str:
+    """Prefer the inner ``✗ access denied: <perm> from <call>`` family."""
+    if not text:
+        return ""
+    marker = "✗ access denied:"
+    from_at = -1
+    for needle in (" from api.call", " from ext.call"):
+        from_at = text.find(needle)
+        if from_at >= 0:
+            break
+    if from_at >= 0:
+        start = text.rfind(marker, 0, from_at)
+        if start < 0:
+            start = text.find(marker)
+        if start < 0:
+            return ""
+        return _trim_wrap(text[start:])
+    if text.strip().startswith(marker) and " on Host" not in text:
+        return text.strip().split("\n", 1)[0]
+    return ""
+
+
+def quiet_shell_result(result, source: str = ""):
+    """Unwrap leftover Host-pipe noise. Keep exact permission + call."""
+    if not isinstance(result, str):
+        return result
+    extracted = _extract_quiet_line(result)
+    if extracted:
+        return extracted
+    text = result.strip()
+    leaked = (
+        "lacks permission '" in text
+        or "Access denied: user " in text
+        or " on Host" in text
+    )
+    if not leaked:
+        return result
+    perm = permission_name(text)
+    src = source or call_source(text)
+    return format_quiet_denied(perm, src)
+
+
+def raise_quiet_access_denied(exc: BaseException, source: str = "") -> None:
+    """Re-raise AccessDenied as one quiet line (permission + call).
+
+    Must be called from an ``except`` block. Other PermissionErrors pass
+    through unchanged so allowlist / blocked-method errors stay intact.
+    """
+    is_denied = type(exc).__name__ == "AccessDenied" or bool(
+        getattr(exc, "permission", "")
+    )
+    if not is_denied:
+        raise
+    if type(exc).__name__ == "AccessDenied" and not isinstance(exc, AccessDenied):
+        raise PermissionError(str(exc)) from None
+    perm = permission_name(exc)
+    src = source or call_source(exc)
+    msg = format_quiet_denied(perm, src)
+    if isinstance(exc, AccessDenied):
+        raise AccessDenied(msg, permission=perm, source=src) from None
+    raise PermissionError(msg) from None
+
+
+def product_shell_guard(run):
+    """Outer ``__shell__`` body: return one ``✗`` line, never a traceback.
+
+    Opening ``__shell__`` without ``shell.execute`` → that permission only.
+    In-REPL denials keep the inner ``@require`` permission and the call.
+    """
+    try:
+        return quiet_shell_result(run())
+    except AccessDenied as exc:
+        return quiet_access_denied(exc)
+    except PermissionError as exc:
+        return quiet_access_denied(exc)
 
 
 # Controller principal captured at @init / @post_upgrade time.
@@ -195,7 +380,8 @@ def require(operation: str):
                 caller = ic.caller().to_str()
                 if not _check_access(caller, operation):
                     raise AccessDenied(
-                        f"Access denied: user {caller} lacks permission '{operation}'"
+                        f"Access denied: user {caller} lacks permission '{operation}'",
+                        permission=operation,
                     )
                 return (yield from fn(*args, **kwargs))
             return async_wrapper
@@ -205,7 +391,8 @@ def require(operation: str):
                 caller = ic.caller().to_str()
                 if not _check_access(caller, operation):
                     raise AccessDenied(
-                        f"Access denied: user {caller} lacks permission '{operation}'"
+                        f"Access denied: user {caller} lacks permission '{operation}'",
+                        permission=operation,
                     )
                 return fn(*args, **kwargs)
             return wrapper

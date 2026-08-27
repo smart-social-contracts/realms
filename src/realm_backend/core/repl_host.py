@@ -17,6 +17,8 @@ from typing import Any, FrozenSet, Iterable, Optional
 
 from ic_basilisk_toolkit.secure_orm import RpcError, SecureORM
 
+from core.access import api_call_source, ext_call_source, raise_quiet_access_denied
+
 HOST_ACTIONS = (
     "host.call",
     "host.ext_sync",
@@ -628,8 +630,17 @@ def drive_result(result: Any) -> Any:
         return result
 
 
-def _as_permission(exc: BaseException) -> PermissionError:
-    return PermissionError(str(exc))
+def _as_permission(exc: BaseException, source: str = "") -> PermissionError:
+    """AccessDenied with the exact permission and the call that failed."""
+    from core.access import AccessDenied, format_quiet_denied, permission_name
+
+    perm = permission_name(exc)
+    src = source or getattr(exc, "source", "") or ""
+    if isinstance(exc, AccessDenied):
+        return AccessDenied(
+            format_quiet_denied(perm, src), permission=perm, source=src
+        )
+    return PermissionError(format_quiet_denied(perm, src) if perm or src else str(exc))
 
 
 def resolve_host_secure_orm() -> type:
@@ -726,30 +737,32 @@ class HostSecureORM(SecureORM):
             method = kwargs.get("method")
             args = list(kwargs.get("args") or [])
             call_kwargs = dict(kwargs.get("kwargs") or {})
-            return self._call_host(method, args, call_kwargs)
+            return self._call_host(
+                method, args, call_kwargs, source=api_call_source(method)
+            )
         if action == "host.ext_sync":
+            ext_name = kwargs.get("extension_name")
+            fn_name = kwargs.get("function_name")
             return self._call_host(
                 "extension_sync_call",
-                [
-                    kwargs.get("extension_name"),
-                    kwargs.get("function_name"),
-                    json_args(kwargs.get("args")),
-                ],
+                [ext_name, fn_name, json_args(kwargs.get("args"))],
                 {},
+                source=ext_call_source(ext_name, fn_name),
             )
         if action == "host.ext_async":
+            ext_name = kwargs.get("extension_name")
+            fn_name = kwargs.get("function_name")
             return self._call_host(
                 "extension_async_call",
-                [
-                    kwargs.get("extension_name"),
-                    kwargs.get("function_name"),
-                    json_args(kwargs.get("args")),
-                ],
+                [ext_name, fn_name, json_args(kwargs.get("args"))],
                 {},
+                source=ext_call_source(ext_name, fn_name, async_call=True),
             )
         raise RpcError(f"unknown action {action!r}")
 
-    def _call_host(self, method: Any, args: list, call_kwargs: dict) -> Any:
+    def _call_host(
+        self, method: Any, args: list, call_kwargs: dict, source: str = ""
+    ) -> Any:
         if not isinstance(method, str) or not method:
             raise RpcError("host.call requires a method name")
         if method in self._blocked_methods:
@@ -781,9 +794,9 @@ class HostSecureORM(SecureORM):
             # sets context.extension on the bridge like the UI does.
             with host_call():
                 return drive_result(fn(*args, **call_kwargs))
-        except PermissionError:
-            raise
+        except PermissionError as exc:
+            raise_quiet_access_denied(exc, source=source)
         except Exception as exc:
             if type(exc).__name__ == "AccessDenied":
-                raise _as_permission(exc) from exc
+                raise_quiet_access_denied(exc, source=source)
             raise
