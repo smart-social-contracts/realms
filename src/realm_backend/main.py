@@ -2153,6 +2153,43 @@ def create_department(spec: text) -> text:
 
 
 @update
+@require(Operations.ORGANIZATION_DELETE)
+def delete_department(spec: text) -> text:
+    """Destroy a department and detach children. Gate is ``organization.delete``."""
+    try:
+        data = json.loads(spec or "{}") if spec else {}
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    from core.department_admin import destroy_department
+
+    return json.dumps(destroy_department(str(data.get("name") or "")))
+
+
+@update
+@require(Operations.ORGANIZATION_ADD)
+def apply_department_table(spec: text) -> text:
+    """Apply a department-table JSON document (upsert + explicit destroy)."""
+    try:
+        data = json.loads(spec or "{}") if spec else {}
+    except Exception:
+        return json.dumps({"success": False, "error": "invalid JSON"})
+    from core.access import AccessDenied, _check_access
+    from core.department_table import apply_department_table as _apply
+    from core.department_table import document_has_destroy
+
+    if document_has_destroy(data):
+        caller = ic.caller().to_str()
+        if not _check_access(caller, Operations.ORGANIZATION_DELETE):
+            raise AccessDenied(
+                f"Access denied: user {caller} lacks permission '{Operations.ORGANIZATION_DELETE}'",
+                permission=Operations.ORGANIZATION_DELETE,
+            )
+    return json.dumps(_apply(data))
+
+
+@update
 @require(Operations.REALM_ADMIN)
 def set_canister_config_json(args: text) -> Async[text]:
     """JSON text-in / text-out variant of set_canister_config.

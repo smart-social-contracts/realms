@@ -86,3 +86,19 @@ class Department(Entity, TimestampedMixin):
     def veto_principal_list(self) -> list[str]:
         raw = self.policy_veto_principals or ""
         return [p.strip() for p in raw.split(",") if p.strip()]
+
+    def delete(self):
+        """Remove this department after detaching children.
+
+        Bare ``Entity.delete`` left Positions, grants, memberships, invites,
+        and sidebar visibility behind. ``access_manager.delete_department``
+        calls this method.
+        """
+        if getattr(self, "is_root", False) or (self.name or "") == ROOT_ORG_NAME:
+            raise ValueError("Cannot delete the root department")
+        if not getattr(self, "_department_purge_done", False):
+            from core.department_admin import purge_department_children
+
+            self._department_purge_done = True
+            purge_department_children(self)
+        return super().delete()

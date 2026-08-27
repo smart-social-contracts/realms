@@ -352,3 +352,44 @@ def merge_import_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "failed": failed,
         "errors": errors[:20],
     }
+
+
+def apply_import_records(records: List[dict]) -> Dict[str, Any]:
+    """Deserialize records, honouring ``_action: delete`` on Department rows."""
+    from ic_python_db import Entity
+
+    successful = 0
+    failed = 0
+    errors: List[str] = []
+
+    for record in records:
+        if not isinstance(record, dict):
+            failed += 1
+            errors.append("skipped non-object record")
+            continue
+        action = (
+            str(record.get("_action") or record.get("action") or "").strip().lower()
+        )
+        entity_type = str(record.get("_type") or "")
+        if action in {"delete", "destroy"} and entity_type == "Department":
+            from core.department_admin import destroy_department
+
+            name = str(record.get("name") or record.get("_id") or "").strip()
+            result = destroy_department(name)
+            if result.get("success"):
+                successful += 1
+            else:
+                failed += 1
+                errors.append(
+                    f"Department#{name}: {result.get('error') or 'delete failed'}"
+                )
+            continue
+        try:
+            Entity.deserialize(record, level=1)
+            successful += 1
+        except Exception as e:
+            logger.error(f"Error creating entity: {e}")
+            failed += 1
+            errors.append(f"{record.get('_type', '?')}#{record.get('_id', '?')}: {e}")
+
+    return {"successful": successful, "failed": failed, "errors": errors[:10]}

@@ -90,7 +90,8 @@ jobs:
                     tests/backend/test_ggg_sdk_json_shim.py \
                     tests/backend/test_repl_host.py \
                     tests/backend/test_repl_ui_parity.py \
-                    tests/backend/test_shell_access_denied.py
+                    tests/backend/test_shell_access_denied.py \
+                    tests/backend/test_department_table.py
       - name: Cedar policy drift
         # The embedded policy text the canister runs must mirror the .cedar
         # source files; a stale copy silently changes what a realm enforces.
