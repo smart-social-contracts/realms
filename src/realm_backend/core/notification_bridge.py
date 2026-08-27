@@ -745,6 +745,180 @@ def v_send_test_email(caller="", to="", subject="Realms email test",
     return {"id": notification._id, "to": address}
 
 
+JOIN_PATH = "/join"
+INHABITANT_PROFILES = ("member", "citizen")
+INHABITANT_INVITE_HOURS = 720
+INHABITANT_INVITE_USES = 100
+MAX_JOIN_EMAILS = 50
+JOIN_EVENT_TYPE = "notification"
+
+
+def _parse_email_list(emails=None, to="") -> list:
+    """Accept a list or a comma / newline / semicolon separated string."""
+    raw = emails if emails is not None else to
+    if raw is None or raw == "":
+        raise ValueError("emails is required")
+    if isinstance(raw, str):
+        items = raw.replace(";", ",").replace("\n", ",").split(",")
+    elif isinstance(raw, (list, tuple)):
+        items = raw
+    else:
+        raise ValueError("emails must be a list or comma-separated string")
+
+    addresses = []
+    seen = set()
+    for item in items:
+        address = str(item or "").strip().lower()
+        if not address:
+            continue
+        if not _valid_email(address):
+            raise ValueError(f"Invalid email address: {address}")
+        if address in seen:
+            continue
+        seen.add(address)
+        addresses.append(address)
+
+    if not addresses:
+        raise ValueError("emails is required")
+    if len(addresses) > MAX_JOIN_EMAILS:
+        raise ValueError(f"at most {MAX_JOIN_EMAILS} emails per send")
+    return addresses
+
+
+def _realm_record():
+    from ggg import Realm
+
+    if hasattr(Realm, "instances"):
+        realms = Realm.instances()
+        if realms:
+            return realms[0]
+    load = getattr(Realm, "load", None)
+    if load:
+        return load("1")
+    return None
+
+
+def _is_shared_inhabitant_code(code) -> bool:
+    """True for a reusable inhabitant invite (not staff or citizen-import)."""
+    profile = (getattr(code, "profile", None) or "member").strip()
+    if profile not in INHABITANT_PROFILES:
+        return False
+    if (getattr(code, "department", None) or "").strip():
+        return False
+    if (getattr(code, "position", None) or "").strip():
+        return False
+    if not (getattr(code, "code", None) or "").strip():
+        return False
+    try:
+        meta = json.loads(getattr(code, "metadata", "") or "{}")
+    except Exception:
+        meta = {}
+    if isinstance(meta, dict) and meta.get("kind") == "citizen_import":
+        return False
+    is_valid = getattr(code, "is_valid", None)
+    if callable(is_valid):
+        return bool(is_valid())
+    return True
+
+
+def inhabitant_join_href(caller: str = "") -> str:
+    """Portal join path for inhabitants: ``/join`` or ``/join?invite=…``.
+
+    Relative on purpose. The off-chain worker prefixes ``REALM_PUBLIC_URL``
+    (for example ``https://test.gos.earth/r/<slug>``) so the mailed link is
+    the public portal join URL, not a canister id.
+    """
+    realm = _realm_record()
+    if realm and getattr(realm, "open_registration", False):
+        return JOIN_PATH
+
+    try:
+        from ggg import RegistrationCode
+    except Exception:
+        return JOIN_PATH
+
+    try:
+        for code in RegistrationCode.instances():
+            if _is_shared_inhabitant_code(code):
+                return f"{JOIN_PATH}?invite={code.code}"
+    except Exception:
+        pass
+
+    try:
+        created = RegistrationCode.create(
+            user_id="",
+            created_by=caller or "realm.admin",
+            frontend_url="",
+            expires_in_hours=INHABITANT_INVITE_HOURS,
+            profile="member",
+            max_uses=INHABITANT_INVITE_USES,
+        )
+        plaintext = (getattr(created, "code", None) or "").strip()
+        if plaintext:
+            return f"{JOIN_PATH}?invite={plaintext}"
+    except Exception:
+        pass
+
+    raise ValueError(
+        "Could not create an inhabitant invite code; enable open "
+        "registration or generate an invite first"
+    )
+
+
+def v_send_join_link(caller="", emails=None, to="", **kwargs) -> dict:
+    """Queue the inhabitant join URL to one or more addresses.
+
+    Admin/founder only. Recipients need not be members — each notification
+    uses ``force_email_to`` so the worker can deliver before a User exists.
+    """
+    from core.extension_bridge import caller_has_operation
+    from ggg import Notification
+
+    if not caller_has_operation(caller, ADMIN_OPERATION):
+        raise PermissionError(
+            f"notification.send_join_link requires the "
+            f"'{ADMIN_OPERATION}' operation"
+        )
+
+    user = _caller_user(caller)
+    addresses = _parse_email_list(emails=emails, to=to)
+    href = inhabitant_join_href(caller)
+
+    realm = _realm_record()
+    realm_name = (getattr(realm, "name", None) or "").strip() or "this realm"
+    title = f"You are invited to join {realm_name}"
+    message = (
+        "You are invited to join this realm as an inhabitant. "
+        f"Open the join link to register:\n{href}"
+    )
+
+    queued = []
+    for address in addresses:
+        notification = Notification(
+            topic="join_invite",
+            title=title,
+            message=message,
+            sender=caller,
+            visibility="private",
+            audience_type="user",
+            user=user,
+            read=False,
+            read_by="",
+            icon="mail",
+            href=href,
+            color="blue",
+            metadata=json.dumps({
+                "email_status": "pending",
+                "event_type": JOIN_EVENT_TYPE,
+                "force_email_to": address,
+            }),
+        )
+        _stamp(notification)
+        queued.append({"id": notification._id, "to": address})
+
+    return {"href": href, "queued": len(queued), "notifications": queued}
+
+
 READS = {
     "notification.list": v_list,
     "notification.departments": v_departments,
@@ -763,6 +937,7 @@ WRITES = {
     "notification.verify_email_code": v_verify_email_code,
     "notification.mark_email_sent": v_mark_email_sent,
     "notification.send_test_email": v_send_test_email,
+    "notification.send_join_link": v_send_join_link,
 }
 
 VERBS = dict(READS, **WRITES)

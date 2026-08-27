@@ -1214,6 +1214,14 @@ class _Notifications:
             kwargs["body"] = body
         return _require_rpc("notification.send_test_email", kwargs)
 
+    def send_join_link(self, emails=None, to=""):
+        kwargs = {}
+        if emails is not None:
+            kwargs["emails"] = emails
+        if to:
+            kwargs["to"] = to
+        return _require_rpc("notification.send_join_link", kwargs)
+
 
 class _ExtensionAccess:
     """Who may use which extension.

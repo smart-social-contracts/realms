@@ -621,3 +621,142 @@ def test_verify_too_many_attempts_locks(realm):
     assert "email_verify_code" not in data
     assert "email_verify_expires" not in data
     assert "email_verify_attempts" not in data
+
+
+# ---------------------------------------------------------------------------
+# Founder inhabitant join-link email
+# ---------------------------------------------------------------------------
+
+
+class _InviteCode:
+    def __init__(self, code="inviteABC", profile="member", department="",
+                 position="", metadata="{}", valid=True):
+        self.code = code
+        self.profile = profile
+        self.department = department
+        self.position = position
+        self.metadata = metadata
+        self._valid = valid
+
+    def is_valid(self):
+        return self._valid
+
+
+def _realm_with_join(open_registration=False, name="Valencia Agora"):
+    realm_obj = types.SimpleNamespace(
+        manifest_data="{}",
+        open_registration=open_registration,
+        name=name,
+    )
+    sys.modules["ggg"].Realm = types.SimpleNamespace(
+        load=lambda key: realm_obj,
+        instances=lambda: [realm_obj],
+    )
+    return realm_obj
+
+
+def _registration_codes(*codes, minted=None):
+    minted_holder = []
+
+    def _create(**kwargs):
+        code = minted or _InviteCode(code="minted1")
+        minted_holder.append(code)
+        return code
+
+    class RegistrationCode:
+        @staticmethod
+        def instances():
+            return list(codes)
+
+        create = staticmethod(_create)
+
+    sys.modules["ggg"].RegistrationCode = RegistrationCode
+    return minted_holder
+
+
+def test_send_join_link_is_admin_only(realm):
+    _realm_with_join(open_registration=True)
+    with pytest.raises(PermissionError, match="realm.admin"):
+        call("alice")("notifications", "notification.send_join_link",
+                      {"emails": ["a@example.com"]})
+
+    realm.granted.add("realm.admin")
+    result = call("alice")("notifications", "notification.send_join_link",
+                           {"emails": ["A@Example.com"]})
+    assert result["queued"] == 1
+    assert result["href"] == "/join"
+    assert result["notifications"][0]["to"] == "a@example.com"
+
+
+def test_send_join_link_validates_and_dedupes_emails(realm):
+    realm.granted.add("realm.admin")
+    _realm_with_join(open_registration=True)
+    with pytest.raises(ValueError, match="Invalid email address"):
+        call("alice")("notifications", "notification.send_join_link",
+                      {"emails": "nope"})
+
+    result = call("alice")("notifications", "notification.send_join_link", {
+        "emails": "one@example.com, two@example.com\none@example.com",
+    })
+    assert result["queued"] == 2
+    assert [n["to"] for n in result["notifications"]] == [
+        "one@example.com", "two@example.com",
+    ]
+
+
+def test_send_join_link_queues_force_email_and_worker_marks_sent(realm):
+    realm.granted.add("realm.admin")
+    realm.granted.add("notification.send")
+    _realm_with_join(open_registration=False)
+    _registration_codes(_InviteCode(code="citizenJoin1"))
+
+    result = call("alice")("notifications", "notification.send_join_link", {
+        "emails": ["inhabitant@example.com", "other@example.com"],
+    })
+    assert result["href"] == "/join?invite=citizenJoin1"
+    assert result["queued"] == 2
+
+    note = realm.Notification.load(result["notifications"][0]["id"])
+    metadata = json.loads(note.metadata)
+    assert metadata["email_status"] == "pending"
+    assert metadata["event_type"] == "notification"
+    assert metadata["force_email_to"] == "inhabitant@example.com"
+    assert note.href == "/join?invite=citizenJoin1"
+    assert "/join?invite=citizenJoin1" in note.message
+    assert "inhabitant" in note.message.lower()
+    assert "Valencia Agora" in note.title
+
+    pending = call("worker")(
+        "notifications", "notification.pending_emails", {}
+    )["notifications"]
+    rows = [p for p in pending if p["id"] in {
+        result["notifications"][0]["id"], result["notifications"][1]["id"],
+    }]
+    assert {p["to_address"] for p in rows} == {
+        "inhabitant@example.com", "other@example.com",
+    }
+    assert all(p["href"] == "/join?invite=citizenJoin1" for p in rows)
+
+    marked = call("worker")("notifications", "notification.mark_email_sent", {
+        "id": result["notifications"][0]["id"], "success": True,
+    })
+    assert marked["email_status"] == "sent"
+    assert json.loads(note.metadata)["email_status"] == "sent"
+
+
+def test_send_join_link_skips_staff_and_import_codes(realm):
+    realm.granted.add("realm.admin")
+    _realm_with_join(open_registration=False)
+    minted = _registration_codes(
+        _InviteCode(code="staffOnly", department="Treasury"),
+        _InviteCode(code="importOnly",
+                    metadata=json.dumps({"kind": "citizen_import"})),
+        minted=_InviteCode(code="freshInhabitant"),
+    )
+
+    result = call("alice")("notifications", "notification.send_join_link", {
+        "to": "new@example.com",
+    })
+    assert result["href"] == "/join?invite=freshInhabitant"
+    assert minted  # created a shared inhabitant invite
+
