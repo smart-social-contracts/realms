@@ -71,6 +71,7 @@ from api.registry import get_registry_info, register_realm
 from api.status import get_status
 from api.user import (
     user_get,
+    user_get_record_fields,
     user_register,
     user_update_private_data,
     user_update_public_profile,
@@ -1475,7 +1476,7 @@ def join_realm(
         except Exception:
             was_new_user = True
 
-        user = user_register(caller, granted_profile)
+        user = user_get_record_fields(user_register(caller, granted_profile))
         profiles = Vec[text]()
         if "profiles" in user and user["profiles"]:
             for p in user["profiles"]:
@@ -1621,13 +1622,22 @@ def join_realm(
                         f"Directory upsert to capital {capital_id} raised: {e}"
                     )
 
+        try:
+            from core.membership import user_department_names
+
+            live_user = User[caller]
+            if live_user is not None:
+                user["departments"] = user_department_names(live_user)
+        except Exception:
+            user["departments"] = list(user.get("departments") or [])
+
         return RealmResponse(
             success=True,
             data=RealmResponseData(
                 userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
-                    departments=_text_vec(user.get("departments")),
+                    departments=_text_vec(user["departments"]),
                     nickname=user.get("nickname", ""),
                     avatar=user.get("avatar", ""),
                     private_data=user.get("private_data", ""),
@@ -1659,7 +1669,7 @@ def register_founder(principal: text) -> RealmResponse:
                 ),
             )
 
-        user = user_register(founder, "admin")
+        user = user_get_record_fields(user_register(founder, "admin"))
         logger.info(f"Founder {founder} registered with admin profile")
 
         # Seat the founder in the root org (head + member). Root authority is
@@ -1694,7 +1704,7 @@ def register_founder(principal: text) -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
-                    departments=_text_vec(user.get("departments")),
+                    departments=_text_vec(user["departments"]),
                     nickname=user.get("nickname", ""),
                     avatar=user.get("avatar", ""),
                     private_data=user.get("private_data", ""),
@@ -3817,6 +3827,7 @@ def get_my_user_status() -> RealmResponse:
                 success=False, data=RealmResponseData(error=user["error"])
             )
 
+        user = user_get_record_fields(user)
         profiles = Vec[text]()
         if "profiles" in user and user["profiles"]:
             for p in user["profiles"]:
@@ -3828,7 +3839,7 @@ def get_my_user_status() -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
-                    departments=_text_vec(user.get("departments")),
+                    departments=_text_vec(user["departments"]),
                     nickname=user.get("nickname", ""),
                     avatar=user.get("avatar", ""),
                     private_data=user.get("private_data", ""),
