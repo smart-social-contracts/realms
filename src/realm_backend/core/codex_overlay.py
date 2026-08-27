@@ -398,6 +398,18 @@ def commit_current(ext_id: str, files: Dict[str, str], modules: List[str]) -> di
     """Record the newly installed package as current and prune leftovers."""
     meta = _write_slot("current", ext_id, files, list(modules))
     deleted = prune_codex_table(modules)
+    try:
+        from core.package_manager import record_install
+
+        record_install(
+            ext_id,
+            kind="codex",
+            version=str(meta.get("version") or ""),
+            package_hash=str(meta.get("hash") or ""),
+            claimed=list(modules),
+        )
+    except Exception as exc:
+        logger.warning(f"codex overlay: package record failed — {exc}")
     _invalidate_hooks()
     logger.info(
         f"codex overlay: current={ext_id} hash={meta.get('hash', '')[:12]} "
@@ -468,6 +480,18 @@ def revert(*, authorized_by_vote: bool = False) -> dict:
     apply_error = _apply_to_runtime(restored_id, previous_files)
     _seed_claimed_modules(previous_files, restored_modules)
     pruned = prune_codex_table(restored_modules)
+    try:
+        from core.package_manager import record_install
+
+        record_install(
+            restored_id,
+            kind="codex",
+            version=str(previous_meta.get("version") or ""),
+            package_hash=str(previous_meta.get("hash") or ""),
+            claimed=list(restored_modules),
+        )
+    except Exception as exc:
+        logger.warning(f"codex overlay: package record on revert failed — {exc}")
     _invalidate_hooks()
     result = {
         "success": apply_error is None,
@@ -507,7 +531,7 @@ def _apply_to_runtime(ext_id: str, files: Dict[str, str]) -> Optional[str]:
         logger.warning(f"codex overlay: could not remove other codex — {exc}")
 
     wipe_runtime_package(ext_id)
-    ok = install_extension(ext_id, files)
+    ok = install_extension(ext_id, files, bypass_lock=True)
     if not ok:
         return f"failed to load restored codex '{ext_id}'"
     return None

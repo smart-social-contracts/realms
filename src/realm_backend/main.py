@@ -6882,9 +6882,15 @@ def install_extension(args: text) -> text:
         if not files:
             return json.dumps({"success": False, "error": "files dict is required"})
 
+        from core.package_manager import replace_denied
+
+        denied = replace_denied(ext_id)
+        if denied:
+            return json.dumps({"success": False, "error": denied})
+
         from core.runtime_extensions import install_extension as _install
 
-        ok = _install(ext_id, files)
+        ok = _install(ext_id, files, owner=params.get("owner"))
         if ok:
             return json.dumps({"success": True, "extension_id": ext_id, "files_count": len(files)})
         else:
@@ -7583,6 +7589,12 @@ def install_codex(args: text) -> text:
         if not files:
             return json.dumps({"success": False, "error": "files dict is required"})
 
+        from core.package_manager import replace_denied
+
+        denied = replace_denied(codex_id)
+        if denied:
+            return json.dumps({"success": False, "error": denied})
+
         from core.runtime_codex import install_codex_package, legacy_init_py_error
 
         init_py_error = legacy_init_py_error(codex_id, files)
@@ -7740,6 +7752,75 @@ def get_codex_overlay_status() -> text:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@query
+def list_packages() -> text:
+    """Installed package records (id, kind, version, hash, owner, lock).
+
+    Callable from the core System UI and from ``__shell__`` via
+    ``api.call('list_packages')`` or
+    ``from core.package_manager import list_packages``.
+    """
+    try:
+        from core.package_manager import list_packages as _list
+
+        return json.dumps(_list())
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def lock_package(args: text) -> text:
+    """Lock an installed package so only the owner / bypass may replace it.
+
+    Args (JSON): {"id": str}
+    """
+    try:
+        params = json.loads(args) if args else {}
+        from core.package_manager import lock_package as _lock
+
+        return json.dumps(_lock(params.get("id") or params.get("package_id") or ""))
+    except Exception as e:
+        logger.error(f"lock_package error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def unlock_package(args: text) -> text:
+    """Unlock an installed package.
+
+    Args (JSON): {"id": str}
+    """
+    try:
+        params = json.loads(args) if args else {}
+        from core.package_manager import unlock_package as _unlock
+
+        return json.dumps(_unlock(params.get("id") or params.get("package_id") or ""))
+    except Exception as e:
+        logger.error(f"unlock_package error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def transfer_package(args: text) -> text:
+    """Transfer package ownership to a principal or department name.
+
+    Args (JSON): {"id": str, "owner": str}
+    """
+    try:
+        params = json.loads(args) if args else {}
+        from core.package_manager import transfer_package as _transfer
+
+        return json.dumps(
+            _transfer(
+                params.get("id") or params.get("package_id") or "",
+                params.get("owner") or params.get("new_owner") or "",
+            )
+        )
+    except Exception as e:
+        logger.error(f"transfer_package error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 # ---------------------------------------------------------------------------
 # Registry-based install endpoints (inter-canister pull from file registry)
 # ---------------------------------------------------------------------------
@@ -7802,7 +7883,13 @@ def install_extension_from_registry(args: text) -> Async[text]:
 
         from api.file_registry import install_extension_from_registry as _install
 
-        result = yield from _install(registry_id, ext_id, version, frontend_canister_id=frontend_id)
+        result = yield from _install(
+            registry_id,
+            ext_id,
+            version,
+            frontend_canister_id=frontend_id,
+            owner=params.get("owner"),
+        )
 
         # After a canister reinstall, init_() runs before extensions are
         # installed so extension initialize() hooks never fire.  Call it

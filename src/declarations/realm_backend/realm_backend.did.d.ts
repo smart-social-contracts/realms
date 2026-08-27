@@ -1123,6 +1123,10 @@ export interface _SERVICE {
     Array<string>
   >,
   'get_codex_overlay_status' : ActorMethod<[], string>,
+  'list_packages' : ActorMethod<[], string>,
+  'lock_package' : ActorMethod<[string], string>,
+  'unlock_package' : ActorMethod<[string], string>,
+  'transfer_package' : ActorMethod<[string], string>,
   'get_extension_frontend_info' : ActorMethod<[string], string>,
   'get_extensions' : ActorMethod<[], RealmResponse>,
   'get_federal_vote' : ActorMethod<[string], string>,

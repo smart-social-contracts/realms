@@ -15,6 +15,7 @@ sys.modules.setdefault("ic_python_logging", MagicMock())
 
 import core.codex_overlay as overlay  # noqa: E402
 import core.codex_hooks as hooks  # noqa: E402
+import core.package_manager as packages  # noqa: E402
 
 
 class FakeRow:
@@ -52,6 +53,7 @@ class FakeCodex:
 @pytest.fixture
 def slots(tmp_path, monkeypatch):
     monkeypatch.setattr(overlay, "SLOTS_DIR", str(tmp_path / "codex_slots"))
+    monkeypatch.setattr(packages, "PACKAGES_DIR", str(tmp_path / "packages"))
     FakeCodex.reset()
     ggg = types.ModuleType("ggg")
     ggg.Codex = FakeCodex
