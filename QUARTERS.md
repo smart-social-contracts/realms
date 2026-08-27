@@ -2,11 +2,11 @@
 
 ## Overview
 
-A **realm is a set of quarters that run the same codex.** The codex is the realm's constitution — it encodes every policy: admission, fees, governance, taxation, justice, assignment. Quarters are sovereign demoi (each home to up to a few thousand users) that belong to a realm because their users collectively choose to adopt its codex.
+A **realm is a set of canisters that sync the same stack to a capital canister.** The stack is WASM + codex + manifest + extensions; the capital publishes it (it does not run day-to-day governance). The codex is the realm's constitution — it encodes every policy: admission, fees, governance, taxation, justice, assignment. Quarters are sovereign demoi (each home to up to a few thousand users) that belong to a realm because their users collectively choose to adopt its codex.
 
 The whole architecture reduces to one primitive:
 
-> **A realm is a shared codex. The capital quarter is its origin and pusher. Admission = receive the codex. Governance = amend the codex. Dissent = fork. Secession = drop the codex.**
+> **A realm is a set of canisters that sync the same stack to a capital canister.** (Technical.) A realm is a decentralized network of computers that sync the same digital system of governance to a capital. (Plain.)
 
 Everything else — capital, fees, taxation, reputation — is policy *inside* the codex, not load-bearing infrastructure.
 
@@ -17,7 +17,7 @@ Everything else — capital, fees, taxation, reputation — is policy *inside* t
 | Term | Definition |
 |------|-----------|
 | **Quarter** | A full, sovereign realm backend canister, home to up to a few thousand users. Holds its own users, governance data, and extensions. Acts as a collective entity via its codex (decisions made by its users' votes). |
-| **Realm** | The set of quarters running the same codex. Membership *is* codex-adherence. |
+| **Realm** | A set of canisters that sync the same stack to a capital canister. Membership *is* codex-adherence. |
 | **Codex** | The shared constitution of a realm. Encodes all policy. Distributed from the capital on admission and on amendment. |
 | **Capital** | The quarter that is the codex's origin and pusher, and the gate for admission. It is still an ordinary quarter (holds users, runs governance). Its only realm-wide powers are **admission** and **codex propagation** — both disciplined by every quarter's freedom to secede. |
 | **Secession** | A quarter dropping the codex and ceasing to sync. Frictionless: all users and data stay with the quarter. |
