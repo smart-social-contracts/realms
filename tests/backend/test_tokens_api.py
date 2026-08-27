@@ -22,6 +22,7 @@ _spec.loader.exec_module(tokens)
 
 _indexer_for_ledger = tokens._indexer_for_ledger
 resolve_shared_token = tokens.resolve_shared_token
+resolve_catalog_token = tokens.resolve_catalog_token
 resolve_shared_token_by_ledger = tokens.resolve_shared_token_by_ledger
 resolve_ledger_token_info = tokens.resolve_ledger_token_info
 register_treasury_token = tokens.register_treasury_token
@@ -68,6 +69,13 @@ def test_resolve_ckeurc_official_ledger_on_all_catalog_networks():
         assert cfg["name"] == "ckEURC"
         assert cfg["name"] != "ckEUR"
         assert resolve_shared_token("CKEURC", network)["ledger"] == official
+
+
+def test_resolve_catalog_token_ckeurc_without_network():
+    cfg = resolve_catalog_token("ckEURC", "")
+    assert cfg is not None
+    assert cfg["ledger"] == "pe5t5-diaaa-aaaar-qahwa-cai"
+    assert resolve_catalog_token("", "staging") is None
 
 
 def test_resolve_ckeurc_by_ledger():

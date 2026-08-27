@@ -111,12 +111,31 @@ export function tokenDraftFromChoice(
 	}
 	const token = sharedTokenById(choiceId);
 	if (!token) return null;
+	const token_canister_id = token.ledgers[network] || Object.values(token.ledgers)[0] || '';
+	if (!token_canister_id) return null;
 	const draft: Record<string, string | number> = {
 		symbol: token.symbol,
-		token_canister_id: token.ledgers[network],
+		token_canister_id,
 		decimals: token.decimals
 	};
-	const indexer = token.indexers?.[network];
+	const indexer = token.indexers?.[network] || Object.values(token.indexers || {})[0];
 	if (indexer) draft.indexer_canister_id = indexer;
 	return draft;
+}
+
+/** Fill ledger/decimals/indexer when a catalog pick was stored as symbol-only. */
+export function completeCatalogTokenDraft(
+	token: { symbol?: string; token_canister_id?: string | number; decimals?: number } | null,
+	network: SetupTokenNetwork = setupTokenNetwork()
+): Record<string, string | number> | null {
+	if (!token) return null;
+	const canister = String(token.token_canister_id || '').trim();
+	if (canister) {
+		return { ...token, token_canister_id: canister };
+	}
+	const matched = matchSharedToken({ symbol: String(token.symbol || '') });
+	if (!matched) {
+		return { ...token };
+	}
+	return tokenDraftFromChoice(matched.id, { symbol: '', token_canister_id: '' }, network);
 }

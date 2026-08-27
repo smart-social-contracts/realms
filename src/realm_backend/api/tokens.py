@@ -387,6 +387,25 @@ def resolve_shared_token(symbol: str, network: str) -> Optional[dict]:
     return None
 
 
+def resolve_catalog_token(symbol: str, network: str = "") -> Optional[dict]:
+    """Resolve a catalog symbol, searching every network if one miss or network is empty.
+
+    ckEURC is the same ledger on staging/demo/test. Do not invent REALMS when
+    ``symbol`` is empty — callers must pass the draft/setup symbol.
+    """
+    cfg = resolve_shared_token(symbol, network)
+    if cfg and (cfg.get("ledger") or "").strip():
+        return cfg
+    preferred = (network or "").strip().lower()
+    for net_key in _SHARED_TOKEN_LEDGERS:
+        if net_key == preferred:
+            continue
+        cfg = resolve_shared_token(symbol, net_key)
+        if cfg and (cfg.get("ledger") or "").strip():
+            return cfg
+    return None
+
+
 def get_treasury_token_indexer(symbol: str = "", ledger_canister_id: str = "") -> str:
     """Return the registered indexer for the treasury token, else ledger ID."""
     sym = (symbol or "").strip()

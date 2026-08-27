@@ -268,6 +268,15 @@ describe('wizardLogic', () => {
 			).toBe('ckEURC');
 		});
 
+		it('can show ckEURC from a symbol-only draft (ledger filled at save/launch)', () => {
+			expect(
+				resolveReviewTokenSymbol({
+					...freshState,
+					draft: { token: { symbol: 'ckEURC' } }
+				})
+			).toBe('ckEURC');
+		});
+
 		it('treats an explicit skipped token as empty so review can say Skipped', () => {
 			expect(resolveReviewTokenSymbol({ ...freshState, draft: { token: null } })).toBe('');
 			expect(resolveReviewTokenSymbol(freshState)).toBe('');

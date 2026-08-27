@@ -184,6 +184,12 @@ def setup_save_draft(args_json: str) -> str:
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
 
+    if "token" in params:
+        params["token"] = _complete_catalog_token_draft(
+            params.get("token"),
+            getattr(realm, "network", "") or "",
+        )
+
     partial = {
         k: params[k]
         for k in ("step", "codex", "token", "identity", "languages")
@@ -354,19 +360,72 @@ def _treasury_token_refused() -> dict:
     return {"success": False, **no_treasury_token_error()}
 
 
+def _token_record(value: Any) -> Optional[dict]:
+    return value if isinstance(value, dict) else None
+
+
+def _catalog_token_for_symbol(symbol: str, network: str = "") -> Optional[dict]:
+    """Look up a shared-catalog token. Empty symbol does not invent REALMS."""
+    symbol = (symbol or "").strip()
+    if not symbol:
+        return None
+    try:
+        from api.tokens import resolve_catalog_token
+    except ImportError:
+        return None
+
+    return resolve_catalog_token(symbol, network)
+
+
+def _complete_catalog_token_draft(token: Any, network: str = "") -> Any:
+    """Fill ledger/decimals/indexer from the catalog when only a symbol is stored."""
+    if token is None or not isinstance(token, dict):
+        return token
+    completed = dict(token)
+    if (completed.get("token_canister_id") or "").strip():
+        return completed
+    catalog = _catalog_token_for_symbol(
+        str(completed.get("symbol") or ""),
+        network,
+    )
+    if not catalog:
+        return completed
+    ledger = (catalog.get("ledger") or "").strip()
+    if not ledger:
+        return completed
+    completed["token_canister_id"] = ledger
+    if completed.get("decimals") is None and catalog.get("decimals") is not None:
+        completed["decimals"] = catalog["decimals"]
+    if not (completed.get("indexer_canister_id") or "").strip() and catalog.get("indexer"):
+        completed["indexer_canister_id"] = catalog["indexer"]
+    return completed
+
+
 def _configured_token_canister_id(realm, draft: dict) -> str:
-    token = draft.get("token") or {}
-    if isinstance(token, dict):
+    token = _token_record(draft.get("token"))
+    if token:
         token_canister_id = (token.get("token_canister_id") or "").strip()
         if token_canister_id:
             return token_canister_id
     token_canister_id = (getattr(realm, "token_canister_id", "") or "").strip()
     if token_canister_id:
         return token_canister_id
-    setup_token = get_setup_config(realm).get("token")
-    if isinstance(setup_token, dict):
-        return (setup_token.get("token_canister_id") or "").strip()
-    return ""
+    setup_token = _token_record(get_setup_config(realm).get("token"))
+    if setup_token:
+        token_canister_id = (setup_token.get("token_canister_id") or "").strip()
+        if token_canister_id:
+            return token_canister_id
+    symbol = ""
+    if token:
+        symbol = (token.get("symbol") or "").strip()
+    if not symbol and setup_token:
+        symbol = (setup_token.get("symbol") or "").strip()
+    if not symbol:
+        return ""
+    catalog = _catalog_token_for_symbol(symbol, getattr(realm, "network", "") or "")
+    if not catalog:
+        return ""
+    return (catalog.get("ledger") or "").strip()
 
 
 def _apply_configured_token(realm, params: dict) -> Async[dict]:
