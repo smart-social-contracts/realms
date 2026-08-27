@@ -152,6 +152,12 @@ export interface WizardStepNavigationResult {
 	errorMessage?: string;
 }
 
+/** True when launch has started and the founder may still edit earlier steps. */
+export function isFailedOrRunningLaunch(setupState: SetupState | null | undefined): boolean {
+	const status = setupState?.launch?.status;
+	return status === 'running' || status === 'failed';
+}
+
 /**
  * Stepper / programmatic navigation rules. Back navigation never mutates backend state.
  * The codex banner only appears when attempting to skip ahead from step 1.
@@ -179,6 +185,13 @@ export function canNavigateToWizardStep(
 		return { allowed: true };
 	}
 
+	// A failed/running launch must not trap the founder on review. Codex was
+	// already required to start launch, so they may return to Token (or any
+	// earlier step) to persist a ledger and retry.
+	if (isFailedOrRunningLaunch(setupState)) {
+		return { allowed: true };
+	}
+
 	if (!canAdvanceFromCodexStep(setupState)) {
 		return {
 			allowed: false,
@@ -201,13 +214,20 @@ export function resolveInitialWizardStep(
 ): WizardStep {
 	if (urlStepToken) {
 		const step = urlTokenToStep(urlStepToken);
-		if (step && canNavigate('welcome', step, setupState).allowed) {
-			return step;
+		if (step) {
+			if (canNavigate('welcome', step, setupState).allowed) {
+				return step;
+			}
+			// After a failed/running launch the founder may deep-link back to
+			// Token (or any earlier step) even if the first-run welcome gate
+			// would still block skip-ahead.
+			if (isFailedOrRunningLaunch(setupState)) {
+				return step;
+			}
 		}
 	}
 
-	const launchStatus = setupState.launch?.status;
-	if (launchStatus === 'running' || launchStatus === 'failed') {
+	if (isFailedOrRunningLaunch(setupState)) {
 		return 'review';
 	}
 
@@ -219,4 +239,26 @@ export function resolveInitialWizardStep(
 	}
 
 	return 'welcome';
+}
+
+/**
+ * Token label for Launch review. Uses persisted draft / applied token only —
+ * never the wizard's UI default (REALMS), so a skipped token stays skipped.
+ */
+export function resolveReviewTokenSymbol(setupState: SetupState | null | undefined): string {
+	const draftToken = setupState?.draft?.token;
+	if (draftToken === null) {
+		return '';
+	}
+	if (typeof draftToken?.symbol === 'string' && draftToken.symbol.trim()) {
+		return draftToken.symbol.trim();
+	}
+	const applied = setupState?.token;
+	if (typeof applied?.symbol === 'string' && applied.symbol.trim()) {
+		return applied.symbol.trim();
+	}
+	if (typeof applied?.existing === 'string' && applied.existing.trim()) {
+		return applied.existing.trim();
+	}
+	return '';
 }

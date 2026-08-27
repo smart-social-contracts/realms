@@ -10,8 +10,10 @@ import {
 	isCodexChosen,
 	isCodexInstalled,
 	isCodexPrimaryActionDisabled,
+	isFailedOrRunningLaunch,
 	reconcileCodexVersion,
 	resolveInitialWizardStep,
+	resolveReviewTokenSymbol,
 	resolveSelectedCodexVersion,
 	shouldClearCodexAdvanceError,
 	isSetupCatalogCodex,
@@ -19,6 +21,7 @@ import {
 	urlTokenToStep
 } from './wizardLogic';
 import type { SetupState } from './types';
+import { tokenDraftFromChoice } from './sharedTokens';
 
 const installedState: SetupState = {
 	status: 'setup',
@@ -180,17 +183,58 @@ describe('wizardLogic', () => {
 	});
 
 	describe('initial step resolution', () => {
+		const failedLaunchState: SetupState = {
+			...freshState,
+			launch: {
+				status: 'failed',
+				phase: 'configure_token',
+				steps: [
+					{ name: 'install_codex', status: 'completed', error: null },
+					{
+						name: 'configure_token',
+						status: 'failed',
+						error: 'No treasury currency — set the treasury ledger canister in Realm Settings so the token symbol can be resolved'
+					}
+				],
+				updated_at: '1'
+			}
+		};
+		const runningLaunchState: SetupState = {
+			...freshState,
+			launch: { status: 'running', phase: 'install_codex', steps: [], updated_at: null }
+		};
+
 		it('prefers a reachable URL step', () => {
 			expect(resolveInitialWizardStep(draftChosenState, 'token')).toBe('token');
 		});
 
-		it('resumes a running or failed launch on review', () => {
-			expect(
-				resolveInitialWizardStep(
-					{ ...freshState, launch: { status: 'running', phase: 'install_codex', steps: [], updated_at: null } },
-					null
-				)
-			).toBe('review');
+		it('resumes a running or failed launch on review when no step is requested', () => {
+			expect(resolveInitialWizardStep(runningLaunchState, null)).toBe('review');
+			expect(resolveInitialWizardStep(failedLaunchState, null)).toBe('review');
+			expect(isFailedOrRunningLaunch(failedLaunchState)).toBe(true);
+		});
+
+		it('does not trap a failed launch on review when the URL asks for token', () => {
+			expect(resolveInitialWizardStep(failedLaunchState, 'token')).toBe('token');
+			expect(resolveInitialWizardStep(failedLaunchState, 'launch')).toBe('review');
+		});
+
+		it('does not trap a running launch on review when the URL asks for token', () => {
+			expect(resolveInitialWizardStep(runningLaunchState, 'token')).toBe('token');
+		});
+
+		it('allows the Token stepper after a failed launch even without a draft codex', () => {
+			expect(canNavigateToWizardStep('review', 'token', failedLaunchState)).toEqual({
+				allowed: true
+			});
+			expect(canNavigateToWizardStep('welcome', 'token', failedLaunchState)).toEqual({
+				allowed: true
+			});
+			expect(canNavigateToWizardStep('welcome', 'token', freshState)).toEqual({
+				allowed: false,
+				showError: false,
+				errorMessage: 'Choose a codex before continuing to later steps'
+			});
 		});
 
 		it('falls back to the saved draft step', () => {
@@ -206,6 +250,42 @@ describe('wizardLogic', () => {
 					null
 				)
 			).toBe('languages');
+		});
+	});
+
+	describe('review token symbol and persist contract', () => {
+		it('shows the persisted draft symbol, not the REALMS UI default', () => {
+			expect(
+				resolveReviewTokenSymbol({
+					...freshState,
+					draft: {
+						token: {
+							symbol: 'ckEURC',
+							token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai'
+						}
+					}
+				})
+			).toBe('ckEURC');
+		});
+
+		it('treats an explicit skipped token as empty so review can say Skipped', () => {
+			expect(resolveReviewTokenSymbol({ ...freshState, draft: { token: null } })).toBe('');
+			expect(resolveReviewTokenSymbol(freshState)).toBe('');
+		});
+
+		it('maps a catalog ckEURC choice to the ledger configure_token reads', () => {
+			const token = tokenDraftFromChoice('ckEURC', { symbol: '', token_canister_id: '' }, 'staging');
+			expect(token).toEqual({
+				symbol: 'ckEURC',
+				token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
+				decimals: 6
+			});
+			expect(
+				resolveReviewTokenSymbol({
+					...freshState,
+					draft: { token: { symbol: String(token!.symbol), token_canister_id: String(token!.token_canister_id) } }
+				})
+			).toBe('ckEURC');
 		});
 	});
 
