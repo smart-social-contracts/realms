@@ -42,6 +42,19 @@ export const LAUNCH_PHASES = [
 	{ name: 'complete', label: 'Complete setup' }
 ] as const;
 
+export function firstFailedLaunchStepError(
+	launch?: {
+		status?: string;
+		steps?: Array<{ status?: string; error?: string | null }>;
+	} | null
+): string {
+	if (!launch || launch.status !== 'failed' || !Array.isArray(launch.steps)) {
+		return '';
+	}
+	const failed = launch.steps.find((step) => step.status === 'failed' && step.error);
+	return String(failed?.error || '');
+}
+
 export function stepToUrlToken(step: WizardStep): WizardStepUrlToken {
 	if (step === 'review') return 'launch';
 	return step;
@@ -286,4 +299,30 @@ export function founderConfigureTokenFromSetupState(
 	if (setupState?.draft?.token === null) return null;
 	const token = (setupState?.draft?.token ?? setupState?.token ?? null) as CatalogTokenDraftInput;
 	return configureTokenPayload(token, network);
+}
+
+export function persistedRealmLedger(setupState: SetupState | null | undefined): string {
+	const fromRealm = String(setupState?.realm_token_canister_id || '').trim();
+	if (fromRealm) return fromRealm;
+	const applied = setupState?.token;
+	if (applied && typeof applied === 'object') {
+		return String(
+			(applied as { token_canister_id?: unknown }).token_canister_id || ''
+		).trim();
+	}
+	return '';
+}
+
+/** True only when apply both claimed success and the ledger is on realm/setup.token. */
+export function applyDraftTokenDidPersist(
+	expectedLedger: string,
+	applyResult: { success?: boolean; token?: { token_canister_id?: string } | null } | null,
+	setupState?: SetupState | null
+): boolean {
+	const expected = (expectedLedger || '').trim();
+	if (!expected) return false;
+	if (!applyResult?.success) return false;
+	const fromApply = String(applyResult.token?.token_canister_id || '').trim();
+	if (fromApply !== expected) return false;
+	return persistedRealmLedger(setupState) === expected;
 }

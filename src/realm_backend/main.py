@@ -8204,14 +8204,51 @@ def setup_set_branding(args: text) -> text:
 
 
 @update
-def setup_save_draft(args: text) -> text:
-    """Persist partial setup wizard draft without installing anything."""
+def setup_save_draft(args: text) -> Async[text]:
+    """Persist draft via api.setup (leftover may steal that), then host-apply.
+
+    Leftover ``api/setup.py`` can shadow ``from api.setup import setup_save_draft``.
+    Apply lives in ``core.setup_draft_token`` so leftover cannot steal the body.
+    """
     try:
         from api.setup import setup_save_draft as _save
 
-        return _save(args)
+        result = _save(args)
+        if hasattr(result, "send"):
+            result = yield from result
+        persist_text = result if isinstance(result, str) else json.dumps(result)
+        try:
+            parsed = json.loads(persist_text)
+        except Exception:
+            parsed = {}
+        if not (isinstance(parsed, dict) and parsed.get("success")):
+            return persist_text
+
+        from core.setup_draft_token import apply_persisted_draft_if_present
+
+        apply_result = apply_persisted_draft_if_present()
+        if hasattr(apply_result, "send"):
+            apply_result = yield from apply_result
+        if isinstance(apply_result, dict) and apply_result.get("success") is False:
+            return json.dumps(apply_result)
+        return persist_text
     except Exception as e:
         logger.error(f"setup_save_draft error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+def setup_apply_draft_token() -> Async[text]:
+    """Unshadowed apply. Body is core.setup_draft_token, never api.setup."""
+    try:
+        from core.setup_draft_token import apply_setup_draft_token_now
+
+        result = apply_setup_draft_token_now()
+        if hasattr(result, "send"):
+            return (yield from result)
+        return result
+    except Exception as e:
+        logger.error(f"setup_apply_draft_token error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

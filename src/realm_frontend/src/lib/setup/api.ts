@@ -262,6 +262,21 @@ export async function configureSetupToken(payload: Record<string, unknown>): Pro
 	);
 }
 
+export async function applySetupDraftToken(): Promise<SetupActionResult> {
+	const actor = await getActor();
+	if (typeof actor.setup_apply_draft_token !== 'function') {
+		return { success: false, error: 'Could not apply treasury ledger' };
+	}
+	try {
+		return parseJson<SetupActionResult>(await actor.setup_apply_draft_token());
+	} catch (err) {
+		return {
+			success: false,
+			error: err instanceof Error ? err.message : 'Could not apply treasury ledger'
+		};
+	}
+}
+
 export async function setSetupBranding(payload: {
 	logo_data_url?: string;
 	background_data_url?: string;

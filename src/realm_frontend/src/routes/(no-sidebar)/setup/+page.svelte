@@ -6,6 +6,7 @@
 	import { Button, Heading, Input, Label, P } from 'flowbite-svelte';
 	import {
 		LAUNCH_STATUS_POLL_MS,
+		applySetupDraftToken,
 		configureSetupToken,
 		fetchSetupDraftAsset,
 		fetchSetupLaunchStatus,
@@ -27,6 +28,7 @@
 		isSetupCatalogCodex,
 		reconcileCodexVersion,
 		resolveInitialWizardStep,
+		applyDraftTokenDidPersist,
 		founderConfigureTokenFromSetupState,
 		resolveReviewTokenSymbol,
 		resolveSelectedCodexVersion,
@@ -611,16 +613,17 @@
 		busy = true;
 		error = '';
 		try {
-			// Founder-auth apply writes realm.token_canister_id NOW. Do not
-			// wait for the canister-identity launch tick — Retry may leave a
-			// stale failed configure_token row in place.
+			// save_draft is the leftover-safe path that already runs on Valencia.
+			// It now writes realm.token_canister_id. Then call the new Candid
+			// setup_apply_draft_token (leftover cannot intercept that name).
+			const ok = await persistDraft({ step: 'branding', token });
+			if (!ok) return;
+			const persisted = await applyAndConfirmDraftToken(String(payload.token_canister_id));
+			if (!persisted) return;
 			const applied = await configureSetupToken(payload);
 			if (!applied.success) {
 				error = applied.error || 'Could not apply treasury ledger';
-				return;
 			}
-			const ok = await persistDraft({ step: 'branding', token });
-			if (!ok) return;
 			tokenSymbol = String(token?.symbol || payload.symbol || '');
 			tokenCanisterId = String(payload.token_canister_id);
 			navigateToStep('branding');
@@ -742,28 +745,59 @@
 		}
 	}
 
+	async function applyAndConfirmDraftToken(expectedLedger: string): Promise<boolean> {
+		const expected = expectedLedger.trim();
+		if (!expected) {
+			error = 'Could not apply treasury ledger';
+			return false;
+		}
+		let draftApplied;
+		try {
+			draftApplied = await applySetupDraftToken();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Could not apply treasury ledger';
+			return false;
+		}
+		if (!draftApplied.success) {
+			error = draftApplied.error || 'Could not apply treasury ledger';
+			return false;
+		}
+		let refreshed: SetupState;
+		try {
+			refreshed = await fetchSetupState();
+		} catch {
+			error = 'Could not apply treasury ledger';
+			return false;
+		}
+		applySetupState(refreshed);
+		if (!applyDraftTokenDidPersist(expected, draftApplied, refreshed)) {
+			error = 'Could not apply treasury ledger';
+			return false;
+		}
+		return true;
+	}
+
 	async function handleLaunch() {
 		busy = true;
 		error = '';
 		try {
 			const reviewSymbol = resolveReviewTokenSymbol(setupState);
 			const payload = founderConfigureTokenFromSetupState(setupState);
-			if (reviewSymbol) {
-				if (!payload) {
-					error = 'Choose a token, or enter a custom symbol and ledger canister';
-					return;
-				}
-				const applied = await configureSetupToken(payload);
-				if (!applied.success) {
-					error = applied.error || 'Could not apply treasury ledger';
-					return;
-				}
-				const completedToken = completeCatalogTokenDraft(
-					setupState?.draft?.token ?? setupState?.token
-				);
-				if (completedToken) {
-					await persistDraft({ token: completedToken }, { refresh: false });
-				}
+			const expectedLedger = String(payload?.token_canister_id || '').trim();
+			if (reviewSymbol && !expectedLedger) {
+				error = 'Choose a token, or enter a custom symbol and ledger canister';
+				return;
+			}
+			if (!expectedLedger) {
+				error = 'Could not apply treasury ledger';
+				return;
+			}
+			const completedToken = completeCatalogTokenDraft(
+				setupState?.draft?.token ?? setupState?.token
+			);
+			if (completedToken) {
+				const saved = await persistDraft({ token: completedToken }, { refresh: false });
+				if (!saved) return;
 			}
 			const normalized = normalizeLanguages(selectedLanguages, primaryLanguage);
 			if (!('error' in normalized)) {
@@ -776,6 +810,16 @@
 					},
 					{ refresh: false }
 				);
+			}
+			// Leftover setup_launch can return success:true with the fossil row.
+			// Retry must persist via setup_apply_draft_token and fail at the top
+			// if realm.token_canister_id is still empty.
+			if (!(await applyAndConfirmDraftToken(expectedLedger))) return;
+			if (payload) {
+				const applied = await configureSetupToken(payload);
+				if (!applied.success) {
+					error = applied.error || 'Could not apply treasury ledger';
+				}
 			}
 			const result = await startSetupLaunch();
 			if (!result.success) {

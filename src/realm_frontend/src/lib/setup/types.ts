@@ -80,6 +80,7 @@ export interface SetupState {
 	realm_name?: string;
 	realm_manifesto?: string;
 	realm_welcome_message?: string;
+	realm_token_canister_id?: string | null;
 }
 
 export interface AvailableCodex {
@@ -94,6 +95,7 @@ export interface SetupActionResult {
 	success: boolean;
 	error?: string;
 	resolved_version?: string;
+	token?: { token_canister_id?: string; symbol?: string } | null;
 }
 
 export interface SetupDraftSaveBranding {
@@ -132,6 +134,7 @@ export interface SetupBackendActor {
 	setup_set_branding: (json: string) => Promise<string>;
 	complete_setup: () => Promise<string>;
 	setup_save_draft: (json: string) => Promise<string>;
+	setup_apply_draft_token: () => Promise<string>;
 	get_setup_draft_asset: (kind: string) => Promise<string>;
 	get_setup_launch_status: () => Promise<string>;
 	setup_launch: () => Promise<string>;

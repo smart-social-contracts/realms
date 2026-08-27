@@ -605,6 +605,7 @@ def get_setup_state_payload() -> dict:
         "realm_name": getattr(realm, "name", None) or None,
         "realm_manifesto": getattr(realm, "manifesto", None) or "",
         "realm_welcome_message": getattr(realm, "welcome_message", None) or "",
+        "realm_token_canister_id": (getattr(realm, "token_canister_id", "") or "").strip() or None,
         "setup_completed_at": setup.get("setup_completed_at"),
         **_setup_language_fields(realm, identity if isinstance(identity, dict) else None, draft),
     }
