@@ -123,19 +123,48 @@ export function tokenDraftFromChoice(
 	return draft;
 }
 
-/** Fill ledger/decimals/indexer when a catalog pick was stored as symbol-only. */
+export type CatalogTokenDraftInput =
+	| {
+			symbol?: string;
+			id?: string;
+			existing?: string;
+			token_canister_id?: string | number;
+			decimals?: number;
+	  }
+	| string
+	| null
+	| undefined;
+
+function catalogTokenSymbol(token: CatalogTokenDraftInput): string {
+	if (token == null) return '';
+	if (typeof token === 'string') return token.trim();
+	const symbol = String(token.symbol || token.id || token.existing || '').trim();
+	return symbol;
+}
+
+/** Fill ledger/decimals/indexer for every realistic catalog draft shape. */
 export function completeCatalogTokenDraft(
-	token: { symbol?: string; token_canister_id?: string | number; decimals?: number } | null,
+	token: CatalogTokenDraftInput,
 	network: SetupTokenNetwork = setupTokenNetwork()
 ): Record<string, string | number> | null {
-	if (!token) return null;
-	const canister = String(token.token_canister_id || '').trim();
-	if (canister) {
-		return { ...token, token_canister_id: canister };
+	if (token == null) return null;
+	if (typeof token === 'string') {
+		const symbol = token.trim();
+		if (!symbol) return null;
+		return completeCatalogTokenDraft({ symbol }, network);
 	}
-	const matched = matchSharedToken({ symbol: String(token.symbol || '') });
+	const canister = String(token.token_canister_id || '').trim();
+	const symbol = catalogTokenSymbol(token);
+	if (canister) {
+		return {
+			...token,
+			...(symbol ? { symbol } : {}),
+			token_canister_id: canister
+		};
+	}
+	const matched = matchSharedToken({ symbol });
 	if (!matched) {
-		return { ...token };
+		return symbol ? { ...token, symbol } : { ...token };
 	}
 	return tokenDraftFromChoice(matched.id, { symbol: '', token_canister_id: '' }, network);
 }

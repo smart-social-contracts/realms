@@ -360,8 +360,45 @@ def _treasury_token_refused() -> dict:
     return {"success": False, **no_treasury_token_error()}
 
 
+def _token_symbol_from_value(value: Any) -> str:
+    """Pull a catalog symbol out of any realistic draft/applied token shape."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if not isinstance(value, dict):
+        return ""
+    for key in ("symbol", "id", "existing"):
+        raw = value.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return ""
+
+
 def _token_record(value: Any) -> Optional[dict]:
-    return value if isinstance(value, dict) else None
+    """Normalize draft.token to a dict, or None if empty/null.
+
+    Accepts a dict with ``symbol`` / ``id`` / ``existing`` / ``token_canister_id``,
+    or a bare string such as ``"ckEURC"`` / ``"ckEURC "``. Empty/null returns
+    None so Launch stays fail-closed (no invented REALMS).
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        symbol = value.strip()
+        return {"symbol": symbol} if symbol else None
+    if not isinstance(value, dict):
+        return None
+    out = dict(value)
+    if not (out.get("symbol") or "").strip():
+        symbol = _token_symbol_from_value(out)
+        if symbol:
+            out["symbol"] = symbol
+    has_ledger = bool((out.get("token_canister_id") or "").strip())
+    has_symbol = bool((out.get("symbol") or "").strip())
+    if not has_ledger and not has_symbol:
+        return None
+    return out
 
 
 def _catalog_token_for_symbol(symbol: str, network: str = "") -> Optional[dict]:
@@ -378,10 +415,17 @@ def _catalog_token_for_symbol(symbol: str, network: str = "") -> Optional[dict]:
 
 
 def _complete_catalog_token_draft(token: Any, network: str = "") -> Any:
-    """Fill ledger/decimals/indexer from the catalog when only a symbol is stored."""
-    if token is None or not isinstance(token, dict):
-        return token
-    completed = dict(token)
+    """Coerce any catalog-shaped token into {symbol, ledger, decimals, indexer}.
+
+    Strings, ``{id}``, ``{existing}``, and ``{symbol}`` all resolve through
+    the catalog. ``None`` / empty stay ``None`` (explicit skip).
+    """
+    if token is None:
+        return None
+    record = _token_record(token)
+    if record is None:
+        return None
+    completed = dict(record)
     if (completed.get("token_canister_id") or "").strip():
         return completed
     catalog = _catalog_token_for_symbol(
@@ -415,11 +459,7 @@ def _configured_token_canister_id(realm, draft: dict) -> str:
         token_canister_id = (setup_token.get("token_canister_id") or "").strip()
         if token_canister_id:
             return token_canister_id
-    symbol = ""
-    if token:
-        symbol = (token.get("symbol") or "").strip()
-    if not symbol and setup_token:
-        symbol = (setup_token.get("symbol") or "").strip()
+    symbol = _token_symbol_from_value(token) or _token_symbol_from_value(setup_token)
     if not symbol:
         return ""
     catalog = _catalog_token_for_symbol(symbol, getattr(realm, "network", "") or "")
@@ -496,9 +536,7 @@ def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
         if isinstance(token_record, dict) and token_record.get("token_canister_id") == token_canister_id:
             return {"success": True, "skipped": True, "token": token_record}
 
-    token = draft.get("token") or {}
-    if not isinstance(token, dict):
-        token = {}
+    token = _token_record(draft.get("token")) or {}
     result = yield from _apply_configured_token(
         realm,
         {

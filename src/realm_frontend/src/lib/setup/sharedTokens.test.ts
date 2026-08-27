@@ -76,6 +76,24 @@ describe('sharedTokens', () => {
 		});
 	});
 
+	it('fills pe5t5 from a bare string, {id}, or {existing} catalog pick', () => {
+		const expected = {
+			symbol: 'ckEURC',
+			token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
+			decimals: 6
+		};
+		expect(completeCatalogTokenDraft('ckEURC', 'staging')).toEqual(expected);
+		expect(completeCatalogTokenDraft('ckEURC ', 'staging')).toEqual(expected);
+		expect(completeCatalogTokenDraft({ id: 'ckEURC' }, 'staging')).toEqual(expected);
+		expect(completeCatalogTokenDraft({ existing: 'ckEURC' }, 'staging')).toEqual(expected);
+	});
+
+	it('does not invent REALMS for an empty or null token', () => {
+		expect(completeCatalogTokenDraft(null, 'staging')).toBeNull();
+		expect(completeCatalogTokenDraft('', 'staging')).toBeNull();
+		expect(completeCatalogTokenDraft('   ', 'staging')).toBeNull();
+	});
+
 	it('does not invent a ledger for a custom token without a canister id', () => {
 		expect(
 			completeCatalogTokenDraft(

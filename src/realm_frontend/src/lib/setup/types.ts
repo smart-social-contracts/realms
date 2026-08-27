@@ -23,10 +23,14 @@ export interface SetupLanguages {
 export interface SetupDraftToken {
 	token_canister_id?: string;
 	symbol?: string;
+	id?: string;
+	existing?: string;
 	decimals?: number;
 	indexer_canister_id?: string;
 	token_type?: string;
 }
+
+export type SetupDraftTokenValue = SetupDraftToken | string | null;
 
 export interface SetupDraftBranding {
 	logo?: boolean;
@@ -39,7 +43,7 @@ export interface SetupDraftBranding {
 export interface SetupDraft {
 	step?: SetupDraftStep;
 	codex?: SetupCodexSelection;
-	token?: SetupDraftToken | null;
+	token?: SetupDraftTokenValue;
 	branding?: SetupDraftBranding | null;
 	identity?: SetupIdentity | null;
 	languages?: SetupLanguages | null;
@@ -101,7 +105,7 @@ export interface SetupDraftSaveBranding {
 export type SetupDraftPartial = {
 	step?: SetupDraftStep;
 	codex?: SetupCodexSelection | null;
-	token?: SetupDraftToken | null;
+	token?: SetupDraftTokenValue;
 	branding?: SetupDraftSaveBranding | null;
 	identity?: SetupIdentity | null;
 	languages?: SetupLanguages | null;

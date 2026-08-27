@@ -1334,8 +1334,19 @@ def test_configured_token_id_resolves_ckeurc_symbol_without_ledger(monkeypatch):
     _FakeRealm.reset(realm)
 
     assert setup_api._configured_token_canister_id(realm, {"token": {"symbol": "ckEURC"}}) == ck_eurc
+    assert setup_api._configured_token_canister_id(realm, {"token": "ckEURC"}) == ck_eurc
+    assert setup_api._configured_token_canister_id(realm, {"token": "ckEURC "}) == ck_eurc
+    assert setup_api._configured_token_canister_id(realm, {"token": {"id": "ckEURC"}}) == ck_eurc
+    assert setup_api._configured_token_canister_id(realm, {"token": {"existing": "ckEURC"}}) == ck_eurc
     assert setup_api._configured_token_canister_id(realm, {"token": None}) == ""
     assert setup_api._configured_token_canister_id(realm, {}) == ""
+    assert setup_api._token_record("ckEURC") == {"symbol": "ckEURC"}
+    assert setup_api._token_record("ckEURC ") == {"symbol": "ckEURC"}
+    assert setup_api._token_record({"id": "ckEURC"})["symbol"] == "ckEURC"
+    assert setup_api._token_record({"existing": "ckEURC"})["symbol"] == "ckEURC"
+    assert setup_api._token_record(None) is None
+    assert setup_api._token_record("") is None
+    assert setup_api._token_record("   ") is None
 
 
 def test_launch_configure_token_applies_ckeurc_from_symbol_only_draft(monkeypatch):
@@ -1402,6 +1413,77 @@ def test_setup_save_draft_fills_ckeurc_ledger_from_symbol(monkeypatch):
     assert saved["draft"]["token"]["indexer_canister_id"] == ck_eurc
     assert realm.token_canister_id == ""
     assert realm.accounting_currency == ""
+
+
+@pytest.mark.parametrize(
+    "token_payload",
+    ["ckEURC", "ckEURC ", {"id": "ckEURC"}, {"symbol": "ckEURC"}, {"existing": "ckEURC"}],
+)
+def test_setup_save_draft_coerces_realistic_ckeurc_shapes(monkeypatch, token_payload):
+    setup_api = _import_setup_api()
+    _load_real_tokens(monkeypatch)
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+
+    saved = json.loads(
+        setup_api.setup_save_draft(json.dumps({"step": "branding", "token": token_payload}))
+    )
+    assert saved["success"] is True
+    assert saved["draft"]["token"]["symbol"] == "ckEURC"
+    assert saved["draft"]["token"]["token_canister_id"] == ck_eurc
+    assert saved["draft"]["token"]["decimals"] == 6
+    assert saved["draft"]["token"]["indexer_canister_id"] == ck_eurc
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
+
+
+@pytest.mark.parametrize(
+    "token_payload",
+    ["ckEURC", {"id": "ckEURC"}, {"existing": "ckEURC"}],
+)
+def test_launch_configure_token_applies_ckeurc_from_realistic_draft_shapes(
+    monkeypatch, token_payload
+):
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": token_payload,
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _FakeRealm.reset(realm)
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
+
+    result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert result["success"] is True
+    assert "Realm Settings" not in (result.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+    assert realm.accounting_currency != "REALMS"
 
 
 def test_setup_save_draft_skipped_token_does_not_invent_realms(monkeypatch):

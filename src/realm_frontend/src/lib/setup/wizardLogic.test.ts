@@ -277,6 +277,27 @@ describe('wizardLogic', () => {
 			).toBe('ckEURC');
 		});
 
+		it('can show ckEURC from a string, {id}, or {existing} draft', () => {
+			expect(
+				resolveReviewTokenSymbol({
+					...freshState,
+					draft: { token: 'ckEURC' }
+				})
+			).toBe('ckEURC');
+			expect(
+				resolveReviewTokenSymbol({
+					...freshState,
+					draft: { token: { id: 'ckEURC' } }
+				})
+			).toBe('ckEURC');
+			expect(
+				resolveReviewTokenSymbol({
+					...freshState,
+					draft: { token: { existing: 'ckEURC' } }
+				})
+			).toBe('ckEURC');
+		});
+
 		it('treats an explicit skipped token as empty so review can say Skipped', () => {
 			expect(resolveReviewTokenSymbol({ ...freshState, draft: { token: null } })).toBe('');
 			expect(resolveReviewTokenSymbol(freshState)).toBe('');
