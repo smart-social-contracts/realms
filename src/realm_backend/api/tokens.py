@@ -244,6 +244,14 @@ _SHARED_TOKEN_LEDGERS = {
             "decimals": 6,
             "name": "ckUSDC",
         },
+        # Official mainnet ICRC ledger. DFINITY docs / ckETH minter publish
+        # the ledger only; no separate index canister, so indexer = ledger.
+        "ckEURC": {
+            "ledger": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "indexer": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "decimals": 6,
+            "name": "ckEURC",
+        },
     },
     "demo": {
         "REALMS": {
@@ -264,6 +272,12 @@ _SHARED_TOKEN_LEDGERS = {
             "decimals": 6,
             "name": "ckUSDC",
         },
+        "ckEURC": {
+            "ledger": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "indexer": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "decimals": 6,
+            "name": "ckEURC",
+        },
     },
     "test": {
         "REALMS": {
@@ -283,6 +297,12 @@ _SHARED_TOKEN_LEDGERS = {
             "indexer": "ufqgi-4qaaa-aaaam-qbsna-cai",
             "decimals": 6,
             "name": "ckUSDC",
+        },
+        "ckEURC": {
+            "ledger": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "indexer": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "decimals": 6,
+            "name": "ckEURC",
         },
     },
 }

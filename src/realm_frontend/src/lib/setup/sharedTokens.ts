@@ -51,6 +51,18 @@ export const SHARED_TOKEN_CATALOG: SharedTokenOption[] = [
 			demo: 'xevnm-gaaaa-aaaar-qafnq-cai',
 			test: 'xevnm-gaaaa-aaaar-qafnq-cai'
 		}
+	},
+	{
+		id: 'ckEURC',
+		name: 'ckEURC',
+		symbol: 'ckEURC',
+		description: 'Circle EURC on Ethereum, chain-key — IC-native euro stablecoin',
+		decimals: 6,
+		ledgers: {
+			staging: 'pe5t5-diaaa-aaaar-qahwa-cai',
+			demo: 'pe5t5-diaaa-aaaar-qahwa-cai',
+			test: 'pe5t5-diaaa-aaaar-qahwa-cai'
+		}
 	}
 ];
 
