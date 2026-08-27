@@ -38,6 +38,7 @@
 		CUSTOM_TOKEN_ID,
 		SHARED_TOKEN_CATALOG,
 		matchSharedToken,
+		completeCatalogTokenDraft,
 		tokenDraftFromChoice
 	} from '$lib/setup/sharedTokens';
 	import { fileToCompressedDataUrl, urlToCompressedDataUrl } from '$lib/utils/imageDataUrl';
@@ -586,11 +587,13 @@
 	}
 
 	async function handleTokenSave() {
-		const token = tokenDraftFromChoice(tokenChoice, {
-			symbol: tokenSymbol,
-			token_canister_id: tokenCanisterId
-		});
-		if (!token) {
+		const token = completeCatalogTokenDraft(
+			tokenDraftFromChoice(tokenChoice, {
+				symbol: tokenSymbol,
+				token_canister_id: tokenCanisterId
+			})
+		);
+		if (!token || !(String(token.token_canister_id || '').trim())) {
 			error = 'Choose a token, or enter a custom symbol and ledger canister';
 			return;
 		}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	CUSTOM_TOKEN_ID,
 	SHARED_TOKEN_CATALOG,
+	completeCatalogTokenDraft,
 	matchSharedToken,
 	tokenDraftFromChoice
 } from './sharedTokens';
@@ -54,5 +55,32 @@ describe('sharedTokens', () => {
 				'test'
 			)
 		).toEqual({ symbol: 'MINE', token_canister_id: 'aaaaa-aa' });
+	});
+
+	it('Token Continue persists pe5t5 for a catalog ckEURC pick', () => {
+		const persisted = completeCatalogTokenDraft(
+			tokenDraftFromChoice('ckEURC', { symbol: '', token_canister_id: '' }, 'staging')
+		);
+		expect(persisted).toEqual({
+			symbol: 'ckEURC',
+			token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
+			decimals: 6
+		});
+	});
+
+	it('fills pe5t5 when a catalog pick was stored as symbol-only', () => {
+		expect(completeCatalogTokenDraft({ symbol: 'ckEURC' }, 'staging')).toEqual({
+			symbol: 'ckEURC',
+			token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
+			decimals: 6
+		});
+	});
+
+	it('does not invent a ledger for a custom token without a canister id', () => {
+		expect(
+			completeCatalogTokenDraft(
+				tokenDraftFromChoice(CUSTOM_TOKEN_ID, { symbol: 'MINE', token_canister_id: '' }, 'test')
+			)
+		).toBeNull();
 	});
 });
