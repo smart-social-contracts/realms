@@ -6,6 +6,7 @@
 	import { Button, Heading, Input, Label, P } from 'flowbite-svelte';
 	import {
 		LAUNCH_STATUS_POLL_MS,
+		configureSetupToken,
 		fetchSetupDraftAsset,
 		fetchSetupLaunchStatus,
 		fetchSetupState,
@@ -26,6 +27,7 @@
 		isSetupCatalogCodex,
 		reconcileCodexVersion,
 		resolveInitialWizardStep,
+		founderConfigureTokenFromSetupState,
 		resolveReviewTokenSymbol,
 		resolveSelectedCodexVersion,
 		shouldClearCodexAdvanceError,
@@ -37,6 +39,7 @@
 	import {
 		CUSTOM_TOKEN_ID,
 		SHARED_TOKEN_CATALOG,
+		configureTokenPayload,
 		matchSharedToken,
 		completeCatalogTokenDraft,
 		tokenDraftFromChoice
@@ -600,17 +603,26 @@
 				token_canister_id: tokenCanisterId
 			})
 		);
-		if (!token || !(String(token.token_canister_id || '').trim())) {
+		const payload = configureTokenPayload(token);
+		if (!payload) {
 			error = 'Choose a token, or enter a custom symbol and ledger canister';
 			return;
 		}
 		busy = true;
 		error = '';
 		try {
+			// Founder-auth apply writes realm.token_canister_id NOW. Do not
+			// wait for the canister-identity launch tick — Retry may leave a
+			// stale failed configure_token row in place.
+			const applied = await configureSetupToken(payload);
+			if (!applied.success) {
+				error = applied.error || 'Could not apply treasury ledger';
+				return;
+			}
 			const ok = await persistDraft({ step: 'branding', token });
 			if (!ok) return;
-			tokenSymbol = String(token.symbol);
-			tokenCanisterId = String(token.token_canister_id || '');
+			tokenSymbol = String(token?.symbol || payload.symbol || '');
+			tokenCanisterId = String(payload.token_canister_id);
 			navigateToStep('branding');
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not save token draft';
@@ -735,12 +747,23 @@
 		error = '';
 		try {
 			const reviewSymbol = resolveReviewTokenSymbol(setupState);
-			const completedToken = completeCatalogTokenDraft(
-				setupState?.draft?.token ?? setupState?.token
-			);
-			if (reviewSymbol && completedToken && String(completedToken.token_canister_id || '').trim()) {
-				const ok = await persistDraft({ token: completedToken }, { refresh: false });
-				if (!ok) return;
+			const payload = founderConfigureTokenFromSetupState(setupState);
+			if (reviewSymbol) {
+				if (!payload) {
+					error = 'Choose a token, or enter a custom symbol and ledger canister';
+					return;
+				}
+				const applied = await configureSetupToken(payload);
+				if (!applied.success) {
+					error = applied.error || 'Could not apply treasury ledger';
+					return;
+				}
+				const completedToken = completeCatalogTokenDraft(
+					setupState?.draft?.token ?? setupState?.token
+				);
+				if (completedToken) {
+					await persistDraft({ token: completedToken }, { refresh: false });
+				}
 			}
 			const normalized = normalizeLanguages(selectedLanguages, primaryLanguage);
 			if (!('error' in normalized)) {

@@ -168,3 +168,21 @@ export function completeCatalogTokenDraft(
 	}
 	return tokenDraftFromChoice(matched.id, { symbol: '', token_canister_id: '' }, network);
 }
+
+/** Payload for founder-auth ``setup_configure_token``. Empty/null stays fail-closed. */
+export function configureTokenPayload(
+	token: CatalogTokenDraftInput,
+	network: SetupTokenNetwork = setupTokenNetwork()
+): Record<string, string | number> | null {
+	const completed = completeCatalogTokenDraft(token, network);
+	const ledger = String(completed?.token_canister_id || '').trim();
+	if (!completed || !ledger) return null;
+	const payload: Record<string, string | number> = { token_canister_id: ledger };
+	const symbol = String(completed.symbol || '').trim();
+	if (symbol) payload.symbol = symbol;
+	if (completed.decimals != null) payload.decimals = completed.decimals;
+	if (completed.indexer_canister_id) {
+		payload.indexer_canister_id = String(completed.indexer_canister_id);
+	}
+	return payload;
+}

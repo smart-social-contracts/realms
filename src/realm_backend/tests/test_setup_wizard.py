@@ -210,6 +210,15 @@ def _run_async(gen):
         return stop.value
 
 
+def _call_setup_launch(setup_api):
+    result = setup_api.setup_launch()
+    if hasattr(result, "send"):
+        result = _run_async(result)
+    if isinstance(result, str):
+        return json.loads(result)
+    return result
+
+
 def _settings_treasury_message() -> str:
     from core.realm_currency import no_treasury_token_error
 
@@ -1057,6 +1066,59 @@ def test_begin_setup_launch_resumes_stuck_install_codex_phase():
     assert install_step["status"] == "pending"
 
 
+def test_begin_setup_launch_resets_failed_configure_token_even_if_running():
+    """Retry must not no-op when a step is failed but parent status is running."""
+    stale_err = (
+        "No treasury currency — set the treasury ledger "
+        "canister in Realm Settings so the token symbol "
+        "can be resolved"
+    )
+    stale_at = str(mock_ic.time.return_value)
+    realm = _FakeRealm(
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {
+                            "symbol": "ckEURC",
+                            "token_canister_id": "pe5t5-diaaa-aaaar-qahwa-cai",
+                            "decimals": 6,
+                        },
+                    },
+                    "launch": {
+                        "status": "running",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "install_codex", "status": "completed", "error": None},
+                            {
+                                "name": "configure_token",
+                                "status": "failed",
+                                "error": stale_err,
+                            },
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": stale_at,
+                    },
+                }
+            }
+        )
+    )
+    _FakeRealm.reset(realm)
+    mock_ic.time.return_value = mock_ic.time.return_value + 1
+
+    assert setup_core.begin_setup_launch(realm) is None
+    launch = json.loads(realm.manifest_data)["setup"]["launch"]
+    token_step = next(s for s in launch["steps"] if s["name"] == "configure_token")
+    assert token_step["status"] == "pending"
+    assert token_step["error"] is None
+    assert launch["status"] == "running"
+    assert launch["updated_at"] != stale_at
+    assert stale_err not in (token_step.get("error") or "")
+
+
 def test_complete_setup_persists_registry_id_before_notify(monkeypatch):
     setup_api = _import_setup_api()
 
@@ -1111,7 +1173,7 @@ def test_setup_launch_requires_codex_in_draft():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     _authorized_creator(realm)
 
-    result = json.loads(setup_api.setup_launch())
+    result = _call_setup_launch(setup_api)
     assert result["success"] is False
     assert "codex" in result["error"].lower()
 
@@ -1240,6 +1302,317 @@ def test_launch_configure_token_refused_when_ledger_unresolvable(monkeypatch):
     assert result["error"] != _settings_treasury_message()
     assert realm.token_canister_id == ""
     assert realm.accounting_currency == ""
+
+
+def test_setup_configure_token_writes_realm_token_canister_id(monkeypatch):
+    """Token Continue / founder start-of-Launch persist realm.token_canister_id."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps({"setup": {"creator_principal": "creator-1"}}),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
+
+    result = json.loads(
+        _run_async(
+            setup_api.setup_configure_token(
+                json.dumps(
+                    {
+                        "token_canister_id": ck_eurc,
+                        "symbol": "ckEURC",
+                        "decimals": 6,
+                    }
+                )
+            )
+        )
+    )
+    assert result["success"] is True
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+    setup_cfg = json.loads(realm.manifest_data)["setup"]
+    assert setup_cfg["token"]["token_canister_id"] == ck_eurc
+    assert setup_cfg["token"]["symbol"] == "ckEURC"
+
+
+def test_leftover_old_launch_succeeds_after_founder_configure_token(monkeypatch):
+    """Create-day launch ignored draft.token; founder apply unblocks it."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {
+                            "symbol": "ckEURC",
+                            "token_canister_id": ck_eurc,
+                            "decimals": 6,
+                        },
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
+
+    from core.realm_currency import no_treasury_token_error, realm_currency
+
+    def _old_launch(realm_obj, _draft):
+        ledger = (getattr(realm_obj, "token_canister_id", "") or "").strip()
+        if not ledger or not realm_currency():
+            return {"success": False, **no_treasury_token_error()}
+        return {"success": True, "skipped": True, "token": {"token_canister_id": ledger}}
+
+    refused = _old_launch(realm, setup_core.get_setup_draft(realm))
+    assert refused["success"] is False
+    assert refused["error_code"] == "no_treasury_token"
+    assert realm.token_canister_id == ""
+
+    applied = json.loads(
+        _run_async(
+            setup_api.setup_configure_token(
+                json.dumps({"token_canister_id": ck_eurc, "symbol": "ckEURC"})
+            )
+        )
+    )
+    assert applied["success"] is True
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+
+    leftover_ok = _old_launch(realm, setup_core.get_setup_draft(realm))
+    assert leftover_ok["success"] is True
+
+
+def test_retry_after_draft_gains_ledger_reruns_configure_token(monkeypatch):
+    """Failed Settings row must be reset; Retry re-runs configure_token on pe5t5."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    stale_updated_at = "1787858624611611294"
+    settings_err = _settings_treasury_message()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "step": "review",
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {
+                            "symbol": "ckEURC",
+                            "token_canister_id": ck_eurc,
+                            "decimals": 6,
+                        },
+                    },
+                    "launch": {
+                        "status": "failed",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "install_codex", "status": "completed", "error": None},
+                            {
+                                "name": "configure_token",
+                                "status": "failed",
+                                "error": settings_err,
+                            },
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": stale_updated_at,
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
+    monkeypatch.setattr("core.quarter_bootstrap.seed_recurring_codex_task", lambda *_a, **_k: None)
+    monkeypatch.setattr("core.quarter_bootstrap.disable_recurring_task", lambda *_a, **_k: None)
+
+    assert setup_core.begin_setup_launch(realm) is None
+    launch = json.loads(realm.manifest_data)["setup"]["launch"]
+    token_step = next(s for s in launch["steps"] if s["name"] == "configure_token")
+    assert token_step["status"] == "pending"
+    assert token_step["error"] is None
+    assert launch["status"] == "running"
+    assert launch["updated_at"] != stale_updated_at
+
+    result = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert result["success"] is True
+    assert result.get("error_code") != "no_treasury_token"
+    assert "Realm Settings" not in (result.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+
+
+def test_setup_launch_retry_drives_configure_token_when_draft_has_pe5t5(monkeypatch):
+    """setup_launch Retry re-executes configure_token instead of leaving the stale row."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    stale_updated_at = "1787858624611611294"
+    settings_err = _settings_treasury_message()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {
+                            "symbol": "ckEURC",
+                            "token_canister_id": ck_eurc,
+                            "decimals": 6,
+                        },
+                    },
+                    "launch": {
+                        "status": "failed",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "install_codex", "status": "completed", "error": None},
+                            {
+                                "name": "configure_token",
+                                "status": "failed",
+                                "error": settings_err,
+                            },
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": stale_updated_at,
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
+    monkeypatch.setattr("core.quarter_bootstrap.seed_recurring_codex_task", lambda *_a, **_k: None)
+    monkeypatch.setattr("core.quarter_bootstrap.disable_recurring_task", lambda *_a, **_k: None)
+
+    result = _call_setup_launch(setup_api)
+    assert result["success"] is True
+    launch = result["launch"]
+    token_step = next(s for s in launch["steps"] if s["name"] == "configure_token")
+    assert token_step["status"] == "completed"
+    assert token_step["error"] is None
+    assert launch["updated_at"] != stale_updated_at
+    assert settings_err not in (token_step.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+
+
+def test_setup_launch_writes_realm_ledger_when_tick_is_dead(monkeypatch):
+    """Retry applies pe5t5 even if seed/advance are dead; second Launch is not Settings."""
+    setup_api = _import_setup_api()
+    ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
+    stale_updated_at = "1787858624611611294"
+    settings_err = _settings_treasury_message()
+    realm = _FakeRealm(
+        status=RealmStatus.SETUP,
+        network="staging",
+        manifest_data=json.dumps(
+            {
+                "setup": {
+                    "creator_principal": "creator-1",
+                    "draft": {
+                        "codex": {"package": "agora", "version": "1.0.0"},
+                        "token": {
+                            "symbol": "ckEURC",
+                            "token_canister_id": ck_eurc,
+                            "decimals": 6,
+                        },
+                    },
+                    "launch": {
+                        "status": "failed",
+                        "phase": "configure_token",
+                        "steps": [
+                            {"name": "install_codex", "status": "completed", "error": None},
+                            {
+                                "name": "configure_token",
+                                "status": "failed",
+                                "error": settings_err,
+                            },
+                            {"name": "upload_branding", "status": "pending", "error": None},
+                            {"name": "apply_identity", "status": "pending", "error": None},
+                            {"name": "complete", "status": "pending", "error": None},
+                        ],
+                        "updated_at": stale_updated_at,
+                    },
+                }
+            }
+        ),
+        token_canister_id="",
+        accounting_currency="",
+    )
+    _authorized_creator(realm)
+    tokens_mod = _load_real_tokens(monkeypatch)
+    monkeypatch.setattr(
+        tokens_mod,
+        "Icrc1MetadataService",
+        MagicMock(side_effect=RuntimeError("offline")),
+    )
+    monkeypatch.setattr(
+        "core.quarter_bootstrap.seed_recurring_codex_task",
+        MagicMock(side_effect=RuntimeError("seed dead")),
+    )
+    monkeypatch.setattr("core.quarter_bootstrap.disable_recurring_task", lambda *_a, **_k: None)
+
+    def _dead_advance():
+        raise RuntimeError("tick dead")
+
+    monkeypatch.setattr(setup_api, "advance_setup_launch", _dead_advance)
+
+    result = _call_setup_launch(setup_api)
+    assert result["success"] is True
+    assert realm.token_canister_id == ck_eurc
+    assert realm.accounting_currency == "ckEURC"
+    assert result.get("error_code") != "no_treasury_token"
+    assert settings_err not in (result.get("error") or "")
+
+    second = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert second["success"] is True
+    assert second.get("error_code") != "no_treasury_token"
+    assert "Realm Settings" not in (second.get("error") or "")
+    assert realm.token_canister_id == ck_eurc
 
 
 def test_setup_configure_token_denies_non_founder():
@@ -1821,14 +2194,16 @@ def test_setup_launch_failure_records_error_and_resume(monkeypatch):
     assert token_step["status"] == "failed"
     assert "token registry" in token_step["error"]
 
-    setup_api.setup_launch()
+    relaunch = _call_setup_launch(setup_api)
+    assert relaunch["success"] is True
     assert seeded == [setup_core.SETUP_LAUNCH_TASK_NAME]
-    relaunch_launch = json.loads(realm.manifest_data)["setup"]["launch"]
-    assert relaunch_launch["status"] == "running"
+    relaunch_launch = relaunch["launch"]
+    assert relaunch_launch["status"] in ("running", "completed")
     token_step = next(
         s for s in relaunch_launch["steps"] if s["name"] == "configure_token"
     )
-    assert token_step["status"] == "pending"
+    assert token_step["status"] in ("pending", "completed")
+    assert token_step["error"] is None
 
     third = _run_async(setup_core.advance_setup_launch())
     assert third["success"] is True

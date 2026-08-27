@@ -3,6 +3,7 @@ import {
 	CUSTOM_TOKEN_ID,
 	SHARED_TOKEN_CATALOG,
 	completeCatalogTokenDraft,
+	configureTokenPayload,
 	matchSharedToken,
 	tokenDraftFromChoice
 } from './sharedTokens';
@@ -100,5 +101,23 @@ describe('sharedTokens', () => {
 				tokenDraftFromChoice(CUSTOM_TOKEN_ID, { symbol: 'MINE', token_canister_id: '' }, 'test')
 			)
 		).toBeNull();
+	});
+
+	it('Token Continue payload is setup_configure_token with pe5t5', () => {
+		expect(
+			configureTokenPayload(
+				tokenDraftFromChoice('ckEURC', { symbol: '', token_canister_id: '' }, 'staging')
+			)
+		).toEqual({
+			symbol: 'ckEURC',
+			token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
+			decimals: 6
+		});
+		expect(configureTokenPayload(null)).toBeNull();
+		expect(configureTokenPayload({ symbol: 'ckEURC' }, 'staging')).toEqual({
+			symbol: 'ckEURC',
+			token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
+			decimals: 6
+		});
 	});
 });

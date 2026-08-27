@@ -10,6 +10,7 @@ import {
 	isCodexChosen,
 	isCodexInstalled,
 	isCodexPrimaryActionDisabled,
+	founderConfigureTokenFromSetupState,
 	isFailedOrRunningLaunch,
 	reconcileCodexVersion,
 	resolveInitialWizardStep,
@@ -301,6 +302,31 @@ describe('wizardLogic', () => {
 		it('treats an explicit skipped token as empty so review can say Skipped', () => {
 			expect(resolveReviewTokenSymbol({ ...freshState, draft: { token: null } })).toBe('');
 			expect(resolveReviewTokenSymbol(freshState)).toBe('');
+		});
+
+		it('Launch / Token Continue founder payload writes pe5t5 from draft', () => {
+			expect(
+				founderConfigureTokenFromSetupState(
+					{
+						...freshState,
+						draft: {
+							token: {
+								symbol: 'ckEURC',
+								token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
+								decimals: 6
+							}
+						}
+					},
+					'staging'
+				)
+			).toEqual({
+				symbol: 'ckEURC',
+				token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
+				decimals: 6
+			});
+			expect(
+				founderConfigureTokenFromSetupState({ ...freshState, draft: { token: null } }, 'staging')
+			).toBeNull();
 		});
 
 		it('maps a catalog ckEURC choice to the ledger configure_token reads', () => {

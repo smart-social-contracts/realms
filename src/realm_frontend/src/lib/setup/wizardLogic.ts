@@ -1,4 +1,9 @@
 import type { SetupState } from './types';
+import {
+	configureTokenPayload,
+	type CatalogTokenDraftInput,
+	type SetupTokenNetwork
+} from './sharedTokens';
 
 export type WizardStep = 'welcome' | 'codex' | 'token' | 'branding' | 'languages' | 'review';
 
@@ -266,4 +271,19 @@ export function resolveReviewTokenSymbol(setupState: SetupState | null | undefin
 	const fromDraft = tokenSymbolFromStoredValue(draftToken);
 	if (fromDraft) return fromDraft;
 	return tokenSymbolFromStoredValue(setupState?.token);
+}
+
+/**
+ * Founder-auth ``setup_configure_token`` payload from persisted draft / applied
+ * token. Token Continue and Launch start must call this so realm.token_canister_id
+ * is written now — do not wait for the canister-identity launch tick.
+ * An explicit skipped token (null) stays fail-closed.
+ */
+export function founderConfigureTokenFromSetupState(
+	setupState: SetupState | null | undefined,
+	network?: SetupTokenNetwork
+): Record<string, string | number> | null {
+	if (setupState?.draft?.token === null) return null;
+	const token = (setupState?.draft?.token ?? setupState?.token ?? null) as CatalogTokenDraftInput;
+	return configureTokenPayload(token, network);
 }
