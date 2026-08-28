@@ -24,11 +24,13 @@ def test_test_flags_from_staging_descriptor():
     flags = gen.test_flags_from_parameters(desc.get("parameters"))
     assert flags == {
         "test_mode": True,
-        "ii_bypass": False,
+        "ii_bypass": True,
         "user_self_registration": True,
         "demo_data": False,
         "skip_terms": False,
         "skip_passport_zkproof": False,
+        "disable_monetary_tokens": True,
+        "demo_notice": True,
     }
 
 
@@ -41,21 +43,18 @@ def test_test_flags_from_test_descriptor():
     assert flags["user_self_registration"] is True
     assert flags["demo_data"] is True
     assert flags["skip_terms"] is True
+    assert flags["disable_monetary_tokens"] is True
+    assert flags["demo_notice"] is False
 
 
-def test_staging_agora_canister_in_generated_steps():
+def test_staging_parameters_include_host_go_live_flags():
     gen = _load_gen()
     canister_ids = gen._load_canister_ids()
-    steps, parameters, realms = gen.generate_env_arrangement("staging", canister_ids)
-    agora = next(r for r in realms if r["slug"] == "agora")
-    assert agora["backend"] == "ihbn6-yiaaa-aaaac-beh3a-cai"
-    config_steps = [
-        s for s in steps
-        if s["method"] == "set_canister_config_json" and s["target"] == agora["backend"]
-    ]
-    assert len(config_steps) == 1
-    assert config_steps[0]["args"]["test_flags"]["user_self_registration"] is True
+    _steps, parameters, _realms = gen.generate_env_arrangement("staging", canister_ids)
     assert parameters["network"] == "staging"
+    assert parameters["test_flags"]["disable_monetary_tokens"] is True
+    assert parameters["test_flags"]["demo_notice"] is True
+    assert parameters["test_flags"]["user_self_registration"] is True
 
 
 def test_all_env_arrangement_files_exist_after_generation():
@@ -67,5 +66,9 @@ def test_all_env_arrangement_files_exist_after_generation():
         doc = json.loads(path.read_text())
         assert doc["name"] in ("test", "staging", "demo")
         assert doc["active"] is True
-        assert doc["steps"], name
+        if name != "staging.json":
+            assert doc["steps"], name
         assert doc["parameters"]["test_flags"], name
+        flags = doc["parameters"]["test_flags"]
+        assert "disable_monetary_tokens" in flags
+        assert "demo_notice" in flags

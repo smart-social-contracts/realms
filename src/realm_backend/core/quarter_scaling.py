@@ -89,7 +89,12 @@ def _capital_runtime_config(realm) -> dict:
             "test_mode_skip_terms": bool(g("test_mode_skip_terms", False)),
             "test_mode_skip_passport_zkproof": bool(g("test_mode_skip_passport_zkproof", False)),
             "test_mode_skip_authentication": bool(g("test_mode_skip_authentication", False)),
+            "test_mode_disable_monetary_tokens": bool(
+                g("test_mode_disable_monetary_tokens", False)
+            ),
+            "test_mode_demo_notice": bool(g("test_mode_demo_notice", False)),
         },
+        "demo_notice_body": g("demo_notice_body", ""),
     }
 
 

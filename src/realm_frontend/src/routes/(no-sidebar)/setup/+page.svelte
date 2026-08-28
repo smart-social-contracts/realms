@@ -40,7 +40,6 @@
 	import { generateBrandingAssets } from '$lib/setup/brandingGenerate';
 	import {
 		CUSTOM_TOKEN_ID,
-		SHARED_TOKEN_CATALOG,
 		configureTokenPayload,
 		matchSharedToken,
 		completeCatalogTokenDraft,
@@ -48,7 +47,18 @@
 	} from '$lib/setup/sharedTokens';
 	import { fileToCompressedDataUrl, urlToCompressedDataUrl } from '$lib/utils/imageDataUrl';
 	import { setupStateStore } from '$lib/stores/setupState';
-	import { realmManifesto, realmName, realmWelcomeMessage } from '$lib/stores/realmInfo';
+	import {
+		demoNoticeBody,
+		realmManifesto,
+		realmName,
+		realmPrimaryLanguage,
+		realmWelcomeMessage,
+		testModeDemoNotice,
+		testModeDisableMonetaryTokens
+	} from '$lib/stores/realmInfo';
+	import DemoNotice from '$lib/components/DemoNotice.svelte';
+	import TokenChoiceList from '$lib/components/TokenChoiceList.svelte';
+	import { isTokenChoiceSelectable } from '$lib/config/hostTestFlags';
 	import PublicDashboardPreview from '$lib/setup/PublicDashboardPreview.svelte';
 	import BrandingDropzone from '$lib/setup/BrandingDropzone.svelte';
 	import { get } from 'svelte/store';
@@ -109,6 +119,10 @@
 	let brandingApplyInFlight: Promise<void> | null = null;
 	let selectedLanguages = $state<string[]>(['en']);
 	let primaryLanguage = $state('en');
+	let noticeChecked = $state(false);
+	let noticeConfirmed = $state(false);
+
+	const NOTICE_STORAGE_KEY = 'realms.demo-notice.setup-accepted';
 
 	const stepIndex = $derived(steps.findIndex((s) => s.id === currentStep));
 	const isWelcomeStep = $derived(currentStep === 'welcome');
@@ -155,6 +169,7 @@
 	const languagesDraftValid = $derived(
 		!('error' in normalizeLanguages(selectedLanguages, primaryLanguage))
 	);
+	const showNoticeGate = $derived($testModeDemoNotice && !noticeConfirmed);
 	const summaryLanguages = $derived(
 		(setupState?.draft?.languages?.languages as string[] | undefined) ||
 			setupState?.languages ||
@@ -635,6 +650,7 @@
 	}
 
 	function selectTokenChoice(id: string) {
+		if (!isTokenChoiceSelectable(id, $testModeDisableMonetaryTokens)) return;
 		tokenChoice = id;
 		if (id === CUSTOM_TOKEN_ID) return;
 		const token = tokenDraftFromChoice(id, { symbol: '', token_canister_id: '' });
@@ -925,8 +941,25 @@
 		return launchState?.steps.find((step) => step.name === name)?.error ?? null;
 	}
 
+	function confirmNotice() {
+		if (!noticeChecked) return;
+		noticeConfirmed = true;
+		if (browser) {
+			try {
+				sessionStorage.setItem(NOTICE_STORAGE_KEY, '1');
+			} catch {
+				// ignore quota / private mode
+			}
+		}
+	}
+
 	onMount(() => {
 		if (!browser) return;
+		try {
+			noticeConfirmed = sessionStorage.getItem(NOTICE_STORAGE_KEY) === '1';
+		} catch {
+			noticeConfirmed = false;
+		}
 		void loadWizard();
 		const timer = setInterval(async () => {
 			if (leftSetup) return;
@@ -960,7 +993,26 @@
 	<title>{$_('setup.wizard.document_title', { values: { name: $realmName || $_('setup.wizard.unnamed_realm') } })}</title>
 </svelte:head>
 
-<div class="setup-wizard" class:setup-wizard--welcome={isWelcomeStep}>
+<div class="setup-wizard" class:setup-wizard--welcome={isWelcomeStep && !showNoticeGate}>
+	{#if showNoticeGate}
+		<div class="setup-wizard__shell">
+			<DemoNotice
+				bodies={$demoNoticeBody}
+				primaryLanguage={$realmPrimaryLanguage || primaryLanguage}
+				bind:accepted={noticeChecked}
+			/>
+			<div class="mt-4">
+				<Button
+					color="none"
+					class={primaryButtonClass}
+					disabled={!noticeChecked}
+					onclick={confirmNotice}
+				>
+					{$_('setup.wizard.continue')}
+				</Button>
+			</div>
+		</div>
+	{:else}
 	{#if isWelcomeStep}
 		<div class="setup-wizard__ambient" aria-hidden="true">
 			<span class="setup-wizard__ambient-glow"></span>
@@ -1237,50 +1289,21 @@
 					<P class="text-gray-600">
 						Use a shared token already on the network, or point at your own ICRC-1 ledger.
 					</P>
-					<div class="setup-wizard__codex-list">
-						{#each SHARED_TOKEN_CATALOG as token (token.id)}
-							<label
-								class="setup-wizard__codex-card setup-wizard__codex-card--compact"
-								class:setup-wizard__codex-card--selected={tokenChoice === token.id}
-							>
-								<input
-									type="radio"
-									name="token"
-									value={token.id}
-									checked={tokenChoice === token.id}
-									onchange={() => selectTokenChoice(token.id)}
-								/>
-								<div class="setup-wizard__codex-card-body">
-									<strong>{token.name}</strong>
-									<p class="setup-wizard__codex-description text-sm text-gray-600">
-										{token.description}
-									</p>
-								</div>
-							</label>
-						{/each}
-						<label
-							class="setup-wizard__codex-card setup-wizard__codex-card--compact"
-							class:setup-wizard__codex-card--selected={tokenChoice === CUSTOM_TOKEN_ID}
-						>
-							<input
-								type="radio"
-								name="token"
-								value={CUSTOM_TOKEN_ID}
-								checked={tokenChoice === CUSTOM_TOKEN_ID}
-								onchange={() => selectTokenChoice(CUSTOM_TOKEN_ID)}
-							/>
-							<div class="setup-wizard__codex-card-body">
-								<strong>Custom token</strong>
-								<p class="setup-wizard__codex-description text-sm text-gray-600">
-									Your own ICRC-1 ledger canister.
-								</p>
-							</div>
-						</label>
-					</div>
+					<TokenChoiceList
+						selectedId={tokenChoice}
+						monetaryDisabled={$testModeDisableMonetaryTokens}
+						locale={primaryLanguage}
+						onSelect={selectTokenChoice}
+					/>
 					{#if tokenChoice === CUSTOM_TOKEN_ID}
 						<div class="setup-wizard__field">
 							<Label for="token-symbol">Token symbol</Label>
-							<Input id="token-symbol" bind:value={tokenSymbol} placeholder="MYTOKEN" />
+							<Input
+								id="token-symbol"
+								bind:value={tokenSymbol}
+								placeholder="MYTOKEN"
+								disabled={$testModeDisableMonetaryTokens}
+							/>
 						</div>
 						<div class="setup-wizard__field">
 							<Label for="token-canister">Ledger canister ID</Label>
@@ -1288,6 +1311,7 @@
 								id="token-canister"
 								bind:value={tokenCanisterId}
 								placeholder="Existing ledger canister principal"
+								disabled={$testModeDisableMonetaryTokens}
 							/>
 						</div>
 					{/if}
@@ -1549,6 +1573,7 @@
 			{/key}
 		{/if}
 	</div>
+	{/if}
 </div>
 
 <style>

@@ -60,6 +60,58 @@ def skip_passport_zkproof() -> bool:
     return get_realm_flag("test_mode_skip_passport_zkproof", False)
 
 
+def _realm_or_loaded(realm=None):
+    if realm is not None:
+        return realm
+    try:
+        from ggg import Realm
+
+        return Realm.load("1")
+    except Exception:
+        return None
+
+
+def is_monetary_tokens_disabled(realm=None) -> bool:
+    """True when the host UI must gray out ckBTC/ckUSDC/ckEURC/Custom.
+
+    Explicit Realm flag wins. If the field was never set (pre-flag backends),
+    staging/demo/test default to disabled.
+    """
+    from core.demo_notice import default_disable_monetary_tokens, explicit_or_host_default
+
+    realm = _realm_or_loaded(realm)
+    if realm is None:
+        return False
+    return explicit_or_host_default(
+        getattr(realm, "test_mode_disable_monetary_tokens", None),
+        getattr(realm, "network", ""),
+        default_disable_monetary_tokens,
+    )
+
+
+def is_demo_notice_enabled(realm=None) -> bool:
+    """True when join + founder setup must show the configurable demo notice."""
+    from core.demo_notice import default_demo_notice, explicit_or_host_default
+
+    realm = _realm_or_loaded(realm)
+    if realm is None:
+        return False
+    return explicit_or_host_default(
+        getattr(realm, "test_mode_demo_notice", None),
+        getattr(realm, "network", ""),
+        default_demo_notice,
+    )
+
+
+def get_demo_notice_bodies(realm=None) -> dict:
+    """Locale → notice body, English seeded from Legal when unset."""
+    from core.demo_notice import resolve_demo_notice_bodies
+
+    realm = _realm_or_loaded(realm)
+    stored = getattr(realm, "demo_notice_body", "") if realm is not None else ""
+    return resolve_demo_notice_bodies(stored)
+
+
 def get_runtime_flags_payload() -> dict:
     """Lightweight runtime flags + identity for the frontend join flow.
 
@@ -97,6 +149,9 @@ def get_runtime_flags_payload() -> dict:
         "test_mode_skip_passport_zkproof": get_realm_flag(
             "test_mode_skip_passport_zkproof", False
         ),
+        "test_mode_disable_monetary_tokens": is_monetary_tokens_disabled(realm),
+        "test_mode_demo_notice": is_demo_notice_enabled(realm),
+        "demo_notice_body": get_demo_notice_bodies(realm),
         "primary_color": _setup.get_primary_color(realm),
         **_realm_language_flags(realm),
     }

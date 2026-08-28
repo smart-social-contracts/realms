@@ -6,6 +6,11 @@ import { applyBrandingPrimary, DEFAULT_PRIMARY_COLOR, parsePrimaryColor } from '
 import { applyResolvedLocale } from '$lib/i18n';
 import { coerceRealmLanguages } from '$lib/i18n/realmLocales';
 import { userLocale } from '$lib/stores/userLocale';
+import {
+	resolveDemoNoticeEnabled,
+	resolveDisableMonetaryTokens,
+	type DemoNoticeBodies
+} from '$lib/config/hostTestFlags';
 
 const RUNTIME_FLAGS_TIMEOUT_MS = 12_000;
 const STATUS_QUERY_TIMEOUT_MS = 12_000;
@@ -78,6 +83,10 @@ interface RealmInfo {
 	testModeDemoData: boolean;
 	testModeSkipTerms: boolean;
 	testModeSkipPassportZkproof: boolean;
+	testModeDisableMonetaryTokens: boolean;
+	testModeDemoNotice: boolean;
+	demoNoticeBody: Record<string, string>;
+	network: string;
 	loading: boolean;
 	error: string | null;
 }
@@ -104,6 +113,10 @@ const createRealmInfoStore = () => {
 		testModeDemoData: false,
 		testModeSkipTerms: false,
 		testModeSkipPassportZkproof: false,
+		testModeDisableMonetaryTokens: false,
+		testModeDemoNotice: false,
+		demoNoticeBody: {},
+		network: '',
 		loading: true,
 		error: null
 	});
@@ -198,6 +211,11 @@ const createRealmInfoStore = () => {
 						fromFlags?.languages ?? status?.languages,
 						fromFlags?.primary_language ?? status?.primary_language
 					);
+					const network =
+						(fromFlags?.network as string) || (status?.network as string) || '';
+					const noticeBodies = (fromFlags?.demo_notice_body ||
+						status?.demo_notice_body ||
+						{}) as DemoNoticeBodies;
 					update(state => ({
 						...state,
 						name: (fromFlags?.realm_name as string) || (status?.realm_name as string) || '',
@@ -222,6 +240,18 @@ const createRealmInfoStore = () => {
 						testModeDemoData: (fromFlags?.test_mode_demo_data as boolean) ?? (status?.test_mode_demo_data as boolean) ?? false,
 						testModeSkipTerms: (fromFlags?.test_mode_skip_terms as boolean) ?? (status?.test_mode_skip_terms as boolean) ?? false,
 						testModeSkipPassportZkproof: (fromFlags?.test_mode_skip_passport_zkproof as boolean) ?? (status?.test_mode_skip_passport_zkproof as boolean) ?? false,
+						testModeDisableMonetaryTokens: resolveDisableMonetaryTokens(
+							(fromFlags?.test_mode_disable_monetary_tokens as boolean | undefined) ??
+								(status?.test_mode_disable_monetary_tokens as boolean | undefined),
+							network
+						),
+						testModeDemoNotice: resolveDemoNoticeEnabled(
+							(fromFlags?.test_mode_demo_notice as boolean | undefined) ??
+								(status?.test_mode_demo_notice as boolean | undefined),
+							network
+						),
+						demoNoticeBody: noticeBodies && typeof noticeBodies === 'object' ? noticeBodies : {},
+						network,
 						loading: false
 					}));
 					if (browser) {
@@ -278,3 +308,7 @@ export const testModeUserSelfRegistration = derived(realmInfo, $r => $r.testMode
 export const testModeDemoData = derived(realmInfo, $r => $r.testModeDemoData);
 export const testModeSkipTerms = derived(realmInfo, $r => $r.testModeSkipTerms);
 export const testModeSkipPassportZkproof = derived(realmInfo, $r => $r.testModeSkipPassportZkproof);
+export const testModeDisableMonetaryTokens = derived(realmInfo, $r => $r.testModeDisableMonetaryTokens);
+export const testModeDemoNotice = derived(realmInfo, $r => $r.testModeDemoNotice);
+export const demoNoticeBody = derived(realmInfo, $r => $r.demoNoticeBody);
+export const realmNetwork = derived(realmInfo, $r => $r.network);

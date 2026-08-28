@@ -47,6 +47,8 @@ TEST_PARAM_MAP: dict[str, str] = {
     "TEST_MODE_DEMO_DATA": "demo_data",
     "TEST_MODE_SKIP_TERMS": "skip_terms",
     "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
+    "TEST_MODE_DISABLE_MONETARY_TOKENS": "disable_monetary_tokens",
+    "TEST_MODE_DEMO_NOTICE": "demo_notice",
 }
 
 LITE_EXTENSIONS = [

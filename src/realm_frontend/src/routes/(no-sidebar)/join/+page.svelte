@@ -11,7 +11,9 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { resolve } from '$app/paths';
-  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmManifesto, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
+  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmManifesto, realmOpenRegistration, realmPrimaryLanguage, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms, testModeDemoNotice, demoNoticeBody } from '$lib/stores/realmInfo';
+  import DemoNotice from '$lib/components/DemoNotice.svelte';
+  import { shouldShowJoinNotice } from '$lib/config/hostTestFlags';
   import { cn } from '$lib/theme/utilities';
   import { formatQuarterLabel } from '$lib/utils/quarterLabels';
   import { probeFederatedMembership, activateMembership } from '$lib/utils/federatedMembership';
@@ -121,12 +123,14 @@
     window.open(internetIdentityUrl, '_blank', 'noopener,noreferrer');
   }
 
+  $: showJoinNotice = shouldShowJoinNotice($testModeDemoNotice, $testModeSkipTerms);
+
   // ── Linear step model for the progress indicator (issue #156) ──────────────
-  // Order: Sign In → Terms → Profile → Welcome. System assigns the quarter;
+  // Order: Sign In → Notice → Profile → Welcome. System assigns the quarter;
   // there is no free pick_quarter step on the open-registration path.
   $: steps = [
     { id: 'auth', label: 'Sign In' },
-    ...($testModeSkipTerms ? [] : [{ id: 'terms', label: 'Terms' }]),
+    ...(showJoinNotice ? [{ id: 'terms', label: 'Notice' }] : []),
     { id: 'profile', label: 'Invitation' },
     { id: 'success', label: 'Welcome' },
   ];
@@ -166,10 +170,14 @@
   function stepAfterProbe() {
     // Founders registered at deploy time must not be sent back through invite.
     if (userHasJoined) return 'already_joined';
-    if ($testModeIIBypass) {
+    // Demo notice replaces T&C. II bypass does not skip it.
+    if (shouldShowJoinNotice($testModeDemoNotice, $testModeSkipTerms)) {
+      return 'terms';
+    }
+    if ($testModeIIBypass || $testModeSkipTerms) {
       return 'profile';
     }
-    return $testModeSkipTerms ? 'profile' : 'terms';
+    return 'profile';
   }
 
   function membershipQuarterLabel(hit) {
@@ -615,7 +623,7 @@
 
   function handleTermsAccept() {
     if (!agreement) {
-      error = 'Please accept the terms to continue';
+      error = 'Please confirm you understand this notice';
       return;
     }
     error = '';
@@ -1034,9 +1042,6 @@
       <!-- Step: Terms -->
       {:else if currentStep === 'terms'}
         <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
-          <h2 class="text-2xl font-bold text-gray-900 mb-2">Terms & Conditions</h2>
-          <p class="text-gray-500 mb-6">Please review and accept to continue</p>
-
           {#if showQuarterBanner}
             <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
               <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
@@ -1064,41 +1069,11 @@
             </div>
           {/if}
           
-          <div class="space-y-4 mb-6">
-            <div class="flex gap-3 p-3 bg-gray-50 rounded-lg items-start">
-              <svg class="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p class="text-sm text-gray-700">Your interactions will be governed by smart contracts deployed on the Internet Computer Protocol</p>
-            </div>
-            <div class="flex gap-3 p-3 bg-gray-50 rounded-lg items-start">
-              <svg class="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <p class="text-sm text-gray-700">You maintain ownership of your digital assets and identity</p>
-            </div>
-            <div class="flex gap-3 p-3 bg-gray-50 rounded-lg items-start">
-              <svg class="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-              </svg>
-              <p class="text-sm text-gray-700">Your participation is subject to the rules established by decentralized governance</p>
-            </div>
-            <div class="flex gap-3 p-3 bg-gray-50 rounded-lg items-start">
-              <svg class="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-              </svg>
-              <p class="text-sm text-gray-700">All transactions are recorded on the Internet Computer blockchain</p>
-            </div>
-          </div>
-          
-          <label class="flex items-center gap-3 p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors mb-6">
-            <input 
-              type="checkbox" 
-              bind:checked={agreement}
-              class="w-5 h-5 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-            />
-            <span class="text-sm font-medium text-gray-700">I agree to these terms and conditions</span>
-          </label>
+          <DemoNotice
+            bodies={$demoNoticeBody}
+            primaryLanguage={$realmPrimaryLanguage}
+            bind:accepted={agreement}
+          />
           
           <div class="flex gap-3">
             {#if prevStepId}

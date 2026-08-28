@@ -1628,6 +1628,8 @@ def _link_token_nft_canisters(
                 "TEST_MODE_SKIP_TERMS": "skip_terms",
                 "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
                 "TEST_MODE_SKIP_AUTHENTICATION": "skip_authentication",
+                "TEST_MODE_DISABLE_MONETARY_TOKENS": "disable_monetary_tokens",
+                "TEST_MODE_DEMO_NOTICE": "demo_notice",
             }
             flags = {
                 fk: bool(parameters[pk])

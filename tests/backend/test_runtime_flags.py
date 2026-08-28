@@ -141,6 +141,36 @@ def test_runtime_flags_payload_includes_languages(fake_ggg):
     assert payload["primary_language"] == "ca-valencia"
 
 
+def test_runtime_flags_payload_includes_host_demo_flags(fake_ggg):
+    _set_realm(
+        name="Demo Realm",
+        network="staging",
+        test_mode_disable_monetary_tokens=True,
+        test_mode_demo_notice=True,
+        demo_notice_body="",
+    )
+    payload = fake_ggg.get_runtime_flags_payload()
+    assert payload["success"] is True
+    assert payload["test_mode_disable_monetary_tokens"] is True
+    assert payload["test_mode_demo_notice"] is True
+    assert payload["demo_notice_body"]["en"]
+    assert "software" in payload["demo_notice_body"]["en"]
+    assert "sofware" not in payload["demo_notice_body"]["en"]
+    assert payload["demo_notice_body"]["es"] == ""
+
+
+def test_runtime_flags_explicit_false_wins_over_host_default(fake_ggg):
+    _set_realm(
+        name="Demo Realm",
+        network="staging",
+        test_mode_disable_monetary_tokens=False,
+        test_mode_demo_notice=False,
+    )
+    payload = fake_ggg.get_runtime_flags_payload()
+    assert payload["test_mode_disable_monetary_tokens"] is False
+    assert payload["test_mode_demo_notice"] is False
+
+
 def test_runtime_flags_payload_includes_primary_color(fake_ggg):
     import json
 

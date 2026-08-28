@@ -63,6 +63,7 @@
       "eyebrow": "Realm setup",
       "configure": "Configure {name}",
       "steps_label": "Setup steps",
+      "step_notice": "Notice",
       "step_welcome": "Welcome",
       "step_codex": "Codex",
       "step_token": "Token",
