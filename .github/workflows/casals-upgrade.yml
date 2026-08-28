@@ -233,6 +233,28 @@ jobs:
           icp identity import casals-ci --from-pem /tmp/casals_ci.pem --storage plaintext
           echo "Upgrade principal: $(icp identity principal --identity casals-ci)"
 
+      # Off-chain monitor (casals.realmsgos.dev) must be in connect-src or the
+      # Cycles page cannot refresh treasury. Stock Casals CSP is IC hosts only;
+      # keep this patch so an older casals_ref cannot regress gos-as-a-service#19.
+      - name: Allow monitor origin in Casals frontend CSP
+        working-directory: casals
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("frontend/static/.ic-assets.json5")
+          text = path.read_text(encoding="utf-8")
+          origin = "https://casals.realmsgos.dev"
+          if origin in text:
+              print(f"CSP already allows {origin}")
+          else:
+              old = "https://identity.ic0.app;"
+              new = f"https://identity.ic0.app {origin};"
+              if old not in text:
+                  raise SystemExit("could not find connect-src insertion point in .ic-assets.json5")
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+              print(f"Added {origin} to connect-src")
+          PY
+
       # ---- Build + deploy -----------------------------------------------------
       - name: Build Casals WASMs
         working-directory: casals
