@@ -26,11 +26,42 @@ parse_notice_bodies = dn.parse_notice_bodies
 resolve_demo_notice_bodies = dn.resolve_demo_notice_bodies
 
 
+_CANISTER_ILLEGAL_ATTRS = (
+    "__file__",
+    "__path__",
+    "__cached__",
+    "__spec__",
+    "inspect.getfile",
+    "inspect.getsourcefile",
+    "loader.get_source",
+)
+
+
 def test_json_seed_matches_python_fallback():
-    seeded = json.loads(dn._DEFAULTS_PATH.read_text(encoding="utf-8"))["en"]
+    defaults_path = MODULE_PATH.with_name("demo_notice_defaults.json")
+    seeded = json.loads(defaults_path.read_text(encoding="utf-8"))["en"]
     _SEEDED_ENGLISH_FALLBACK = dn._SEEDED_ENGLISH_FALLBACK
     assert seeded == _SEEDED_ENGLISH_FALLBACK
     assert DEFAULT_DEMO_NOTICE_EN == _SEEDED_ENGLISH_FALLBACK
+
+
+def test_demo_notice_source_avoids_canister_illegal_attrs():
+    source = MODULE_PATH.read_text(encoding="utf-8")
+    for token in _CANISTER_ILLEGAL_ATTRS:
+        assert token not in source, f"demo_notice must not use {token}"
+
+
+def test_demo_notice_imports_without_file_attr():
+    """Basilisk post_upgrade execs bundled modules with no ``__file__``."""
+    source = MODULE_PATH.read_text(encoding="utf-8")
+    ns = {"__name__": "demo_notice_canister", "__builtins__": __builtins__}
+    exec(compile(source, "demo_notice.py", "exec"), ns)  # noqa: S102
+    assert (
+        "This software is for demo / experimental purposes"
+        in ns["DEFAULT_DEMO_NOTICE_EN"]
+    )
+    assert ns["DEFAULT_DEMO_NOTICE_EN"] == DEFAULT_DEMO_NOTICE_EN
+    assert ns["resolve_demo_notice_bodies"]("")["es"] == ""
 
 
 def test_seeded_english_is_legal_copy_and_spells_software():
@@ -77,9 +108,17 @@ def test_parse_accepts_bare_english_string():
 
 
 def test_explicit_flag_wins_over_host_default():
-    assert dn.explicit_or_host_default(False, "staging", default_disable_monetary_tokens) is False
-    assert dn.explicit_or_host_default(True, "ic", default_disable_monetary_tokens) is True
-    assert dn.explicit_or_host_default(None, "staging", default_disable_monetary_tokens) is True
+    assert (
+        dn.explicit_or_host_default(False, "staging", default_disable_monetary_tokens)
+        is False
+    )
+    assert (
+        dn.explicit_or_host_default(True, "ic", default_disable_monetary_tokens) is True
+    )
+    assert (
+        dn.explicit_or_host_default(None, "staging", default_disable_monetary_tokens)
+        is True
+    )
     assert dn.explicit_or_host_default(None, "ic", default_demo_notice) is False
 
 

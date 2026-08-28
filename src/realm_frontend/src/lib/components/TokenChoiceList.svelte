@@ -26,26 +26,29 @@
 
 	const unavailable = $derived(monetaryUnavailableLabel(locale));
 
+	function selectable(id: string): boolean {
+		return isTokenChoiceSelectable(id, monetaryDisabled);
+	}
+
 	function choose(id: string) {
-		if (!isTokenChoiceSelectable(id, monetaryDisabled)) return;
+		if (!selectable(id)) return;
 		onSelect(id);
 	}
 </script>
 
 <div class="setup-wizard__codex-list">
 	{#each SHARED_TOKEN_CATALOG as token (token.id)}
-		{@const selectable = isTokenChoiceSelectable(token.id, monetaryDisabled)}
 		<label
 			class="setup-wizard__codex-card setup-wizard__codex-card--compact"
 			class:setup-wizard__codex-card--selected={selectedId === token.id}
-			class:setup-wizard__codex-card--disabled={!selectable}
+			class:setup-wizard__codex-card--disabled={!selectable(token.id)}
 		>
 			<input
 				type="radio"
 				{name}
 				value={token.id}
 				checked={selectedId === token.id}
-				disabled={!selectable}
+				disabled={!selectable(token.id)}
 				onchange={() => choose(token.id)}
 			/>
 			<div class="setup-wizard__codex-card-body">
@@ -53,24 +56,23 @@
 				<p class="setup-wizard__codex-description text-sm text-gray-600">
 					{token.description}
 				</p>
-				{#if !selectable}
+				{#if !selectable(token.id)}
 					<p class="text-xs text-gray-500 mt-1">{unavailable}</p>
 				{/if}
 			</div>
 		</label>
 	{/each}
-	{@const customSelectable = isTokenChoiceSelectable(CUSTOM_TOKEN_ID, monetaryDisabled)}
 	<label
 		class="setup-wizard__codex-card setup-wizard__codex-card--compact"
 		class:setup-wizard__codex-card--selected={selectedId === CUSTOM_TOKEN_ID}
-		class:setup-wizard__codex-card--disabled={!customSelectable}
+		class:setup-wizard__codex-card--disabled={!selectable(CUSTOM_TOKEN_ID)}
 	>
 		<input
 			type="radio"
 			{name}
 			value={CUSTOM_TOKEN_ID}
 			checked={selectedId === CUSTOM_TOKEN_ID}
-			disabled={!customSelectable}
+			disabled={!selectable(CUSTOM_TOKEN_ID)}
 			onchange={() => choose(CUSTOM_TOKEN_ID)}
 		/>
 		<div class="setup-wizard__codex-card-body">
@@ -78,7 +80,7 @@
 			<p class="setup-wizard__codex-description text-sm text-gray-600">
 				Your own ICRC-1 ledger canister.
 			</p>
-			{#if !customSelectable}
+			{#if !selectable(CUSTOM_TOKEN_ID)}
 				<p class="text-xs text-gray-500 mt-1">{unavailable}</p>
 			{/if}
 		</div>

@@ -1,6 +1,7 @@
 """Host demo notice + monetary-token test flags.
 
-The English notice body is seeded from ``demo_notice_defaults.json`` (Legal).
+The English notice body is the Legal seed (kept in-module for the canister;
+``demo_notice_defaults.json`` is the host Legal copy — tests require a match).
 Primary-locale slots are stored on the Realm entity and left empty until
 Legal/Story writes them — this module does not invent translations.
 
@@ -11,9 +12,6 @@ Test (gos.earth) default: monetary tokens disabled; notice follows skip_terms.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
-_DEFAULTS_PATH = Path(__file__).with_name("demo_notice_defaults.json")
 
 HOST_DISABLE_MONETARY_NETWORKS = frozenset({"staging", "demo", "test"})
 HOST_DEMO_NOTICE_NETWORKS = frozenset({"staging", "demo"})
@@ -22,6 +20,9 @@ HOST_DEMO_NOTICE_NETWORKS = frozenset({"staging", "demo"})
 NOTICE_LOCALE_SLOTS = ("en", "es", "de", "fr", "it", "zh-CN", "ca-valencia")
 
 
+# Canister Python has no module path and no readable copy of the JSON, so the
+# Legal English seed lives here. ``demo_notice_defaults.json`` stays the host
+# Legal source; tests require the two texts to match.
 _SEEDED_ENGLISH_FALLBACK = (
     "Before you continue. Please read. This is a notice, not a contract.\n\n"
     "1. This software is for demo / experimental purposes. Do not use for any "
@@ -35,18 +36,7 @@ _SEEDED_ENGLISH_FALLBACK = (
 )
 
 
-def _load_seeded_english() -> str:
-    try:
-        raw = json.loads(_DEFAULTS_PATH.read_text(encoding="utf-8"))
-        text = str(raw.get("en") or "").strip()
-    except Exception:
-        text = ""
-    if not text:
-        text = _SEEDED_ENGLISH_FALLBACK
-    return text.replace("sofware", "software")
-
-
-DEFAULT_DEMO_NOTICE_EN = _load_seeded_english()
+DEFAULT_DEMO_NOTICE_EN = _SEEDED_ENGLISH_FALLBACK.replace("sofware", "software")
 
 
 def normalize_network(network: str | None) -> str:
@@ -64,7 +54,9 @@ def default_demo_notice(network: str | None) -> bool:
 def seed_host_flag_defaults(obj: dict, network: str | None = None) -> dict:
     """Set missing host go-live fields on a Realm migrate dict. Never overwrites."""
     net = normalize_network(network if network is not None else obj.get("network"))
-    obj.setdefault("test_mode_disable_monetary_tokens", default_disable_monetary_tokens(net))
+    obj.setdefault(
+        "test_mode_disable_monetary_tokens", default_disable_monetary_tokens(net)
+    )
     obj.setdefault("test_mode_demo_notice", default_demo_notice(net))
     obj.setdefault("demo_notice_body", "")
     return obj
