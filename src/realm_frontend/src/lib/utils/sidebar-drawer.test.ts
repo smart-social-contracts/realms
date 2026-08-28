@@ -19,10 +19,13 @@ describe('sidebar drawer vs desktop rail', () => {
 
 	it('shows a scrim + sliding panel only on the mobile drawer', () => {
 		expect(sidebar).toContain('lg:hidden');
+		expect(sidebar).toContain('mobile-nav-drawer');
 		expect(sidebar).toContain('drawer-backdrop');
 		expect(sidebar).toContain('drawer-panel');
 		expect(sidebar).toContain("aria-label=\"Close menu\"");
 		expect(sidebar).toMatch(/drawerHidden \? 'pointer-events-none'/);
+		expect(sidebar).toContain('@media (min-width: 1024px)');
+		expect(sidebar).toMatch(/\.mobile-nav-drawer[\s\S]*pointer-events:\s*none/);
 	});
 
 	it('clips the desktop rail while it collapses so the banner is not covered', () => {

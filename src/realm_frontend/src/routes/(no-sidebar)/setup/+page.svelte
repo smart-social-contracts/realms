@@ -78,6 +78,8 @@
 		{ id: 'review', labelKey: 'setup.wizard.step_review', skippable: false }
 	];
 
+	const toolbarNativeClass =
+		'text-center font-medium inline-flex items-center justify-center px-5 py-2.5 text-sm rounded-lg disabled:cursor-not-allowed disabled:opacity-50';
 	const primaryButtonClass =
 		'bg-gray-900 text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900';
 	const secondaryButtonClass =
@@ -1144,29 +1146,29 @@
 						</Button>
 					{:else if currentStep === 'review'}
 						{#if launchFailed}
-							<Button
-								color="none"
-								class={primaryButtonClass}
+							<button
+								type="button"
+								class="{toolbarNativeClass} {primaryButtonClass}"
 								style={primaryColor ? `background:${primaryColor};border-color:${primaryColor}` : ''}
 								disabled={busy}
 								onclick={handleLaunch}
 							>
 								{busy ? $_('setup.wizard.launch_retrying') : $_('setup.wizard.launch_retry')}
-							</Button>
+							</button>
 						{:else if launchCompleted}
 							<Button color="none" class={primaryButtonClass} disabled>{$_('setup.wizard.launch_complete')}</Button>
 						{:else if launchRunning}
 							<Button color="none" class={primaryButtonClass} disabled>{$_('setup.wizard.launching')}</Button>
 						{:else}
-							<Button
-								color="none"
-								class={primaryButtonClass}
+							<button
+								type="button"
+								class="{toolbarNativeClass} {primaryButtonClass}"
 								style={primaryColor ? `background:${primaryColor};border-color:${primaryColor}` : ''}
 								disabled={busy || !summaryCodexPackage}
 								onclick={handleLaunch}
 							>
 								{busy ? $_('setup.wizard.launch_starting') : $_('setup.wizard.launch_start')}
-							</Button>
+							</button>
 						{/if}
 					{/if}
 				</div>

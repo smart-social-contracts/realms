@@ -161,6 +161,9 @@ export async function mountSandboxedExtension(
   iframe.style.border = 'none';
   iframe.style.display = 'block';
   iframe.style.minHeight = '200px';
+  iframe.style.position = 'relative';
+  iframe.style.zIndex = '1';
+  iframe.style.pointerEvents = 'auto';
 
   container.innerHTML = '';
   container.appendChild(iframe);
