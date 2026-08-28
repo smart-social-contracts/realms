@@ -63,6 +63,11 @@
 		min-height: 0;
 		overflow: hidden;
 	}
+	/* Closed 0fr rows can still leak descendant boxes into hit-testing
+	   (mouse misses the visible control; Tab+Enter still activates it). */
+	.sidebar-fold:not(.is-open) > .fold {
+		pointer-events: none;
+	}
 	.sidebar-fold > .fold-summary :global(.fold-chevron) {
 		flex-shrink: 0;
 		transform: rotate(-90deg);

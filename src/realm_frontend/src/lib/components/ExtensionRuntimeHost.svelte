@@ -497,6 +497,18 @@
 		overflow: hidden;
 	}
 
+	.extension-mount-point {
+		position: relative;
+		z-index: 1;
+		pointer-events: auto;
+	}
+
+	.extension-mount-point :global(iframe) {
+		position: relative;
+		z-index: 1;
+		pointer-events: auto;
+	}
+
 	.extension-mount-point.hidden,
 	.extension-host-fullbleed :global(.extension-mount-point.hidden) {
 		display: none !important;

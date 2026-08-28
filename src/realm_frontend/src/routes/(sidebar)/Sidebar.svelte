@@ -290,7 +290,7 @@
 
 <!-- Mobile drawer: fill the pane under the header (no guessed top-16 gap). -->
 <div
-	class="absolute inset-0 z-[60] lg:hidden {drawerHidden ? 'pointer-events-none' : ''}"
+	class="mobile-nav-drawer absolute inset-0 z-[60] lg:hidden {drawerHidden ? 'pointer-events-none' : ''}"
 	role="dialog"
 	aria-modal={!drawerHidden}
 	aria-hidden={drawerHidden}
@@ -685,6 +685,15 @@
 		.drawer-backdrop,
 		.drawer-panel {
 			transition: none;
+		}
+	}
+	/* Desktop: the drawer is a full-pane stacking layer. If `lg:hidden` is
+	   missing from the built CSS, an open drawer (desktop default) steals
+	   every mouse hit while Tab can still reach controls underneath. */
+	@media (min-width: 1024px) {
+		.mobile-nav-drawer {
+			display: none !important;
+			pointer-events: none !important;
 		}
 	}
 </style>

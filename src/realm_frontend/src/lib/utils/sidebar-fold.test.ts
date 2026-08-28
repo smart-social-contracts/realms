@@ -42,6 +42,11 @@ describe('sidebar fold animation', () => {
 		expect(fold).toContain('setOpen?.(open)');
 	});
 
+	it('disables hits on a closed fold so leaked 0fr boxes cannot steal clicks', () => {
+		expect(fold).toContain('.sidebar-fold:not(.is-open) > .fold');
+		expect(fold).toContain('pointer-events: none');
+	});
+
 	it('rotates only this fold’s chevron, not nested or sibling rows', () => {
 		expect(fold).toContain('transition: transform 200ms ease-out');
 		expect(fold).toContain('.sidebar-fold.is-open > .fold-summary :global(.fold-chevron)');

@@ -25,6 +25,9 @@
 			justify-content: center;
 			align-items: center;
 			background: #ffffff;
+			/* Visual only. A leftover splash must not steal mouse hits while
+			   Tab can still reach the focused control underneath. */
+			pointer-events: none;
 		}
 
 		#app-splash .globe-stage {
