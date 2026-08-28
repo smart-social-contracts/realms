@@ -2025,7 +2025,30 @@ def _set_canister_config_impl(
         if installed_version:
             realm.installed_version = installed_version
         if network:
+            previous_network = getattr(realm, "network", "") or ""
             realm.network = network
+            # Seed host go-live defaults the first time a staging/demo/test
+            # network is recorded, unless this call already set those flags.
+            incoming_flags = {}
+            if test_flags_json:
+                try:
+                    parsed_incoming = json.loads(test_flags_json)
+                    if isinstance(parsed_incoming, dict):
+                        incoming_flags = parsed_incoming
+                except (TypeError, ValueError):
+                    incoming_flags = {}
+            if not previous_network:
+                from core.demo_notice import (
+                    default_demo_notice,
+                    default_disable_monetary_tokens,
+                )
+
+                if "disable_monetary_tokens" not in incoming_flags:
+                    realm.test_mode_disable_monetary_tokens = (
+                        default_disable_monetary_tokens(network)
+                    )
+                if "demo_notice" not in incoming_flags:
+                    realm.test_mode_demo_notice = default_demo_notice(network)
 
         if can_test_mode is not None:
             realm.can_test_mode = bool(can_test_mode)
@@ -2041,7 +2064,12 @@ def _set_canister_config_impl(
                     realm.can_test_mode = bool(flags.pop("can_test_mode"))
                 else:
                     flags.pop("can_test_mode")
-            any_flag_true = any(v for v in flags.values() if v)
+            bool_flag_values = [
+                v
+                for k, v in flags.items()
+                if k not in ("demo_notice_body", "notice_body")
+            ]
+            any_flag_true = any(v for v in bool_flag_values if v)
             allowed = test_flags_allowed(
                 effective_network, bool(getattr(realm, "can_test_mode", False))
             )
@@ -2063,10 +2091,17 @@ def _set_canister_config_impl(
                 "skip_terms": "test_mode_skip_terms",
                 "skip_passport_zkproof": "test_mode_skip_passport_zkproof",
                 "skip_authentication": "test_mode_skip_authentication",
+                "disable_monetary_tokens": "test_mode_disable_monetary_tokens",
+                "demo_notice": "test_mode_demo_notice",
             }
             for key, attr in _FLAG_MAP.items():
                 if key in flags:
                     setattr(realm, attr, bool(flags[key]))
+            notice_raw = flags.get("demo_notice_body", flags.get("notice_body"))
+            if notice_raw is not None:
+                from core.demo_notice import dump_notice_bodies, parse_notice_bodies
+
+                realm.demo_notice_body = dump_notice_bodies(parse_notice_bodies(notice_raw))
 
         if accounting_currency:
             symbol = str(accounting_currency).strip()
@@ -2277,7 +2312,8 @@ def set_test_flags_json(args: text) -> text:
 
     Args (JSON): {"test_flags": {...}} or a bare flags object with keys
     test_mode, ii_bypass, user_self_registration, demo_data, skip_terms,
-    skip_passport_zkproof.
+    skip_passport_zkproof, disable_monetary_tokens, demo_notice,
+    demo_notice_body.
 
     Returns: {"success": bool, "message"?: str, "error"?: str}.
     """

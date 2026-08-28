@@ -263,6 +263,7 @@ _QUARTER_CONFIG_STR_FIELDS = (
     "marketplace_canister_id",
     "token_canister_id",
     "nft_canister_id",
+    "demo_notice_body",
 )
 _QUARTER_CONFIG_BOOL_FIELDS = (
     "open_registration",
@@ -277,6 +278,8 @@ _QUARTER_TEST_FLAG_FIELDS = (
     "test_mode_skip_terms",
     "test_mode_skip_passport_zkproof",
     "test_mode_skip_authentication",
+    "test_mode_disable_monetary_tokens",
+    "test_mode_demo_notice",
 )
 # RealmStatus values from ggg/governance/realm.py — duplicated here so this
 # module stays pure-stdlib and unit-testable without the canister.

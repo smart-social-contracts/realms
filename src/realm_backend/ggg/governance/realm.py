@@ -16,7 +16,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 8
+    __version__ = 9
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -41,6 +41,10 @@ class Realm(Entity, TimestampedMixin):
             obj.setdefault("can_test_mode", False)
         if from_version < 8:
             obj.setdefault("sync_state", "")
+        if from_version < 9:
+            from core.demo_notice import seed_host_flag_defaults
+
+            seed_host_flag_defaults(obj)
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.SETUP)
@@ -128,3 +132,9 @@ class Realm(Entity, TimestampedMixin):
     test_mode_skip_terms = Boolean(default=False)
     test_mode_skip_passport_zkproof = Boolean(default=False)
     test_mode_skip_authentication = Boolean(default=False)
+    # Host go-live flags (gos.earth). Staging/demo default on via migrate +
+    # descriptors; do not strip an already-configured treasury ledger.
+    test_mode_disable_monetary_tokens = Boolean(default=False)
+    test_mode_demo_notice = Boolean(default=False)
+    # JSON object of locale → notice body. Empty English falls back to Legal seed.
+    demo_notice_body = String(max_length=8192, default="")

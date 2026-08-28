@@ -1,7 +1,7 @@
 {
   "$comment": "Full-fidelity test-environment arrangement for the realms mundus. Generated from deployment-descriptors/test-mundus-layered.yml (canister ids + parameters.test_flags) and examples/demo manifests. Per realm: set_canister_config_json \u2192 update_realm_config \u2192 register_realm_from_registry \u2192 install_branding_from_registry \u2192 install_codex_from_registry \u2192 install_extension_from_registry (each ext) \u2192 resync_extension_frontends. Apply in batches via Casals apply_arrangement. Regenerate: python3 casals-config/_gen_arrangements.py.",
   "name": "test",
-  "description": "Realms test environment: runtime flags (demo_data=True, ii_bypass=True, skip_authentication=True, skip_passport_zkproof=True, skip_terms=True, test_mode=True, user_self_registration=True) + identity + codex + full extensions.",
+  "description": "Realms test environment: runtime flags (demo_data=True, demo_notice=False, disable_monetary_tokens=True, ii_bypass=True, skip_authentication=True, skip_passport_zkproof=True, skip_terms=True, test_mode=True, user_self_registration=True) + identity + codex + full extensions.",
   "active": true,
   "parameters": {
     "network": "test",
@@ -14,7 +14,9 @@
       "user_self_registration": true,
       "demo_data": true,
       "skip_terms": true,
-      "skip_passport_zkproof": true
+      "skip_passport_zkproof": true,
+      "disable_monetary_tokens": true,
+      "demo_notice": false
     }
   },
   "steps": [
@@ -33,7 +35,9 @@
           "user_self_registration": true,
           "demo_data": true,
           "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_passport_zkproof": true,
+          "disable_monetary_tokens": true,
+          "demo_notice": false
         }
       }
     },
@@ -347,7 +351,9 @@
           "user_self_registration": true,
           "demo_data": true,
           "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_passport_zkproof": true,
+          "disable_monetary_tokens": true,
+          "demo_notice": false
         }
       }
     },
@@ -670,7 +676,9 @@
           "user_self_registration": true,
           "demo_data": true,
           "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_passport_zkproof": true,
+          "disable_monetary_tokens": true,
+          "demo_notice": false
         }
       }
     },

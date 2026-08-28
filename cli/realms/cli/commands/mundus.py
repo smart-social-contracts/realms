@@ -732,6 +732,8 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
             "TEST_MODE_SKIP_TERMS": "skip_terms",
             "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
             "TEST_MODE_SKIP_AUTHENTICATION": "skip_authentication",
+            "TEST_MODE_DISABLE_MONETARY_TOKENS": "disable_monetary_tokens",
+            "TEST_MODE_DEMO_NOTICE": "demo_notice",
         }
         flags = {}
         for param_name, flag_key in _TEST_PARAM_MAP.items():

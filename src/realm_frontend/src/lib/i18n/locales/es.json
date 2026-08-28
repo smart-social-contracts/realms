@@ -15,7 +15,10 @@
     "join": "Unirse",
     "switch_user": "Cambiar usuario",
     "identities": "Mis Identidades",
-    "main_menu": "Menú Principal"
+    "main_menu": "Menú Principal",
+    "notice": "Aviso",
+    "i_understand_this_notice": "Entiendo este aviso",
+    "not_available_in_this_demo": "No disponible en esta demo"
   },
   "navigation": {
     "dashboard": "Panel",

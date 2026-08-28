@@ -14,7 +14,9 @@
       "user_self_registration": true,
       "demo_data": true,
       "skip_terms": true,
-      "skip_passport_zkproof": true
+      "skip_passport_zkproof": true,
+      "disable_monetary_tokens": true,
+      "demo_notice": false
     }
   },
   "steps": [
@@ -33,7 +35,9 @@
           "user_self_registration": true,
           "demo_data": true,
           "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_passport_zkproof": true,
+          "disable_monetary_tokens": true,
+          "demo_notice": false
         }
       }
     },
@@ -212,7 +216,9 @@
           "user_self_registration": true,
           "demo_data": true,
           "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_passport_zkproof": true,
+          "disable_monetary_tokens": true,
+          "demo_notice": false
         }
       }
     },
@@ -391,7 +397,9 @@
           "user_self_registration": true,
           "demo_data": true,
           "skip_terms": true,
-          "skip_passport_zkproof": true
+          "skip_passport_zkproof": true,
+          "disable_monetary_tokens": true,
+          "demo_notice": false
         }
       }
     },
