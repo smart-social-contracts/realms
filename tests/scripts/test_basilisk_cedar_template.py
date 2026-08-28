@@ -79,6 +79,7 @@ def test_leftover_free_pack_forces_cedar(tmp_path, monkeypatch):
     assert captured["cmd"][-2:] == ["realm_backend", str(REPO_ROOT / "src" / "realm_backend" / "main.py")]
     assert captured["env"]["BASILISK_TEMPLATE_WASM"] == str(dest)
     assert Path(captured["env"]["BASILISK_TEMPLATE_WASM"]).name == bct.CEDAR_TEMPLATE_NAME
+    assert captured["env"]["CANISTER_CANDID_PATH"].endswith("src/realm_backend/realm_backend.did")
 
 
 def test_dfx_json_realm_backend_uses_cedar_pack():

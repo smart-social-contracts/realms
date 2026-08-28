@@ -1057,6 +1057,7 @@ export interface _SERVICE {
   'cancel_federal_vote' : ActorMethod<[string], string>,
   'change_quarter' : ActorMethod<[string], RealmResponse>,
   'complete_setup' : ActorMethod<[], string>,
+  'enter_setup' : ActorMethod<[Principal, string, string], string>,
   'create_multi_step_scheduled_task' : ActorMethod<
     [string, string, bigint, bigint],
     string

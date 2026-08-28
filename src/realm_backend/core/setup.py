@@ -96,7 +96,58 @@ def set_realm_registry_canister_id(realm, registry_id: str) -> None:
     update_setup_config(realm, {"realm_registry_canister_id": registry_id})
 
 
-def enter_setup(creator: str, registry_id: str, environment: str = "") -> dict:
+def can_enter_setup(caller: str, is_controller: bool = False) -> bool:
+    """Whether the caller may run first-boot enter_setup.
+
+    IC controllers still work (legacy mundus). The GOS installer is *not* a
+    lasting controller under Casals, so known installer/registry principals
+    and a configured installer/trusted principal may also enter once.
+    """
+    caller = (caller or "").strip()
+    if not caller:
+        return False
+    if is_controller:
+        return True
+    from .network_infra import is_known_bootstrap_principal
+
+    if is_known_bootstrap_principal(caller):
+        return True
+    from ggg import Realm
+
+    realm = Realm.load("1")
+    if not realm:
+        return False
+    installer_id = str(getattr(realm, "installer_canister_id", "") or "").strip()
+    if installer_id and installer_id == caller:
+        return True
+    trusted = [
+        p.strip()
+        for p in str(getattr(realm, "trusted_principals", "") or "").split(",")
+        if p.strip()
+    ]
+    return caller in trusted
+
+
+def record_bootstrap_caller(realm, caller: str) -> None:
+    """Remember the first-boot installer so later @require(realm.admin) passes."""
+    caller = (caller or "").strip()
+    if not caller:
+        return
+    if not str(getattr(realm, "installer_canister_id", "") or "").strip():
+        realm.installer_canister_id = caller
+    trusted = [
+        p.strip()
+        for p in str(getattr(realm, "trusted_principals", "") or "").split(",")
+        if p.strip()
+    ]
+    if caller not in trusted:
+        trusted.append(caller)
+        realm.trusted_principals = ",".join(trusted)
+
+
+def enter_setup(
+    creator: str, registry_id: str, environment: str = "", caller: str = ""
+) -> dict:
     """Record founding creator and registry link when GOS enters in-realm setup."""
     from ggg import Realm
 
@@ -123,6 +174,8 @@ def enter_setup(creator: str, registry_id: str, environment: str = "") -> dict:
     infra_err = apply_network_infra(realm, network)
     if infra_err:
         return infra_err
+    if caller:
+        record_bootstrap_caller(realm, caller)
     return {"ok": True}
 
 

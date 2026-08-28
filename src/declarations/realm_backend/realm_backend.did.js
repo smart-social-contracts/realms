@@ -182,6 +182,7 @@ export const idlFactory = ({ IDL }) => {
     'cancel_federal_vote' : IDL.Func([IDL.Text], [IDL.Text], []),
     'change_quarter' : IDL.Func([IDL.Text], [RealmResponse], []),
     'complete_setup' : IDL.Func([], [IDL.Text], []),
+    'enter_setup' : IDL.Func([IDL.Principal, IDL.Text, IDL.Text], [IDL.Text], []),
     'create_multi_step_scheduled_task' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Nat],
         [IDL.Text],

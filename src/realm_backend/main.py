@@ -8153,12 +8153,14 @@ def register_realm_from_registry(args: text) -> Async[text]:
 def enter_setup(creator: Principal, registry_id: text, environment: text) -> text:
     """Put a new realm into in-realm setup (GOS installer bootstrap)."""
     try:
-        if not ic.is_controller(ic.caller()):
+        from core.setup import can_enter_setup, enter_setup as _enter_setup
+
+        caller = ic.caller().to_str()
+        if not can_enter_setup(caller, is_controller=ic.is_controller(ic.caller())):
             return json.dumps({"ok": False, "error": "unauthorized"})
-        from core.setup import enter_setup as _enter_setup
 
         return json.dumps(
-            _enter_setup(creator.to_str(), registry_id, environment)
+            _enter_setup(creator.to_str(), registry_id, environment, caller=caller)
         )
     except Exception as e:
         logger.error(f"enter_setup error: {e}\n{traceback.format_exc()}")
