@@ -421,6 +421,13 @@ def deploy_backend(
     src_backend = Path("src/realm_backend").resolve()
     wasm_in_cwd = src_backend / ".basilisk" / "realm_backend" / "realm_backend.wasm"
     print(f"   🔨 Building realm_backend WASM (cwd={src_backend})...")
+    _scripts = Path(__file__).resolve().parent
+    if str(_scripts) not in sys.path:
+        sys.path.insert(0, str(_scripts))
+    from basilisk_cedar_template import apply_cedar_template_env
+
+    env = apply_cedar_template_env(env)
+    print(f"   🌲 template: {env['BASILISK_TEMPLATE_WASM']}")
     result = subprocess.run(
         ["python", "-m", "basilisk", "realm_backend", "main.py"],
         cwd=str(src_backend),
@@ -561,7 +568,12 @@ def deploy_frontend(
                 # as a side effect of building the WASM.
                 print("   ⚙️  Metadata unavailable — running Basilisk to "
                       "generate candid...")
-                build_env = env.copy()
+                _scripts = Path(__file__).resolve().parent
+                if str(_scripts) not in sys.path:
+                    sys.path.insert(0, str(_scripts))
+                from basilisk_cedar_template import apply_cedar_template_env
+
+                build_env = apply_cedar_template_env(env)
                 build_env["CANISTER_CANDID_PATH"] = str(candid_path.resolve())
                 bres = subprocess.run(
                     ["python", "-m", "basilisk",

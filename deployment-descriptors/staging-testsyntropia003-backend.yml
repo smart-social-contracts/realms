@@ -2,8 +2,9 @@
 # Deploys the Cedar-gated sandboxed REPL backend (realms#282, toolkit 0.5.3)
 # built from the local checkout. Mode upgrade preserves all realm state.
 #
-# Requires BASILISK_TEMPLATE_WASM pointing at the Cedar-enabled basilisk
-# template, otherwise the sandboxed __shell__ is unavailable in this build.
+# leftover-free / mundus --version build packs via scripts/pack_realm_backend.py
+# (Cedar template only). Do not point BASILISK_TEMPLATE_WASM at the plain
+# CPython template — it is not a pack path.
 version: 2
 network: staging
 

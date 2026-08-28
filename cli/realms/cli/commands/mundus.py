@@ -138,8 +138,9 @@ def _build_artifacts(scope: str = "both") -> dict[str, Path]:
 
     if scope != "frontend_only":
         console.print("  Building backend WASM...")
+        pack_script = project_root / "scripts" / "pack_realm_backend.py"
         result = subprocess.run(
-            ["python", "-m", "basilisk", "realm_backend", "src/realm_backend/main.py"],
+            [sys.executable, str(pack_script)],
             cwd=project_root, capture_output=True, text=True, env=build_env,
         )
         if result.returncode != 0:

@@ -1054,8 +1054,8 @@ dfx --run-deprecated canister call yhw3g-fyaaa-aaaas-qgorq-cai resolve_slug \
   '("realmtest6")' --network test --output json
 # → backend_canister_id, frontend_canister_id
 
-# 2. Backend WASM — build locally, upgrade directly (~25s)
-python -m basilisk realm_backend src/realm_backend/main.py
+# 2. Backend WASM — leftover-free pack with Cedar template only (~25s)
+python3 scripts/pack_realm_backend.py
 gzip -c .basilisk/realm_backend/realm_backend.wasm > /tmp/realm_backend.wasm.gz
 dfx --run-deprecated canister install <backend-id> \
   --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network test
@@ -1114,8 +1114,8 @@ asked to redeploy a `/r/<slug>/` realm, not just the backend):
 ```bash
 cd /path/to/realms
 
-# 1. Backend WASM — build locally, upgrade directly (~25s)
-python -m basilisk realm_backend src/realm_backend/main.py
+# 1. Backend WASM — leftover-free pack with Cedar template only (~25s)
+python3 scripts/pack_realm_backend.py
 gzip -c .basilisk/realm_backend/realm_backend.wasm > /tmp/realm_backend.wasm.gz
 dfx --run-deprecated canister install 4ilhs-2iaaa-aaaac-bfsaq-cai \
   --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network staging

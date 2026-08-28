@@ -8,17 +8,17 @@ pip install -r requirements-dev.txt
 
 pip install -e cli/
 
-# Ensure the CPython canister template WASM is available for the current
-# basilisk version.  Download the latest template from the basilisk GitHub
-# release so we always get the most up-to-date Rust code (timers, etc.).
-# Falls back to copying from a previous version only if download fails.
+# Realm backends pack only with the Cedar basilisk template
+# (cpython_canister_template_cedar.wasm). The plain CPython template has no
+# _basilisk_sandbox and is not a pack path. leftover-free packs go through
+# scripts/pack_realm_backend.py, which sets BASILISK_TEMPLATE_WASM to this file.
 BASILISK_VER=$(python -c "import basilisk; print(basilisk.__version__)")
 BASILISK_DIR="$HOME/.config/basilisk/$BASILISK_VER"
-TEMPLATE="cpython_canister_template.wasm"
-TEMPLATE_URL="https://github.com/smart-social-contracts/basilisk/releases/download/cpython-wasm-3.13.0/$TEMPLATE"
+TEMPLATE="cpython_canister_template_cedar.wasm"
+TEMPLATE_URL="https://github.com/smart-social-contracts/basilisk/releases/download/cpython-wasm-3.13.0-ic1/$TEMPLATE"
 mkdir -p "$BASILISK_DIR"
 if [ ! -f "$BASILISK_DIR/$TEMPLATE" ]; then
-    echo "Downloading CPython canister template from $TEMPLATE_URL ..."
+    echo "Downloading Cedar basilisk template from $TEMPLATE_URL ..."
     if curl -fL -o "$BASILISK_DIR/$TEMPLATE" "$TEMPLATE_URL" 2>/dev/null; then
         echo "Downloaded template WASM to $BASILISK_DIR/$TEMPLATE ($(du -sh "$BASILISK_DIR/$TEMPLATE" | cut -f1))"
     else

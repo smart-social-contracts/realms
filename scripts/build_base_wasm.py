@@ -30,7 +30,9 @@ What the script does
 
    Same shape as `core.runtime_extensions.get_all_extension_manifests`'s
    "no baked-in" path expects.
-3. Runs `python -m basilisk realm_backend src/realm_backend/main.py`.
+3. Packs via the leftover-free Cedar path (`scripts/pack_realm_backend.py`
+   equivalent: ``python -m basilisk`` with ``BASILISK_TEMPLATE_WASM`` forced
+   to ``cpython_canister_template_cedar.wasm``).
 4. Optionally gzips the resulting WASM.
 5. Optionally restores the original `extension_packages/` tree on success.
 
@@ -62,48 +64,11 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-# Realms authorize, so they build on the Cedar-enabled CPython template rather
-# than the plain one. basilisk honours an explicit BASILISK_TEMPLATE_WASM over
-# everything else, but it must be a local file, so this fetches it to a cache
-# and points there. CI, deploy.py and the wizard then all produce Cedar-enabled
-# realms without each remembering to ask. An operator can still point at any
-# template by setting the variable themselves.
-_CEDAR_TEMPLATE_URL = (
-    "https://github.com/smart-social-contracts/basilisk/releases/download/"
-    "cpython-wasm-3.13.0-ic1/cpython_canister_template_cedar.wasm"
-)
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
 
-# C symbol for _basilisk_sandbox.sha256 (basilisk_sandbox.c). Templates built
-# before this export cannot hash spawn sources and must not be used for Realms.
-_SANDBOX_SHA256_SYMBOL = b"sandbox_sha256"
-
-
-def _cedar_template_path() -> str:
-    """Fetch the Cedar template to a local cache and return its path."""
-    import urllib.request
-
-    cache_dir = Path.home() / ".cache" / "realms" / "templates"
-    dest = cache_dir / "cpython_canister_template_cedar.wasm"
-    if not dest.exists():
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        print(f"   ⬇️  fetching Cedar template: {_CEDAR_TEMPLATE_URL}")
-        urllib.request.urlretrieve(_CEDAR_TEMPLATE_URL, dest)
-    return str(dest)
-
-
-def _require_sandbox_sha256_template(template_path: str) -> None:
-    """Refuse to build on a Cedar template that lacks _basilisk_sandbox.sha256."""
-    path = Path(template_path)
-    if not path.is_file():
-        raise SystemExit(f"BASILISK_TEMPLATE_WASM not found: {template_path}")
-    if _SANDBOX_SHA256_SYMBOL not in path.read_bytes():
-        raise SystemExit(
-            f"BASILISK template {template_path} predates _basilisk_sandbox.sha256 "
-            f"(missing C symbol {_SANDBOX_SHA256_SYMBOL!r}). Rebuild the Cedar "
-            f"template from current basilisk (ic-basilisk >= 0.14.2) and point "
-            f"BASILISK_TEMPLATE_WASM at it, or delete the cached template so a "
-            f"fresh one is fetched."
-        )
+from basilisk_cedar_template import apply_cedar_template_env  # noqa: E402
 
 
 # ── Stub source — must stay in sync with what ─────────────────────────────────
@@ -202,16 +167,12 @@ def _run_basilisk(repo_root: Path, *, dry_run: bool) -> Path:
 
     cmd = [sys.executable, "-m", "basilisk", "realm_backend", str(main_py)]
     print(f"   🐍 {' '.join(cmd)}")
+    env = apply_cedar_template_env()
+    print(f"   🌲 template: {env['BASILISK_TEMPLATE_WASM']}")
     if dry_run:
         print("   (dry-run: skipping basilisk invocation)")
         # Fake the path so callers can keep going.
         return repo_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
-
-    env = dict(os.environ)
-    if not env.get("BASILISK_TEMPLATE_WASM"):
-        env["BASILISK_TEMPLATE_WASM"] = _cedar_template_path()
-        print(f"   🌲 template: {env['BASILISK_TEMPLATE_WASM']}")
-    _require_sandbox_sha256_template(env["BASILISK_TEMPLATE_WASM"])
 
     rc = subprocess.run(cmd, cwd=str(repo_root), env=env).returncode
     if rc != 0:
