@@ -1,20 +1,25 @@
 """Guest vs member sidebar chrome (ME is frontend; REALM MANAGEMENT is here)."""
 
-import sys
+import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "src" / "realm_backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.sidebar_visibility import (  # noqa: E402
-    include_sidebar_category,
-    is_realm_member,
-    should_include_core_system,
-)
-
 MAIN_PY = BACKEND / "main.py"
+
+
+def _load_visibility():
+    path = BACKEND / "core" / "sidebar_visibility.py"
+    spec = importlib.util.spec_from_file_location("sidebar_visibility", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_vis = _load_visibility()
+include_sidebar_category = _vis.include_sidebar_category
+is_realm_member = _vis.is_realm_member
+should_include_core_system = _vis.should_include_core_system
 
 
 def test_guest_is_not_a_member():
