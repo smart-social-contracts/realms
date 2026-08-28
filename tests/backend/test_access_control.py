@@ -242,11 +242,59 @@ class TestCheckAccess:
     def test_empty_trusted_principals(self, MockUser, MockRealm):
         realm = MagicMock()
         realm.trusted_principals = ""
+        realm.status = "setup"
+        realm.installer_canister_id = ""
+        realm.test_mode_skip_authentication = False
         MockRealm.load.return_value = realm
         MockUser.__getitem__ = MagicMock(return_value=None)
 
         from core.access import _check_access
         assert _check_access("some-principal", Operations.TRANSFER_CREATE) is False
+
+    @patch("ggg.Realm")
+    @patch("ggg.User")
+    def test_installer_has_admin_during_setup_without_controller(self, MockUser, MockRealm):
+        realm = MagicMock()
+        realm.trusted_principals = ""
+        realm.status = "setup"
+        realm.installer_canister_id = ""
+        realm.test_mode_skip_authentication = False
+        MockRealm.load.return_value = realm
+        MockUser.__getitem__ = MagicMock(return_value=None)
+
+        from core.access import _check_access
+        installer = "fltjm-tyaaa-aaaap-qunhq-cai"
+        assert _check_access(installer, Operations.REALM_ADMIN) is True
+        assert _check_access("random-attacker", Operations.REALM_ADMIN) is False
+
+    @patch("ggg.Realm")
+    @patch("ggg.User")
+    def test_known_installer_loses_blanket_admin_after_setup(self, MockUser, MockRealm):
+        realm = MagicMock()
+        realm.trusted_principals = ""
+        realm.status = "alpha"
+        realm.installer_canister_id = ""
+        realm.test_mode_skip_authentication = False
+        MockRealm.load.return_value = realm
+        MockUser.__getitem__ = MagicMock(return_value=None)
+
+        from core.access import _check_access
+        assert _check_access("fltjm-tyaaa-aaaap-qunhq-cai", Operations.REALM_ADMIN) is False
+
+    @patch("ggg.Realm")
+    @patch("ggg.User")
+    def test_recorded_installer_keeps_admin_after_setup(self, MockUser, MockRealm):
+        realm = MagicMock()
+        realm.trusted_principals = ""
+        realm.status = "alpha"
+        realm.installer_canister_id = "fltjm-tyaaa-aaaap-qunhq-cai"
+        realm.test_mode_skip_authentication = False
+        MockRealm.load.return_value = realm
+        MockUser.__getitem__ = MagicMock(return_value=None)
+
+        from core.access import _check_access
+        assert _check_access("fltjm-tyaaa-aaaap-qunhq-cai", Operations.REALM_ADMIN) is True
+        assert _check_access("random-attacker", Operations.REALM_ADMIN) is False
 
     @patch("ggg.Realm")
     @patch("ggg.User")

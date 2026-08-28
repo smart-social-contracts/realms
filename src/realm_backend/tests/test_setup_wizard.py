@@ -109,6 +109,9 @@ class _FakeRealm:
         self.accounting_currency = accounting_currency
         self.accounting_currency_decimals = accounting_currency_decimals
         self.network = network
+        self.installer_canister_id = ""
+        self.trusted_principals = ""
+        self.test_mode_skip_authentication = False
 
     @classmethod
     def load(cls, _realm_id):
@@ -292,13 +295,18 @@ def test_effective_status_fail_closed_to_setup():
     assert setup_core.effective_realm_status(realm) == "setup"
 
 
-def _enter_setup_with_controller_gate(
-    creator: str, registry_id: str, environment: str = ""
+_TEST_INSTALLER = "fltjm-tyaaa-aaaap-qunhq-cai"
+
+
+def _enter_setup_with_auth_gate(
+    creator: str, registry_id: str, environment: str = "", caller: str = ""
 ) -> dict:
-    """Mirror main.enter_setup controller check + core.enter_setup."""
-    if not mock_ic.is_controller(mock_ic.caller.return_value):
+    """Mirror main.enter_setup caller check + core.enter_setup."""
+    caller = caller or mock_ic.caller.return_value.to_str.return_value
+    is_controller = bool(mock_ic.is_controller(mock_ic.caller.return_value))
+    if not setup_core.can_enter_setup(caller, is_controller=is_controller):
         return {"ok": False, "error": "unauthorized"}
-    return setup_core.enter_setup(creator, registry_id, environment)
+    return setup_core.enter_setup(creator, registry_id, environment, caller=caller)
 
 
 def test_enter_setup_sets_creator_and_registry():
@@ -306,7 +314,7 @@ def test_enter_setup_sets_creator_and_registry():
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate(
+    result = _enter_setup_with_auth_gate(
         "creator-1", "registry-canister", "staging"
     )
 
@@ -329,7 +337,7 @@ def test_enter_setup_fills_empty_infra_ids_for_test():
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate(
+    result = _enter_setup_with_auth_gate(
         "creator-1", "registry-canister", "test"
     )
 
@@ -348,7 +356,7 @@ def test_enter_setup_rejects_unknown_environment():
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate(
+    result = _enter_setup_with_auth_gate(
         "creator-1", "registry-canister", "production"
     )
 
@@ -366,7 +374,7 @@ def test_enter_setup_empty_environment_preserves_existing_network():
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate("creator-1", "registry-canister", "")
+    result = _enter_setup_with_auth_gate("creator-1", "registry-canister", "")
 
     assert result == {"ok": True}
     assert realm.network == "production"
@@ -377,7 +385,7 @@ def test_enter_setup_strips_environment_whitespace():
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate(
+    result = _enter_setup_with_auth_gate(
         "creator-1", "registry-canister", "  test  "
     )
 
@@ -400,7 +408,7 @@ def test_enter_setup_idempotent_for_same_creator():
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate("creator-1", "new-registry")
+    result = _enter_setup_with_auth_gate("creator-1", "new-registry")
 
     assert result == {"ok": True}
     setup_cfg = json.loads(realm.manifest_data)["setup"]
@@ -416,7 +424,7 @@ def test_enter_setup_rejects_different_creator():
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate("creator-2", "registry-canister")
+    result = _enter_setup_with_auth_gate("creator-2", "registry-canister")
 
     assert result == {
         "ok": False,
@@ -424,15 +432,91 @@ def test_enter_setup_rejects_different_creator():
     }
 
 
-def test_enter_setup_rejects_non_controller():
+def test_enter_setup_rejects_random_principal():
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _FakeRealm.reset(realm)
+    mock_ic.is_controller.return_value = False
+    mock_ic.caller.return_value.to_str.return_value = "random-attacker"
+
+    result = _enter_setup_with_auth_gate(
+        "creator-1", "registry-canister", caller="random-attacker"
+    )
+
+    assert result == {"ok": False, "error": "unauthorized"}
+    assert "setup" not in json.loads(realm.manifest_data)
+    assert realm.installer_canister_id == ""
+    assert realm.trusted_principals == ""
+
+
+def test_enter_setup_allows_installer_without_controller():
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _FakeRealm.reset(realm)
+    mock_ic.is_controller.return_value = False
+    mock_ic.caller.return_value.to_str.return_value = _TEST_INSTALLER
+
+    result = _enter_setup_with_auth_gate(
+        "creator-1", "registry-canister", "test", caller=_TEST_INSTALLER
+    )
+
+    assert result == {"ok": True}
+    setup_cfg = json.loads(realm.manifest_data)["setup"]
+    assert setup_cfg["creator_principal"] == "creator-1"
+    assert realm.installer_canister_id == _TEST_INSTALLER
+    assert _TEST_INSTALLER in realm.trusted_principals.split(",")
+
+
+def test_enter_setup_installer_once_is_idempotent_same_creator():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = False
 
-    result = _enter_setup_with_controller_gate("creator-1", "registry-canister")
+    first = _enter_setup_with_auth_gate(
+        "creator-1", "registry-canister", "test", caller=_TEST_INSTALLER
+    )
+    second = _enter_setup_with_auth_gate(
+        "creator-1", "other-registry", "test", caller=_TEST_INSTALLER
+    )
 
-    assert result == {"ok": False, "error": "unauthorized"}
-    assert "setup" not in json.loads(realm.manifest_data)
+    assert first == {"ok": True}
+    assert second == {"ok": True}
+    setup_cfg = json.loads(realm.manifest_data)["setup"]
+    assert setup_cfg["creator_principal"] == "creator-1"
+    assert setup_cfg["realm_registry_canister_id"] == "other-registry"
+
+
+def test_enter_setup_rejects_random_after_installer_bootstrapped():
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _FakeRealm.reset(realm)
+    mock_ic.is_controller.return_value = False
+
+    assert _enter_setup_with_auth_gate(
+        "creator-1", "registry-canister", "test", caller=_TEST_INSTALLER
+    ) == {"ok": True}
+    denied = _enter_setup_with_auth_gate(
+        "creator-2", "registry-canister", "test", caller="random-attacker"
+    )
+    assert denied == {"ok": False, "error": "unauthorized"}
+
+
+def test_bootstrap_admin_allows_installer_during_setup_not_random():
+    from core.access import is_bootstrap_admin_caller
+
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is True
+    assert is_bootstrap_admin_caller("yhw3g-fyaaa-aaaas-qgorq-cai", realm) is True
+    assert is_bootstrap_admin_caller("random-attacker", realm) is False
+    assert is_bootstrap_admin_caller(_TEST_INSTALLER, None) is False
+
+
+def test_bootstrap_admin_recorded_installer_survives_setup_complete():
+    from core.access import is_bootstrap_admin_caller
+
+    realm = _FakeRealm(status=RealmStatus.ALPHA, manifest_data="{}")
+    realm.installer_canister_id = _TEST_INSTALLER
+    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is True
+    assert is_bootstrap_admin_caller("random-attacker", realm) is False
+    realm.installer_canister_id = ""
+    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is False
 
 
 def test_enter_setup_rejects_when_completed():
@@ -445,7 +529,7 @@ def test_enter_setup_rejects_when_completed():
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate("creator-1", "registry-canister")
+    result = _enter_setup_with_auth_gate("creator-1", "registry-canister")
 
     assert result == {"ok": False, "error": "setup already completed"}
 
@@ -454,7 +538,7 @@ def test_enter_setup_rejects_when_realm_missing():
     _FakeRealm.reset(None)
     mock_ic.is_controller.return_value = True
 
-    result = _enter_setup_with_controller_gate("creator-1", "registry-canister")
+    result = _enter_setup_with_auth_gate("creator-1", "registry-canister")
 
     assert result == {"ok": False, "error": "realm not initialized"}
 
