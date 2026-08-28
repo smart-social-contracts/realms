@@ -7264,6 +7264,10 @@ def get_sidebar(args: text) -> text:
             get_all_extension_manifests,
             list_installed as _list_runtime_installed,
         )
+        from core.sidebar_visibility import (
+            include_sidebar_category,
+            should_include_core_system,
+        )
         from ggg import Extension, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, User
 
         caller = ic.caller().to_str()
@@ -7394,23 +7398,28 @@ def get_sidebar(args: text) -> text:
 
         # Core System UI is not an extension (issue #328). Safe mode and
         # revert live here for whoever holds codex.revert (root / Congress).
-        grouped.setdefault("realm_management", []).append(
-            (
-                "_core_system",
-                {
-                    "label": "System",
-                    "icon": "ti-adjustments",
-                    "href": "/ggg",
-                    "tooltip": "Core System: safe mode and codex revert",
-                },
+        # Membership, not caller presence: guests (signed-in, no User
+        # member/admin profile) must not see REALM MANAGEMENT / System.
+        if should_include_core_system(user_profiles):
+            grouped.setdefault("realm_management", []).append(
+                (
+                    "_core_system",
+                    {
+                        "label": "System",
+                        "icon": "ti-adjustments",
+                        "href": "/ggg",
+                        "tooltip": "Core System: safe mode and codex revert",
+                    },
+                )
             )
-        )
 
         # Sort items within each category: DB position > hardcoded default > alphabetical
         categories_out = []
         all_cat_ids = set(grouped.keys()) | set(category_order.keys())
         for cat_id in sorted(all_cat_ids, key=lambda c: category_order.get(c, 50)):
             if cat_id not in grouped:
+                continue
+            if not include_sidebar_category(cat_id, user_profiles):
                 continue
             items = grouped[cat_id]
             default_order = DEFAULT_ITEM_ORDER.get(cat_id, [])

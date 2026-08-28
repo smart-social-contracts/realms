@@ -9,8 +9,9 @@
 	import { styles, cn } from '$lib/theme/utilities';
 	import { topUtilityItems, SECTION_HEADER_ME, SECTION_HEADER_REALM, SECTION_HEADER_MUNDUS } from '$lib/config/sidebar';
 	import { sidebarConfig, sidebarLoading, loadSidebar } from '$lib/stores/sidebar';
-	import { profilesLoading } from '$lib/stores/profiles';
+	import { profilesLoading, userProfiles } from '$lib/stores/profiles';
 	import { isAuthenticated } from '$lib/stores/auth';
+	import { shouldShowMeSection, visibleSidebarCategories } from '$lib/utils/sidebar-member-chrome';
 	import { unreadCount } from '$lib/stores/notifications';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
 	import { isNavItemActive } from '$lib/utils/breadcrumb';
@@ -31,6 +32,8 @@
 
 	$: navPathname = $page.url.pathname;
 	$: navSearch = $page.url.search;
+	$: showMeSection = shouldShowMeSection($isAuthenticated, $userProfiles);
+	$: sidebarCategories = visibleSidebarCategories($sidebarConfig?.categories, $userProfiles);
 
 	function navIsActive(href: string, pathname = navPathname, search = navSearch): boolean {
 		return isNavItemActive(href, pathname, search);
@@ -176,7 +179,8 @@
 			next.__section_me__ = true;
 		}
 
-		const activeCategory = config.categories.find((category) =>
+		const categories = visibleSidebarCategories(config.categories, get(userProfiles));
+		const activeCategory = categories.find((category) =>
 			category.items.some((item) => navIsActive(item.href, pathname, search)),
 		);
 		const inRealm =
@@ -335,6 +339,7 @@
 							</li>
 						</ul>
 					{:else}
+						{#if showMeSection}
 						<div class="pt-5 pb-1">
 							<SidebarFold bind:open={foldOpen['__section_me__']} setOpen={(nextOpen) => setFoldOpen('__section_me__', nextOpen)}>
 								<div slot="header" class="flex w-full min-w-0 items-center justify-between">
@@ -359,6 +364,7 @@
 							</ul>
 							</SidebarFold>
 						</div>
+						{/if}
 						{#if $profilesLoading || $sidebarLoading}
 							<div class="py-4 flex items-center justify-center">
 								<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
@@ -382,7 +388,7 @@
 										</li>
 									{/each}
 								</ul>
-								{#each $sidebarConfig.categories as category (category.id)}
+								{#each sidebarCategories as category (category.id)}
 									<div class="pt-2 pb-1 px-3">
 									<SidebarFold
 										bind:open={foldOpen[category.id]}
@@ -481,6 +487,7 @@
 					</li>
 				</ul>
 			{:else}
+			{#if showMeSection}
 			<!-- ME section (super-category) -->
 			<div class="pt-5 lg:pt-3 pb-1">
 			<SidebarFold bind:open={foldOpen['__section_me__']} setOpen={(nextOpen) => setFoldOpen('__section_me__', nextOpen)}>
@@ -522,6 +529,7 @@
 				</ul>
 			</SidebarFold>
 			</div>
+			{/if}
 
 			<!-- Loading State -->
 			{#if $profilesLoading || $sidebarLoading}
@@ -565,7 +573,7 @@
 					</ul>
 
 					<!-- Category sections (collapsible) -->
-					{#each $sidebarConfig.categories as category (category.id)}
+					{#each sidebarCategories as category (category.id)}
 						<div class="pt-2 pb-1 px-3">
 						<SidebarFold
 							bind:open={foldOpen[category.id]}
