@@ -22,7 +22,7 @@ export function shouldShowMeSection(
 	return Boolean(isAuthenticated) && isRealmMember(profiles);
 }
 
-/** REALM MANAGEMENT (System and any siblings) is member-only. */
+/** REALM MANAGEMENT is member-only. */
 export function visibleSidebarCategories<T extends { id: string }>(
 	categories: readonly T[] | null | undefined,
 	profiles: readonly string[] | null | undefined,
