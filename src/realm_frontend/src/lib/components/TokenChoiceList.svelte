@@ -25,6 +25,9 @@
 	}: Props = $props();
 
 	const unavailable = $derived(monetaryUnavailableLabel(locale));
+	const customSelectable = $derived(
+		isTokenChoiceSelectable(CUSTOM_TOKEN_ID, monetaryDisabled)
+	);
 
 	function choose(id: string) {
 		if (!isTokenChoiceSelectable(id, monetaryDisabled)) return;
@@ -59,7 +62,6 @@
 			</div>
 		</label>
 	{/each}
-	{@const customSelectable = isTokenChoiceSelectable(CUSTOM_TOKEN_ID, monetaryDisabled)}
 	<label
 		class="setup-wizard__codex-card setup-wizard__codex-card--compact"
 		class:setup-wizard__codex-card--selected={selectedId === CUSTOM_TOKEN_ID}

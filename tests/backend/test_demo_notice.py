@@ -27,10 +27,30 @@ resolve_demo_notice_bodies = dn.resolve_demo_notice_bodies
 
 
 def test_json_seed_matches_python_fallback():
+    assert dn._DEFAULTS_PATH is not None
     seeded = json.loads(dn._DEFAULTS_PATH.read_text(encoding="utf-8"))["en"]
     _SEEDED_ENGLISH_FALLBACK = dn._SEEDED_ENGLISH_FALLBACK
     assert seeded == _SEEDED_ENGLISH_FALLBACK
     assert DEFAULT_DEMO_NOTICE_EN == _SEEDED_ENGLISH_FALLBACK
+
+
+def test_seeded_english_survives_missing_file_dunder():
+    """Basilisk canister modules have no ``__file__`` (IC0503 on import)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "demo_notice_no_file", MODULE_PATH
+    )
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    src = MODULE_PATH.read_text(encoding="utf-8")
+    # Simulate the canister exec environment: no __file__ in globals.
+    code = compile(src, str(MODULE_PATH), "exec")
+    ns = {"__name__": "demo_notice_no_file"}
+    exec(code, ns)
+    assert ns["_DEFAULTS_PATH"] is None
+    assert "software" in ns["DEFAULT_DEMO_NOTICE_EN"]
+    assert "sofware" not in ns["DEFAULT_DEMO_NOTICE_EN"]
 
 
 def test_seeded_english_is_legal_copy_and_spells_software():

@@ -13,7 +13,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-_DEFAULTS_PATH = Path(__file__).with_name("demo_notice_defaults.json")
+# Basilisk execs bundled modules with no ``__file__``. Resolve the Legal
+# JSON when a real filesystem path exists; otherwise use the embedded fallback.
+def _defaults_json_path():
+    here = globals().get("__file__")
+    if not here:
+        return None
+    return Path(here).with_name("demo_notice_defaults.json")
+
+
+_DEFAULTS_PATH = _defaults_json_path()
 
 HOST_DISABLE_MONETARY_NETWORKS = frozenset({"staging", "demo", "test"})
 HOST_DEMO_NOTICE_NETWORKS = frozenset({"staging", "demo"})
@@ -36,11 +45,14 @@ _SEEDED_ENGLISH_FALLBACK = (
 
 
 def _load_seeded_english() -> str:
-    try:
-        raw = json.loads(_DEFAULTS_PATH.read_text(encoding="utf-8"))
-        text = str(raw.get("en") or "").strip()
-    except Exception:
-        text = ""
+    text = ""
+    path = _DEFAULTS_PATH
+    if path is not None:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            text = str(raw.get("en") or "").strip()
+        except Exception:
+            text = ""
     if not text:
         text = _SEEDED_ENGLISH_FALLBACK
     return text.replace("sofware", "software")
