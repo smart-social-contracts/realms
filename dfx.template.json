@@ -2,7 +2,7 @@
   "dfx": "0.31.0",
   "canisters": {
     "realm_backend": {
-      "build": "python -m basilisk realm_backend src/realm_backend/main.py",
+      "build": "python3 scripts/pack_realm_backend.py",
       "candid": "src/realm_backend/realm_backend.did",
       "declarations": {
         "node_compatibility": true
