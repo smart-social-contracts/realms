@@ -78,6 +78,9 @@ class Async:
         self._args = args
         self._kwargs = kwargs
 
+    def __class_getitem__(cls, _item):
+        return cls
+
     def __iter__(self):
         raise NotImplementedError(
             "Async inter-canister calls are not supported in local testing. "

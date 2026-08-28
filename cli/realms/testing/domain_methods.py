@@ -105,7 +105,7 @@ def appointment_end(self, ended_at=0):
     self.ended_at = ended_at or int(time.time())
 
 
-def position_appoint(position, user):
+def position_appoint(position, user, kind=None, **kwargs):
     """Mirror of ggg.appoint: idempotent, returns None when full/not open."""
     from .ggg_module import Appointment
     import time
@@ -124,6 +124,9 @@ def position_appoint(position, user):
         started_at=int(time.time()),
         ended_at=0,
         status="active",
+        kind=kind or "substantive",
+        source_canister_id=kwargs.get("source_canister_id", ""),
+        source_position_key=kwargs.get("source_position_key", ""),
     )
 
 

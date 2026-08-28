@@ -206,7 +206,9 @@ class Profiles:
 # ═══════════════════════════════════════════════════════════════════════════
 
 # --- System ---
-User = _entity("User", alias="id")
+User = _entity("User", alias="id", methods={
+    "__relations__": ("departments", "profiles", "extensions", "permissions"),
+})
 Human = _entity("Human", alias="name")
 Identity = _entity("Identity")
 
@@ -234,12 +236,18 @@ Proposal = _entity("Proposal", alias="proposal_id", methods={
 Vote = _entity("Vote")
 Notification = _entity("Notification")
 Codex = _entity("Codex", alias="name")
-Permission = _entity("Permission", alias="name")
+Permission = _entity("Permission", alias="name", methods={
+    "__relations__": ("departments", "users", "profiles"),
+})
 
 Department = _entity("Department", alias="name", methods={
     "__relations__": ("members", "permissions", "extensions"),
 })
 DepartmentAuthority = _entity("DepartmentAuthority")
+Extension = _entity("Extension", alias="name", methods={
+    "__relations__": ("departments", "profiles"),
+})
+MenuDepartmentVisibility = _entity("MenuDepartmentVisibility")
 ROOT_ORG_NAME = "root"
 
 RegistrationCode = _entity("RegistrationCode", alias="code_hash")
@@ -260,6 +268,11 @@ class PositionStatus:
 class AppointmentStatus:
     ACTIVE = "active"
     ENDED = "ended"
+
+
+class AppointmentKind:
+    SUBSTANTIVE = "substantive"
+    ACTING = "acting"
 
 
 Position = _entity("Position", alias="key", methods={
