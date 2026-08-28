@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -11,6 +11,9 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const sidebar = readFileSync(resolve(here, '../../routes/(sidebar)/Sidebar.svelte'), 'utf8');
 const layout = readFileSync(resolve(here, '../../routes/(sidebar)/+layout.svelte'), 'utf8');
+const navbar = readFileSync(resolve(here, '../../routes/(sidebar)/Navbar.svelte'), 'utf8');
+const sidebarConfig = readFileSync(resolve(here, '../config/sidebar.ts'), 'utf8');
+const gggRoute = resolve(here, '../../routes/(sidebar)/ggg/+page.svelte');
 
 const guestProfiles = [] as const;
 const visitorProfiles = ['visitor'] as const;
@@ -93,5 +96,18 @@ describe('Sidebar.svelte membership gate', () => {
 	it('keeps the host brain FAB wiring (not chrome cleanup)', () => {
 		expect(layout).toContain("event.action.type === 'assistant.open'");
 		expect(layout).toContain('portalAssistantOpen');
+	});
+});
+
+describe('leftover /ggg Admin Dashboard is gone', () => {
+	it('does not serve a /ggg host route', () => {
+		expect(existsSync(gggRoute)).toBe(false);
+	});
+
+	it('has no /ggg nav links in host chrome for guest, member, or admin', () => {
+		for (const chrome of [sidebar, layout, navbar, sidebarConfig]) {
+			expect(chrome).not.toContain('/ggg');
+			expect(chrome).not.toContain('_core_system');
+		}
 	});
 });
