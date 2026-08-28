@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -44,5 +44,13 @@ describe('live realm chrome', () => {
 		expect(appHtml).toContain('href="/custom/logo.png"');
 		expect(appHtml).not.toContain('href="/images/logo.png"');
 		expect(appHtml).not.toContain('logo_sphere_only');
+	});
+
+	it('does not ship default /custom brand files in the frontend asset tree', () => {
+		const customDir = resolve(here, '../../../static/custom');
+		expect(existsSync(resolve(customDir, 'logo.png'))).toBe(false);
+		expect(existsSync(resolve(customDir, 'background.png'))).toBe(false);
+		expect(existsSync(resolve(here, '../../../static/images/logo.png'))).toBe(true);
+		expect(existsSync(resolve(here, '../../../static/images/background.png'))).toBe(true);
 	});
 });

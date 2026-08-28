@@ -73,6 +73,11 @@ src/realm_frontend/src/routes/welcome/
 src/realm_frontend/src/lib/i18n/locales/extensions/
 src/realm_frontend/static/extensions/
 
+# Deploy scripts may copy a realm's logo/background into static/custom for a
+# sheet-realm build. Never commit those — a new realm must ship no brand.
+src/realm_frontend/static/custom/logo.png
+src/realm_frontend/static/custom/background.png
+
 # ── OS / editor ─────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

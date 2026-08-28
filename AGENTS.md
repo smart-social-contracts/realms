@@ -807,6 +807,11 @@ asset canister via `install_branding_from_registry` (served same-origin at
 because Casals re-grants the backend `Commit` on the (wiped) asset canister during
 provisioning.
 
+The **frontend asset bundle must not include** `/custom/logo.png` or
+`/custom/background.png`. After a fresh frontend install those paths 404 until
+the founder uploads (or a sheet-realm arrangement installs branding). Host
+chrome under `/images/` is unrelated and may stay.
+
 For the demo realms, publish their source images into the registry first:
 
 ```bash
