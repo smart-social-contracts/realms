@@ -88,6 +88,7 @@ jobs:
                     tests/backend/test_time_utils.py \
                     tests/backend/test_call_origin.py \
                     tests/backend/test_ggg_sdk_json_shim.py \
+                    tests/backend/test_sidebar_visibility.py \
                     tests/backend/test_repl_host.py \
                     tests/backend/test_repl_ui_parity.py \
                     tests/backend/test_shell_access_denied.py
