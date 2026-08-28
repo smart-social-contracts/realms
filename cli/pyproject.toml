@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "realms-gos"
-version = "0.4.0"
-description = "Realms Governance Operating System - CLI and SDK for managing realms on the Internet Computer"
+version = "0.4.1"
+description = "Realms GOS (Governance Operating System) - CLI and SDK for managing realms on the Internet Computer"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -75,7 +75,7 @@ profile = "black"
 multi_line_output = 3
 
 [tool.mypy]
-python_version = "0.4.0"
+python_version = "3.8"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

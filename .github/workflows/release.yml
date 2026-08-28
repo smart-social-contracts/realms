@@ -17,6 +17,16 @@ on:
         required: false
         type: boolean
         default: true
+      skip_version_bump:
+        description: 'Use version.txt as-is instead of bumping (for a pre-set semver such as 0.4.1)'
+        required: false
+        type: boolean
+        default: false
+      cli_only:
+        description: 'Publish the CLI to PyPI only — skip WASM/frontend builds, GitHub release assets, and file_registry'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -34,6 +44,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull latest extensions from main
+        if: ${{ inputs.cli_only != true }}
         run: git submodule update --remote extensions
 
       - name: Set up Python
@@ -42,12 +53,14 @@ jobs:
           python-version: '3.10'
 
       - name: Set up Node.js
+        if: ${{ inputs.cli_only != true }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
 
       - name: Install dfx
+        if: ${{ inputs.cli_only != true }}
         run: |
           DFX_VERSION=0.32.0
           curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
@@ -59,11 +72,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install semver build twine
-          pip install -r requirements.txt
-          pip install -e cli/
+          if [ "${{ inputs.cli_only }}" != "true" ]; then
+            pip install -r requirements.txt
+            pip install -e cli/
+          fi
 
       - name: Configure dfx identity (Casals CI key)
-        if: ${{ inputs.publish_to_registry == true }}
+        if: ${{ inputs.publish_to_registry == true && inputs.cli_only != true }}
         env:
           CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
           IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
@@ -81,7 +96,7 @@ jobs:
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
           echo "release identity principal: $(dfx identity get-principal)"
 
-      # Bump version
+      # Bump version (or reuse the version already written to version.txt)
       - name: Bump version
         id: bump_version
         run: |
@@ -93,12 +108,16 @@ jobs:
           fi
 
           CURRENT_VERSION=$(cat version.txt)
-          NEW_VERSION=$(python -c "import semver; v=semver.VersionInfo.parse('${CURRENT_VERSION}'); print(v.bump_${{ github.event.inputs.release_type || 'patch' }}())")
-
-          echo "${NEW_VERSION}" > version.txt
-
-          sed -i "s/version = \".*\"/version = \"${NEW_VERSION}\"/" cli/pyproject.toml
-          sed -i "s/__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" cli/realms/__init__.py
+          if [ "${{ inputs.skip_version_bump }}" = "true" ]; then
+            NEW_VERSION="${CURRENT_VERSION}"
+            echo "Using pre-set version ${NEW_VERSION} (skip_version_bump)"
+          else
+            NEW_VERSION=$(python -c "import semver; v=semver.VersionInfo.parse('${CURRENT_VERSION}'); print(v.bump_${{ github.event.inputs.release_type || 'patch' }}())")
+            echo "${NEW_VERSION}" > version.txt
+            # Anchor at start-of-line so [tool.mypy] python_version is not overwritten.
+            sed -i "s/^version = \".*\"/version = \"${NEW_VERSION}\"/" cli/pyproject.toml
+            sed -i "s/^__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" cli/realms/__init__.py
+          fi
 
           echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -116,6 +135,7 @@ jobs:
       # Build artifacts. The base build defaults to the Cedar template, so the
       # release WASM a new realm pulls from the registry authorizes too.
       - name: Build backend WASM
+        if: ${{ inputs.cli_only != true }}
         run: |
           export CANISTER_CANDID_PATH="$(pwd)/src/realm_backend/realm_backend.did"
           python3 scripts/build_base_wasm.py --gzip
@@ -123,6 +143,7 @@ jobs:
           echo "✅ Backend WASM built ($(stat -c%s realm_backend.wasm.gz) bytes)"
 
       - name: Generate Candid declarations
+        if: ${{ inputs.cli_only != true }}
         run: |
           mkdir -p src/realm_frontend/src/lib/declarations
           cp -r src/declarations/realm_backend src/realm_frontend/src/lib/declarations/realm_backend
@@ -130,6 +151,7 @@ jobs:
           echo "✅ Candid declarations copied, DID file ready"
 
       - name: Build frontend
+        if: ${{ inputs.cli_only != true }}
         run: |
           cd src/realm_frontend
           npm install --legacy-peer-deps
@@ -140,6 +162,7 @@ jobs:
           echo "✅ Frontend tarball built ($(stat -c%s realm_frontend.tar.gz) bytes)"
 
       - name: Compute release asset checksums
+        if: ${{ inputs.cli_only != true }}
         run: |
           echo "# SHA-256 checksums for release assets" > checksums.txt
           for f in realm_backend.wasm.gz realm_backend.did realm_frontend.tar.gz; do
@@ -170,6 +193,7 @@ jobs:
 
       # Create GitHub release (reads notes file from workspace before we clean it up)
       - name: Create GitHub Release
+        if: ${{ inputs.cli_only != true }}
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
@@ -183,6 +207,18 @@ jobs:
             realm_frontend.tar.gz
             checksums.txt
 
+      - name: Create GitHub Release (CLI / PyPI only)
+        if: ${{ inputs.cli_only == true }}
+        id: create_release_cli
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump_version.outputs.NEW_VERSION }}
+          name: Release v${{ steps.bump_version.outputs.NEW_VERSION }}
+          body: |
+            CLI / PyPI release `${{ steps.bump_version.outputs.NEW_VERSION }}`.
+
+            Package `realms-gos` public name: **Realms GOS** (Governance Operating System).
+
       # Commit version bump + remove the consumed release notes file
       - name: Commit and push version changes
         run: |
@@ -191,14 +227,18 @@ jobs:
           if [ -f ".github/RELEASE_NOTES_NEXT.md" ]; then
             git rm .github/RELEASE_NOTES_NEXT.md
           fi
-          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}"
-          git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
-          git push origin
-          echo "✅ Version changes committed and pushed"
+          if git diff --cached --quiet; then
+            echo "No version or release-notes changes to commit"
+          else
+            git commit -m "chore: bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}"
+            git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
+            git push origin
+            echo "✅ Version changes committed and pushed"
+          fi
 
       # Publish artifacts to all three environments
       - name: Publish to file_registry — test
-        if: ${{ inputs.publish_to_registry == true }}
+        if: ${{ inputs.publish_to_registry == true && inputs.cli_only != true }}
         run: |
           python3 scripts/publish_build.py \
             --environment test \
@@ -208,7 +248,7 @@ jobs:
             --identity ci
 
       - name: Publish to file_registry — demo
-        if: ${{ inputs.publish_to_registry == true }}
+        if: ${{ inputs.publish_to_registry == true && inputs.cli_only != true }}
         run: |
           python3 scripts/publish_build.py \
             --environment demo \
@@ -218,7 +258,7 @@ jobs:
             --identity ci
 
       - name: Publish to file_registry — staging
-        if: ${{ inputs.publish_to_registry == true }}
+        if: ${{ inputs.publish_to_registry == true && inputs.cli_only != true }}
         run: |
           python3 scripts/publish_build.py \
             --environment staging \
@@ -231,9 +271,11 @@ jobs:
         run: |
           echo "═══════════════════════════════════════════════════════"
           echo " Release v${{ steps.bump_version.outputs.NEW_VERSION }} complete"
-          echo " GitHub: ${{ steps.create_release.outputs.url }}"
+          echo " GitHub: ${{ steps.create_release.outputs.url || steps.create_release_cli.outputs.url }}"
           echo " PyPI:   https://pypi.org/project/realms-gos/${{ steps.bump_version.outputs.NEW_VERSION }}/"
-          if [ "${{ inputs.publish_to_registry }}" = "true" ]; then
+          if [ "${{ inputs.cli_only }}" = "true" ]; then
+            echo " scope: CLI / PyPI only"
+          elif [ "${{ inputs.publish_to_registry }}" = "true" ]; then
             echo " file_registry: published to test / demo / staging"
           fi
           echo "═══════════════════════════════════════════════════════"
