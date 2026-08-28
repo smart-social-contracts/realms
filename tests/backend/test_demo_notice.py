@@ -56,7 +56,10 @@ def test_demo_notice_imports_without_file_attr():
     source = MODULE_PATH.read_text(encoding="utf-8")
     ns = {"__name__": "demo_notice_canister", "__builtins__": __builtins__}
     exec(compile(source, "demo_notice.py", "exec"), ns)  # noqa: S102
-    assert "This software is for demo / experimental purposes" in ns["DEFAULT_DEMO_NOTICE_EN"]
+    assert (
+        "This software is for demo / experimental purposes"
+        in ns["DEFAULT_DEMO_NOTICE_EN"]
+    )
     assert ns["DEFAULT_DEMO_NOTICE_EN"] == DEFAULT_DEMO_NOTICE_EN
     assert ns["resolve_demo_notice_bodies"]("")["es"] == ""
 
@@ -105,9 +108,17 @@ def test_parse_accepts_bare_english_string():
 
 
 def test_explicit_flag_wins_over_host_default():
-    assert dn.explicit_or_host_default(False, "staging", default_disable_monetary_tokens) is False
-    assert dn.explicit_or_host_default(True, "ic", default_disable_monetary_tokens) is True
-    assert dn.explicit_or_host_default(None, "staging", default_disable_monetary_tokens) is True
+    assert (
+        dn.explicit_or_host_default(False, "staging", default_disable_monetary_tokens)
+        is False
+    )
+    assert (
+        dn.explicit_or_host_default(True, "ic", default_disable_monetary_tokens) is True
+    )
+    assert (
+        dn.explicit_or_host_default(None, "staging", default_disable_monetary_tokens)
+        is True
+    )
     assert dn.explicit_or_host_default(None, "ic", default_demo_notice) is False
 
 

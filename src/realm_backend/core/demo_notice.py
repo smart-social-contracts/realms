@@ -54,7 +54,9 @@ def default_demo_notice(network: str | None) -> bool:
 def seed_host_flag_defaults(obj: dict, network: str | None = None) -> dict:
     """Set missing host go-live fields on a Realm migrate dict. Never overwrites."""
     net = normalize_network(network if network is not None else obj.get("network"))
-    obj.setdefault("test_mode_disable_monetary_tokens", default_disable_monetary_tokens(net))
+    obj.setdefault(
+        "test_mode_disable_monetary_tokens", default_disable_monetary_tokens(net)
+    )
     obj.setdefault("test_mode_demo_notice", default_demo_notice(net))
     obj.setdefault("demo_notice_body", "")
     return obj
