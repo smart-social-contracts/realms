@@ -9,6 +9,7 @@ import { isAuthenticated } from "$lib/auth";
 import { categories as parseCategories } from "$lib/format";
 import { listingScreenshotUrls } from "$lib/file-registry-client";
 import { marketplaceClient } from "$lib/marketplace-client";
+import { parseVerifiedOnlyParam, setVerifiedOnlySearchParam } from "$lib/verified-filter";
 function extensionThumbnail(ext) {
   return listingScreenshotUrls(ext)[0] || "";
 }
@@ -19,7 +20,7 @@ let perPage = 24;
 let loading = true;
 let error = "";
 let searchQuery = "";
-let verifiedOnly = false;
+let verifiedOnly = true;
 let selectedCategory = "";
 let sortBy = "newest";
 let likedSet = new Set();
@@ -28,7 +29,7 @@ let lastUrlQ = "";
 onMount(() => {
   const params = $pageStore.url.searchParams;
   searchQuery = params.get("q") ?? "";
-  verifiedOnly = params.get("verified") === "1";
+  verifiedOnly = parseVerifiedOnlyParam(params.get("verified"));
   selectedCategory = params.get("category") ?? "";
   lastUrlQ = searchQuery;
   mounted = true;
@@ -41,7 +42,7 @@ function adoptUrlQuery(params) {
   if (q === lastUrlQ) return;
   lastUrlQ = q;
   searchQuery = q;
-  verifiedOnly = params.get("verified") === "1";
+  verifiedOnly = parseVerifiedOnlyParam(params.get("verified"));
   page = 1;
   load(page, perPage, verifiedOnly);
 }
@@ -49,7 +50,7 @@ function syncUrl() {
   if (!browser) return;
   const params = new URLSearchParams();
   if (searchQuery.trim()) params.set("q", searchQuery.trim());
-  if (verifiedOnly) params.set("verified", "1");
+  setVerifiedOnlySearchParam(params, verifiedOnly);
   if (selectedCategory) params.set("category", selectedCategory);
   const qs = params.toString();
   lastUrlQ = searchQuery.trim();

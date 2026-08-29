@@ -49,11 +49,19 @@ function resolveEnv(searchParams) {
 
 function MarketplacePage() {
   const { t } = useTranslation()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState('extensions')
   const [category, setCategory] = useState('all')
-  const [verifiedOnly, setVerifiedOnly] = useState(false)
+  // Default checked. Only ?verified=0 unchecks; no localStorage.
+  const verifiedOnly = searchParams.get('verified') !== '0'
   const [searchQuery, setSearchQuery] = useState('')
+
+  function setVerifiedOnly(checked) {
+    const next = new URLSearchParams(searchParams)
+    if (checked) next.set('verified', '1')
+    else next.set('verified', '0')
+    setSearchParams(next, { replace: true })
+  }
 
   const envKey = useMemo(() => resolveEnv(searchParams), [searchParams])
   const config = ENVIRONMENTS[envKey]

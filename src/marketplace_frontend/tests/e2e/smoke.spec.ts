@@ -41,6 +41,9 @@ test.describe('marketplace_frontend smoke', () => {
     await expect(page.getByRole('button', { name: /Most Downloaded/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Most Liked/i })).toBeVisible();
 
+    const verifiedOnly = page.locator('.verified-toggle input[type="checkbox"]');
+    await expect(verifiedOnly).toBeChecked();
+
     // Click 'Most Liked' — should not throw or navigate.
     await page.getByRole('button', { name: /Most Liked/i }).click();
     // Click 'Codices' kind toggle.
@@ -55,6 +58,7 @@ test.describe('marketplace_frontend smoke', () => {
     await expect(page.getByRole('heading', { name: 'Extensions' })).toBeVisible();
     await expect(page.getByPlaceholder('Search extensions…')).toBeVisible();
     await expect(page.getByText(/Verified only/i)).toBeVisible();
+    await expect(page.locator('.verified-toggle input[type="checkbox"]')).toBeChecked();
     // Sort dropdown with the three options the plan calls out.
     const sort = page.locator('select');
     await expect(sort).toBeVisible();

@@ -13,6 +13,7 @@ import {
 } from "$lib/marketplace-client";
 import { isAuthenticated, principalStore } from "$lib/auth";
 import { CONFIG } from "$lib/config";
+import { parseVerifiedOnlyParam, setVerifiedOnlySearchParam } from "$lib/verified-filter";
 const KIND_VALUES = ["ext", "codex", "assistant"];
 const KIND_I18N = {
   ext: "kind.extensions",
@@ -49,7 +50,7 @@ function langLabel(code) {
 }
 let kind = "ext";
 let metric = "downloads";
-let verifiedOnly = false;
+let verifiedOnly = true;
 let selectedCategory = "";
 let selectedLanguage = "";
 let loading = true;
@@ -69,7 +70,7 @@ onMount(async () => {
   if (k === "ext" || k === "codex" || k === "assistant") kind = k;
   const s = params.get("sort");
   if (s === "likes" || s === "downloads" || s === "newest") metric = s;
-  verifiedOnly = params.get("verified") === "1";
+  verifiedOnly = parseVerifiedOnlyParam(params.get("verified"));
   if (kind === "ext") selectedCategory = params.get("category") ?? "";
   if (kind === "ext") selectedLanguage = params.get("lang") ?? "";
   searchQuery = params.get("q") ?? "";
@@ -90,7 +91,7 @@ function syncUrl(k, m, v, cat, lang) {
   if (searchQuery.trim()) params.set("q", searchQuery.trim());
   if (k !== "ext") params.set("kind", k);
   if (m !== "downloads") params.set("sort", m);
-  if (v) params.set("verified", "1");
+  setVerifiedOnlySearchParam(params, v);
   if (k === "ext" && cat) params.set("category", cat);
   if (k === "ext" && lang) params.set("lang", lang);
   const qs = params.toString();

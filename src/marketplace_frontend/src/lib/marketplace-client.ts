@@ -11,6 +11,7 @@
 
 import { marketplace } from './canisters';
 import { builtinExtensions, builtinCodices } from './builtin-catalog';
+import { listingsOrBuiltinFallback, paginateList } from './verified-filter';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -345,17 +346,12 @@ function normPendingAudit(raw: any): PendingAudit {
   };
 }
 
-// Fallback helpers — return built-in catalog items when the backend is
-// empty or unreachable so the marketplace always has content.
-
-function withExtFallback<T extends ExtensionListing[]>(items: T): T {
-  if (items.length > 0) return items;
-  return builtinExtensions as unknown as T;
+function fallbackExtensions(canisterItems: ExtensionListing[], verifiedOnly: boolean): ExtensionListing[] {
+  return listingsOrBuiltinFallback(canisterItems, builtinExtensions, verifiedOnly);
 }
 
-function withCodexFallback<T extends CodexListing[]>(items: T): T {
-  if (items.length > 0) return items;
-  return builtinCodices as unknown as T;
+function fallbackCodices(canisterItems: CodexListing[], verifiedOnly: boolean): CodexListing[] {
+  return listingsOrBuiltinFallback(canisterItems, builtinCodices, verifiedOnly);
 }
 
 function matchesQuery(text: string, q: string): boolean {
@@ -429,7 +425,7 @@ export const marketplaceClient = {
       throw new Error(`Extension '${id}' not found`);
     }
   },
-  async listExtensions(page: number, perPage: number, verifiedOnly = false): Promise<{
+  async listExtensions(page: number, perPage: number, verifiedOnly = true): Promise<{
     listings: ExtensionListing[];
     total_count: number;
     page: number;
@@ -441,20 +437,19 @@ export const marketplaceClient = {
       if (listings.length > 0) {
         return { listings, total_count: toNumber(r.total_count), page: toNumber(r.page), per_page: toNumber(r.per_page) };
       }
-    } catch { /* fall through to built-in catalog */ }
-    const start = (page - 1) * perPage;
-    const slice = builtinExtensions.slice(start, start + perPage);
-    return { listings: slice, total_count: builtinExtensions.length, page, per_page: perPage };
+    } catch { /* fall through — empty or offline, never fake Verified */ }
+    return paginateList(fallbackExtensions([], verifiedOnly), page, perPage);
   },
-  async searchExtensions(q: string, verifiedOnly = false): Promise<ExtensionListing[]> {
+  async searchExtensions(q: string, verifiedOnly = true): Promise<ExtensionListing[]> {
     try {
       const r = await marketplace.search_extensions(q, verifiedOnly);
       const items = (r as any[]).map(normExt);
       if (items.length > 0) return items;
     } catch { /* fall through */ }
-    return builtinExtensions.filter(
+    const matches = builtinExtensions.filter(
       (e) => matchesQuery(e.name, q) || matchesQuery(e.description, q) || matchesQuery(e.categories, q),
     );
+    return listingsOrBuiltinFallback([], matches, verifiedOnly);
   },
   async getMyExtensions(): Promise<ExtensionListing[]> {
     const r = await marketplace.get_my_extensions();
@@ -480,7 +475,7 @@ export const marketplaceClient = {
       throw new Error(`Codex '${id}' not found`);
     }
   },
-  async listCodices(page: number, perPage: number, verifiedOnly = false): Promise<{
+  async listCodices(page: number, perPage: number, verifiedOnly = true): Promise<{
     listings: CodexListing[];
     total_count: number;
     page: number;
@@ -492,20 +487,19 @@ export const marketplaceClient = {
       if (listings.length > 0) {
         return { listings, total_count: toNumber(r.total_count), page: toNumber(r.page), per_page: toNumber(r.per_page) };
       }
-    } catch { /* fall through to built-in catalog */ }
-    const start = (page - 1) * perPage;
-    const slice = builtinCodices.slice(start, start + perPage);
-    return { listings: slice, total_count: builtinCodices.length, page, per_page: perPage };
+    } catch { /* fall through — empty or offline, never fake Verified */ }
+    return paginateList(fallbackCodices([], verifiedOnly), page, perPage);
   },
-  async searchCodices(q: string, verifiedOnly = false): Promise<CodexListing[]> {
+  async searchCodices(q: string, verifiedOnly = true): Promise<CodexListing[]> {
     try {
       const r = await marketplace.search_codices(q, verifiedOnly);
       const items = (r as any[]).map(normCodex);
       if (items.length > 0) return items;
     } catch { /* fall through */ }
-    return builtinCodices.filter(
+    const matches = builtinCodices.filter(
       (c) => matchesQuery(c.name, q) || matchesQuery(c.description, q) || matchesQuery(c.categories, q),
     );
+    return listingsOrBuiltinFallback([], matches, verifiedOnly);
   },
   async getMyCodices(): Promise<CodexListing[]> {
     const r = await marketplace.get_my_codices();
@@ -529,7 +523,7 @@ export const marketplaceClient = {
     const r = await marketplace.get_assistant_details(id);
     return normAssistant(unwrap<any>(r));
   },
-  async listAssistants(page: number, perPage: number, verifiedOnly = false): Promise<{
+  async listAssistants(page: number, perPage: number, verifiedOnly = true): Promise<{
     listings: AssistantListing[];
     total_count: number;
     page: number;
@@ -543,7 +537,7 @@ export const marketplaceClient = {
       per_page: toNumber(r.per_page),
     };
   },
-  async searchAssistants(q: string, verifiedOnly = false): Promise<AssistantListing[]> {
+  async searchAssistants(q: string, verifiedOnly = true): Promise<AssistantListing[]> {
     const r = await marketplace.search_assistants(q, verifiedOnly);
     return (r as any[]).map(normAssistant);
   },
@@ -590,43 +584,43 @@ export const marketplaceClient = {
   },
 
   // --- rankings --------------------------------------------------------
-  async topExtensionsByDownloads(n = 20, verifiedOnly = false): Promise<ExtensionListing[]> {
+  async topExtensionsByDownloads(n = 20, verifiedOnly = true): Promise<ExtensionListing[]> {
     try {
       const r = await marketplace.top_extensions_by_downloads(BigInt(n), verifiedOnly);
       const items = (r as any[]).map(normExt);
       if (items.length > 0) return items;
     } catch { /* fall through */ }
-    return builtinExtensions.slice(0, n);
+    return fallbackExtensions([], verifiedOnly).slice(0, n);
   },
-  async topExtensionsByLikes(n = 20, verifiedOnly = false): Promise<ExtensionListing[]> {
+  async topExtensionsByLikes(n = 20, verifiedOnly = true): Promise<ExtensionListing[]> {
     try {
       const r = await marketplace.top_extensions_by_likes(BigInt(n), verifiedOnly);
       const items = (r as any[]).map(normExt);
       if (items.length > 0) return items;
     } catch { /* fall through */ }
-    return builtinExtensions.slice(0, n);
+    return fallbackExtensions([], verifiedOnly).slice(0, n);
   },
-  async topCodicesByDownloads(n = 20, verifiedOnly = false): Promise<CodexListing[]> {
+  async topCodicesByDownloads(n = 20, verifiedOnly = true): Promise<CodexListing[]> {
     try {
       const r = await marketplace.top_codices_by_downloads(BigInt(n), verifiedOnly);
       const items = (r as any[]).map(normCodex);
       if (items.length > 0) return items;
     } catch { /* fall through */ }
-    return builtinCodices.slice(0, n);
+    return fallbackCodices([], verifiedOnly).slice(0, n);
   },
-  async topCodicesByLikes(n = 20, verifiedOnly = false): Promise<CodexListing[]> {
+  async topCodicesByLikes(n = 20, verifiedOnly = true): Promise<CodexListing[]> {
     try {
       const r = await marketplace.top_codices_by_likes(BigInt(n), verifiedOnly);
       const items = (r as any[]).map(normCodex);
       if (items.length > 0) return items;
     } catch { /* fall through */ }
-    return builtinCodices.slice(0, n);
+    return fallbackCodices([], verifiedOnly).slice(0, n);
   },
-  async topAssistantsByDownloads(n = 20, verifiedOnly = false): Promise<AssistantListing[]> {
+  async topAssistantsByDownloads(n = 20, verifiedOnly = true): Promise<AssistantListing[]> {
     const r = await marketplace.top_assistants_by_downloads(BigInt(n), verifiedOnly);
     return (r as any[]).map(normAssistant);
   },
-  async topAssistantsByLikes(n = 20, verifiedOnly = false): Promise<AssistantListing[]> {
+  async topAssistantsByLikes(n = 20, verifiedOnly = true): Promise<AssistantListing[]> {
     const r = await marketplace.top_assistants_by_likes(BigInt(n), verifiedOnly);
     return (r as any[]).map(normAssistant);
   },
