@@ -1,5 +1,6 @@
 // Static catalog of built-in extensions and codices shipped with Realms.
 // Mirrors src/marketplace_frontend/src/lib/builtin-catalog.ts for the website.
+// Builtins are not marketplace-approved — never set verification_status to 'verified'.
 
 const now = Date.now() * 1_000_000
 
@@ -15,7 +16,7 @@ function ext(id, name, description, version, icon, cats) {
     categories: cats,
     installs: 0,
     likes: 0,
-    verification_status: 'verified',
+    verification_status: 'unverified',
     is_active: true,
     created_at: now,
     updated_at: now,
@@ -36,7 +37,7 @@ function codex(id, alias, name, description, version, icon, cats, realmType) {
     categories: cats,
     installs: 0,
     likes: 0,
-    verification_status: 'verified',
+    verification_status: 'unverified',
     is_active: true,
     created_at: now,
     updated_at: now,

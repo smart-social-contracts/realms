@@ -1,9 +1,13 @@
 // Static catalog of built-in extensions and codices shipped with Realms.
 //
 // When the marketplace_backend canister is empty or unreachable, the UI
-// falls back to this list so the marketplace always shows real content.
+// may fall back to this list for offline/dev — never as marketplace-verified.
 
 import type { ExtensionListing, CodexListing } from './marketplace-client';
+import {
+  BUILTIN_VERIFICATION_NOTES,
+  BUILTIN_VERIFICATION_STATUS,
+} from './verified-filter';
 
 const now = Date.now() * 1_000_000;
 
@@ -31,8 +35,8 @@ function ext(
     download_url: `https://github.com/smart-social-contracts/realms/tree/main/extensions/extensions/${id}`,
     installs: 0,
     likes: 0,
-    verification_status: 'verified',
-    verification_notes: 'Built-in',
+    verification_status: BUILTIN_VERIFICATION_STATUS,
+    verification_notes: BUILTIN_VERIFICATION_NOTES,
     is_active: true,
     created_at: now,
     updated_at: now,
@@ -64,8 +68,8 @@ function codex(
     file_registry_namespace: `codex/${id}/${version}`,
     installs: 0,
     likes: 0,
-    verification_status: 'verified',
-    verification_notes: 'Built-in',
+    verification_status: BUILTIN_VERIFICATION_STATUS,
+    verification_notes: BUILTIN_VERIFICATION_NOTES,
     is_active: true,
     created_at: now,
     updated_at: now,

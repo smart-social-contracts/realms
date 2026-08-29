@@ -7,6 +7,7 @@ import ItemCard from "$lib/components/ItemCard.svelte";
 import SkeletonCard from "$lib/components/SkeletonCard.svelte";
 import { isAuthenticated } from "$lib/auth";
 import { marketplaceClient } from "$lib/marketplace-client";
+import { parseVerifiedOnlyParam, setVerifiedOnlySearchParam } from "$lib/verified-filter";
 import { categories } from "$lib/format";
 let items = [];
 let total = 0;
@@ -15,7 +16,7 @@ let perPage = 24;
 let loading = true;
 let error = "";
 let searchQuery = "";
-let verifiedOnly = false;
+let verifiedOnly = true;
 let sortBy = "newest";
 let domainFilter = "";
 let likedSet = new Set();
@@ -24,7 +25,7 @@ let lastUrlQ = "";
 onMount(() => {
   const params = $pageStore.url.searchParams;
   searchQuery = params.get("q") ?? "";
-  verifiedOnly = params.get("verified") === "1";
+  verifiedOnly = parseVerifiedOnlyParam(params.get("verified"));
   lastUrlQ = searchQuery;
   mounted = true;
 });
@@ -36,7 +37,7 @@ function adoptUrlQuery(params) {
   if (q === lastUrlQ) return;
   lastUrlQ = q;
   searchQuery = q;
-  verifiedOnly = params.get("verified") === "1";
+  verifiedOnly = parseVerifiedOnlyParam(params.get("verified"));
   page = 1;
   load(page, perPage, verifiedOnly);
 }
@@ -44,7 +45,7 @@ function syncUrl() {
   if (!browser) return;
   const params = new URLSearchParams();
   if (searchQuery.trim()) params.set("q", searchQuery.trim());
-  if (verifiedOnly) params.set("verified", "1");
+  setVerifiedOnlySearchParam(params, verifiedOnly);
   const qs = params.toString();
   lastUrlQ = searchQuery.trim();
   goto(qs ? `/assistants?${qs}` : "/assistants", { replaceState: true, keepFocus: true, noScroll: true });
