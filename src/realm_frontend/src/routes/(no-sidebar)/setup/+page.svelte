@@ -1060,40 +1060,42 @@
 
 			<nav class="setup-wizard__steps" aria-label={$_('setup.wizard.steps_label')}>
 				{#each steps as step, index (step.id)}
-					{#if index > 0}
-						<span
-							class="setup-wizard__step-rail"
-							class:setup-wizard__step-rail--done={index <= stepIndex}
-							aria-hidden="true"
-						></span>
-					{/if}
-					<button
-						type="button"
-						class="setup-wizard__step"
-						class:setup-wizard__step--active={step.id === currentStep}
-						class:setup-wizard__step--done={index < stepIndex}
-						class:setup-wizard__step--pending={index > stepIndex}
-						aria-current={step.id === currentStep ? 'step' : undefined}
-						onclick={() => goToStep(step.id)}
-					>
-						<span class="setup-wizard__step-index">
-							{#if index < stepIndex}
-								<svg viewBox="0 0 16 16" aria-hidden="true">
-									<path
-										d="M3.5 8.5 6.5 11.5 12.5 4.5"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="1.8"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									/>
-								</svg>
-							{:else}
-								{index + 1}
-							{/if}
-						</span>
-						{$_(step.labelKey)}
-					</button>
+					<div class="setup-wizard__step-unit">
+						{#if index > 0}
+							<span
+								class="setup-wizard__step-rail"
+								class:setup-wizard__step-rail--done={index <= stepIndex}
+								aria-hidden="true"
+							></span>
+						{/if}
+						<button
+							type="button"
+							class="setup-wizard__step"
+							class:setup-wizard__step--active={step.id === currentStep}
+							class:setup-wizard__step--done={index < stepIndex}
+							class:setup-wizard__step--pending={index > stepIndex}
+							aria-current={step.id === currentStep ? 'step' : undefined}
+							onclick={() => goToStep(step.id)}
+						>
+							<span class="setup-wizard__step-index">
+								{#if index < stepIndex}
+									<svg viewBox="0 0 16 16" aria-hidden="true">
+										<path
+											d="M3.5 8.5 6.5 11.5 12.5 4.5"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										/>
+									</svg>
+								{:else}
+									{index + 1}
+								{/if}
+							</span>
+							<span class="setup-wizard__step-label">{$_(step.labelKey)}</span>
+						</button>
+					</div>
 				{/each}
 			</nav>
 			{#if !loading}
@@ -1586,6 +1588,12 @@
 		padding: 1.5rem;
 	}
 
+	@media (max-width: 639px) {
+		.setup-wizard {
+			padding: 0.75rem;
+		}
+	}
+
 	:global(.dark) .setup-wizard {
 		background: #0f172a;
 	}
@@ -1724,6 +1732,13 @@
 		border-radius: 1rem;
 		padding: 1.5rem;
 		box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+		min-width: 0;
+	}
+
+	@media (max-width: 639px) {
+		.setup-wizard__shell {
+			padding: 1rem 0.85rem;
+		}
 	}
 
 	:global(.dark) .setup-wizard__shell {
@@ -1778,14 +1793,28 @@
 
 	.setup-wizard__steps {
 		display: flex;
-		align-items: center;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		width: 100%;
+		min-width: 0;
+		row-gap: 0.75rem;
 		margin-bottom: 1.75rem;
 	}
 
+	.setup-wizard__step-unit {
+		display: flex;
+		align-items: flex-start;
+		flex: 1 1 30%;
+		min-width: 30%;
+		max-width: 33.333%;
+	}
+
 	.setup-wizard__step-rail {
-		flex: 1 1 1.25rem;
+		flex: 0 0 0.55rem;
+		align-self: flex-start;
 		height: 1px;
-		min-width: 0.75rem;
+		min-width: 0.4rem;
+		margin-top: 0.72rem;
 		background: #e2e8f0;
 	}
 
@@ -1802,16 +1831,27 @@
 	}
 
 	.setup-wizard__step {
-		display: inline-flex;
+		display: flex;
+		flex: 1 1 auto;
+		flex-direction: column;
 		align-items: center;
-		gap: 0.45rem;
+		gap: 0.3rem;
+		min-width: 0;
+		width: 100%;
 		border: none;
 		background: transparent;
 		color: #94a3b8;
-		padding: 0.15rem 0.15rem;
-		font-size: 0.8125rem;
-		white-space: nowrap;
+		padding: 0;
+		font-size: 0.6875rem;
+		line-height: 1.2;
+		text-align: center;
 		cursor: pointer;
+	}
+
+	.setup-wizard__step-label {
+		display: block;
+		width: 100%;
+		white-space: nowrap;
 	}
 
 	.setup-wizard__step--done {
@@ -1830,6 +1870,29 @@
 	:global(.dark) .setup-wizard__step--done,
 	:global(.dark) .setup-wizard__step--active {
 		color: #f8fafc;
+	}
+
+	@media (max-width: 639px) {
+		.setup-wizard__step-unit:nth-child(3n + 1) .setup-wizard__step-rail {
+			display: none;
+		}
+	}
+
+	@media (min-width: 640px) {
+		.setup-wizard__step-unit {
+			flex: 1 1 0;
+			min-width: 0;
+			max-width: none;
+		}
+
+		.setup-wizard__step {
+			font-size: 0.75rem;
+		}
+
+		.setup-wizard__step-rail {
+			flex: 1 1 0.75rem;
+			min-width: 0.55rem;
+		}
 	}
 
 	.setup-wizard__step-index {
