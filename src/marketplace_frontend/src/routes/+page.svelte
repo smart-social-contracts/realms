@@ -175,34 +175,28 @@ function extensionThumbnail(ext) {
 </script>
 
 <section class="landing-hero" aria-labelledby="landing-title">
-  <div class="landing-badges">
-    {#if CONFIG.env_name}
-      <span class="badge badge-env">{$_('landing.badge_env', { values: { env: CONFIG.env_name } })}</span>
-    {/if}
-    {#if CONFIG.realms_version}
-      <span class="badge badge-version">{$_('landing.badge_version', { values: { version: CONFIG.realms_version } })}</span>
-    {/if}
+  <div class="landing-bg" aria-hidden="true">
+    <img src="/images/hero-bg.jpg" alt="" />
+    <div class="landing-overlay"></div>
   </div>
-  <h1 id="landing-title">{$_('landing.product_name')}</h1>
-  <p class="landing-pitch">{$_('landing.pitch')}</p>
-  <ul class="landing-features" aria-label="Features">
-    <li><i class="ti ti-rocket" aria-hidden="true"></i><span>{$_('landing.feature_launch')}</span></li>
-    <li><i class="ti ti-puzzle" aria-hidden="true"></i><span>{$_('landing.feature_install')}</span></li>
-    <li><i class="ti ti-users-group" aria-hidden="true"></i><span>{$_('landing.feature_community')}</span></li>
-  </ul>
-  <div class="landing-ctas">
-    {#if CONFIG.portal_url}
-      <a class="cta primary" href={CONFIG.portal_url} target="_blank" rel="noreferrer">
-        <i class="ti ti-external-link" aria-hidden="true"></i>
+  <div class="landing-card">
+    <h1 id="landing-title" class="landing-wordmark">
+      <img src="/images/logo_horizontal.svg" alt="Realms" />
+    </h1>
+    <div class="landing-ctas">
+      <a class="cta primary" href={CONFIG.portal_url || 'https://demo.gos.earth'} target="_blank" rel="noreferrer">
         {$_('landing.cta_launch')}
       </a>
-    {/if}
-    <button type="button" class="cta secondary" on:click={() => scrollToCatalog('ext')}>
-      {$_('landing.cta_browse_extensions')}
-    </button>
-    <button type="button" class="cta secondary" on:click={() => scrollToCatalog('codex')}>
-      {$_('landing.cta_browse_codices')}
-    </button>
+      <button type="button" class="cta secondary" on:click={() => scrollToCatalog('ext')}>
+        {$_('landing.cta_browse_extensions')}
+      </button>
+      <button type="button" class="cta secondary" on:click={() => scrollToCatalog('codex')}>
+        {$_('landing.cta_browse_codices')}
+      </button>
+      <a class="cta secondary" href="/about">
+        {$_('landing.cta_about')}
+      </a>
+    </div>
   </div>
 </section>
 
@@ -313,91 +307,76 @@ function extensionThumbnail(ext) {
 
 <style>
   .landing-hero {
-    margin-bottom: 2.5rem;
-    padding: 2rem 2.25rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  }
-  .landing-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-  }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.7rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    text-transform: lowercase;
-  }
-  .badge-env {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-  }
-  .badge-version {
-    background: var(--verified-bg);
-    border: 1px solid rgba(22, 101, 52, 0.15);
-    color: var(--verified);
-  }
-  .landing-hero h1 {
-    font-size: clamp(1.75rem, 4vw, 2.5rem);
-    margin: 0 0 0.6rem;
-    letter-spacing: -0.02em;
-  }
-  .landing-pitch {
-    color: var(--text-muted);
-    font-size: 1.05rem;
-    margin: 0 0 1.5rem;
-    max-width: 42rem;
-  }
-  .landing-features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0.75rem 1.25rem;
-    margin: 0 0 1.75rem;
-    padding: 0;
-    list-style: none;
-  }
-  .landing-features li {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    color: var(--text);
-    font-size: 0.9rem;
+    justify-content: center;
+    min-height: calc(100vh - 60px);
+    padding: 2.5rem 1.25rem;
+    overflow: hidden;
   }
-  .landing-features .ti {
-    font-size: 1.15rem;
-    color: var(--text-muted);
-    flex-shrink: 0;
+  .landing-bg {
+    position: absolute;
+    inset: 0;
+  }
+  .landing-bg img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.6;
+  }
+  .landing-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom right,
+      rgba(248, 250, 252, 0.6),
+      rgba(255, 255, 255, 0.5),
+      rgba(250, 250, 250, 0.6)
+    );
+  }
+  .landing-card {
+    position: relative;
+    z-index: 1;
+    width: min(64rem, 100%);
+    padding: 2.5rem 2rem;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.18);
+    text-align: center;
+  }
+  .landing-wordmark {
+    margin: 0 0 2rem;
+  }
+  .landing-wordmark img {
+    display: block;
+    margin: 0 auto;
+    height: clamp(5rem, 12vw, 7rem);
+    width: auto;
   }
   .landing-ctas {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.65rem;
+    justify-content: center;
+    gap: 0.75rem;
   }
   .cta {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.6rem 1.1rem;
-    border-radius: 0.5rem;
-    font-size: 0.9rem;
+    justify-content: center;
+    padding: 1rem 2rem;
+    border-radius: 0.75rem;
+    font-size: 1.05rem;
     font-weight: 600;
     text-decoration: none;
     transition: all 0.15s ease;
     cursor: pointer;
   }
-  .cta .ti { font-size: 1rem; }
   .cta.primary {
     background: var(--primary);
-    border: 1px solid var(--primary);
+    border: 2px solid var(--primary);
     color: #fff;
   }
   .cta.primary:hover {
@@ -405,13 +384,17 @@ function extensionThumbnail(ext) {
     border-color: var(--primary-hover);
   }
   .cta.secondary {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.8);
+    border: 2px solid var(--primary);
     color: var(--text);
   }
   .cta.secondary:hover {
-    border-color: var(--border-strong);
     background: var(--surface-2);
+  }
+  .catalog {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 0;
   }
   .catalog-header h2 {
     font-size: 1.35rem;
@@ -423,8 +406,8 @@ function extensionThumbnail(ext) {
   }
 
   @media (max-width: 600px) {
-    .landing-hero { padding: 1.5rem 1.25rem; }
-    .landing-ctas .cta { flex: 1 1 100%; justify-content: center; }
+    .landing-card { padding: 1.75rem 1.25rem; }
+    .landing-ctas .cta { flex: 1 1 100%; }
   }
 
   /* Primary navigation between listing types â reads as content tabs. */

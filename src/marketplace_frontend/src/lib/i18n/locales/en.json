@@ -10,13 +10,15 @@
     "developer": "Developer",
     "admin": "Admin",
     "sign_in": "Sign in",
-    "sign_out": "Sign out"
+    "sign_out": "Sign out",
+    "about": "About"
   },
   "footer": {
     "open_source": "Realms Marketplace · open source",
     "built_on_ic": "Built on the Internet Computer",
     "github": "GitHub",
-    "casals": "Casals"
+    "casals": "Casals",
+    "build": "Realms GOS {version} ({commit})"
   },
   "kind": {
     "extensions": "Extensions",
@@ -43,14 +45,10 @@
   "landing": {
     "product_name": "Realms GOS",
     "pitch": "Decentralized governance realms on the Internet Computer.",
-    "feature_launch": "Launch a realm in minutes",
-    "feature_install": "Install codices & extensions",
-    "feature_community": "Community-owned on IC",
-    "cta_launch": "Launch a realm",
+    "cta_launch": "Launch your realm",
     "cta_browse_extensions": "Browse extensions",
     "cta_browse_codices": "Browse codices",
-    "badge_env": "{env} environment",
-    "badge_version": "Realms GOS {version}"
+    "cta_about": "About"
   },
   "discover": {
     "title": "Enhance the experience of your realm's members.",
@@ -318,5 +316,140 @@
     "approve_failed": "Approve failed: {error}",
     "reject_failed": "Reject failed: {error}",
     "could_not_grant": "Could not grant: {error}"
+  },
+  "about": {
+    "hero": {
+      "title": "The Governance Operating System",
+      "subtitle1": "• Launch a full public administration in seconds",
+      "subtitle2": "• Fully auditable. Fully transparent. AI-powered",
+      "subtitle3": "• Engineered to eliminate corruption and inefficiencies",
+      "tryDemo": "Try Demo",
+      "requestInvite": "Request Invitation Code",
+      "alphaBadge": "Alpha — Early Access"
+    },
+    "mission": {
+      "title": "What is Realms?",
+      "description": "<strong>Realms</strong> is a decentralized software platform for public administration — a Governance Operating System (GOS) designed to deliver essential public services such as justice, social welfare, property registries, and more. From small towns to entire nations, it empowers communities to design, run, and evolve their own governance systems — free from the corruption and inefficiencies of traditional bureaucracy. This way, Realms opens a window towards a new civilizational paradigm called <strong>Smart Social Contracts</strong>.",
+      "learnMore": "Learn more about Smart Social Contracts",
+      "learnMoreUrl": "https://dshd5-wqaaa-aaaau-ac7wa-cai.icp0.io/"
+    },
+    "principles": {
+      "title": "Core Principles",
+      "intro": "Realms is based on the following 4 core principles to solve the current problems of our societies.",
+      "transparency": {
+        "title": "Transparency",
+        "description": "Transparency builds trust between the government and the public, as users can see how processes are executed and where resources, such as tax money, are allocated. Transparency also helps prevent corruption and strengthens the legitimacy of institutions."
+      },
+      "efficiency": {
+        "title": "Efficiency",
+        "description": "Efficiency involves delivering services effectively while minimizing costs and reducing waste. This fosters a strong sense of fairness, reinforcing public confidence in the governance system. As a result, users are more likely to support and comply with tax obligations."
+      },
+      "diversity": {
+        "title": "Diversity",
+        "description": "Diversity in governance ensures that a wide range of perspectives are represented. This leads to more inclusive and equitable policies that cater to different societal needs, fostering social cohesion and reducing marginalization."
+      },
+      "resilience": {
+        "title": "Resilience",
+        "description": "Resilience enables governance systems to respond to crises, adapt to changes, and recover from setbacks. A resilient governance system ensures stability and continuity, even in times of stress, protecting long-term societal wellbeing."
+      }
+    },
+    "features": {
+      "title": "How It Works",
+      "subtitle": "A simple overview of the technology behind Realms",
+      "internetComputer": {
+        "title": "Built on the Internet Computer",
+        "description": "The Internet Computer is a decentralized world computer that runs entirely on-chain — no traditional servers, no single point of failure. This means your governance system is always online, owned by no single entity, and immune to censorship or shutdown."
+      },
+      "extensionSystem": {
+        "title": "Extension Marketplace",
+        "description": "Customize your realm with ready-to-use modules: voting systems, treasury management, land registries, justice systems, identity verification, and more. Communities can share and adopt extensions that work for them."
+      },
+      "secure": {
+        "title": "Secure & Transparent",
+        "description": "Every decision, every transaction, every rule is recorded on-chain and publicly verifiable. Citizens can audit how taxes are spent, track proposals from submission to execution, and verify that the rules are applied equally to everyone."
+      },
+      "developerFriendly": {
+        "title": "Composable Governance",
+        "description": "Anyone can design their own governance rules — called codices — by combining existing components like building blocks. No coding required to get started; just select the modules that fit your community's needs."
+      },
+      "multiRealm": {
+        "title": "Mundus: Connected Realms",
+        "description": "Realms don't exist in isolation. Through Mundus, multiple governance systems can interoperate — sharing citizens, resources, or agreements. Think of it as a network of digital nations that can collaborate seamlessly."
+      },
+      "instantSetup": {
+        "title": "Clone & Deploy in Seconds",
+        "description": "See a governance model you like? Clone it instantly and adapt it to your community. No need to build from scratch — proven systems can be replicated and customized in seconds."
+      },
+      "aiGovernors": {
+        "title": "AI Governors & Advisors",
+        "description": "Leverage AI-powered governors and advisors that can analyze proposals, provide recommendations, and even autonomously execute routine governance tasks — all while remaining transparent and accountable to citizens."
+      }
+    },
+    "forPeople": {
+      "title": "For People",
+      "subtitle": "Take control of your civic identity and participate in transparent governance",
+      "identity": {
+        "title": "Verify Your Identity Privately",
+        "description": "Using zero-knowledge proof technology, you can prove your citizenship and age without exposing your passport data. Your personal information never leaves your device — only cryptographic proof is shared.",
+        "features": [
+          "Privacy-preserving: passport data stays on your phone",
+          "Prove age and citizenship without revealing personal details",
+          "One person = one identity (Sybil-resistant)",
+          "Works with any NFC-enabled passport"
+        ]
+      },
+      "participate": {
+        "title": "Participate in Your Community",
+        "description": "Once verified, join realms that matter to you. Vote on proposals, track how public funds are spent, and hold your representatives accountable — all with full transparency."
+      },
+      "create": {
+        "title": "Create Your Own Realm",
+        "description": "Whether it's a neighborhood association, a cooperative, or a community project — anyone can create a realm and invite members to participate in collective decision-making."
+      }
+    },
+    "forInstitutions": {
+      "title": "For Institutions",
+      "subtitle": "Modernize your governance infrastructure with transparency and efficiency",
+      "governments": {
+        "title": "For Governments",
+        "description": "Migrate your public administration to Realms GOS and offer citizens a new level of transparency and participation. From municipal services to national registries, Realms can handle governance at any scale.",
+        "benefits": [
+          "Eliminate corruption through full transparency",
+          "Reduce administrative costs with automation",
+          "Increase citizen trust and engagement",
+          "Interoperate with other governments via Mundus"
+        ]
+      },
+      "organizations": {
+        "title": "For Organizations",
+        "description": "NGOs, cooperatives, and associations can leverage Realms for transparent treasury management, democratic voting, and accountable leadership."
+      },
+      "migration": {
+        "title": "Seamless Migration",
+        "description": "Our team works with you to design a migration path that fits your needs. Start with a pilot program, onboard citizens gradually, and scale when you're ready."
+      },
+      "cta": "Contact Us",
+      "benefits_heading": "Key Benefits"
+    },
+    "getStarted": {
+      "title": "Get Started",
+      "subtitle": "Experience Realms firsthand or connect with our team",
+      "demo": {
+        "title": "Try the Demo",
+        "description": "Explore a fully functional governance system. Create proposals, vote, manage treasury, and see how transparent governance works in practice.",
+        "button": "Launch Demo"
+      },
+      "contact": {
+        "title": "Let's Talk",
+        "description": "Have questions? Want to discuss how Realms could work for your community? We'd love to hear from you.",
+        "button": "Get in Touch"
+      },
+      "developers": {
+        "title": "For Developers",
+        "description": "Ready to build? Check out the documentation, CLI tools, and start creating your own governance extensions.",
+        "button": "Read the Docs"
+      }
+    },
+    "product_name": "Realms GOS"
   }
 }

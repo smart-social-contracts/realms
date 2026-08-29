@@ -60,9 +60,12 @@ $: routeIsActive = (path) => {
 {#if browser && i18nReady}
 <header class="topbar">
   <div class="bar">
-    <a href="/" class="brand" aria-label="Realms Marketplace home">
-      <img src="/images/logo_horizontal.svg" alt="Realms Marketplace" />
-    </a>
+    <div class="brand-group">
+      <a href="/" class="brand" aria-label="Realms Marketplace home">
+        <img src="/images/logo_horizontal.svg" alt="Realms Marketplace" />
+      </a>
+      <a href="/about" class="chrome-link" class:active={routeIsActive('/about')}>{$_('nav.about')}</a>
+    </div>
 
     <form class="search" on:submit|preventDefault={submitSearch} role="search">
       <input
@@ -130,7 +133,7 @@ $: routeIsActive = (path) => {
   </div>
 </header>
 
-<main class="main">
+<main class="main" class:flush={$page.url.pathname === '/'}>
   <slot />
 </main>
 
@@ -161,6 +164,7 @@ $: routeIsActive = (path) => {
       {/if}
     </div>
     <div class="build-line">{$_('footer.open_source')}</div>
+    <div class="build-meta">{$_('footer.build', { values: { version: __BUILD_VERSION__, commit: __BUILD_COMMIT__ } })}</div>
     <a class="icp" href="https://internetcomputer.org" target="_blank" rel="noreferrer">
       <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" />
       <span>{$_('footer.built_on_ic')}</span>
@@ -188,6 +192,12 @@ $: routeIsActive = (path) => {
     padding: 0 1.5rem;
     height: 60px;
   }
+  .brand-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
   .brand {
     display: inline-flex;
     align-items: center;
@@ -199,6 +209,18 @@ $: routeIsActive = (path) => {
     width: auto;
     display: block;
   }
+  .chrome-link {
+    flex-shrink: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 0.35rem 0.55rem;
+    border-radius: 0.45rem;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .chrome-link:hover { color: var(--text); background: var(--surface-2); }
+  .chrome-link.active { color: var(--text); }
   .search {
     flex: 1;
     display: flex;
@@ -320,6 +342,10 @@ $: routeIsActive = (path) => {
     margin: 0 auto;
     padding: 2rem 1.5rem 4rem;
   }
+  .main.flush {
+    max-width: none;
+    padding: 0 0 4rem;
+  }
 
   /* Footer mirrors the realm_frontend footer: a centered card with a
      GitHub link, a muted text line, and the "Built on the Internet
@@ -363,6 +389,11 @@ $: routeIsActive = (path) => {
     font-size: 0.75rem;
     color: var(--text-faint);
   }
+  .footer-card .build-meta {
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
   .footer-card .icp {
     display: inline-flex;
     align-items: center;
@@ -383,7 +414,7 @@ $: routeIsActive = (path) => {
       padding-bottom: 0.7rem;
       gap: 0.6rem;
     }
-    .brand { order: 1; }
+    .brand-group { order: 1; }
     .actions { order: 2; margin-left: auto; }
     .search { order: 3; flex-basis: 100%; max-width: none; margin: 0; }
   }

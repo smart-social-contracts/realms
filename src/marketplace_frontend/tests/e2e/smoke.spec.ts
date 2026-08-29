@@ -21,35 +21,62 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('marketplace_frontend smoke', () => {
-  test('top charts page renders and toggles work', async ({ page }) => {
+  test('home door has no env/version chips and keeps the catalog', async ({ page }) => {
     await page.goto('/');
 
-    // Header chrome
+    await expect(page.getByRole('heading', { name: 'Realms' })).toBeVisible();
+    await expect(page.locator('.landing-wordmark img[src="/images/logo_horizontal.svg"]')).toBeVisible();
+    await expect(page.locator('.landing-bg img[src="/images/hero-bg.jpg"]')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Realms GOS' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'The Governance Operating System' })).toHaveCount(0);
+    await expect(page.getByText('Launch a realm')).toHaveCount(0);
+    await expect(page.getByText(/Decentralized governance realms/i)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Launch your realm' })).toBeVisible();
+    await expect(page.getByText(/test environment/i)).toHaveCount(0);
+    await expect(page.getByText(/realms gos main/i)).toHaveCount(0);
+    await expect(page.locator('.landing-badges, .badge-env, .badge-version')).toHaveCount(0);
+
+    await expect(page.getByRole('link', { name: /^About$/ })).toHaveCount(2);
+    await expect(page.getByRole('heading', { name: /Enhance the experience/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Extensions/i })).toBeVisible();
+  });
+
+  test('about route recycles Realms GOS landing sections', async ({ page }) => {
+    await page.goto('/about');
+
+    await expect(page.getByRole('heading', { name: 'The Governance Operating System' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'What is Realms?' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Core Principles' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'How It Works' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'For People' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'For Institutions' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Get Started' })).toBeVisible();
+    await expect(page.getByText(/test environment/i)).toHaveCount(0);
+    await expect(page.getByText(/realms gos main/i)).toHaveCount(0);
+    await expect(page.locator('iframe')).toHaveCount(0);
+  });
+
+  test('home catalog below the landing hero still toggles', async ({ page }) => {
+    await page.goto('/');
+
     await expect(page.getByRole('link', { name: /Realms Marketplace/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Top Charts' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Extensions' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Codices' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Upload' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^About$/ }).first()).toBeVisible();
 
-    // Page heading + subtitle
-    await expect(page.getByRole('heading', { name: 'Top Charts' })).toBeVisible();
-    await expect(page.getByText(/Discover the most popular extensions/i)).toBeVisible();
+    const catalog = page.locator('#catalog');
+    await catalog.scrollIntoViewIfNeeded();
+    await expect(page.getByRole('heading', { name: /Enhance the experience/i })).toBeVisible();
 
-    // Both kind toggles present and switchable.
-    await expect(page.getByRole('button', { name: /Extensions/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Codices/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Extensions/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Codices/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Most Downloaded/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Most Liked/i })).toBeVisible();
 
     const verifiedOnly = page.locator('.verified-toggle input[type="checkbox"]');
     await expect(verifiedOnly).toBeChecked();
 
-    // Click 'Most Liked' — should not throw or navigate.
     await page.getByRole('button', { name: /Most Liked/i }).click();
-    // Click 'Codices' kind toggle.
-    await page.getByRole('button', { name: /Codices/i }).first().click();
+    await page.getByRole('tab', { name: /Codices/i }).click();
 
-    // Footer brand mark.
     await expect(page.getByText(/built on the/i)).toBeVisible();
   });
 
@@ -88,10 +115,11 @@ test.describe('marketplace_frontend smoke', () => {
     await expect(selects).toHaveCount(2);
   });
 
-  test('top charts has Assistants kind toggle', async ({ page }) => {
+  test('home catalog has Assistants kind toggle', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('button', { name: /^Assistants$/ })).toBeVisible();
-    await page.getByRole('button', { name: /^Assistants$/ }).click();
+    await page.locator('#catalog').scrollIntoViewIfNeeded();
+    await expect(page.getByRole('tab', { name: /^Assistants$/ })).toBeVisible();
+    await page.getByRole('tab', { name: /^Assistants$/ }).click();
   });
 
   test('upload page gates on sign-in', async ({ page }) => {

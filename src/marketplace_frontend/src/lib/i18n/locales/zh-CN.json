@@ -10,13 +10,15 @@
     "developer": "开发者",
     "admin": "管理",
     "sign_in": "登录",
-    "sign_out": "退出登录"
+    "sign_out": "退出登录",
+    "about": "关于"
   },
   "footer": {
     "open_source": "Realms 市场 · 开源",
     "built_on_ic": "基于 Internet Computer 构建",
     "github": "GitHub",
-    "casals": "Casals"
+    "casals": "Casals",
+    "build": "Realms GOS {version} ({commit})"
   },
   "kind": {
     "extensions": "扩展",
@@ -42,15 +44,11 @@
   },
   "landing": {
     "product_name": "Realms GOS",
-    "pitch": "Decentralized governance realms on the Internet Computer.",
-    "feature_launch": "Launch a realm in minutes",
-    "feature_install": "Install codices & extensions",
-    "feature_community": "Community-owned on IC",
-    "cta_launch": "Launch a realm",
-    "cta_browse_extensions": "Browse extensions",
-    "cta_browse_codices": "Browse codices",
-    "badge_env": "{env} environment",
-    "badge_version": "Realms GOS {version}"
+    "pitch": "运行在 Internet Computer 上的去中心化治理 Realm。",
+    "cta_launch": "启动你的 Realm",
+    "cta_browse_extensions": "浏览扩展",
+    "cta_browse_codices": "浏览法典",
+    "cta_about": "关于"
   },
   "discover": {
     "title": "提升您的 realm 成员的体验。",
@@ -318,5 +316,140 @@
     "approve_failed": "批准失败：{error}",
     "reject_failed": "拒绝失败：{error}",
     "could_not_grant": "无法授予：{error}"
+  },
+  "about": {
+    "hero": {
+      "title": "治理操作系统",
+      "subtitle1": "• 几秒钟内启动完整的公共管理系统",
+      "subtitle2": "• 完全可审计。完全透明。AI驱动",
+      "subtitle3": "• 旨在消除腐败和低效",
+      "tryDemo": "试用演示",
+      "requestInvite": "申请邀请码",
+      "alphaBadge": "Alpha — 抢先体验"
+    },
+    "mission": {
+      "title": "什么是Realms？",
+      "description": "<strong>Realms</strong>是一个去中心化的公共管理软件平台——一个治理操作系统（GOS），旨在提供司法、社会福利、产权登记等基本公共服务。从小城镇到整个国家，它使社区能够设计、运行和发展自己的治理系统——摆脱传统官僚主义的腐败和低效。通过这种方式，Realms开启了一个通往名为<strong>智能社会契约</strong>的新文明范式的窗口。",
+      "learnMore": "了解更多关于智能社会契约",
+      "learnMoreUrl": "https://dshd5-wqaaa-aaaau-ac7wa-cai.icp0.io/"
+    },
+    "principles": {
+      "title": "核心原则",
+      "intro": "Realms基于以下4个核心原则来解决我们社会当前的问题。",
+      "transparency": {
+        "title": "透明度",
+        "description": "透明度在政府和公众之间建立信任,因为用户可以看到流程如何执行以及资源(如税收)如何分配。透明度还有助于防止腐败并加强机构的合法性。"
+      },
+      "efficiency": {
+        "title": "效率",
+        "description": "效率涉及有效地提供服务,同时最大限度地降低成本和减少浪费。这培养了强烈的公平感,增强了公众对治理系统的信心。因此,用户更有可能支持和遵守税收义务。"
+      },
+      "diversity": {
+        "title": "多样性",
+        "description": "治理中的多样性确保代表广泛的观点。这导致更具包容性和公平性的政策,满足不同的社会需求,促进社会凝聚力并减少边缘化。"
+      },
+      "resilience": {
+        "title": "韧性",
+        "description": "韧性使治理系统能够应对危机、适应变化并从挫折中恢复。有韧性的治理系统即使在压力时期也能确保稳定性和连续性,保护长期社会福祉。"
+      }
+    },
+    "features": {
+      "title": "运作原理",
+      "subtitle": "Realms背后技术的简单概述",
+      "internetComputer": {
+        "title": "构建于互联网计算机之上",
+        "description": "互联网计算机是一台去中心化的世界计算机,完全在链上运行——没有传统服务器,没有单点故障。这意味着您的治理系统永远在线,不属于任何单一实体,并且免受审查或关闭的影响。"
+      },
+      "extensionSystem": {
+        "title": "扩展市场",
+        "description": "使用即用型模块自定义您的领域:投票系统、财务管理、土地登记、司法系统、身份验证等。社区可以分享和采用适合他们的扩展。"
+      },
+      "secure": {
+        "title": "安全透明",
+        "description": "每个决定、每笔交易、每条规则都记录在链上并可公开验证。公民可以审计税款如何使用,追踪提案从提交到执行的全过程,并验证规则对每个人都平等适用。"
+      },
+      "developerFriendly": {
+        "title": "可组合治理",
+        "description": "任何人都可以设计自己的治理规则——称为法典——通过像积木一样组合现有组件。无需编程即可开始;只需选择适合您社区需求的模块。"
+      },
+      "multiRealm": {
+        "title": "Mundus:互联领域",
+        "description": "领域不是孤立存在的。通过Mundus,多个治理系统可以互操作——共享公民、资源或协议。可以把它想象成一个可以无缝协作的数字国家网络。"
+      },
+      "instantSetup": {
+        "title": "秒级克隆与部署",
+        "description": "看到喜欢的治理模式?立即克隆并根据您的社区进行调整。无需从头开始——经过验证的系统可以在几秒钟内复制和定制。"
+      },
+      "aiGovernors": {
+        "title": "AI治理者与顾问",
+        "description": "利用AI驱动的治理者和顾问，他们可以分析提案、提供建议，甚至自主执行日常治理任务——同时对公民保持透明和负责。"
+      }
+    },
+    "forPeople": {
+      "title": "面向个人",
+      "subtitle": "掌控您的公民身份，参与透明治理",
+      "identity": {
+        "title": "私密验证您的身份",
+        "description": "使用零知识证明技术，您可以证明您的公民身份和年龄，而无需暴露护照数据。您的个人信息永远不会离开您的设备——只分享加密证明。",
+        "features": [
+          "隐私保护：护照数据保留在您的手机上",
+          "证明年龄和公民身份而不泄露个人详细信息",
+          "一人=一个身份（抗女巫攻击）",
+          "适用于任何支持NFC的护照"
+        ]
+      },
+      "participate": {
+        "title": "参与您的社区",
+        "description": "验证后，加入您关心的领域。对提案进行投票，追踪公共资金的使用情况，并让您的代表负责——一切都完全透明。"
+      },
+      "create": {
+        "title": "创建您自己的领域",
+        "description": "无论是邻里协会、合作社还是社区项目——任何人都可以创建领域并邀请成员参与集体决策。"
+      }
+    },
+    "forInstitutions": {
+      "title": "面向机构",
+      "subtitle": "以透明和高效的方式现代化您的治理基础设施",
+      "governments": {
+        "title": "面向政府",
+        "description": "将您的公共管理迁移到Realms GOS，为公民提供新的透明度和参与度。从市政服务到国家登记，Realms可以处理任何规模的治理。",
+        "benefits": [
+          "通过完全透明消除腐败",
+          "通过自动化降低行政成本",
+          "提高公民信任和参与度",
+          "通过Mundus与其他政府互操作"
+        ]
+      },
+      "organizations": {
+        "title": "面向组织",
+        "description": "非政府组织、合作社和协会可以利用Realms进行透明的财务管理、民主投票和负责任的领导。"
+      },
+      "migration": {
+        "title": "无缝迁移",
+        "description": "我们的团队与您合作，设计适合您需求的迁移路径。从试点项目开始，逐步引入公民，准备好后进行扩展。"
+      },
+      "cta": "联系我们",
+      "benefits_heading": "主要优势"
+    },
+    "getStarted": {
+      "title": "立即开始",
+      "subtitle": "亲身体验Realms或与我们的团队联系",
+      "demo": {
+        "title": "试用演示",
+        "description": "探索一个完全功能的治理系统。创建提案、投票、管理财务,并了解透明治理在实践中如何运作。",
+        "button": "启动演示"
+      },
+      "contact": {
+        "title": "联系我们",
+        "description": "有问题吗?想讨论Realms如何为您的社区服务?我们很乐意听取您的意见。",
+        "button": "取得联系"
+      },
+      "developers": {
+        "title": "面向开发者",
+        "description": "准备好构建了吗?查看文档、CLI工具,并开始创建您自己的治理扩展。",
+        "button": "阅读文档"
+      }
+    },
+    "product_name": "Realms GOS"
   }
 }
