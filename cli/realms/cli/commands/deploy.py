@@ -142,9 +142,16 @@ def _inject_version_placeholders(folder_path: Path, logger) -> None:
 
     commit_hash = ""
     commit_datetime = ""
+    commit_hash_short = ""
+    built_at_iso = ""
     try:
         commit_hash = subprocess.check_output(
             ["git", "rev-parse", "HEAD"],
+            cwd=str(project_root),
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        commit_hash_short = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
             cwd=str(project_root),
             stderr=subprocess.DEVNULL,
         ).decode().strip()
@@ -155,6 +162,11 @@ def _inject_version_placeholders(folder_path: Path, logger) -> None:
         ).decode().strip()
     except Exception as e:
         logger.warning(f"Could not get git info for placeholders: {e}")
+    try:
+        from datetime import datetime, timezone
+        built_at_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        built_at_iso = ""
 
     # Version from version.txt (project root)
     version = ""
@@ -197,6 +209,8 @@ def _inject_version_placeholders(folder_path: Path, logger) -> None:
     replacements = [
         ("COMMIT_HASH_PLACEHOLDER", commit_hash),
         ("COMMIT_DATETIME_PLACEHOLDER", commit_datetime),
+        ("SHA_PLACEHOLDER", commit_hash_short),
+        ("BUILT_AT_ISO_PLACEHOLDER", built_at_iso),
         ("BASILISK_VERSION_PLACEHOLDER", basilisk_version),
         ("IC_BASILISK_TOOLKIT_VERSION_PLACEHOLDER", ic_basilisk_toolkit_version),
         ("IC_PYTHON_DB_VERSION_PLACEHOLDER", ic_python_db_version),
@@ -207,6 +221,9 @@ def _inject_version_placeholders(folder_path: Path, logger) -> None:
     # --- Target files (relative to realm folder) -----------------------------
     target_files = [
         "src/realm_backend/api/status.py",
+        "src/realm_backend/api/version_http.py",
+        "src/marketplace_backend/api/status.py",
+        "src/marketplace_backend/api/version_http.py",
         "src/realm_registry_backend/api/status.py",
         "src/realm_frontend/src/app.html",
         "src/realm_registry_frontend/src/app.html",

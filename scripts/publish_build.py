@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Patched certified-assets WASM used by all Realms frontend canisters.
@@ -98,6 +99,36 @@ def _basilisk_python(root: Path) -> str:
         _run([str(venv / "bin" / "pip"), "install", "-q", "--upgrade", "pip"])
         _run([str(venv / "bin" / "pip"), "install", "-q", *_BASILISK_REQUIREMENTS])
     return str(py)
+
+
+def _stamp_version_http(root: Path, release_tag: str | None) -> None:
+    """Bake GET /version provenance into backend sources before WASM build.
+
+    ``sha`` / ``built_at`` are always known at build time. ``version`` is the
+    release tag only — omitted honestly for ``--from-main`` snapshots.
+    """
+    sha = git_short_sha(root)
+    built_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    files = (
+        root / "src" / "realm_backend" / "api" / "version_http.py",
+        root / "src" / "marketplace_backend" / "api" / "version_http.py",
+    )
+    for path in files:
+        if not path.is_file():
+            continue
+        text = path.read_text()
+        original = text
+        if sha:
+            text = text.replace("SHA_PLACEHOLDER", sha)
+        text = text.replace("BUILT_AT_ISO_PLACEHOLDER", built_at)
+        if release_tag:
+            text = text.replace("VERSION_PLACEHOLDER", release_tag)
+        if text != original:
+            path.write_text(text)
+            print(
+                f"  stamped {path.relative_to(root)} "
+                f"sha={sha} built_at={built_at} version={release_tag or '(omit)'}"
+            )
 
 
 def _build_realm_backend(root: Path) -> Path:
@@ -274,6 +305,8 @@ def main():
 
     if want_backend:
         canister, main_py = spec["backend"]
+        release_tag = None if args.from_main else f"v{version}"
+        _stamp_version_http(root, release_tag)
         backend_wasm = _build_backend(root, canister, main_py)
     if want_frontend:
         frontend_dist = _build_frontend(root, spec["frontend"], env)

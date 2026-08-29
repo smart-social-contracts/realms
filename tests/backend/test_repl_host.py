@@ -179,6 +179,7 @@ class TestDidAllowlist:
         assert BLOCKED_METHODS == {
             "__shell__",
             "http_request",
+            "http_request_update",
             "http_transform",
             "__get_candid_interface_tmp_hack",
         }

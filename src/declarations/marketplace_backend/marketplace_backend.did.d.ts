@@ -453,7 +453,7 @@ export interface HttpResponseIncoming {
   'body' : Uint8Array | number[],
   'headers' : Array<Header>,
   'upgrade' : [] | [boolean],
-  'streaming_strategy' : [] | [StreamingStrategy],
+  'streaming_strategy' : [] | [string],
   'status_code' : number,
 }
 export interface HttpTransform {
@@ -1034,6 +1034,8 @@ export interface _SERVICE {
   'get_my_purchases' : ActorMethod<[], Array<PurchaseRecord>>,
   'grant_manual_license' : ActorMethod<[string, bigint, string], GenericResult>,
   'greet' : ActorMethod<[string], string>,
+  'http_request' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
+  'http_request_update' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
   'has_liked' : ActorMethod<[string, string, string], boolean>,
   'has_purchased_assistant' : ActorMethod<[string, string], boolean>,
   'has_purchased_codex' : ActorMethod<[string, string], boolean>,

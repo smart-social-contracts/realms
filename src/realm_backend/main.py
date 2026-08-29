@@ -69,6 +69,11 @@ from api.nft import (
 )
 from api.registry import get_registry_info, register_realm
 from api.status import get_status
+from api.version_http import (
+    http_request_upgrade_signal,
+    is_version_path,
+    version_http_response,
+)
 from api.user import (
     user_get,
     user_get_record_fields,
@@ -357,6 +362,7 @@ _HOST_BLOCKED = frozenset(
     {
         "__shell__",
         "http_request",
+        "http_request_update",
         "http_transform",
         "__get_candid_interface_tmp_hack",
     }
@@ -5873,7 +5879,12 @@ def http_request_404():
 
 @query
 def http_request(req: HttpRequest) -> HttpResponseIncoming:
-    """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
+    """Handle HTTP requests to the canister. Only for unauthenticated read operations.
+
+    GET /version (and OPTIONS) upgrade to ``http_request_update`` so the
+    HTTP gateway can certify the response. Existing /status and /extensions
+    stay cheap query reads.
+    """
     try:
         method = req["method"]
         url = req["url"]
@@ -5887,6 +5898,9 @@ def http_request(req: HttpRequest) -> HttpResponseIncoming:
             streaming_strategy=None,
             upgrade=False,
         )
+
+        if method.upper() == "OPTIONS" or is_version_path(url):
+            return http_request_upgrade_signal()
 
         if method == "GET":
             # Strip leading slash and query params
@@ -5902,6 +5916,22 @@ def http_request(req: HttpRequest) -> HttpResponseIncoming:
         return not_found
     except Exception as e:
         logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
+        return {
+            "status_code": 500,
+            "headers": [],
+            "body": bytes(traceback.format_exc(), "ascii"),
+            "streaming_strategy": None,
+            "upgrade": False,
+        }
+
+
+@update
+def http_request_update(req: HttpRequest) -> HttpResponseIncoming:
+    """Certified HTTP responses. Serves GET /version; OPTIONS → 204; else 404."""
+    try:
+        return version_http_response(req)
+    except Exception as e:
+        logger.error(f"Error handling HTTP update: {str(e)}\n{traceback.format_exc()}")
         return {
             "status_code": 500,
             "headers": [],

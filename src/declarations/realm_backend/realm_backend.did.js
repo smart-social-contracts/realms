@@ -352,6 +352,7 @@ export const idlFactory = ({ IDL }) => {
     'get_zones' : IDL.Func([IDL.Nat], [IDL.Text], ['query']),
     'grant_delegation_json' : IDL.Func([IDL.Text], [IDL.Text], []),
     'http_request' : IDL.Func([HttpRequest], [HttpResponseIncoming], ['query']),
+    'http_request_update' : IDL.Func([HttpRequest], [HttpResponseIncoming], []),
     'http_transform' : IDL.Func([HttpTransformArgs], [HttpResponse], ['query']),
     'install_branding_from_registry' : IDL.Func([IDL.Text], [IDL.Text], []),
     'install_codex' : IDL.Func([IDL.Text], [IDL.Text], []),

@@ -132,6 +132,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Stamp GET /version provenance (gos-as-a-service#39) before packing WASM.
+      # Unstamped placeholders are omitted honestly at query time — never invent.
+      - name: Stamp /version build provenance
+        if: ${{ inputs.cli_only != true }}
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          BUILT_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          VERSION="v${{ steps.bump_version.outputs.NEW_VERSION }}"
+          for f in \
+            src/realm_backend/api/version_http.py \
+            src/marketplace_backend/api/version_http.py
+          do
+            sed -i "s/SHA_PLACEHOLDER/${SHA}/g" "$f"
+            sed -i "s/BUILT_AT_ISO_PLACEHOLDER/${BUILT_AT}/g" "$f"
+            sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" "$f"
+          done
+          echo "Stamped /version: sha=${SHA} built_at=${BUILT_AT} version=${VERSION}"
+
       # Build artifacts. The base build defaults to the Cedar template, so the
       # release WASM a new realm pulls from the registry authorizes too.
       - name: Build backend WASM

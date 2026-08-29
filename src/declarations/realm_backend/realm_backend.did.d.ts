@@ -1164,6 +1164,7 @@ export interface _SERVICE {
   'get_zones' : ActorMethod<[bigint], string>,
   'grant_delegation_json' : ActorMethod<[string], string>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
+  'http_request_update' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
   'http_transform' : ActorMethod<[HttpTransformArgs], HttpResponse>,
   'install_branding_from_registry' : ActorMethod<[string], string>,
   'install_codex' : ActorMethod<[string], string>,
