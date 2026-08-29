@@ -21,6 +21,34 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('marketplace_frontend smoke', () => {
+  test('home door has no env/version chips and keeps the catalog', async ({ page }) => {
+    await page.goto('/');
+
+    await expect(page.getByRole('heading', { name: 'Realms GOS' })).toBeVisible();
+    await expect(page.getByText(/test environment/i)).toHaveCount(0);
+    await expect(page.getByText(/realms gos main/i)).toHaveCount(0);
+    await expect(page.locator('.landing-badges, .badge-env, .badge-version')).toHaveCount(0);
+
+    await expect(page.getByRole('link', { name: /^About$/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Enhance the experience/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Extensions/i })).toBeVisible();
+  });
+
+  test('about route recycles Realms GOS landing sections', async ({ page }) => {
+    await page.goto('/about');
+
+    await expect(page.getByRole('heading', { name: 'The Governance Operating System' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'What is Realms?' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Core Principles' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'How It Works' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'For People' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'For Institutions' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Get Started' })).toBeVisible();
+    await expect(page.getByText(/test environment/i)).toHaveCount(0);
+    await expect(page.getByText(/realms gos main/i)).toHaveCount(0);
+    await expect(page.locator('iframe')).toHaveCount(0);
+  });
+
   test('top charts page renders and toggles work', async ({ page }) => {
     await page.goto('/');
 

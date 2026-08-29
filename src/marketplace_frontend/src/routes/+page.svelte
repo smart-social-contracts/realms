@@ -175,21 +175,8 @@ function extensionThumbnail(ext) {
 </script>
 
 <section class="landing-hero" aria-labelledby="landing-title">
-  <div class="landing-badges">
-    {#if CONFIG.env_name}
-      <span class="badge badge-env">{$_('landing.badge_env', { values: { env: CONFIG.env_name } })}</span>
-    {/if}
-    {#if CONFIG.realms_version}
-      <span class="badge badge-version">{$_('landing.badge_version', { values: { version: CONFIG.realms_version } })}</span>
-    {/if}
-  </div>
   <h1 id="landing-title">{$_('landing.product_name')}</h1>
   <p class="landing-pitch">{$_('landing.pitch')}</p>
-  <ul class="landing-features" aria-label="Features">
-    <li><i class="ti ti-rocket" aria-hidden="true"></i><span>{$_('landing.feature_launch')}</span></li>
-    <li><i class="ti ti-puzzle" aria-hidden="true"></i><span>{$_('landing.feature_install')}</span></li>
-    <li><i class="ti ti-users-group" aria-hidden="true"></i><span>{$_('landing.feature_community')}</span></li>
-  </ul>
   <div class="landing-ctas">
     {#if CONFIG.portal_url}
       <a class="cta primary" href={CONFIG.portal_url} target="_blank" rel="noreferrer">
@@ -203,6 +190,9 @@ function extensionThumbnail(ext) {
     <button type="button" class="cta secondary" on:click={() => scrollToCatalog('codex')}>
       {$_('landing.cta_browse_codices')}
     </button>
+    <a class="cta secondary" href="/about">
+      {$_('landing.cta_about')}
+    </a>
   </div>
 </section>
 
@@ -320,32 +310,6 @@ function extensionThumbnail(ext) {
     border-radius: 0.75rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   }
-  .landing-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-  }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.7rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    text-transform: lowercase;
-  }
-  .badge-env {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-  }
-  .badge-version {
-    background: var(--verified-bg);
-    border: 1px solid rgba(22, 101, 52, 0.15);
-    color: var(--verified);
-  }
   .landing-hero h1 {
     font-size: clamp(1.75rem, 4vw, 2.5rem);
     margin: 0 0 0.6rem;
@@ -356,26 +320,6 @@ function extensionThumbnail(ext) {
     font-size: 1.05rem;
     margin: 0 0 1.5rem;
     max-width: 42rem;
-  }
-  .landing-features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0.75rem 1.25rem;
-    margin: 0 0 1.75rem;
-    padding: 0;
-    list-style: none;
-  }
-  .landing-features li {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    color: var(--text);
-    font-size: 0.9rem;
-  }
-  .landing-features .ti {
-    font-size: 1.15rem;
-    color: var(--text-muted);
-    flex-shrink: 0;
   }
   .landing-ctas {
     display: flex;
