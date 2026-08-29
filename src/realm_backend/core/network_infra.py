@@ -8,8 +8,16 @@ NETWORK_INFRA = {
     "demo": {
         "file_registry": "vi64l-3aaaa-aaaae-qj4va-cai",
         "marketplace": "ehyfg-wyaaa-aaaae-qg3qq-cai",
-        "installer": "2s4td-daaaa-aaaao-bazmq-cai",
-        "registry": "rhw4p-gqaaa-aaaac-qbw7q-cai",
+        # Historical GOS IDs plus the live Casals-managed stack. rhw4p is
+        # IC0301; demo.gos.earth uses moqmm (installer) / mjrky (registry).
+        "installer": (
+            "2s4td-daaaa-aaaao-bazmq-cai",
+            "moqmm-caaaa-aaaah-qu27q-cai",
+        ),
+        "registry": (
+            "rhw4p-gqaaa-aaaac-qbw7q-cai",
+            "mjrky-pyaaa-aaaah-qu27a-cai",
+        ),
     },
     "staging": {
         "file_registry": "hacwc-baaaa-aaaac-bfxmq-cai",
@@ -20,19 +28,34 @@ NETWORK_INFRA = {
 }
 
 
+def _principal_ids(value) -> list:
+    """Normalize a NETWORK_INFRA installer/registry value to principal strings."""
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set, frozenset)):
+        items = value
+    else:
+        items = (value,)
+    ids = []
+    for item in items:
+        text = (item or "").strip()
+        if text:
+            ids.append(text)
+    return ids
+
+
 def known_bootstrap_principals() -> frozenset:
     """GOS installer + registry principals that may first-boot a realm.
 
     Casals is not a lasting controller. After canister create, the installer
-    (fltjm on test) calls enter_setup / set_canister_config_json. Those
-    callers must be recognizable without an IC-controller check.
+    (fltjm on test, moqmm on live demo) calls enter_setup /
+    set_canister_config_json. Those callers must be recognizable without an
+    IC-controller check.
     """
     ids = set()
     for entry in NETWORK_INFRA.values():
         for key in ("installer", "registry"):
-            value = (entry.get(key) or "").strip()
-            if value:
-                ids.add(value)
+            ids.update(_principal_ids(entry.get(key)))
     return frozenset(ids)
 
 
