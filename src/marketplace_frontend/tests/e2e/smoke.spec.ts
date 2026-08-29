@@ -29,7 +29,7 @@ test.describe('marketplace_frontend smoke', () => {
     await expect(page.getByText(/realms gos main/i)).toHaveCount(0);
     await expect(page.locator('.landing-badges, .badge-env, .badge-version')).toHaveCount(0);
 
-    await expect(page.getByRole('link', { name: /^About$/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^About$/ })).toHaveCount(2);
     await expect(page.getByRole('heading', { name: /Enhance the experience/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Extensions/i })).toBeVisible();
   });
