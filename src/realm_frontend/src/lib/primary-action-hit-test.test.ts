@@ -60,4 +60,30 @@ describe('primary action mouse hit-testing', () => {
 		const loader = readSrc('extension-loader.ts');
 		expect(loader).toContain("iframe.style.pointerEvents = 'auto'");
 	});
+
+	it('dismisses Test Mode Active on a native mouse click, not only Tab+Enter', () => {
+		const banner = readSrc('components/DemoBanner.svelte');
+		expect(banner).toContain('type="button"');
+		expect(banner).toContain('onclick={dismissBanner}');
+		expect(banner).toContain('demo_banner.dismiss_label');
+		// Click must land on the <button>, not the X <path>. Delegated SVG
+		// hits are the Tab+Enter-works / mouse-dead class.
+		expect(banner).toMatch(/<svg[^>]*pointer-events-none/);
+		expect(banner).toContain('pointer-events-auto');
+		// Stay below header z-[70] so the X does not cover menu / avatar.
+		expect(banner).toMatch(/\bz-10\b/);
+		expect(banner).not.toMatch(/z-\[7/);
+		expect(banner).not.toMatch(/z-\[8/);
+		expect(banner).not.toMatch(/z-\[9/);
+	});
+
+	it('does not let Test Mode banner stacking steal header chrome clicks', () => {
+		const layout = readSrc('../routes/(sidebar)/+layout.svelte');
+		const navbar = readSrc('../routes/(sidebar)/Navbar.svelte');
+		expect(layout).toContain('z-[70]');
+		expect(layout).toContain('<Navbar bind:drawerHidden />');
+		expect(navbar).toContain('pointer-events: auto');
+		expect(navbar).toContain('drawerHidden = !drawerHidden');
+		expect(navbar).toContain('AuthButton');
+	});
 });
