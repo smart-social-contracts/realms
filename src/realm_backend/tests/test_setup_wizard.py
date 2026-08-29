@@ -296,6 +296,7 @@ def test_effective_status_fail_closed_to_setup():
 
 
 _TEST_INSTALLER = "fltjm-tyaaa-aaaap-qunhq-cai"
+_DEMO_LIVE_INSTALLER = "moqmm-caaaa-aaaah-qu27q-cai"
 
 
 def _enter_setup_with_auth_gate(
@@ -504,6 +505,8 @@ def test_bootstrap_admin_allows_installer_during_setup_not_random():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is True
     assert is_bootstrap_admin_caller("yhw3g-fyaaa-aaaas-qgorq-cai", realm) is True
+    assert is_bootstrap_admin_caller(_DEMO_LIVE_INSTALLER, realm) is True
+    assert is_bootstrap_admin_caller("mjrky-pyaaa-aaaah-qu27a-cai", realm) is True
     assert is_bootstrap_admin_caller("random-attacker", realm) is False
     assert is_bootstrap_admin_caller(_TEST_INSTALLER, None) is False
 

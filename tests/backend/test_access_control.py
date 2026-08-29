@@ -264,7 +264,9 @@ class TestCheckAccess:
 
         from core.access import _check_access
         installer = "fltjm-tyaaa-aaaap-qunhq-cai"
+        demo_installer = "moqmm-caaaa-aaaah-qu27q-cai"
         assert _check_access(installer, Operations.REALM_ADMIN) is True
+        assert _check_access(demo_installer, Operations.REALM_ADMIN) is True
         assert _check_access("random-attacker", Operations.REALM_ADMIN) is False
 
     @patch("ggg.Realm")
