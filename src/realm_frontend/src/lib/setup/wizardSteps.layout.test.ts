@@ -34,15 +34,16 @@ describe('setup wizard step rail layout', () => {
 
 	it('puts each setup step label under the index, not inline', () => {
 		expect(setupPage).toContain('class="setup-wizard__step-label"');
+		expect(setupPage).toContain('class="setup-wizard__step-unit"');
 		expect(cssBlock('setup-wizard__step')).toMatch(/flex-direction:\s*column/);
 		expect(cssBlock('setup-wizard__step')).not.toMatch(/white-space:\s*nowrap/);
-		expect(cssBlock('setup-wizard__step')).toMatch(/min-width:\s*0/);
-		expect(cssBlock('setup-wizard__step-label')).toMatch(/overflow-wrap:\s*break-word/);
+		expect(cssBlock('setup-wizard__step-label')).toMatch(/white-space:\s*nowrap/);
 	});
 
-	it('lets the rail shrink instead of overflowing the card', () => {
+	it('wraps the six steps to three-across on a phone instead of overflowing', () => {
+		expect(cssBlock('setup-wizard__steps')).toMatch(/flex-wrap:\s*wrap/);
 		expect(cssBlock('setup-wizard__steps')).toMatch(/min-width:\s*0/);
-		expect(cssBlock('setup-wizard__steps')).toMatch(/width:\s*100%/);
-		expect(cssBlock('setup-wizard__step-rail')).toMatch(/min-width:\s*0\.2rem/);
+		expect(cssBlock('setup-wizard__step-unit')).toMatch(/max-width:\s*33\.333%/);
+		expect(setupPage).toMatch(/nth-child\(3n \+ 1\)/);
 	});
 });

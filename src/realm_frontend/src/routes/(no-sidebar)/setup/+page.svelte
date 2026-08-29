@@ -1058,42 +1058,44 @@
 				</div>
 			</header>
 
-			<nav class="setup-wizard__steps" lang="en" aria-label={$_('setup.wizard.steps_label')}>
+			<nav class="setup-wizard__steps" aria-label={$_('setup.wizard.steps_label')}>
 				{#each steps as step, index (step.id)}
-					{#if index > 0}
-						<span
-							class="setup-wizard__step-rail"
-							class:setup-wizard__step-rail--done={index <= stepIndex}
-							aria-hidden="true"
-						></span>
-					{/if}
-					<button
-						type="button"
-						class="setup-wizard__step"
-						class:setup-wizard__step--active={step.id === currentStep}
-						class:setup-wizard__step--done={index < stepIndex}
-						class:setup-wizard__step--pending={index > stepIndex}
-						aria-current={step.id === currentStep ? 'step' : undefined}
-						onclick={() => goToStep(step.id)}
-					>
-						<span class="setup-wizard__step-index">
-							{#if index < stepIndex}
-								<svg viewBox="0 0 16 16" aria-hidden="true">
-									<path
-										d="M3.5 8.5 6.5 11.5 12.5 4.5"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="1.8"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									/>
-								</svg>
-							{:else}
-								{index + 1}
-							{/if}
-						</span>
-						<span class="setup-wizard__step-label">{$_(step.labelKey)}</span>
-					</button>
+					<div class="setup-wizard__step-unit">
+						{#if index > 0}
+							<span
+								class="setup-wizard__step-rail"
+								class:setup-wizard__step-rail--done={index <= stepIndex}
+								aria-hidden="true"
+							></span>
+						{/if}
+						<button
+							type="button"
+							class="setup-wizard__step"
+							class:setup-wizard__step--active={step.id === currentStep}
+							class:setup-wizard__step--done={index < stepIndex}
+							class:setup-wizard__step--pending={index > stepIndex}
+							aria-current={step.id === currentStep ? 'step' : undefined}
+							onclick={() => goToStep(step.id)}
+						>
+							<span class="setup-wizard__step-index">
+								{#if index < stepIndex}
+									<svg viewBox="0 0 16 16" aria-hidden="true">
+										<path
+											d="M3.5 8.5 6.5 11.5 12.5 4.5"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										/>
+									</svg>
+								{:else}
+									{index + 1}
+								{/if}
+							</span>
+							<span class="setup-wizard__step-label">{$_(step.labelKey)}</span>
+						</button>
+					</div>
 				{/each}
 			</nav>
 			{#if !loading}
@@ -1791,19 +1793,27 @@
 
 	.setup-wizard__steps {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: flex-start;
-		justify-content: space-between;
 		width: 100%;
 		min-width: 0;
+		row-gap: 0.75rem;
 		margin-bottom: 1.75rem;
 	}
 
+	.setup-wizard__step-unit {
+		display: flex;
+		align-items: flex-start;
+		flex: 1 1 30%;
+		min-width: 30%;
+		max-width: 33.333%;
+	}
+
 	.setup-wizard__step-rail {
-		flex: 1 1 0.35rem;
+		flex: 0 0 0.55rem;
 		align-self: flex-start;
 		height: 1px;
-		min-width: 0.2rem;
-		max-width: 2.5rem;
+		min-width: 0.4rem;
 		margin-top: 0.72rem;
 		background: #e2e8f0;
 	}
@@ -1822,11 +1832,12 @@
 
 	.setup-wizard__step {
 		display: flex;
-		flex: 1 1 0;
+		flex: 1 1 auto;
 		flex-direction: column;
 		align-items: center;
 		gap: 0.3rem;
 		min-width: 0;
+		width: 100%;
 		border: none;
 		background: transparent;
 		color: #94a3b8;
@@ -1840,8 +1851,7 @@
 	.setup-wizard__step-label {
 		display: block;
 		width: 100%;
-		overflow-wrap: break-word;
-		hyphens: auto;
+		white-space: nowrap;
 	}
 
 	.setup-wizard__step--done {
@@ -1862,15 +1872,26 @@
 		color: #f8fafc;
 	}
 
+	@media (max-width: 639px) {
+		.setup-wizard__step-unit:nth-child(3n + 1) .setup-wizard__step-rail {
+			display: none;
+		}
+	}
+
 	@media (min-width: 640px) {
+		.setup-wizard__step-unit {
+			flex: 1 1 0;
+			min-width: 0;
+			max-width: none;
+		}
+
 		.setup-wizard__step {
 			font-size: 0.75rem;
 		}
 
 		.setup-wizard__step-rail {
-			flex-basis: 1.25rem;
-			min-width: 0.75rem;
-			max-width: none;
+			flex: 1 1 0.75rem;
+			min-width: 0.55rem;
 		}
 	}
 
