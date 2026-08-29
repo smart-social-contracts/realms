@@ -18,6 +18,7 @@ describe("marketplace about copy", () => {
       const loc = loadLocale(file);
       assert.equal(loc.landing.product_name, "Realms GOS");
       assert.ok(loc.landing.pitch);
+      assert.ok(loc.landing.cta_launch);
       assert.ok(loc.landing.cta_about);
       assert.equal(loc.landing.badge_env, undefined);
       assert.equal(loc.landing.badge_version, undefined);
@@ -35,6 +36,11 @@ describe("marketplace about copy", () => {
       assert.ok(loc.about.getStarted.demo.button);
     });
   }
+
+  it("English home CTA is Launch your realm", () => {
+    assert.equal(loadLocale("en.json").landing.cta_launch, "Launch your realm");
+    assert.notEqual(loadLocale("en.json").landing.cta_launch, "Launch a realm");
+  });
 
   it("English about copy matches the website landing strings", () => {
     const about = loadLocale("en.json").about;

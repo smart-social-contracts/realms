@@ -133,7 +133,7 @@ $: routeIsActive = (path) => {
   </div>
 </header>
 
-<main class="main">
+<main class="main" class:flush={$page.url.pathname === '/'}>
   <slot />
 </main>
 
@@ -341,6 +341,10 @@ $: routeIsActive = (path) => {
     max-width: 1200px;
     margin: 0 auto;
     padding: 2rem 1.5rem 4rem;
+  }
+  .main.flush {
+    max-width: none;
+    padding: 0 0 4rem;
   }
 
   /* Footer mirrors the realm_frontend footer: a centered card with a
