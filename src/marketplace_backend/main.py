@@ -230,11 +230,14 @@ from _cdk import (
     Principal,
     Record,
     StableBTreeMap,
+    Tuple,
     Variant,
     Vec,
+    blob,
     float64,
     ic,
     init,
+    nat16,
     nat64,
     post_upgrade,
     query,
@@ -312,6 +315,10 @@ from api.rankings import (
     top_extensions_by_likes as top_extensions_by_likes_impl,
 )
 from api.status import get_status
+from api.version_http import (
+    http_request_upgrade_signal,
+    version_http_response,
+)
 from api.verification import (
     list_pending_audits as list_pending_audits_impl,
     request_audit as request_audit_impl,
@@ -1507,3 +1514,39 @@ def list_pending_audits() -> Vec[PendingAudit]:
 @query
 def greet(name: str) -> str:
     return f"Hello from Marketplace, {name}!"
+
+
+# ---------------------------------------------------------------------------
+# Incoming HTTP (GET /version) — gos-as-a-service#39
+# Types match the shapes already declared in marketplace_backend.did
+# (Header / HttpRequest / HttpResponseIncoming).
+# ---------------------------------------------------------------------------
+
+Header = Tuple[str, str]
+
+
+class HttpRequest(Record):
+    method: str
+    url: str
+    headers: Vec["Header"]
+    body: blob
+
+
+class HttpResponseIncoming(Record):
+    status_code: nat16
+    headers: Vec["Header"]
+    body: blob
+    streaming_strategy: Opt[str]
+    upgrade: Opt[bool]
+
+
+@query
+def http_request(req: HttpRequest) -> HttpResponseIncoming:
+    """Signal the gateway to upgrade so /version can be certified."""
+    return http_request_upgrade_signal()
+
+
+@update
+def http_request_update(req: HttpRequest) -> HttpResponseIncoming:
+    """Serve GET /version; OPTIONS → 204; anything else → 404 JSON."""
+    return version_http_response(req)

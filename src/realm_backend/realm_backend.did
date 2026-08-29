@@ -334,6 +334,7 @@ service : {
   "extension_sync_call" : (text, text, text) -> (ExtensionCallResponse);
   "extension_async_call" : (text, text, text) -> (ExtensionCallResponse);
   "http_request" : (HttpRequest) -> (HttpResponseIncoming) query;
+  "http_request_update" : (HttpRequest) -> (HttpResponseIncoming);
   "http_transform" : (HttpTransformArgs) -> (HttpResponse) query;
   "__shell__" : (text) -> (text);
   "create_multi_step_scheduled_task" : (text, text, nat, nat) -> (text);

@@ -44,7 +44,7 @@ type StreamingCallbackHttpResponse = record { body : blob; token : opt Streaming
 type Callback = func (StreamingToken) -> (StreamingCallbackHttpResponse) query;
 type CallbackStrategy = record { callback : Callback; token : StreamingToken };
 type StreamingStrategy = variant { Callback : CallbackStrategy };
-type HttpResponseIncoming = record { status_code : nat16; headers : vec Header; body : blob; streaming_strategy : opt StreamingStrategy; upgrade : opt bool };
+type HttpResponseIncoming = record { status_code : nat16; headers : vec Header; body : blob; streaming_strategy : opt text; upgrade : opt bool };
 type KeyTooLarge = record { given : nat32; max : nat32 };
 type ValueTooLarge = record { given : nat32; max : nat32 };
 type AssetClass = variant { Cryptocurrency : null; FiatCurrency : null };
@@ -303,5 +303,7 @@ service : (opt MarketplaceInitArg) -> {
   "set_verification_status" : (text, text, text, text) -> (GenericResult);
   "list_pending_audits" : () -> (vec PendingAudit) query;
   "greet" : (text) -> (text) query;
+  "http_request" : (HttpRequest) -> (HttpResponseIncoming) query;
+  "http_request_update" : (HttpRequest) -> (HttpResponseIncoming);
   "__get_candid_interface_tmp_hack" : () -> (text) query;
 }

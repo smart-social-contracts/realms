@@ -224,6 +224,20 @@ export const idlFactory = ({ IDL }) => {
     'likes_count' : IDL.Nat64,
   });
   const StatusResult = IDL.Variant({ 'Ok' : StatusRecord, 'Err' : IDL.Text });
+  const Header = IDL.Tuple(IDL.Text, IDL.Text);
+  const HttpRequest = IDL.Record({
+    'url' : IDL.Text,
+    'method' : IDL.Text,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(Header),
+  });
+  const HttpResponseIncoming = IDL.Record({
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(Header),
+    'upgrade' : IDL.Opt(IDL.Bool),
+    'streaming_strategy' : IDL.Opt(IDL.Text),
+    'status_code' : IDL.Nat16,
+  });
   return IDL.Service({
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
     'add_reviewer' : IDL.Func([IDL.Text], [GenericResult], []),
@@ -264,6 +278,8 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'greet' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+    'http_request' : IDL.Func([HttpRequest], [HttpResponseIncoming], ['query']),
+    'http_request_update' : IDL.Func([HttpRequest], [HttpResponseIncoming], []),
     'has_liked' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text],
         [IDL.Bool],

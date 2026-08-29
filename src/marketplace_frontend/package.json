@@ -8,8 +8,9 @@
     "start": "vite --port 3002",
     "prebuild": "dfx --run-deprecated generate marketplace_backend",
     "build": "vite build",
-    "test": "node --experimental-strip-types --test src/lib/*.test.ts",
-    "test:unit": "node --experimental-strip-types --test src/lib/*.test.ts",
+    "postbuild": "node scripts/write-version-file.js",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts && node --test ../../scripts/build-info.test.js",
+    "test:unit": "node --experimental-strip-types --test src/lib/*.test.ts && node --test ../../scripts/build-info.test.js",
     "test:e2e": "playwright test",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss,svelte}\""
   },
