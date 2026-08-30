@@ -65,15 +65,15 @@ DERIVATION_ORIGINS = {
     "ic": "https://realmsgos.org",
 }
 
-# Same queue IDs as ``realms registry realm deploy-realm`` / mundus.
+# Live GOS queue IDs (demo.gos.earth is mjrky/moqmm; rhw4p/2s4td are IC0301).
 REGISTRY_IDS = {
     "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
-    "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
+    "demo": "mjrky-pyaaa-aaaah-qu27a-cai",
     "test": "yhw3g-fyaaa-aaaas-qgorq-cai",
 }
 INSTALLER_IDS = {
     "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
-    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+    "demo": "moqmm-caaaa-aaaah-qu27q-cai",
     "test": "fltjm-tyaaa-aaaap-qunhq-cai",
 }
 
