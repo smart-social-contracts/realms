@@ -391,6 +391,7 @@ export const idlFactory = ({ IDL }) => {
     'refresh_invoice' : IDL.Func([IDL.Text], [IDL.Text], []),
     'register_demo_citizens' : IDL.Func([IDL.Text], [IDL.Text], []),
     'register_founder' : IDL.Func([IDL.Text], [RealmResponse], []),
+    'register_co_admin' : IDL.Func([IDL.Text], [IDL.Text], []),
     'register_quarter' : IDL.Func([IDL.Text, IDL.Text], [RealmResponse], []),
     'register_realm_from_registry' : IDL.Func([IDL.Text], [IDL.Text], []),
     'register_realm_with_registry' : IDL.Func(

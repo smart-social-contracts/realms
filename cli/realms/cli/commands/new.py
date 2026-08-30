@@ -34,6 +34,8 @@ DEPLOYMENT_COST_CREDITS = 5
 ALLOWED_GOS = "realms-gos"
 ALLOWED_NETWORKS = ("test", "staging", "demo", "ic")
 PEM_DEPLOY_IDENTITY_NAMES = frozenset({"deployer", "my_dev_identity_1"})
+ANONYMOUS_PRINCIPAL = "2vxsx-fae"
+_PRINCIPAL_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+$")
 
 BRANDING_MAX_BYTES = 1_572_864  # ~1.5 MiB (matches core.setup.BRANDING_DATA_URL_MAX_BYTES)
 MANIFESTO_MAX_CHARS = 256
@@ -363,6 +365,7 @@ def merge_spec_and_flags(
     data_path: Optional[str] = None,
     members: Optional[int] = None,
     open_registration: Optional[bool] = None,
+    co_admin: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Merge spec JSON with CLI flags. Flags win. Does not validate yet."""
     branding_spec = spec.get("branding") if isinstance(spec.get("branding"), dict) else {}
@@ -463,6 +466,11 @@ def merge_spec_and_flags(
     else:
         merged_open = bool(open_registration)
 
+    merged_co_admin = (
+        co_admin if co_admin is not None else spec.get("co_admin") or ""
+    )
+    merged_co_admin = str(merged_co_admin or "").strip()
+
     return {
         "name": merged_name,
         "slug": merged_slug,
@@ -483,6 +491,7 @@ def merge_spec_and_flags(
         "members": merged_members,
         "open_registration": merged_open,
         "invite_codes": [str(c).strip() for c in (invite_codes or []) if str(c).strip()],
+        "co_admin": merged_co_admin,
     }
 
 
@@ -570,10 +579,48 @@ def validate_merged_spec(
     if errors:
         raise StageError("validate", "\n".join(errors))
 
+    co_admin = str(merged.get("co_admin") or "").strip()
+    if co_admin:
+        validate_ic_principal(co_admin, "--co-admin")
+    pem_err = pem_deploy_requires_co_admin(identity, co_admin)
+    if pem_err:
+        raise StageError("validate", pem_err)
+
     for key, label in (("logo", "logo"), ("background", "background")):
         path = _deep_get(merged, "branding", key, default="")
         if path:
             validate_branding_size(str(path), label)
+
+
+def validate_ic_principal(principal: str, label: str = "principal") -> None:
+    """Reject empty, anonymous, or obviously malformed IC principals."""
+    p = (principal or "").strip()
+    if not p:
+        raise StageError("validate", f"{label} is required")
+    if p == ANONYMOUS_PRINCIPAL:
+        raise StageError("validate", f"{label} cannot be the anonymous principal")
+    if not _PRINCIPAL_RE.fullmatch(p) or len(p) < 20:
+        raise StageError(
+            "validate",
+            f"{label} does not look like an IC principal: {p}",
+        )
+
+
+def pem_deploy_requires_co_admin(identity: str, co_admin: str) -> Optional[str]:
+    """Error if a known dfx deploy key is used without --co-admin."""
+    if classify_identity(identity) != "pem_deploy":
+        return None
+    if (co_admin or "").strip():
+        return None
+    origin = "https://demo.gos.earth"
+    return (
+        f"--identity '{identity}' is a dfx deploy key. Browser Internet Identity "
+        f"login would be a different user.\n"
+        f"Pass --co-admin <your-II-principal> (copy it from the browser console "
+        f"after logging into {origin} / the realm portal).\n"
+        f"After deploy, that principal is registered as a second admin "
+        f"(admin profile + root org). {identity} stays the founder User."
+    )
 
 
 def credits_shortfall_message(principal: str, balance: int, network: str) -> str:
@@ -618,10 +665,10 @@ def identity_refuse_message(name: str, network: str) -> str:
         f"--identity '{name}' looks like an unlinked dfx/PEM deploy key, not an "
         f"Internet Identity. The installer would record that principal as founder, "
         f"and browser II login would be a different user.\n"
-        f"Link II first (realm SPA derivation origin):\n"
+        f"Either pass --co-admin <your-II-principal> so that principal is "
+        f"registered as a second admin after launch, or link II:\n"
         f"  icp identity link web {name} --app {origin}\n"
-        f"Confirm against the realm's /canister_ids.js derivation_origin after deploy, "
-        f"then retry with the same --identity."
+        f"Confirm against the realm's /canister_ids.js derivation_origin after deploy."
     )
 
 
@@ -765,8 +812,10 @@ def _icp_identity_web_linked(name: str) -> Optional[bool]:
     return None
 
 
-def assert_identity_is_ii_linked(identity: str, network: str) -> str:
-    """Refuse known PEM deploy keys. Warn if we cannot confirm a web link."""
+def assert_identity_is_ii_linked(
+    identity: str, network: str, co_admin: str = ""
+) -> str:
+    """Refuse known PEM deploy keys unless --co-admin is set. Warn if unconfirmed."""
     web_linked = _icp_identity_web_linked(identity)
     pem_path = Path.home() / ".config/dfx/identity" / identity / "identity.pem"
     kind = classify_identity(
@@ -775,12 +824,20 @@ def assert_identity_is_ii_linked(identity: str, network: str) -> str:
         pem_file_exists=pem_path.is_file() and web_linked is not True,
     )
     if kind == "pem_deploy":
+        if (co_admin or "").strip():
+            console.print(
+                f"[yellow]Warning:[/yellow] --identity '{identity}' is a dfx deploy "
+                f"key (founder on-chain). Browser II login will use --co-admin "
+                f"{co_admin.strip()} as a second admin, not as the founder User."
+            )
+            return kind
         raise StageError("validate", identity_refuse_message(identity, network))
     if kind == "unknown":
         origin = derivation_origin_for_network(network)
         console.print(
             f"[yellow]Warning:[/yellow] could not confirm --identity '{identity}' is "
-            f"II-linked. If this is a dfx PEM key, abort and run:\n"
+            f"II-linked. If this is a dfx PEM key, abort and pass --co-admin "
+            f"<II-principal>, or run:\n"
             f"  icp identity link web {identity} --app {origin}"
         )
     return kind
@@ -1039,6 +1096,90 @@ def _setup_json_call(
     if raw.get("success") is False:
         _fail(stage, raw.get("error") or f"{method} failed")
     return raw
+
+
+_CO_ADMIN_SHELL = """
+from api.user import user_register
+from core.membership import add_department_member, user_in_department
+from core.org_policy import ensure_root_org, grant_root_authority_over_local_orgs
+from ggg import User
+p = {principal!r}
+user_register(p, "admin")
+root = ensure_root_org()
+grant_root_authority_over_local_orgs()
+u = User[p]
+if u and not user_in_department(u, root):
+    add_department_member(root, u)
+print("ok")
+"""
+
+
+def _co_admin_method_missing(err: str) -> bool:
+    lower = (err or "").lower()
+    return "register_co_admin" in lower and (
+        "no update method" in lower
+        or "has no method" in lower
+        or "not found" in lower
+        or "unknown method" in lower
+        or "ic0536" in lower
+    )
+
+
+def register_co_admin_principal(
+    merged: Dict[str, Any],
+    backend_id: str,
+    network: str,
+    identity: str,
+) -> None:
+    """After launch, register --co-admin as a second admin User. Idempotent.
+
+    Prefers ``register_co_admin``. If this realm WASM does not have that
+    method yet, falls back to founder ``__shell__`` using existing APIs.
+    """
+    principal = str(merged.get("co_admin") or "").strip()
+    if not principal:
+        return
+    console.print(f"  register_co_admin {principal}")
+    try:
+        raw = _canister_call(
+            backend_id,
+            "register_co_admin",
+            f'("{principal}")',
+            network,
+            identity,
+            timeout=180,
+        )
+    except RuntimeError as exc:
+        err = str(exc)
+        if not _co_admin_method_missing(err):
+            _fail("co-admin", err)
+        console.print(
+            "  register_co_admin not on this WASM — falling back to __shell__"
+        )
+        code = _CO_ADMIN_SHELL.format(principal=principal)
+        raw = _canister_call(
+            backend_id,
+            "__shell__",
+            _candid_text_arg(code),
+            network,
+            identity,
+            timeout=180,
+        )
+        text = raw if isinstance(raw, str) else json.dumps(raw)
+        if "ok" not in text.lower() and "success" not in text.lower():
+            _fail("co-admin", f"__shell__ co-admin failed: {text[:400]}")
+        console.print(f"  co-admin {principal} (admin profile + root org, via __shell__)")
+        return
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            _fail("co-admin", f"register_co_admin returned non-JSON: {raw[:300]}")
+    if not isinstance(raw, dict):
+        _fail("co-admin", f"register_co_admin unexpected payload: {raw!r}")
+    if raw.get("success") is False:
+        _fail("co-admin", raw.get("error") or "register_co_admin failed")
+    console.print(f"  co-admin {principal} (admin profile + root org)")
 
 
 def run_setup_stage(
@@ -1438,6 +1579,7 @@ def new_command(
     open_registration: Optional[bool] = None,
     yes: bool = False,
     resume: Optional[str] = None,
+    co_admin: Optional[str] = None,
 ) -> None:
     """Run the live wizard-path create pipeline. Never hits IC from unit tests."""
     stage = "validate"
@@ -1464,11 +1606,12 @@ def new_command(
             data_path=data,
             members=members,
             open_registration=open_registration,
+            co_admin=co_admin,
         )
         network = (network or "").strip().lower()
         identity = (identity or "").strip()
         validate_merged_spec(merged, network=network, identity=identity)
-        assert_identity_is_ii_linked(identity, network)
+        assert_identity_is_ii_linked(identity, network, merged.get("co_admin") or "")
         founder = resolve_identity_principal(identity)
         merged["founder"] = founder
 
@@ -1499,7 +1642,8 @@ def new_command(
                 f"  subnet:   {subnet_label}\n"
                 f"  codex:    {merged['codex']['package']}\n"
                 f"  members:  {merged['members']}\n"
-                f"  founder:  {founder}"
+                f"  founder:  {founder}\n"
+                f"  co-admin: {merged.get('co_admin') or '(none)'}"
             )
             if not typer.confirm("Proceed?"):
                 console.print("[yellow]Aborted.[/yellow]")
@@ -1565,6 +1709,9 @@ def new_command(
         else:
             run_setup_stage(merged, backend_id, network, identity)
 
+        stage = "co-admin"
+        register_co_admin_principal(merged, backend_id, network, identity)
+
         stage = "config"
         apply_runtime_config(merged, backend_id, network, identity)
 
@@ -1580,6 +1727,8 @@ def new_command(
             "portal_url": portal,
             "backend_id": backend_id,
             "frontend_id": frontend_id,
+            "founder": founder,
+            "co_admin": merged.get("co_admin") or "",
             "members": member_rows,
         }
         console.print(json.dumps(result, indent=2))

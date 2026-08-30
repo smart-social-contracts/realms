@@ -310,7 +310,10 @@ def new(
         ...,
         "--identity",
         "-i",
-        help="II-linked identity name (manifest.founder + setup signer). Not a PEM deploy key.",
+        help=(
+            "Identity that pays credits, is manifest.founder, and runs setup. "
+            "II-linked, or a dfx key (e.g. deployer) together with --co-admin."
+        ),
     ),
     network: str = typer.Option(
         ...,
@@ -372,16 +375,29 @@ def new(
     resume: Optional[str] = typer.Option(
         None, "--resume", help="Continue from an existing installer job_id"
     ),
+    co_admin: Optional[str] = typer.Option(
+        None,
+        "--co-admin",
+        help=(
+            "II principal to register as a second admin after launch "
+            "(admin profile + root org). Required when --identity is a dfx "
+            "deploy key (deployer, my_dev_identity_1)."
+        ),
+    ),
 ) -> None:
     """Create a live realm the same way as the *.gos.earth wizard.
 
-    Charges 5 registry credits to the II principal, enqueues request_deployment
+    Charges 5 registry credits to --identity, enqueues request_deployment
     with a Casals/federation/founder manifest, then runs in-realm setup as that
     identity. Does not scaffold a local folder.
 
+    When --identity is a dfx key, pass --co-admin <your-II-principal> (copy it
+    from the browser after logging into *.gos.earth). You log in as that II
+    user with real admin rights; deployer remains the founder User.
+
     Example:
-      icp identity link web alice --app https://staging.realmsgos.org
-      realms new spec.json --identity alice --network staging --yes
+      realms new spec.json --identity deployer --network demo \\
+        --co-admin <ii-principal> --codex agora --name Acme --yes
     """
     new_command(
         spec_file=spec_file,
@@ -407,6 +423,7 @@ def new(
         open_registration=True if open_registration else None,
         yes=yes,
         resume=resume,
+        co_admin=co_admin,
     )
 
 

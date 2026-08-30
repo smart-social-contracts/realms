@@ -1683,41 +1683,17 @@ def register_founder(principal: text) -> RealmResponse:
     deployment. Idempotent — an existing user simply gains the admin profile.
     """
     try:
-        founder = (principal or "").strip()
-        if not founder or founder == "2vxsx-fae":
+        from core.admin_users import register_admin_user
+
+        result = register_admin_user(principal, seat_as_root_head=True)
+        if not result.get("success"):
             return RealmResponse(
                 success=False,
                 data=RealmResponseData(
-                    error="A non-anonymous founder principal is required"
+                    error=result.get("error") or "register_founder failed"
                 ),
             )
-
-        user = user_get_record_fields(user_register(founder, "admin"))
-        logger.info(f"Founder {founder} registered with admin profile")
-
-        # Seat the founder in the root org (head + member). Root authority is
-        # what lets the creator act directly on any organization (root policy
-        # is 1/1 while the founder alone holds it); without this the root org
-        # stays empty and creator actions fall back to target-org proposals.
-        try:
-            from core.membership import add_department_member
-            from core.org_policy import (
-                ensure_root_org,
-                grant_root_authority_over_local_orgs,
-            )
-            from ggg import User as _GGGUser
-
-            root = ensure_root_org()
-            grant_root_authority_over_local_orgs()
-            founder_user = _GGGUser[founder]
-            if founder_user:
-                if not root.head:
-                    root.head = founder_user
-                add_department_member(root, founder_user)
-                logger.info(f"Founder {founder} seated as root org head/member")
-        except Exception as root_err:
-            logger.warning(f"Could not seat founder in root org: {root_err}")
-
+        user = result.get("user") or {}
         return RealmResponse(
             success=True,
             data=RealmResponseData(
@@ -1727,6 +1703,40 @@ def register_founder(principal: text) -> RealmResponse:
     except Exception as e:
         logger.error(f"register_founder failed: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.ALL)
+def register_co_admin(principal: text) -> text:
+    """Register another principal as admin (admin profile + root org member).
+
+    Caller must already be an admin (typical: dfx ``deployer`` founder after
+    ``realms new``). Does not replace the root org head. Idempotent.
+    """
+    try:
+        from core.admin_users import register_admin_user
+
+        caller = ic.caller().to_str()
+        gate_err = setup_gate_error(caller)
+        if gate_err:
+            return json.dumps({"success": False, "error": gate_err})
+
+        result = register_admin_user(principal, seat_as_root_head=False)
+        if not result.get("success"):
+            return json.dumps(
+                {"success": False, "error": result.get("error") or "register_co_admin failed"}
+            )
+        user = result.get("user") or {}
+        return json.dumps(
+            {
+                "success": True,
+                "principal": (principal or "").strip(),
+                "profiles": user.get("profiles") or ["admin"],
+            }
+        )
+    except Exception as e:
+        logger.error(f"register_co_admin failed: {str(e)}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @update

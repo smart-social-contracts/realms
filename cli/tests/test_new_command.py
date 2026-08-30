@@ -280,6 +280,7 @@ class TestIdentityClassification:
     def test_refuse_message_shows_link_web(self):
         msg = identity_refuse_message("deployer", "staging")
         assert "icp identity link web deployer --app https://staging.realmsgos.org" in msg
+        assert "--co-admin" in msg
 
     def test_command_refuses_pem_deploy_identity(self):
         with pytest.raises(typer.Exit) as exc:
@@ -294,6 +295,43 @@ class TestIdentityClassification:
         assert exc.value.exit_code == 1
 
 
+class TestCoAdmin:
+    SAMPLE = "2eqns-rmzes-7npxw-dxpw2-qdy2s-mw6ix-svdo2-oya7o-a6ldc-sqgwh-bqe"
+
+    def test_deployer_refused_without_co_admin(self):
+        merged = _merged()
+        with pytest.raises(StageError) as exc:
+            validate_merged_spec(merged, network="demo", identity="deployer")
+        assert "co-admin" in exc.value.message.lower()
+
+    def test_deployer_ok_with_co_admin(self):
+        merged = _merged()
+        merged["co_admin"] = self.SAMPLE
+        validate_merged_spec(merged, network="demo", identity="deployer")
+
+    def test_flag_overrides_spec(self):
+        merged = merge_spec_and_flags(
+            {"name": "Acme Realm", "codex": {"package": "agora"}, "co_admin": "old-id"},
+            spec_dir=None,
+            co_admin=self.SAMPLE,
+        )
+        assert merged["co_admin"] == self.SAMPLE
+
+    def test_rejects_anonymous(self):
+        merged = _merged()
+        merged["co_admin"] = "2vxsx-fae"
+        with pytest.raises(StageError) as exc:
+            validate_merged_spec(merged, network="demo", identity="deployer")
+        assert "anonymous" in exc.value.message.lower()
+
+    def test_rejects_short_principal(self):
+        merged = _merged()
+        merged["co_admin"] = "not-a-principal"
+        with pytest.raises(StageError) as exc:
+            validate_merged_spec(merged, network="demo", identity="deployer")
+        assert "principal" in exc.value.message.lower()
+
+
 class TestHelp:
     def test_realms_new_help(self):
         result = runner.invoke(app, ["new", "--help"])
@@ -302,4 +340,5 @@ class TestHelp:
         assert "--network" in result.output
         assert "--codex" in result.output
         assert "--resume" in result.output
+        assert "--co-admin" in result.output
         assert "wizard" in result.output.lower() or "live" in result.output.lower()

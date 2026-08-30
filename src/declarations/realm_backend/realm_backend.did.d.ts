@@ -1194,6 +1194,7 @@ export interface _SERVICE {
   'refresh_invoice' : ActorMethod<[string], string>,
   'register_demo_citizens' : ActorMethod<[string], string>,
   'register_founder' : ActorMethod<[string], RealmResponse>,
+  'register_co_admin' : ActorMethod<[string], string>,
   'register_quarter' : ActorMethod<[string, string], RealmResponse>,
   'register_realm_from_registry' : ActorMethod<[string], string>,
   'register_realm_with_registry' : ActorMethod<

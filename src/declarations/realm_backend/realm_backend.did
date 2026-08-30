@@ -249,6 +249,7 @@ service : {
   "get_extensions" : () -> (RealmResponse) query;
   "join_realm" : (text, text, text) -> (RealmResponse);
   "register_founder" : (text) -> (RealmResponse);
+  "register_co_admin" : (text) -> (text);
   "store_admin_invite_hash" : (text) -> (RealmResponse);
   "grant_delegation_json" : (text) -> (text);
   "accept_delegation_json" : (text) -> (text);
