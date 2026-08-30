@@ -107,7 +107,7 @@ realms extension list        # List extensions
 realms extension install     # Install extension
 
 # Registry
-realms registry add          # Register realm
+realms registry realm add          # Register realm
 realms registry list         # List realms
 ```
 → [Full CLI Reference](./reference/CLI_REFERENCE.md)
@@ -156,7 +156,7 @@ mkdir -p extensions/my_extension/frontend
 # 4. Create frontend components
 
 # 5. Install
-realms extension install-from-source
+realms extension runtime-install --canister <id> --source-dir extensions/extensions/<ext_id>
 ```
 → [Extension Guide](../extensions/README.md)
 

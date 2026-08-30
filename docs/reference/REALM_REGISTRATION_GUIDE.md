@@ -25,18 +25,16 @@ The Realms platform has a **complete realm registry system** that allows realms 
 
 3. **CLI Commands** (Already working)
    ```bash
-   # Registry management (manual registration)
-   realms registry add --id <realm_id> --name <name> --url <url> --network <network>
-   realms registry list --network <network>
-   realms registry get --id <realm_id> --network <network>
-   realms registry remove --id <realm_id> --network <network>
-   realms registry search --query <query> --network <network>
-   realms registry count --network <network>
-   
-   # Self-registration (NEW - convenience commands)
-   realms self-register register --realm-id <id> --realm-name <name> --network <network>
-   realms self-register check --realm-id <id> --network <network>
-   realms self-register deregister --realm-id <id> --network <network> --yes
+   # Register this realm's backend with the central registry
+   realms registry realm add \
+     --realm-name "My Demo Governance Realm" \
+     --network local
+
+   realms registry realm list --network local
+   realms registry realm get --id <realm_id> --network local
+   realms registry realm remove --id <realm_id> --network local
+   realms registry realm search --query <query> --network local
+   realms registry realm count --network local
    ```
 
 ## How to Register a Realm
@@ -54,23 +52,20 @@ The Realms platform has a **complete realm registry system** that allows realms 
 ### Method 2: CLI (Recommended for Automation)
 
 ```bash
-# Register your realm
-realms self-register register \
-  --realm-id "my_demo_realm" \
+# Register your realm (calls realm_backend.register_realm_with_registry)
+realms registry realm add \
   --realm-name "My Demo Governance Realm" \
   --frontend-url "abc123-cai.icp0.io" \
   --network local
 
-# Check registration status
-realms self-register check \
-  --realm-id "my_demo_realm" \
-  --network local
+# List registered realms
+realms registry realm list --network local
+
+# Get one realm
+realms registry realm get --id "<backend_canister_id>" --network local
 
 # Remove realm from registry (if needed)
-realms self-register deregister \
-  --realm-id "my_demo_realm" \
-  --network local \
-  --yes
+realms registry realm remove --id "<backend_canister_id>" --network local
 ```
 
 ### Method 3: During Deployment (Automated)
@@ -83,8 +78,7 @@ echo "📝 Registering realm with central registry..."
 
 FRONTEND_URL=$(dfx canister id realm_frontend --network $NETWORK)
 
-realms self-register register \
-  --realm-id "my_unique_realm_id" \
+realms registry realm add \
   --realm-name "My Realm Name" \
   --frontend-url "$FRONTEND_URL.icp0.io" \
   --network $NETWORK
@@ -114,8 +108,7 @@ if [ -z "$FRONTEND_CANISTER_ID" ]; then
 else
     FRONTEND_URL="${FRONTEND_CANISTER_ID}.icp0.io"
     
-    realms self-register register \
-        --realm-id "demo_realm_$(date +%s)" \
+    realms registry realm add \
         --realm-name "$REALM_NAME" \
         --frontend-url "$FRONTEND_URL" \
         --network "$NETWORK" || echo "⚠️  Registration failed (registry may not be deployed)"
@@ -152,11 +145,8 @@ The registry frontend shows real-time status of all realms, helping administrato
 
 ## Architecture Notes
 
-### Self-Registration Commands
-The `realms self-register` commands are convenience wrappers around the core `realms registry` commands. They provide:
-- More intuitive naming for realm operators
-- Sensible defaults for common scenarios
-- Better integration with deployment workflows
+### CLI registration
+`realms registry realm add` calls the realm backend's `register_realm_with_registry`, which makes a secure inter-canister call to the registry. The registry uses the calling backend canister's principal as the realm ID.
 
 ### Backend API
 The `realm_backend` includes registration preparation functions that validate and format registration data. The actual registration is performed by calling the `realm_registry_backend` canister directly.
@@ -167,12 +157,11 @@ The `realm_backend` includes registration preparation functions that validate an
 - ✅ Complete registry backend with full CRUD operations
 - ✅ Beautiful registry frontend with search and filtering
 - ✅ CLI commands for manual and automated registration
-- ✅ Self-registration convenience commands
 - ✅ Integration with deployment workflows
 
 ### Future Enhancements
 1. **Automatic Registration on Deployment**
-   - Add `--auto-register` flag to `dfx deploy`
+   - Add `--auto-register` flag to deploy flows
    - Auto-detect realm name from dfx.json
    
 2. **Registry Categories**
@@ -196,8 +185,7 @@ The `realm_backend` includes registration preparation functions that validate an
 dfx deploy
 
 # Register with local registry
-realms self-register register \
-  --realm-id "dev_realm" \
+realms registry realm add \
   --realm-name "Development Realm" \
   --network local
 
@@ -214,16 +202,13 @@ dfx deploy --network ic
 FRONTEND_ID=$(dfx canister id realm_frontend --network ic)
 
 # Register with production registry
-realms self-register register \
-  --realm-id "production_gov_2024" \
+realms registry realm add \
   --realm-name "Production Governance System 2024" \
   --frontend-url "$FRONTEND_ID.ic0.app" \
   --network ic
 
 # Verify registration
-realms self-register check \
-  --realm-id "production_gov_2024" \
-  --network ic
+realms registry realm get --id "$(dfx canister id realm_backend --network ic)" --network ic
 ```
 
 ### Example 3: Batch Registration
@@ -231,12 +216,12 @@ realms self-register check \
 #!/bin/bash
 # Register multiple realms from a config file
 
-while IFS=',' read -r realm_id realm_name frontend_url; do
+while IFS=',' read -r backend_id realm_name frontend_url; do
   echo "Registering: $realm_name..."
-  realms self-register register \
-    --realm-id "$realm_id" \
+  realms registry realm add \
     --realm-name "$realm_name" \
     --frontend-url "$frontend_url" \
+    --realm-canister "$backend_id" \
     --network local
 done < realms_list.csv
 
@@ -246,22 +231,13 @@ echo "✅ All realms registered!"
 ## Troubleshooting
 
 ### Issue: "Realm already exists"
-**Solution**: The realm ID is already registered. Use a different ID or remove the existing registration first:
+**Solution**: The realm backend principal is already registered. Remove the existing registration first:
 ```bash
-realms self-register deregister --realm-id <id> --network <network> --yes
+realms registry realm remove --id <backend_canister_id> --network <network>
 ```
 
 ### Issue: "Registry canister not found"
-**Solution:** Use the shared registry on test/demo/staging, or create a local registry
-instance with prebuilt GOS artifacts (no source build in Realms):
-
-```bash
-python3 scripts/fetch_gos_artifacts.py --what all
-realms registry create --deploy --network local
-```
-
-To develop the registry itself, work in
-[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
+**Solution:** Use the shared registry on test/demo/staging. For wizard/portal realms, provision via **gos-as-a-service** (`gaas new`). To develop the registry itself, work in [smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
 
 ### Issue: "Command timed out"
 **Solution**: Check that dfx replica is running:
@@ -271,6 +247,6 @@ dfx ping
 
 ## Summary
 
-The **realm registration system is fully functional** and ready to use. Both the web UI and CLI provide complete registration capabilities. The new `realms self-register` commands make it easy to integrate realm registration into your deployment workflows.
+The **realm registration system is fully functional** and ready to use. Both the web UI and CLI provide complete registration capabilities. Use `realms registry realm add` in deployment scripts for automation.
 
 For manual registration, use the web UI. For automated deployment scenarios, use the CLI commands in your deployment scripts.

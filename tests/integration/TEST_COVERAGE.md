@@ -120,7 +120,7 @@ See `.github/workflows/ci-main.yml` for the full CI configuration.
 The following CLI commands are tested through CI workflows:
 - ✅ `realms realm create` - Used in integration test setup
 - ✅ `realms realm deploy` - Used in integration test setup
-- ✅ `realms extension install-from-source` - Used in Docker builds
+- ✅ `realms extension package` / `realms extension install` - Used in Docker builds (via install_extensions.sh)
 - ✅ `realms db import` - Used in generated upload scripts
 
 ## Remaining Test Gaps

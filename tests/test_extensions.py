@@ -49,18 +49,17 @@ def test_extensions():
                         f"realms extension uninstall --extension-id {extension_id} || true"
                     )
 
-    run_command(f"realms extension install-from-source --source-dir {extensions_dir}")
-
-    list_after = run_command("realms extension list")
-    for name in EXTENSION_NAMES:
-        assert_in(list_after, name)
-
     for name in EXTENSION_NAMES:
         ext_source = os.path.join(extensions_dir, name)
         output_path = os.path.abspath(f"{name}.zip")
         run_command(
             f"realms extension package --extension-id {name} --source-dir {ext_source} --package-path {output_path}"
         )
+        run_command(f"realms extension install --package-path {output_path}")
+
+    list_after = run_command("realms extension list")
+    for name in EXTENSION_NAMES:
+        assert_in(list_after, name)
 
     for name in EXTENSION_NAMES:
         assert_file_exists(f"{name}.zip")

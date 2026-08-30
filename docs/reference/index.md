@@ -96,7 +96,7 @@ realms extension list        # List extensions
 realms extension install     # Install extension
 
 # Registry
-realms registry add          # Register realm
+realms registry realm add          # Register realm
 realms registry list         # List realms
 ```
 

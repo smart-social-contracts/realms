@@ -20,7 +20,7 @@ The demo mundus demonstrates key Realms platform capabilities:
 
 ```bash
 # Create and deploy the complete demo mundus
-realms mundus create --deploy
+realms mundus deploy deployment-descriptors/test-mundus-layered.yml --realm agora --version build
 
 # Access the realms
 # Realm 1: http://<realm1_frontend_id>.localhost:8000

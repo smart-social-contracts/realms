@@ -539,8 +539,8 @@ The file_registry namespace for marketplace listings follows `ext/{extension_id}
 CLI helpers (monorepo):
 
 ```bash
-realms extension install-from-source
 realms extension list
+realms extension runtime-install --canister <backend_id> --source-dir extensions/extensions/<ext_id>
 ```
 
 For staging/runtime deploy details, see [Runtime Extension Staging Deploy](/reference/RUNTIME_EXTENSION_STAGING_DEPLOY).

@@ -697,15 +697,6 @@ def get_all_extension_manifests() -> dict:
     return True
 
 
-def install_from_source_command(source_dir: str = "extensions"):
-    """Deprecated: extensions are now loaded dynamically at runtime."""
-    console.print(
-        "[yellow]install-from-source is deprecated. "
-        "Extensions are now loaded dynamically via the file registry at runtime.[/yellow]"
-    )
-    return True
-
-
 def _parse_candid_string(raw: str) -> str:
     """Parse a Candid text response from dfx canister call."""
     raw = raw.strip()
@@ -1903,7 +1894,7 @@ def codex_registry_install_command(canister: str, registry: str, codex_id: str, 
 def extension_command(
     action: str = typer.Argument(
         ...,
-        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests, runtime-install, runtime-uninstall, runtime-list, registry-install, resync-frontends, publish",
+        help="Action to perform: list, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list, registry-install, resync-frontends, publish",
     ),
     extension_id: Optional[str] = typer.Option(
         None, "--extension-id", help="Extension ID for package/uninstall operations"
@@ -1960,13 +1951,6 @@ def extension_command(
 
     if action == "list":
         list_extensions_command()
-    elif action == "install-from-source":
-        install_from_source_command(source_dir)
-    elif action == "generate-manifests":
-        console.print(
-            "[yellow]generate-manifests is deprecated. "
-            "Extensions are now loaded dynamically via the file registry at runtime.[/yellow]"
-        )
     elif action == "package":
         if not extension_id:
             console.print(
@@ -2049,7 +2033,7 @@ def extension_command(
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print(
-            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list, registry-install, resync-frontends, publish[/yellow]"
+            "[yellow]Available actions: list, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list, registry-install, resync-frontends, publish[/yellow]"
         )
         raise typer.Exit(1)
 

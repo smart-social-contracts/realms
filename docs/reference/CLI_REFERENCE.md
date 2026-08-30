@@ -104,60 +104,35 @@ realms status --network staging
 
 ## Mundus Management (Multi-Realm)
 
-### `realms mundus create`
-Create a multi-realm ecosystem with shared registry.
-
-```bash
-# Create mundus from default manifest
-realms mundus create
-
-# Create with custom manifest
-realms mundus create --manifest examples/demo/manifest.json
-
-# Create and deploy immediately
-realms mundus create --deploy
-
-# Specify network
-realms mundus create --network local --deploy
-```
-
-**Options:**
-- `--manifest PATH` - Mundus manifest file (default: examples/demo/manifest.json)
-- `--mundus-name TEXT` - Mundus name (overrides manifest)
-- `--network TEXT` - Target network (local/staging/ic)
-- `--deploy` - Deploy after creation
-- `--mode TEXT` - Deploy mode (upgrade/reinstall)
-
-**What Gets Created:**
-- Multiple realm directories in `.realms/mundus/`
-- Shared registry directory
-- Unified `dfx.json` with all canisters
-- Each realm has its own data and configuration
-- All realms share single dfx instance
-
----
-
 ### `realms mundus deploy`
-Deploy an existing mundus.
+Deploy sheet realms (Agora, Dominion, Syntropia) using a mundus descriptor. Builds from local checkout with `--version build`, or pulls release artifacts with `--version latest`.
 
 ```bash
-# Deploy mundus
-realms mundus deploy --mundus-dir .realms/mundus/mundus_Demo_Mundus_*
+# Frontend-only deploy to test Agora
+realms mundus deploy deployment-descriptors/test-mundus-layered.yml \
+  --realm agora --canister frontend --skip-extensions --codices none \
+  --version build
 
-# Deploy to specific network
-realms mundus deploy --mundus-dir .realms/mundus/... --network staging
-
-# Reinstall mode (wipes data)
-realms mundus deploy --mundus-dir .realms/mundus/... --mode reinstall
+# Full descriptor deploy
+realms mundus deploy deployment-descriptors/staging-mundus-layered.yml \
+  --version build
 ```
 
-**Options:**
-- `--mundus-dir PATH` - Path to mundus directory (required)
-- `--network TEXT` - Target network
-- `--mode TEXT` - Deploy mode (upgrade/reinstall)
-- `--identity PATH` - Identity for deployment
+**Options:** see `realms mundus deploy --help` (`--realm`, `--canister`, `--mode`, `--version`, etc.).
+
+For **local bundled multi-realm dev**, use `realms realm create --manifest <path> --deploy` instead.
+
+To **enqueue a new realm via the registry installer** (wizard path), use the hidden `realms mundus deploy-new` until `realms new` ships (issue #389).
 
 ---
+
+### `realms realm create` (local mundus-style setups)
+Create a local realm folder (optionally with demo data) and deploy with bundled extensions.
+
+```bash
+realms realm create --random --deploy
+realms realm create --manifest examples/demo/manifest.json --deploy
+```
 
 ## Data Operations
 
@@ -242,61 +217,67 @@ basilisk shell
 ## Extension Management
 
 ### `realms extension`
-Manage extensions.
+Manage extensions (runtime install, registry publish/install, local package workflow).
 
 ```bash
 # List installed extensions
 realms extension list
 
-# Install from source
-realms extension install-from-source
+# Runtime install from source dir (backend + frontend bundle)
+realms extension runtime-install --canister <backend_id> --source-dir extensions/extensions/vault
 
-# Install specific extension
-realms extension install-from-source --source-dir extensions/vault
+# Install from file_registry
+realms extension registry-install \
+  --canister <backend_id> --registry <file_registry_id> \
+  --extension-id vault --version 1.0.0 --network test
 
-# Package extension
-realms extension package --extension-id vault
+# Publish bundle to file_registry
+realms extension publish --registry <file_registry_id> --source-dir extensions/extensions/vault
+
+# Package extension (local bundled workflow)
+realms extension package --extension-id vault --source-dir extensions/extensions/vault
 
 # Install from package
 realms extension install --package-path vault-1.0.0.zip
 
 # Uninstall extension
 realms extension uninstall --extension-id vault
-
-# Uninstall all
-realms extension uninstall --all
 ```
 
 **Actions:**
 - `list` - Show installed extensions
-- `install-from-source` - Install from source code
-- `package` - Create zip package
-- `install` - Install from package
-- `uninstall` - Remove extension
+- `runtime-install` / `runtime-uninstall` / `runtime-list` - Direct canister install
+- `registry-install` / `resync-frontends` - Pull from file_registry
+- `publish` - Upload to file_registry
+- `package` / `install` / `uninstall` - Local zip workflow
+
+There is no `realms extension create` command — scaffold extensions manually or copy an existing package under `extensions/extensions/`.
 
 **Options:**
 - `--extension-id TEXT` - Extension identifier
 - `--package-path PATH` - Path to .zip package
-- `--source-dir PATH` - Source directory (default: extensions)
-- `--all` - Apply to all extensions
+- `--source-dir PATH` - Source directory
+- `--canister`, `--registry`, `--network`, `--version` - For runtime/registry actions
+- `--all` - Uninstall all extensions
+
+---
+
+### `realms codex`
+Same pattern as extensions for codex packages (`runtime-install`, `registry-install`, `publish`, etc.).
 
 ---
 
 ## Registry Operations
 
-### `realms registry add`
-Register realm with central registry.
+### `realms registry realm add`
+Register this realm's backend with the central registry (inter-canister call).
 
 ```bash
-# Auto-detect frontend URL
-realms registry add \
-  --realm-id "my_realm_001" \
+realms registry realm add \
   --realm-name "My Governance Realm" \
   --network local
 
-# Specify URL
-realms registry add \
-  --realm-id "prod_realm" \
+realms registry realm add \
   --realm-name "Production Realm" \
   --frontend-url "abc123-cai.ic0.app" \
   --network ic \
@@ -304,55 +285,56 @@ realms registry add \
 ```
 
 **Options:**
-- `--realm-id TEXT` - Unique realm ID (required)
 - `--realm-name TEXT` - Display name (required)
 - `--frontend-url TEXT` - Frontend URL (auto-detected if omitted)
+- `--backend-url TEXT` - Backend URL for status fetching
 - `--network TEXT` - Network (default: local)
 - `--registry-canister TEXT` - Registry canister (default: realm_registry_backend)
+- `--realm-canister TEXT` - This realm's backend canister (default: realm_backend)
 
 ---
 
-### `realms registry list`
+### `realms registry realm list`
 List registered realms.
 
 ```bash
-realms registry list --network local
+realms registry realm list --network local
 ```
 
 ---
 
-### `realms registry get`
+### `realms registry realm get`
 Get realm details.
 
 ```bash
-realms registry get --realm-id "my_realm" --network local
+realms registry realm get --id "<backend_canister_id>" --network local
 ```
 
 ---
 
-### `realms registry remove`
+### `realms registry realm remove`
 Remove realm from registry.
 
 ```bash
-realms registry remove --realm-id "my_realm" --network local
+realms registry realm remove --id "<backend_canister_id>" --network local
 ```
 
 ---
 
-### `realms registry search`
+### `realms registry realm search`
 Search realms by name/ID.
 
 ```bash
-realms registry search --query "governance" --network local
+realms registry realm search --query "governance" --network local
 ```
 
 ---
 
-### `realms registry count`
+### `realms registry realm count`
 Get total realm count.
 
 ```bash
-realms registry count --network local
+realms registry realm count --network local
 ```
 
 ---
@@ -380,32 +362,23 @@ realms db --network staging
 
 ## Context Management
 
-### Network Context
-Set default network.
+Use `realms network` and `realms realm` instead of the old `realms context` commands.
+
+### Network context
 
 ```bash
-# Set network
-realms context set-network staging
-
-# View current
-realms context get-network
-
-# Clear
-realms context clear-network
+realms network set staging
+realms network current
+realms network unset
 ```
 
-### Realm Context
-Set default realm.
+### Realm context
 
 ```bash
-# Set realm
-realms context set-realm my_realm
-
-# View current
-realms context get-realm
-
-# Clear
-realms context clear-realm
+realms realm set my_realm_folder
+realms realm current
+realms realm unset
+realms realm ls
 ```
 
 ---
@@ -460,9 +433,9 @@ realms status  # Uses REALMS_NETWORK
 # 1. Create local realm with demo data
 realms realm create --random --deploy
 
-# 2. Test extensions
-cd generated_realm
-realms extension install-from-source
+# 2. Test extensions (package + install, or runtime-install on IC)
+realms extension package --extension-id vault --source-dir extensions/extensions/vault
+realms extension install --package-path vault.zip
 
 # 3. Run test scripts
 basilisk-toolkit exec -f test_proposal.py
@@ -472,18 +445,11 @@ basilisk-toolkit exec -f test_proposal.py
 
 ### Multi-Realm Development (Mundus)
 ```bash
-# 1. Create mundus with 3 realms + registry
-realms mundus create --deploy
+# 1. Deploy sheet realms via descriptor
+realms mundus deploy deployment-descriptors/test-mundus-layered.yml --version build
 
-# 2. Verify deployment
-# Each realm frontend accessible at different port/canister
-
-# 3. Test cross-realm features via registry
-# Registry URL shown after deployment
-
-# 4. Update individual realms
-cd .realms/mundus/mundus_*/realm_*
-# Make changes and redeploy specific realm
+# 2. Or local bundled multi-realm
+realms realm create --manifest examples/demo/manifest.json --deploy
 ```
 
 ### Production Deployment
@@ -499,8 +465,7 @@ realms realm deploy --network ic --identity prod --mode reinstall
 realms db import prod_data.json --network ic --identity prod
 
 # 4. Register with registry
-realms registry add \
-  --realm-id "prod_2024" \
+realms registry realm add \
   --realm-name "Production Realm 2024" \
   --network ic
 ```

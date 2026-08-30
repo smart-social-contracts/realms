@@ -549,7 +549,8 @@ npm run preview
 ### 3. Install Extension
 
 ```bash
-realms extension install-from-source
+realms extension package --extension-id my_ext --source-dir extensions/extensions/my_ext
+realms extension install --package-path my_ext.zip
 ```
 
 Routes automatically created at `/extensions/my_ext`
