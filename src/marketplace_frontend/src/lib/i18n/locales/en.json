@@ -48,7 +48,11 @@
     "cta_launch": "Launch your realm",
     "cta_browse_extensions": "Browse extensions",
     "cta_browse_codices": "Browse codices",
-    "cta_about": "About"
+    "cta_about": "About",
+    "cta_what": "What is it?",
+    "cta_browse": "Browse marketplace",
+    "scroll_hint": "Discover",
+    "credit": "Built on the Internet Computer with ❤️ from 🇨🇭"
   },
   "discover": {
     "title": "Enhance the experience of your realm's members.",

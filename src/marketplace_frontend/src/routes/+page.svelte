@@ -61,7 +61,7 @@ let likedSet = new Set();
 let searchQuery = "";
 let catalogSection;
 function scrollToCatalog(k) {
-  kind = k;
+  if (k === "ext" || k === "codex" || k === "assistant") kind = k;
   catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 onMount(async () => {
@@ -172,6 +172,9 @@ function categoriesFor(it) {
 function extensionThumbnail(ext) {
   return listingScreenshotUrls(ext)[0] || "";
 }
+function stanzaLine(s) {
+  return String(s ?? "").replace(/^\s*•\s*/, "");
+}
 </script>
 
 <section class="landing-hero" aria-labelledby="landing-title">
@@ -180,24 +183,32 @@ function extensionThumbnail(ext) {
     <div class="landing-overlay"></div>
   </div>
   <div class="landing-card">
-    <h1 id="landing-title" class="landing-wordmark">
+    <div class="landing-wordmark">
       <img src="/images/logo_horizontal.svg" alt="Realms" />
-    </h1>
+    </div>
+    <h1 id="landing-title" class="landing-tagline">{$_('about.hero.title')}</h1>
+    <div class="landing-stanza">
+      <p>{stanzaLine($_('about.hero.subtitle1'))}</p>
+      <p>{stanzaLine($_('about.hero.subtitle2'))}</p>
+      <p>{stanzaLine($_('about.hero.subtitle3'))}</p>
+    </div>
     <div class="landing-ctas">
+      <a class="cta ghost" href="/about">
+        {$_('landing.cta_what')}
+      </a>
+      <button type="button" class="cta ghost" on:click={() => scrollToCatalog()}>
+        {$_('landing.cta_browse')}
+      </button>
       <a class="cta primary" href={CONFIG.portal_url || 'https://demo.gos.earth'} target="_blank" rel="noreferrer">
         {$_('landing.cta_launch')}
       </a>
-      <button type="button" class="cta secondary" on:click={() => scrollToCatalog('ext')}>
-        {$_('landing.cta_browse_extensions')}
-      </button>
-      <button type="button" class="cta secondary" on:click={() => scrollToCatalog('codex')}>
-        {$_('landing.cta_browse_codices')}
-      </button>
-      <a class="cta secondary" href="/about">
-        {$_('landing.cta_about')}
-      </a>
     </div>
   </div>
+  <p class="landing-credit">{$_('landing.credit')}</p>
+  <button type="button" class="scroll-flag" on:click={() => scrollToCatalog()} aria-label={$_('landing.scroll_hint')}>
+    <span class="scroll-line" aria-hidden="true"></span>
+    <span class="scroll-label">{$_('landing.scroll_hint')}</span>
+  </button>
 </section>
 
 <section class="catalog" id="catalog" bind:this={catalogSection}>
@@ -311,8 +322,8 @@ function extensionThumbnail(ext) {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: calc(100vh - 60px);
-    padding: 2.5rem 1.25rem;
+    min-height: 100vh;
+    padding: 2.5rem 1.25rem 5.5rem;
     overflow: hidden;
   }
   .landing-bg {
@@ -323,73 +334,163 @@ function extensionThumbnail(ext) {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.6;
+    transform: scale(1.08);
+    animation: kenburns 32s ease-out forwards;
   }
   .landing-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      to bottom right,
-      rgba(248, 250, 252, 0.6),
-      rgba(255, 255, 255, 0.5),
-      rgba(250, 250, 250, 0.6)
-    );
+    background:
+      radial-gradient(ellipse at center, rgba(12, 16, 14, 0.08) 0%, rgba(12, 16, 14, 0.42) 100%),
+      linear-gradient(to top, rgba(12, 16, 14, 0.5) 0%, rgba(12, 16, 14, 0.12) 42%, rgba(255, 255, 255, 0.06) 100%);
   }
   .landing-card {
     position: relative;
     z-index: 1;
-    width: min(64rem, 100%);
-    padding: 2.5rem 2rem;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-radius: 1.5rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.18);
+    width: min(42rem, 100%);
+    padding: 2.75rem 2.5rem 2.35rem;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(20px) saturate(1.15);
+    -webkit-backdrop-filter: blur(20px) saturate(1.15);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 1.35rem;
+    box-shadow: 0 30px 80px -28px rgba(0, 0, 0, 0.38);
     text-align: center;
+    animation: hero-rise 0.4s ease-out both;
   }
   .landing-wordmark {
-    margin: 0 0 2rem;
+    margin: 0 0 1.35rem;
   }
   .landing-wordmark img {
     display: block;
     margin: 0 auto;
-    height: clamp(5rem, 12vw, 7rem);
+    height: clamp(4.25rem, 10vw, 6.25rem);
     width: auto;
+  }
+  .landing-tagline {
+    margin: 0 0 1.5rem;
+    text-align: center;
+    font-size: clamp(1.35rem, 2.8vw, 1.85rem);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+  .landing-stanza {
+    margin: 0 auto 2rem;
+    max-width: 28rem;
+    color: rgba(23, 23, 23, 0.72);
+    font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", serif;
+    font-size: 0.98rem;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    line-height: 1.9;
+    text-align: center;
+  }
+  .landing-stanza p {
+    margin: 0.15rem 0;
   }
   .landing-ctas {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
-    gap: 0.75rem;
+    gap: 0.15rem 0.35rem;
   }
   .cta {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 1rem 2rem;
-    border-radius: 0.75rem;
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     font-weight: 600;
     text-decoration: none;
-    transition: all 0.15s ease;
+    transition: color 0.18s ease, background 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
     cursor: pointer;
   }
   .cta.primary {
+    padding: 0.85rem 1.6rem;
+    margin-left: 0.45rem;
+    border-radius: 0.65rem;
     background: var(--primary);
-    border: 2px solid var(--primary);
+    border: 1px solid var(--primary);
     color: #fff;
   }
   .cta.primary:hover {
     background: var(--primary-hover);
     border-color: var(--primary-hover);
   }
-  .cta.secondary {
-    background: rgba(255, 255, 255, 0.8);
-    border: 2px solid var(--primary);
+  .cta.ghost {
+    padding: 0.85rem 0.95rem;
+    border: none;
+    background: none;
     color: var(--text);
+    font-weight: 500;
+    opacity: 0.72;
   }
-  .cta.secondary:hover {
-    background: var(--surface-2);
+  .cta.ghost:hover {
+    opacity: 1;
+    text-decoration: underline;
+    text-underline-offset: 0.22em;
+  }
+  .landing-credit {
+    position: absolute;
+    z-index: 2;
+    right: 1.5rem;
+    bottom: 1.15rem;
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.72);
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
+    white-space: nowrap;
+  }
+  .scroll-flag {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    bottom: 1.35rem;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    border: none;
+    background: none;
+    color: rgba(255, 255, 255, 0.78);
+    cursor: pointer;
+    animation: scroll-fade 3.2s ease-in-out infinite;
+  }
+  .scroll-line {
+    width: 1px;
+    height: 1.65rem;
+    background: currentColor;
+  }
+  .scroll-label {
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .scroll-flag:hover { color: #fff; }
+  @keyframes kenburns {
+    from { transform: scale(1.08); }
+    to { transform: scale(1.16) translate(-1.2%, -0.8%); }
+  }
+  @keyframes hero-rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes scroll-fade {
+    0%, 100% { opacity: 0.28; }
+    50% { opacity: 0.9; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .landing-bg img,
+    .landing-card,
+    .scroll-flag {
+      animation: none;
+    }
+    .landing-bg img { transform: scale(1.06); }
   }
   .catalog {
     max-width: 1200px;
@@ -406,8 +507,17 @@ function extensionThumbnail(ext) {
   }
 
   @media (max-width: 600px) {
-    .landing-card { padding: 1.75rem 1.25rem; }
-    .landing-ctas .cta { flex: 1 1 100%; }
+    .landing-card { padding: 1.85rem 1.25rem 1.6rem; width: min(64rem, 100%); }
+    .cta.primary { margin-left: 0; flex: 1 1 100%; }
+    .landing-credit {
+      left: 50%;
+      right: auto;
+      bottom: 3.6rem;
+      transform: translateX(-50%);
+      white-space: normal;
+      text-align: center;
+      max-width: calc(100% - 2rem);
+    }
   }
 
   /* Primary navigation between listing types â reads as content tabs. */

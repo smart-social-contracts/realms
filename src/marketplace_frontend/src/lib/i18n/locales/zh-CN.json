@@ -48,7 +48,11 @@
     "cta_launch": "启动你的 Realm",
     "cta_browse_extensions": "浏览扩展",
     "cta_browse_codices": "浏览法典",
-    "cta_about": "关于"
+    "cta_about": "关于",
+    "cta_what": "这是什么？",
+    "cta_browse": "浏览市场",
+    "scroll_hint": "探索",
+    "credit": "Built on the Internet Computer with ❤️ from 🇨🇭"
   },
   "discover": {
     "title": "提升您的 realm 成员的体验。",

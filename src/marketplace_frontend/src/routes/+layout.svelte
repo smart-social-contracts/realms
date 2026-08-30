@@ -1,6 +1,6 @@
 <script lang="ts">import { onMount } from "svelte";
 import { browser } from "$app/environment";
-import { goto } from "$app/navigation";
+import { afterNavigate, goto } from "$app/navigation";
 import { page } from "$app/stores";
 import { _, locale } from "svelte-i18n";
 import { initI18n, setLocale, supportedLocales } from "$lib/i18n";
@@ -11,15 +11,21 @@ import { shortPrincipal } from "$lib/format";
 import { resolveCasalsUrl } from "$lib/config";
 
 $: casalsUrl = browser ? resolveCasalsUrl() : "";
+$: isHome = $page.url.pathname === "/";
 let booted = false;
 let isController = false;
 let searchTerm = "";
 let i18nReady = false;
 let showLanguageMenu = false;
+let scrolled = false;
 function submitSearch() {
   const q = searchTerm.trim();
   if (!q) return;
   goto(`/?q=${encodeURIComponent(q)}`);
+}
+function onScroll() {
+  if (!browser) return;
+  scrolled = window.scrollY > 24;
 }
 onMount(async () => {
   if (!browser) return;
@@ -28,6 +34,10 @@ onMount(async () => {
   await bootstrapAuth();
   booted = true;
   refreshController();
+  onScroll();
+});
+afterNavigate(() => {
+  onScroll();
 });
 $: if (browser && $locale) document.documentElement.lang = $locale;
 async function refreshController() {
@@ -55,10 +65,10 @@ $: routeIsActive = (path) => {
 };
 </script>
 
-<svelte:window on:click={() => (showLanguageMenu = false)} />
+<svelte:window on:click={() => (showLanguageMenu = false)} on:scroll={onScroll} />
 
 {#if browser && i18nReady}
-<header class="topbar">
+<header class="topbar" class:overlay={isHome} class:revealed={!isHome || scrolled}>
   <div class="bar">
     <div class="brand-group">
       <a href="/" class="brand" aria-label="Realms Marketplace home">
@@ -182,6 +192,26 @@ $: routeIsActive = (path) => {
     z-index: 30;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
+  }
+  .topbar.overlay {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    transition: transform 0.25s ease, opacity 0.2s ease, visibility 0.2s;
+  }
+  .topbar.overlay:not(.revealed) {
+    transform: translateY(-100%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .topbar.overlay.revealed,
+  .topbar.overlay:focus-within {
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
   }
   .bar {
     display: flex;

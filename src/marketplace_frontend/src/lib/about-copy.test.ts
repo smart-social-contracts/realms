@@ -20,6 +20,10 @@ describe("marketplace about copy", () => {
       assert.ok(loc.landing.pitch);
       assert.ok(loc.landing.cta_launch);
       assert.ok(loc.landing.cta_about);
+      assert.ok(loc.landing.cta_what);
+      assert.ok(loc.landing.cta_browse);
+      assert.ok(loc.landing.scroll_hint);
+      assert.ok(loc.landing.credit);
       assert.equal(loc.landing.badge_env, undefined);
       assert.equal(loc.landing.badge_version, undefined);
       assert.ok(loc.nav.about);

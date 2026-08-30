@@ -48,7 +48,11 @@
     "cta_launch": "Starte dein Realm",
     "cta_browse_extensions": "Erweiterungen durchsuchen",
     "cta_browse_codices": "Codices durchsuchen",
-    "cta_about": "Über"
+    "cta_about": "Über",
+    "cta_what": "Was ist das?",
+    "cta_browse": "Marketplace durchsuchen",
+    "scroll_hint": "Entdecken",
+    "credit": "Built on the Internet Computer with ❤️ from 🇨🇭"
   },
   "discover": {
     "title": "Verbessere das Erlebnis der Mitglieder deines Realms.",
