@@ -1288,10 +1288,31 @@ select it.
 To target Environment2 from an agent (or any script), use the
 [Cloud Agents API](https://cursor.com/docs/cloud-agent/api/endpoints)
 `POST /v1/agents` with a named environment. `env` is mutually exclusive with
-explicit `repos` when selecting a named Cursor-hosted environment:
+explicit `repos` when selecting a named Cursor-hosted environment.
+
+The API does **not** accept the Cursor IDE login session. A **user API key**
+is required (`crsr_…` from [Cursor Dashboard → API Keys](https://cursor.com/dashboard/integrations)).
+Creating the key is free; Cloud Agent **runs** bill at API model pricing (same
+as the Agents window).
+
+**Operator laptop:** store the key **only** in
+`~/.config/cursor/secrets.env` (`chmod 600`), one line:
+
+```
+CURSOR_API_KEY=crsr_…
+```
+
+Never commit that file, never paste the key into the repo, `AGENTS.md`, or chat.
+Agent shells are often non-interactive and **will not** load `~/.bashrc` — source
+the file before every API call:
 
 ```bash
-# CURSOR_API_KEY from Cursor Dashboard → API Keys
+set -a
+# shellcheck disable=SC1090
+. "$HOME/.config/cursor/secrets.env"
+set +a
+test -n "${CURSOR_API_KEY:-}" || { echo "missing ~/.config/cursor/secrets.env" >&2; exit 1; }
+
 curl -sS -X POST https://api.cursor.com/v1/agents \
   -u "$CURSOR_API_KEY:" \
   -H 'Content-Type: application/json' \
@@ -1303,7 +1324,8 @@ curl -sS -X POST https://api.cursor.com/v1/agents \
 ```
 
 (`env.type` is `cloud` for Cursor-hosted VMs; `env.name` is the dashboard
-environment name, e.g. `Environment2`.)
+environment name, e.g. `Environment2`. The response `url` is
+`https://cursor.com/agents/bc-…`.)
 
 **Before any IC write**, confirm the attached environment:
 
