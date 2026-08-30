@@ -1277,6 +1277,46 @@ icp identity import deployer /tmp/deployer.pem --storage plaintext -f
 # same PEM as dfx identity `deployer` if a dfx asset-sync is required
 ```
 
+**`realms new` founder (`demo_identity1`).** `deployer` is the wrong principal
+for browser login. Cloud agents cannot click Internet Identity. Put a
+**plaintext II session** in Environment-scoped secrets (not the git repo):
+
+| Secret | Value |
+|---|---|
+| `DEMO_IDENTITY1_PEM_B64` | `base64` of `icp identity export demo_identity1` |
+| `DEMO_IDENTITY1_DELEGATION_B64` | `base64` of `~/.local/share/icp-cli/identity/delegations/demo_identity1.json` |
+
+Create/refresh that identity on a machine **with a browser** (session expires;
+re-link and update the secrets when `icp identity principal --identity demo_identity1` fails):
+
+```bash
+# Derivation origin for demo realms — not demo.gos.earth (that is the portal host).
+icp identity link web demo_identity1 --app https://demo.realmsgos.org --storage plaintext
+icp identity principal --identity demo_identity1
+# must match the principal you see logged in on https://demo.gos.earth
+```
+
+Cloud VM bootstrap (install script / agent prompt):
+
+```bash
+if [ -n "${DEMO_IDENTITY1_PEM_B64:-}" ]; then
+  printf '%s' "$DEMO_IDENTITY1_PEM_B64" | base64 -d > /tmp/demo_identity1.pem
+  extra=()
+  if [ -n "${DEMO_IDENTITY1_DELEGATION_B64:-}" ]; then
+    printf '%s' "$DEMO_IDENTITY1_DELEGATION_B64" | base64 -d > /tmp/demo_identity1.delegation.json
+    extra=(--delegation /tmp/demo_identity1.delegation.json)
+  fi
+  icp identity import demo_identity1 --from-pem /tmp/demo_identity1.pem \
+    --storage plaintext -f "${extra[@]}"
+fi
+# then, from the realms checkout that has `realms new`:
+# realms new spec.json --identity demo_identity1 --network demo --yes
+```
+
+PEM without the delegation JSON is a **different principal** than II. The
+founder would not match browser login. That principal also needs **≥ 5 credits**
+on the demo registry (`realms registry billing add_credits`).
+
 **icp network.** Every `icp` call against IC mainnet / test / staging canisters
 needs an explicit replica (there is no project `icp.yaml`):
 

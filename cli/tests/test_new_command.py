@@ -12,6 +12,7 @@ from realms.cli.commands.new import (
     BRANDING_MAX_BYTES,
     DEPLOYMENT_COST_CREDITS,
     StageError,
+    _identity_kind_is_web,
     assert_credits_sufficient,
     build_portal_manifest,
     check_ic_members_policy,
@@ -265,8 +266,16 @@ class TestIdentityClassification:
     def test_web_linked(self):
         assert classify_identity("alice", web_linked=True) == "web"
 
-    def test_pem_file_without_web_link(self):
-        assert classify_identity("alice", pem_file_exists=True) == "pem_deploy"
+    def test_imported_ii_session_pem_is_not_refused(self):
+        """Cloud agents import ``demo_identity1`` as a plaintext PEM + delegation."""
+        assert classify_identity("demo_identity1", pem_file_exists=True) == "unknown"
+        assert classify_identity("demo_identity1", web_linked=False) == "unknown"
+        assert classify_identity("demo_identity1", web_linked=True) == "web"
+
+    def test_web_auth_kind_counts_as_linked(self):
+        assert _identity_kind_is_web("web-auth") is True
+        assert _identity_kind_is_web("web") is True
+        assert _identity_kind_is_web("pem") is False
 
     def test_refuse_message_shows_link_web(self):
         msg = identity_refuse_message("deployer", "staging")

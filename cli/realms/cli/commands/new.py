@@ -598,15 +598,17 @@ def classify_identity(
     web_linked: Optional[bool] = None,
     pem_file_exists: bool = False,
 ) -> str:
-    """Classify ``--identity`` as ``web``, ``pem_deploy``, or ``unknown``."""
+    """Classify ``--identity`` as ``web``, ``pem_deploy``, or ``unknown``.
+
+    Only known deploy-key *names* are refused. Cloud agents import an II
+    session as a plaintext PEM plus delegation JSON; that still looks like a
+    PEM on disk and must be allowed (e.g. ``demo_identity1``).
+    """
+    del pem_file_exists  # kept for call-site compat; not a refuse signal
     if (name or "").strip() in PEM_DEPLOY_IDENTITY_NAMES:
         return "pem_deploy"
     if web_linked is True:
         return "web"
-    if web_linked is False:
-        return "pem_deploy"
-    if pem_file_exists:
-        return "pem_deploy"
     return "unknown"
 
 
@@ -701,8 +703,28 @@ def resolve_identity_principal(identity: str) -> str:
     raise StageError("validate", f"Could not resolve principal for --identity {identity}: {err}")
 
 
+def _identity_kind_is_web(kind: str) -> bool:
+    k = (kind or "").lower()
+    return k.startswith("web") or k in ("ii", "internet-identity", "linked")
+
+
+def _identity_has_delegation(name: str) -> bool:
+    """II ``link web`` / ``import --delegation`` writes this JSON next to the key."""
+    roots = (
+        Path.home() / ".local/share/icp-cli/identity/delegations",
+        Path.home() / ".config/icp/identity/delegations",
+    )
+    return any((root / f"{name}.json").is_file() for root in roots)
+
+
 def _icp_identity_web_linked(name: str) -> Optional[bool]:
-    """Best-effort: True if icp reports a web/II-linked identity, False if PEM, None unknown."""
+    """Best-effort: True if icp reports a web/II-linked identity, else None.
+
+    A plaintext PEM on disk is *not* evidence of a deploy key — cloud VMs import
+    II sessions that way. Only ``classify_identity`` refuses known deploy names.
+    """
+    if _identity_has_delegation(name):
+        return True
     list_paths = [
         Path.home() / ".local/share/icp-cli/identity/identity_list.json",
         Path.home() / ".config/icp/identity_list.json",
@@ -720,34 +742,26 @@ def _icp_identity_web_linked(name: str) -> Optional[bool]:
         if isinstance(entries, dict) and name in entries:
             info = entries[name]
             if isinstance(info, dict):
-                kind = str(info.get("type") or info.get("kind") or info.get("storage") or "").lower()
-                if kind in ("web", "ii", "internet-identity", "linked"):
+                kind = str(info.get("type") or info.get("kind") or info.get("storage") or "")
+                if _identity_kind_is_web(kind):
                     return True
-                if kind in ("pem", "plaintext", "key", "file"):
-                    return False
         if isinstance(entries, list):
             for item in entries:
                 if not isinstance(item, dict):
                     continue
                 if str(item.get("name") or "") != name:
                     continue
-                kind = str(item.get("type") or item.get("kind") or "").lower()
-                if kind in ("web", "ii", "internet-identity", "linked"):
+                kind = str(item.get("type") or item.get("kind") or "")
+                if _identity_kind_is_web(kind):
                     return True
-                if kind in ("pem", "plaintext", "key"):
-                    return False
     if _icp_available():
         proc = _run(["icp", "identity", "list"], timeout=30)
         if proc.returncode == 0:
-            text = proc.stdout.lower()
-            # Heuristic: ``icp identity list`` may annotate web-linked names.
             for line in proc.stdout.splitlines():
                 if name in line.split() or line.strip().rstrip("*").strip() == name:
                     lower = line.lower()
                     if "web" in lower or "ii" in lower or "linked" in lower:
                         return True
-            if "web" in text and name.lower() in text:
-                pass
     return None
 
 
