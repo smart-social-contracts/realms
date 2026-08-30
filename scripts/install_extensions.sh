@@ -1,23 +1,36 @@
 #!/bin/bash
 
-# This script is used to install extensions using the realms CLI
-# It handles both nested (extensions/extensions/) and flat (extensions/) structures
-# - Nested: Used in main repo with git submodule (extensions/extensions/{ext_id}/)
-# - Flat: Used in standalone deployments (extensions/{ext_id}/)
+# Install bundled extensions into a local realm via package + install.
+# Handles both nested (extensions/extensions/) and flat (extensions/) layouts.
 
 set -e
-# Enable verbose trace mode only if REALMS_VERBOSE is set (for --plain-logs)
 [ "$REALMS_VERBOSE" = "1" ] && set -x
+
+install_from_dir() {
+    local src_dir="$1"
+    echo "Installing extensions from ${src_dir}..."
+    for dir in "${src_dir}"/*/; do
+        [ -d "$dir" ] || continue
+        if [ -f "${dir}manifest.json" ]; then
+            ext_id=$(basename "$dir")
+            echo "  → ${ext_id}"
+            tmp_zip=$(mktemp --suffix=".zip")
+            realms extension package \
+                --extension-id "$ext_id" \
+                --source-dir "$dir" \
+                --package-path "$tmp_zip"
+            realms extension install --package-path "$tmp_zip"
+            rm -f "$tmp_zip"
+        fi
+    done
+}
 
 echo "Installing extensions..."
 
-# Detect extension structure - check for nested submodule structure first
 if [ -d "extensions/extensions" ]; then
     echo "Detected nested extension structure (submodule)"
-    realms extension install-from-source --source-dir extensions/extensions
+    install_from_dir "extensions/extensions"
 elif [ -d "extensions" ]; then
-    # Check if extensions/ contains actual extension directories
-    # An extension directory has a manifest.json or backend/frontend subdirectory
     has_extensions=false
     for dir in extensions/*/; do
         [ -d "$dir" ] || continue
@@ -26,19 +39,15 @@ elif [ -d "extensions" ]; then
             break
         fi
     done
-    
+
     if [ "$has_extensions" = true ]; then
         echo "Detected flat extension structure"
-        realms extension install-from-source --source-dir extensions
+        install_from_dir "extensions"
     else
         echo "Warning: No valid extensions found in extensions/"
     fi
 else
     echo "Warning: No extensions directory found"
 fi
-
-# Marketplace canisters now live in src/marketplace_* (not in the
-# extensions submodule). They are deployed via `realms marketplace deploy`
-# and don't need to be installed as regular extensions.
 
 echo "Extensions installation complete"

@@ -14,7 +14,7 @@ To set it up:
 ```bash
 pip install -e cli
 ```
-To deploy locally `realms realm create --deploy` or `realms mundus create --deploy`.
+To deploy locally use `realms realm create --deploy` or `realms mundus deploy` with a descriptor (see AGENTS.md).
 
 4. Use `scripts/deploy_local_dev.sh` to quickly re-deploy and test your local changes.
 

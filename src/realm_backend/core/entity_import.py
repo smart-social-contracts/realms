@@ -5,7 +5,7 @@ Import records are sorted so referents exist before referees:
   2. Record-level ordering when a batch references other records in the same import
      (e.g. Department.parent, Vote.proposal).
 
-Consumers: import_export ``import_data``, CLI ``realms import``.
+Consumers: import_export ``import_data``, CLI ``realms db import``.
 """
 
 from __future__ import annotations

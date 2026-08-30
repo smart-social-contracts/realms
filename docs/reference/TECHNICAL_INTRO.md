@@ -259,7 +259,7 @@ dfx deploy --network ic
 realms db import realm_data.json --network ic
 
 # 4. Register (optional)
-realms registry add --network ic
+realms registry realm add --network ic
 ```
 
 ## Development Patterns

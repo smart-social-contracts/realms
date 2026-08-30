@@ -32,8 +32,8 @@ pip install -e cli/
 # Create a single realm with demo data
 realms realm create --random --citizens 50 --deploy
 
-# Or create a multi-realm ecosystem
-realms mundus create --deploy
+# Or create a multi-realm ecosystem (local bundled dev)
+realms realm create --manifest examples/demo/manifest.json --deploy
 
 # Your realm is now running!
 # Frontend: http://<canister_id>.localhost:8000
@@ -431,7 +431,7 @@ Manage realm data:
 
 Realms supports two deployment models that produce **the same end-user experience**:
 
-- **Bundled (default, used by `realms realm create --deploy` and `realms mundus create`):** The `realm_backend` WASM ships with every extension and codex baked in. One `dfx deploy` and you're done. Best for local dev and quick demos.
+- **Bundled (default, used by `realms realm create --deploy`):** The `realm_backend` WASM ships with every extension and codex baked in. One `dfx deploy` and you're done. Best for local dev and quick demos.
 - **Layered (used in production for long-lived realms like Dominion):** The base WASM, every extension, every codex, every i18n bundle, and every sidebar manifest are stored in a separate `file_registry` canister and pulled in at install time. Best for upgrading large fleets of realms without rebuilding/redeploying each one.
 
 Both modes coexist. The runtime loader inside `realm_backend` falls back to bundled artifacts when nothing is registered in stable storage, so existing realms keep working unchanged.
@@ -505,7 +505,8 @@ realms codex publish \
 
 # Build and publish the base WASM (Layer 1)
 python scripts/build_base_wasm.py            # produces a stripped .wasm.gz
-realms wasm publish --wasm <path> --version <semver> --network ic
+python scripts/publish_layered.py --network ic --registry <FILE_REGISTRY_CANISTER_ID> --base-wasm-version <semver>
+# Or publish via: realms files publish-release (see AGENTS.md)
 ```
 
 For a full repository-wide publish (every extension + every codex + base WASM), use the orchestrator:
@@ -621,7 +622,7 @@ secrets.DFX_IDENTITY_PEM              # PEM-encoded identity used to publish
 | Situation | Mode |
 |---|---|
 | Local development (`dfx start --clean`) | Bundled (`realms realm create --deploy`) |
-| Multi-realm local demo (`realms mundus create`) | Bundled |
+| Multi-realm local demo (`realms realm create` with a mundus manifest) | Bundled |
 | Single-realm staging or prod deploy you'll redeploy frequently | Either; bundled is simpler |
 | Long-lived realm (e.g. Dominion) where you want to roll out new extensions/codices without rebuilding the WASM | Layered |
 | Fleet of realms sharing the same WASM and extension set | Layered (publish once, install many) |
@@ -637,19 +638,21 @@ Both modes pass the same Playwright snapshot tests (`src/realm_frontend/tests/e2
 
 ## Multi-Realm Deployment (Mundus)
 
-Mundus allows you to deploy multiple realm instances with a shared registry on a single dfx instance.
+Mundus deploys sheet realms (Agora, Dominion, Syntropia) and related infrastructure using deployment descriptors. For local bundled multi-realm dev, use `realms realm create` with a manifest.
 
-### Quick Start
+### Quick Start (sheet realms on IC)
 
 ```bash
-# Create mundus with 3 realms + registry
-realms mundus create --deploy
+# Deploy Agora frontend to staging from local checkout
+realms mundus deploy deployment-descriptors/staging-mundus-layered.yml \
+  --realm agora --canister frontend --skip-extensions --codices none \
+  --version build
+```
 
-# Access realms at different URLs
-# Realm 1: http://<realm1_frontend_id>.localhost:8000
-# Realm 2: http://<realm2_frontend_id>.localhost:8000
-# Realm 3: http://<realm3_frontend_id>.localhost:8000
-# Registry: http://<registry_frontend_id>.localhost:8000
+For local bundled development:
+
+```bash
+realms realm create --manifest examples/demo/manifest.json --deploy
 ```
 
 ### Features
@@ -689,7 +692,7 @@ Edit realm manifests in `examples/demo/realm{N}/manifest.json`:
 
 Then create with your custom manifest:
 ```bash
-realms mundus create --manifest examples/demo/manifest.json --deploy
+realms realm create --manifest examples/demo/manifest.json --deploy
 ```
 
 See [Casals Rollout](./docs/reference/CASALS_ROLLOUT.md) and `AGENTS.md` for deploy workflows.

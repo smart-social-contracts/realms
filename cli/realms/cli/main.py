@@ -93,13 +93,12 @@ app = typer.Typer(
 
 
 
-@app.command("extension", hidden=True)
+@app.command("extension", rich_help_panel="Lifecycle")
 def extension(
     action: str = typer.Argument(
         ...,
-        help="Action to perform (list, install-from-source, package, install, uninstall, "
-        "generate-manifests, runtime-install, runtime-uninstall, runtime-list, "
-        "registry-install, publish)",
+        help="Action to perform (list, package, install, uninstall, runtime-install, "
+        "runtime-uninstall, runtime-list, registry-install, resync-frontends, publish)",
     ),
     extension_id: Optional[str] = typer.Option(None, "--extension-id", help="Extension ID"),
     package_path: Optional[str] = typer.Option(None, "--package-path", help="Package path"),
@@ -155,7 +154,7 @@ def extension(
     )
 
 
-@app.command("codex", hidden=True)
+@app.command("codex", rich_help_panel="Lifecycle")
 def codex(
     action: str = typer.Argument(
         ...,
@@ -299,7 +298,7 @@ def installer_health(
     )
 
 
-@app.command("deploy", rich_help_panel="Lifecycle")
+@app.command("deploy", hidden=True, rich_help_panel="Lifecycle")
 def deploy(
     descriptor: Optional[str] = typer.Argument(
         None,
@@ -342,7 +341,11 @@ def deploy(
         help="[Classic mode] Registry canister ID for realm registration",
     ),
 ) -> None:
-    """Deploy realms using a deployment descriptor or classic folder-based deploy.
+    """[Hidden] Use ``realms mundus deploy`` instead.
+
+    This command remains callable for legacy scripts. For sheet-realm iteration
+    (Agora, Dominion, Syntropia), prefer ``realms mundus deploy`` with a mundus
+    descriptor and ``--version build``.
 
     \b
     DESCRIPTOR MODE (recommended):
@@ -580,7 +583,7 @@ def mundus_deploy(
     )
 
 
-@mundus_app.command("deploy-new")
+@mundus_app.command("deploy-new", hidden=True)
 def mundus_deploy_new(
     name: str = typer.Argument(..., help="Realm name identifier"),
     network: str = typer.Option(
@@ -599,7 +602,12 @@ def mundus_deploy_new(
         False, "--cleanup", help="Delete test canisters after deployment"
     ),
 ) -> None:
-    """Deploy a new realm with no existing canister IDs."""
+    """[Hidden] Enqueue a new realm via the registry installer.
+
+    Prefer ``realms new`` when it ships (issue #389). Until then this command
+    remains callable. For sheet realms use ``realms mundus deploy``; for local
+    dev use ``realms realm create --deploy``.
+    """
     mundus_deploy_new_command(name, network, artifact_version, display_name, manifesto, cleanup)
 
 
@@ -1434,7 +1442,7 @@ def registry_count(
     registry_count_command(network, canister_id)
 
 
-@registry_app.command("create")
+@registry_app.command("create", hidden=True)
 def registry_create(
     registry_name: Optional[str] = typer.Option(None, "--name", help="Registry name"),
     output_dir: str = typer.Option(".realms", "--output-dir", "-o", help="Base output directory"),
@@ -1449,18 +1457,26 @@ def registry_create(
         "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall' (auto picks install/upgrade)"
     ),
 ) -> None:
-    """Create a new registry instance."""
+    """[Hidden] Create a local registry instance.
+
+    The GOS registry is built in gos-as-a-service — use ``gaas new`` for wizard
+    / portal provisioning. This command remains for local test setups.
+    """
     registry_create_command(registry_name, output_dir, network, deploy, identity, mode)
 
 
-@registry_app.command("deploy")
+@registry_app.command("deploy", hidden=True)
 def registry_deploy(
     folder: str = typer.Option(..., "--folder", "-f", help="Path to registry directory"),
     network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
     mode: str = typer.Option("auto", "--mode", "-m", help="Deployment mode (auto, upgrade, reinstall)"),
     identity: Optional[str] = typer.Option(None, "--identity", help="Identity file for IC deployment"),
 ) -> None:
-    """Deploy a registry instance."""
+    """[Hidden] Deploy a local registry folder.
+
+    The GOS registry is built in gos-as-a-service — use ``gaas new`` for wizard
+    / portal provisioning.
+    """
     registry_deploy_command(folder, network, mode, identity)
 
 
@@ -1732,7 +1748,7 @@ def billing_redeem_voucher(
     billing_redeem_voucher_command(principal_id, code, billing_url)
 
 
-@registry_realm_app.command("deploy-realm")
+@registry_realm_app.command("deploy-realm", hidden=True)
 def registry_deploy_realm(
     realm_name: str = typer.Option(..., "--name", "-n", help="Name for the new realm"),
     network: str = typer.Option(
@@ -1746,11 +1762,15 @@ def registry_deploy_realm(
         help="realm_registry_backend canister id (defaults per --network)",
     ),
 ) -> None:
-    """Enqueue a realm deploy via realm_registry_backend.request_deployment (uses dfx identity)."""
+    """[Hidden] Enqueue a realm deploy via the registry installer.
+
+    Prefer ``realms new`` when it ships (issue #389). ``realms mundus deploy``
+    already polls installer jobs for sheet realms.
+    """
     realm_deploy_realm_command(realm_name, network, registry_canister)
 
 
-@registry_realm_app.command("deploy-status")
+@registry_realm_app.command("deploy-status", hidden=True)
 def registry_deploy_status(
     job_id: str = typer.Option(..., "--job-id", "-j", help="Queue job id from deploy-realm"),
     network: str = typer.Option(
@@ -1767,7 +1787,11 @@ def registry_deploy_status(
     poll_interval: int = typer.Option(10, "--poll-interval", help="Seconds between polls (with --wait)"),
     max_wait: int = typer.Option(900, "--max-wait", help="Maximum seconds to wait (with --wait)"),
 ) -> None:
-    """Poll realm_installer for a deployment job status."""
+    """[Hidden] Poll realm_installer for a deployment job status.
+
+    Prefer ``realms new`` when it ships (issue #389). ``realms mundus deploy``
+    already polls installer jobs for sheet realms.
+    """
     realm_deploy_status_command(job_id, network, installer_canister, wait, poll_interval, max_wait)
 
 
@@ -1787,7 +1811,7 @@ def realm_ls(
     
     if not realms:
         console.print(f"[yellow]No realm folders found in {base_dir or REALM_FOLDER}[/yellow]")
-        console.print(f"\n[dim]💡 Create a realm with: realms create --realm-name <name>[/dim]")
+        console.print(f"\n[dim]💡 Create a realm with: realms realm create --realm-name <name>[/dim]")
         return
     
     # Get current realm folder to highlight it

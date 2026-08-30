@@ -357,7 +357,7 @@ def _deploy_realm_internal(
         if not script_path.exists():
             console.print(f"[red]❌ Required script not found: {script_path}[/red]")
             console.print(f"[yellow]   The realm folder may be corrupted or incomplete.[/yellow]")
-            console.print(f"[yellow]   Try recreating with: realms create --realm-name <name>[/yellow]")
+            console.print(f"[yellow]   Try recreating with: realms realm create --realm-name <name>[/yellow]")
             raise typer.Exit(1)
 
     # Query cycles balance before deployment
@@ -600,7 +600,7 @@ def deploy_command(
         
         if not realm_base.exists():
             console.print(f"[red]❌ No realm folder specified and no realms found.[/red]")
-            console.print(f"[yellow]   Create a realm first with: realms create --realm-name <name>[/yellow]")
+            console.print(f"[yellow]   Create a realm first with: realms realm create --realm-name <name>[/yellow]")
             raise typer.Exit(1)
         
         # Find all realm_* directories (realms are created directly in REALM_FOLDER)
@@ -608,7 +608,7 @@ def deploy_command(
         
         if len(realm_dirs) == 0:
             console.print(f"[red]❌ No realm folders found in {realm_base}[/red]")
-            console.print(f"[yellow]   Create a realm first with: realms create --realm-name <name>[/yellow]")
+            console.print(f"[yellow]   Create a realm first with: realms realm create --realm-name <name>[/yellow]")
             raise typer.Exit(1)
         
         elif len(realm_dirs) == 1:

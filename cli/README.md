@@ -261,10 +261,10 @@ realms realm create \
 
 ```bash
 # Create a multi-realm ecosystem with a shared registry
-realms mundus create --deploy
+realms mundus deploy deployment-descriptors/test-mundus-layered.yml --version build
 
-# Or use a custom manifest
-realms mundus create --manifest examples/demo/manifest.json --deploy
+# Or use a custom manifest (local bundled dev)
+realms realm create --manifest examples/demo/manifest.json --deploy
 ```
 
 ## Troubleshooting

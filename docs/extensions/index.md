@@ -88,10 +88,13 @@ def set_my_data(data: dict):
 </div>
 ```
 
-5. **Install the extension**:
+5. **Install the extension** (local bundled workflow):
 ```bash
-realms extension install-from-source
+realms extension package --extension-id my_extension --source-dir extensions/extensions/my_extension
+realms extension install --package-path my_extension.zip
 ```
+
+On IC test/staging realms, use `realms extension registry-install` or `realms extension runtime-install` (see AGENTS.md).
 
 ## Extension Architecture
 
@@ -121,11 +124,11 @@ The Realms CLI provides commands for creating, testing, and deploying extensions
 # List available extensions
 realms extension list
 
-# Create a new extension
-realms extension create my_extension
+# Scaffold manually under extensions/extensions/<id>/ (no CLI scaffold command)
 
-# Install from source
-realms extension install-from-source
+# Local install: package + install, or runtime-install on IC
+realms extension package --extension-id my_extension --source-dir extensions/extensions/my_extension
+realms extension install --package-path my_extension.zip
 
 # Test your extension
 basilisk-toolkit exec -f test_my_extension.py
