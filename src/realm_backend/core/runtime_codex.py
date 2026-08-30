@@ -75,6 +75,41 @@ def _load_manifest(codex_id: str, force=False) -> Optional[dict]:
         return None
 
 
+# Governance modules live at modules/<stem>.py after the unified ext/ flatten,
+# or at backend/modules/<stem>.py on the legacy catalog pull (codex/ namespace
+# does not strip backend/). Both must become Codex entities.
+_CODEX_MODULE_PREFIXES = ("backend/modules/", "modules/")
+
+
+def _codex_module_stem(path: str) -> Optional[str]:
+    """Return the file stem if ``path`` is a top-level governance module.
+
+    Accepts flattened ``modules/<stem>.py`` and unflattened
+    ``backend/modules/<stem>.py``. Nested paths are ignored.
+    """
+    if not path.endswith(".py"):
+        return None
+    for prefix in _CODEX_MODULE_PREFIXES:
+        if path.startswith(prefix):
+            name = path[len(prefix) : -3]
+            if name and "/" not in name:
+                return name
+    return None
+
+
+def _codex_module_file(pkg_path: str, name: str) -> Optional[str]:
+    """Resolve ``<name>.py`` at package root, ``modules/``, or ``backend/modules/``."""
+    candidates = (
+        os.path.join(pkg_path, f"{name}.py"),
+        os.path.join(pkg_path, "modules", f"{name}.py"),
+        os.path.join(pkg_path, "backend", "modules", f"{name}.py"),
+    )
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
 def _codex_names_for_package(codex_id: str) -> List[str]:
     """Return list of codex names (filenames without .py) for a package."""
     pkg_path = _pkg_dir(codex_id)
@@ -85,6 +120,16 @@ def _codex_names_for_package(codex_id: str) -> List[str]:
     for item in os.listdir(pkg_path):
         if item.endswith(".py") and item != "init.py" and item != "__init__.py":
             names.append(item[:-3])  # Strip .py
+    for rel_dir in ("modules", os.path.join("backend", "modules")):
+        module_dir = os.path.join(pkg_path, rel_dir)
+        if not os.path.isdir(module_dir):
+            continue
+        for item in os.listdir(module_dir):
+            if not item.endswith(".py") or item in ("init.py", "__init__.py"):
+                continue
+            stem = item[:-3]
+            if stem and stem not in names:
+                names.append(stem)
     return sorted(names)
 
 
@@ -175,9 +220,11 @@ def install_codex_package(codex_id: str, files: Dict[str, str]) -> bool:
             f.write(content)
         logger.info(f"Codex package {codex_id}: wrote {filename} ({len(content)} bytes)")
 
-    # Create/update Codex entities for each .py file (except init.py)
+    # Create/update Codex entities for each governance module (except init.py)
     for name in _codex_names_for_package(codex_id):
-        py_path = os.path.join(pkg_path, f"{name}.py")
+        py_path = _codex_module_file(pkg_path, name)
+        if not py_path:
+            continue
         with open(py_path, "r") as f:
             code = f.read()
         _create_or_update_codex_entity(name, code)
@@ -194,10 +241,9 @@ def install_codex_package(codex_id: str, files: Dict[str, str]) -> bool:
 
     modules = list(_codex_names_for_package(codex_id))
     for path in files:
-        if path.startswith("modules/") and path.endswith(".py"):
-            stem = path[len("modules/") : -3]
-            if stem and "/" not in stem and stem not in modules:
-                modules.append(stem)
+        stem = _codex_module_stem(path)
+        if stem and stem not in modules:
+            modules.append(stem)
     try:
         from core.codex_overlay import commit_current
 
@@ -310,7 +356,9 @@ def reload_codex_package(codex_id: str) -> bool:
         return False
 
     for name in _codex_names_for_package(codex_id):
-        py_path = os.path.join(pkg_path, f"{name}.py")
+        py_path = _codex_module_file(pkg_path, name)
+        if not py_path:
+            continue
         with open(py_path, "r") as f:
             code = f.read()
         _create_or_update_codex_entity(name, code)

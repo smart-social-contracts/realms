@@ -5,6 +5,7 @@ entity. That is now opt-in via the manifest:
 
   - key absent  → seed every top-level ``modules/*.py`` (legacy default)
   - key present → seed only those stems that exist as ``modules/<name>.py``
+    or unflattened ``backend/modules/<name>.py`` (legacy ``codex/`` pull)
   - empty list  → seed none
 
 These tests load ``api/file_registry.py`` in isolation (same pattern as
@@ -80,6 +81,15 @@ def _build_cdk_stub():
 def _load_file_registry_module():
     previous = sys.modules.get("_cdk")
     sys.modules["_cdk"] = _build_cdk_stub()
+    if "ic_python_logging" not in sys.modules:
+        logging_mod = types.ModuleType("ic_python_logging")
+        logging_mod.get_logger = lambda name: types.SimpleNamespace(
+            info=lambda *a, **k: None,
+            warning=lambda *a, **k: None,
+            error=lambda *a, **k: None,
+            debug=lambda *a, **k: None,
+        )
+        sys.modules["ic_python_logging"] = logging_mod
     try:
         path = src_path / "api" / "file_registry.py"
         spec = importlib.util.spec_from_file_location(
@@ -153,6 +163,26 @@ class TestCodexModulesToSeed:
         )
         assert stems == []
 
+    def test_legacy_backend_modules_path_seeds_membership(self):
+        """Unflattened catalog pull: backend/modules/<stem>.py is a Codex stem."""
+        files = {
+            "manifest.json": '{"kind": "codex", "codex_modules": ["membership"]}',
+            "backend/modules/membership.py": "# membership from legacy catalog",
+        }
+        stems = _stems(
+            fr._codex_modules_to_seed(files, {"codex_modules": ["membership"]})
+        )
+        assert stems == ["membership"]
+
+        stems_absent = _stems(fr._codex_modules_to_seed(files, {"kind": "codex"}))
+        assert stems_absent == ["membership"]
+
+        nested = {
+            "backend/modules/nested/ignored.py": "# not a Codex stem",
+            "backend/entry.py": "# not a module",
+        }
+        assert _stems(fr._codex_modules_to_seed(nested, None)) == []
+
 
 class _FakeCodex:
     """Minimal Codex stand-in: Codex[name] lookup + Codex(name=, code=)."""
@@ -198,3 +228,22 @@ def test_seed_codex_module_entities_honors_allow_list(monkeypatch):
     _FakeCodex.reset()
     assert fr._seed_codex_module_entities("agora", MODULE_FILES, {"codex_modules": []}) == []
     assert _FakeCodex.store == {}
+
+
+def test_legacy_backend_modules_package_seeds_membership_entity(monkeypatch):
+    """Legacy package with only backend/modules/membership.py seeds Codex membership."""
+    _FakeCodex.reset()
+    ggg = types.ModuleType("ggg")
+    ggg.Codex = _FakeCodex
+    monkeypatch.setitem(sys.modules, "ggg", ggg)
+
+    files = {
+        "manifest.json": '{"kind": "codex", "codex_modules": ["membership"]}',
+        "backend/modules/membership.py": "# membership from legacy catalog",
+    }
+    seeded = fr._seed_codex_module_entities(
+        "agora", files, {"codex_modules": ["membership"]}
+    )
+    assert seeded == ["membership"]
+    assert set(_FakeCodex.store) == {"membership"}
+    assert _FakeCodex.store["membership"].code == "# membership from legacy catalog"
