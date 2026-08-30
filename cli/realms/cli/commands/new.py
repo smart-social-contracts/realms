@@ -1,0 +1,1582 @@
+"""``realms new`` — live wizard-path realm create (issue #389).
+
+Mirrors the ``*.gos.earth`` portal wizard: registry ``request_deployment`` with
+a Casals/federation/founder manifest, in-realm setup as the founder Internet
+Identity, then optional config / data / geister members.
+
+Do not confuse with ``realms mundus deploy-new`` (GitHub artifact URLs) or
+``realms realm create`` (local ``.realms/`` scaffold).
+"""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+import typer
+
+from ..utils import console
+
+# ---------------------------------------------------------------------------
+# Constants (portal / GOS)
+# ---------------------------------------------------------------------------
+
+DEPLOYMENT_COST_CREDITS = 5
+ALLOWED_GOS = "realms-gos"
+ALLOWED_NETWORKS = ("test", "staging", "demo", "ic")
+PEM_DEPLOY_IDENTITY_NAMES = frozenset({"deployer", "my_dev_identity_1"})
+
+BRANDING_MAX_BYTES = 1_572_864  # ~1.5 MiB (matches core.setup.BRANDING_DATA_URL_MAX_BYTES)
+MANIFESTO_MAX_CHARS = 256
+WELCOME_MAX_CHARS = 1024
+NAME_MIN_CHARS = 3
+SLUG_MIN_CHARS = 3
+
+GOS_BACKEND_WASM_KEY = "realm-backend"
+GOS_FRONTEND_WASM_KEY = "realm-assets"
+GOS_GGG_CONFORMANCE = "1.0"
+GOS_LOADER_PROFILE = "realms-iframe-v1"
+CASALS_SECTION = "Deployments"
+
+PORTAL_HOSTS = {
+    "staging": "https://staging.gos.earth",
+    "demo": "https://demo.gos.earth",
+    "test": "https://test.gos.earth",
+    "ic": "https://registry.realmsgos.org",
+    "production": "https://registry.realmsgos.org",
+}
+
+# Realm SPA II derivation origin (``icp identity link web --app``).
+DERIVATION_ORIGINS = {
+    "staging": "https://staging.realmsgos.org",
+    "demo": "https://demo.realmsgos.org",
+    "test": "https://test.realmsgos.org",
+    "ic": "https://realmsgos.org",
+}
+
+# Same queue IDs as ``realms registry realm deploy-realm`` / mundus.
+REGISTRY_IDS = {
+    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
+    "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
+    "test": "yhw3g-fyaaa-aaaas-qgorq-cai",
+}
+INSTALLER_IDS = {
+    "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
+    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+    "test": "fltjm-tyaaa-aaaap-qunhq-cai",
+}
+
+GEISTER_INSTALL_HINT = (
+    "Install geister (do not vendor it into Realms): "
+    "pip install geister  "
+    "https://github.com/smart-social-contracts/geister"
+)
+GEISTER_AGENT_PREFIX = "swarm_agent"
+
+POLL_INTERVAL_S = 10
+POLL_TIMEOUT_S = 3600
+LAUNCH_POLL_TIMEOUT_S = 1800
+
+_IMAGE_MIME = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+}
+
+
+class StageError(Exception):
+    """Pipeline failed at a named stage. ``realms new`` prints the stage and exits."""
+
+    def __init__(self, stage: str, message: str):
+        super().__init__(message)
+        self.stage = stage
+        self.message = message
+
+
+# ---------------------------------------------------------------------------
+# Pure helpers (unit-tested, no replica)
+# ---------------------------------------------------------------------------
+
+def slugify(name: str) -> str:
+    """Port of gos-as-a-service ``deployment-manifest-core.js`` ``slugify``."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (name or "realm").lower())
+    slug = slug.strip("-")[:48]
+    return slug or "realm"
+
+
+def normalize_deploy_version(version: Optional[str]) -> str:
+    """Port of ``normalizeDeployVersion``: empty/latest → main; strip leading v."""
+    v = (version or "").strip()
+    if not v or v == "latest":
+        return "main"
+    if v == "main":
+        return "main"
+    return v[1:] if v.startswith("v") else v
+
+
+def portal_url_for_slug(slug: str, network: str) -> str:
+    """Port of ``portalUrlForSlug`` (production host = JS helper's ``ic`` entry)."""
+    base = PORTAL_HOSTS.get((network or "").lower(), PORTAL_HOSTS["staging"])
+    return f"{base.rstrip('/')}/r/{slugify(slug)}"
+
+
+def derivation_origin_for_network(network: str) -> str:
+    return DERIVATION_ORIGINS.get((network or "").lower(), DERIVATION_ORIGINS["staging"])
+
+
+def network_test_flags(network: str) -> Dict[str, Any]:
+    """Port of ``networkTestFlags`` (non-production wizard test_flags)."""
+    net = (network or "staging").lower()
+    if net in ("ic", "production"):
+        return {}
+    if net == "test":
+        return {
+            "test_mode": True,
+            "user_self_registration": True,
+            "demo_data": True,
+            "ii_bypass": True,
+            "skip_terms": True,
+        }
+    if net == "staging":
+        return {
+            "test_mode": True,
+            "user_self_registration": True,
+            "demo_data": False,
+            "ii_bypass": False,
+            "skip_terms": False,
+        }
+    if net == "demo":
+        return {
+            "test_mode": True,
+            "user_self_registration": True,
+            "demo_data": True,
+            "ii_bypass": False,
+            "skip_terms": False,
+        }
+    return {}
+
+
+def looks_like_subnet_id(value: str) -> bool:
+    text = (value or "").strip()
+    if not text or text.lower() in ("automatic", "european", "other"):
+        return False
+    return bool(re.match(r"^[a-z0-9-]+$", text)) and "-" in text and len(text) >= 20
+
+
+def parse_subnet(
+    spec_subnet: Any,
+    flag_subnet: Optional[str],
+) -> Dict[str, str]:
+    """Merge spec ``subnet`` object with ``--subnet`` flag.
+
+    Flag values: ``automatic`` | ``european`` | ``<subnet-id>``.
+    Spec: ``{choice: automatic|european|other, id?: ...}``. Flag wins.
+    """
+    choice = "automatic"
+    subnet_id = ""
+    if isinstance(spec_subnet, dict):
+        choice = str(spec_subnet.get("choice") or "automatic").strip().lower() or "automatic"
+        subnet_id = str(spec_subnet.get("id") or "").strip()
+    elif isinstance(spec_subnet, str) and spec_subnet.strip():
+        choice = spec_subnet.strip().lower()
+
+    if flag_subnet and flag_subnet.strip():
+        raw = flag_subnet.strip()
+        lower = raw.lower()
+        if lower in ("automatic", "european", "other"):
+            choice = lower
+            if lower != "other":
+                subnet_id = ""
+        elif looks_like_subnet_id(raw):
+            choice = "other"
+            subnet_id = raw
+        else:
+            raise StageError(
+                "validate",
+                f"Invalid --subnet '{raw}'. Use automatic, european, or a subnet id.",
+            )
+
+    if choice not in ("automatic", "european", "other"):
+        raise StageError(
+            "validate",
+            f"Invalid subnet.choice '{choice}'. Use automatic, european, or other.",
+        )
+    if choice == "other" and not subnet_id:
+        raise StageError(
+            "validate",
+            "subnet.choice is 'other' but subnet.id is missing. "
+            "Pass --subnet <subnet-id> or set subnet.id in the spec.",
+        )
+    result: Dict[str, str] = {"choice": choice}
+    if subnet_id:
+        result["id"] = subnet_id
+    return result
+
+
+def build_casals_block(
+    realm_name: str,
+    deploy_version: str,
+    subnet: Dict[str, str],
+) -> Dict[str, Any]:
+    """Port of ``buildCasalsBlock`` (realms-gos wasm keys only)."""
+    version_key = normalize_deploy_version(deploy_version)
+    block: Dict[str, Any] = {
+        "section": CASALS_SECTION,
+        "stand": slugify(realm_name),
+        "backend_wasm_key": f"{GOS_BACKEND_WASM_KEY}@{version_key}",
+        "frontend_wasm_key": f"{GOS_FRONTEND_WASM_KEY}@{version_key}",
+    }
+    choice = (subnet.get("choice") or "automatic").lower()
+    if choice == "european":
+        block["subnet_type"] = "european"
+    elif choice == "other":
+        subnet_id = (subnet.get("id") or "").strip()
+        if subnet_id:
+            block["subnet"] = subnet_id
+    return block
+
+
+def build_gos_manifest_block(deploy_version: str) -> Dict[str, Any]:
+    """Port of ``buildGosManifestBlock`` for realms-gos only."""
+    return {
+        "implementation": ALLOWED_GOS,
+        "version": normalize_deploy_version(deploy_version),
+        "ggg_conformance": GOS_GGG_CONFORMANCE,
+        "loader_profile": GOS_LOADER_PROFILE,
+    }
+
+
+def build_portal_manifest(
+    *,
+    name: str,
+    slug: str,
+    network: str,
+    version: str,
+    founder: str,
+    subnet: Dict[str, str],
+    open_registration: bool = False,
+    manifesto: str = "",
+    welcome_message: str = "",
+) -> Dict[str, Any]:
+    """Portal wizard manifest (useCasals: true). No GitHub artifact URLs."""
+    normalized = normalize_deploy_version(version)
+    realm_block: Dict[str, Any] = {
+        "name": name,
+        "display_name": name,
+        "manifesto": manifesto or f"Welcome to {name}.",
+        "welcome_message": welcome_message or f"Welcome to {name}!",
+        "open_registration": bool(open_registration),
+        "extensions": [],
+    }
+    manifest: Dict[str, Any] = {
+        "name": name,
+        "network": network,
+        "deploy_mode": "install",
+        "deploy_scope": "both",
+        "deploy_version": normalized,
+        "gos": build_gos_manifest_block(normalized),
+        "realm": realm_block,
+        "casals": build_casals_block(name, normalized, subnet),
+        "federation": {
+            "slug": slug,
+            "portal_url": portal_url_for_slug(slug, network),
+        },
+        "founder": founder,
+    }
+    deriv = derivation_origin_for_network(network)
+    if deriv:
+        manifest["infra"] = {"ii_derivation_origin": deriv}
+    if network not in ("ic", "production"):
+        manifest["can_test_mode"] = True
+    flags = network_test_flags(network)
+    if flags:
+        manifest["test_flags"] = flags
+    return manifest
+
+
+def _deep_get(data: Dict[str, Any], *keys: str, default: Any = None) -> Any:
+    cur: Any = data
+    for key in keys:
+        if not isinstance(cur, dict) or key not in cur:
+            return default
+        cur = cur[key]
+    return cur
+
+
+def load_spec_file(path: Optional[str]) -> Tuple[Dict[str, Any], Optional[Path]]:
+    """Load spec JSON. Paths inside the spec are relative to the spec file."""
+    if not path:
+        return {}, None
+    spec_path = Path(path).expanduser().resolve()
+    if not spec_path.is_file():
+        raise StageError("validate", f"Spec file not found: {path}")
+    try:
+        data = json.loads(spec_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise StageError("validate", f"Spec file is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise StageError("validate", "Spec file must be a JSON object")
+    return data, spec_path
+
+
+def resolve_spec_path(value: Optional[str], spec_dir: Optional[Path]) -> Optional[str]:
+    if not value:
+        return None
+    p = Path(value).expanduser()
+    if p.is_absolute():
+        return str(p)
+    base = spec_dir if spec_dir is not None else Path.cwd()
+    return str((base / p).resolve())
+
+
+def merge_spec_and_flags(
+    spec: Dict[str, Any],
+    *,
+    spec_dir: Optional[Path],
+    name: Optional[str] = None,
+    slug: Optional[str] = None,
+    gos: Optional[str] = None,
+    version: Optional[str] = None,
+    subnet_flag: Optional[str] = None,
+    codex: Optional[str] = None,
+    codex_version: Optional[str] = None,
+    logo: Optional[str] = None,
+    background: Optional[str] = None,
+    primary: Optional[str] = None,
+    manifesto: Optional[str] = None,
+    welcome: Optional[str] = None,
+    token_symbol: Optional[str] = None,
+    token_canister: Optional[str] = None,
+    config_path: Optional[str] = None,
+    data_path: Optional[str] = None,
+    members: Optional[int] = None,
+    open_registration: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """Merge spec JSON with CLI flags. Flags win. Does not validate yet."""
+    branding_spec = spec.get("branding") if isinstance(spec.get("branding"), dict) else {}
+    token_spec = spec.get("token") if isinstance(spec.get("token"), dict) else None
+    codex_spec = spec.get("codex") if isinstance(spec.get("codex"), dict) else {}
+    config_spec = spec.get("config") if isinstance(spec.get("config"), dict) else None
+
+    merged_name = (name if name is not None else spec.get("name") or "") or ""
+    merged_name = str(merged_name).strip()
+    merged_slug = (slug if slug is not None else spec.get("slug") or "") or ""
+    merged_slug = str(merged_slug).strip()
+    if not merged_slug and merged_name:
+        merged_slug = slugify(merged_name)
+
+    merged_gos = str(gos if gos is not None else spec.get("gos") or ALLOWED_GOS).strip() or ALLOWED_GOS
+    merged_version = str(
+        version if version is not None else spec.get("version") or "main"
+    ).strip() or "main"
+
+    subnet = parse_subnet(spec.get("subnet"), subnet_flag)
+
+    package = (codex if codex is not None else codex_spec.get("package") or "") or ""
+    package = str(package).strip()
+    cv = codex_version if codex_version is not None else codex_spec.get("version")
+    if cv is not None:
+        cv = str(cv).strip() or None
+
+    logo_path = resolve_spec_path(
+        logo if logo is not None else branding_spec.get("logo"), spec_dir
+    )
+    bg_path = resolve_spec_path(
+        background if background is not None else branding_spec.get("background"),
+        spec_dir,
+    )
+    primary_color = (
+        primary if primary is not None else branding_spec.get("primary") or ""
+    ) or ""
+    primary_color = str(primary_color).strip()
+    merged_manifesto = (
+        manifesto if manifesto is not None else branding_spec.get("manifesto") or ""
+    ) or ""
+    merged_welcome = (
+        welcome
+        if welcome is not None
+        else branding_spec.get("welcome_message") or ""
+    ) or ""
+
+    token: Optional[Dict[str, str]] = None
+    if token_spec:
+        token = {
+            "symbol": str(token_spec.get("symbol") or "").strip(),
+            "canister": str(
+                token_spec.get("canister")
+                or token_spec.get("token_canister_id")
+                or ""
+            ).strip(),
+        }
+    if token_symbol or token_canister:
+        token = token or {"symbol": "", "canister": ""}
+        if token_symbol:
+            token["symbol"] = token_symbol.strip()
+        if token_canister:
+            token["canister"] = token_canister.strip()
+    if token and not token.get("symbol") and not token.get("canister"):
+        token = None
+
+    config_obj = config_spec
+    if config_path:
+        cfg_file = Path(resolve_spec_path(config_path, spec_dir) or config_path)
+        if not cfg_file.is_file():
+            raise StageError("validate", f"Config file not found: {config_path}")
+        try:
+            loaded = json.loads(cfg_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise StageError("validate", f"Config file is not valid JSON: {exc}") from exc
+        if not isinstance(loaded, dict):
+            raise StageError("validate", "--config must be a JSON object")
+        config_obj = loaded
+
+    data_value: Any = spec.get("data")
+    if data_path is not None:
+        data_value = resolve_spec_path(data_path, spec_dir) or data_path
+    elif isinstance(data_value, str):
+        data_value = resolve_spec_path(data_value, spec_dir)
+
+    invite_codes = spec.get("invite_codes")
+    if invite_codes is not None and not isinstance(invite_codes, list):
+        raise StageError("validate", "spec.invite_codes must be an array of strings")
+
+    merged_members = spec.get("members", 0) if members is None else members
+    try:
+        merged_members = int(merged_members or 0)
+    except (TypeError, ValueError) as exc:
+        raise StageError("validate", "--members must be an integer") from exc
+
+    if open_registration is None:
+        merged_open = bool(spec.get("open_registration", False))
+    else:
+        merged_open = bool(open_registration)
+
+    return {
+        "name": merged_name,
+        "slug": merged_slug,
+        "gos": merged_gos,
+        "version": merged_version,
+        "subnet": subnet,
+        "codex": {"package": package, "version": cv},
+        "token": token,
+        "branding": {
+            "logo": logo_path,
+            "background": bg_path,
+            "primary": primary_color,
+            "manifesto": str(merged_manifesto),
+            "welcome_message": str(merged_welcome),
+        },
+        "config": config_obj,
+        "data": data_value,
+        "members": merged_members,
+        "open_registration": merged_open,
+        "invite_codes": [str(c).strip() for c in (invite_codes or []) if str(c).strip()],
+    }
+
+
+def validate_branding_size(path: str, label: str) -> None:
+    file_path = Path(path)
+    if not file_path.is_file():
+        raise StageError("validate", f"{label} file not found: {path}")
+    size = file_path.stat().st_size
+    if size > BRANDING_MAX_BYTES:
+        raise StageError(
+            "validate",
+            f"{label} exceeds 1.5 MiB ({size} bytes). Each image must be ≤ 1.5 MiB.",
+        )
+
+
+def check_ic_members_policy(
+    network: str,
+    members: int,
+    open_registration: bool,
+    invite_codes: Sequence[str],
+) -> Optional[str]:
+    """Return an error message if ic + members is refused, else None."""
+    if members <= 0:
+        return None
+    net = (network or "").lower()
+    if net != "ic":
+        return None
+    if open_registration or invite_codes:
+        return None
+    return (
+        "On ic, --members requires --open-registration or spec invite_codes "
+        "so geister agents can join_realm."
+    )
+
+
+def validate_merged_spec(
+    merged: Dict[str, Any],
+    *,
+    network: str,
+    identity: str,
+) -> None:
+    errors: List[str] = []
+    if not identity or not str(identity).strip():
+        errors.append("--identity is required (II-linked identity name)")
+    net = (network or "").strip().lower()
+    if net not in ALLOWED_NETWORKS:
+        errors.append(f"--network must be one of: {', '.join(ALLOWED_NETWORKS)}")
+    name = merged.get("name") or ""
+    if len(name) < NAME_MIN_CHARS:
+        errors.append(f"--name is required and must be at least {NAME_MIN_CHARS} characters")
+    slug = merged.get("slug") or ""
+    if len(slug) < SLUG_MIN_CHARS:
+        errors.append(f"slug must be at least {SLUG_MIN_CHARS} characters (got '{slug}')")
+    gos = merged.get("gos") or ALLOWED_GOS
+    if gos != ALLOWED_GOS:
+        errors.append(f"v1 GOS is {ALLOWED_GOS} only (got '{gos}')")
+    package = _deep_get(merged, "codex", "package", default="") or ""
+    if not package:
+        errors.append("--codex is required (or spec.codex.package)")
+    manifesto = _deep_get(merged, "branding", "manifesto", default="") or ""
+    if len(manifesto) > MANIFESTO_MAX_CHARS:
+        errors.append(f"manifesto exceeds maximum length ({MANIFESTO_MAX_CHARS} chars)")
+    welcome = _deep_get(merged, "branding", "welcome_message", default="") or ""
+    if len(welcome) > WELCOME_MAX_CHARS:
+        errors.append(
+            f"welcome_message exceeds maximum length ({WELCOME_MAX_CHARS} chars)"
+        )
+    primary = _deep_get(merged, "branding", "primary", default="") or ""
+    if primary and not re.fullmatch(r"#[0-9A-Fa-f]{6}", primary):
+        errors.append("--primary must be a #RRGGBB hex color")
+    members = int(merged.get("members") or 0)
+    if members < 0:
+        errors.append("--members must be ≥ 0")
+    ic_err = check_ic_members_policy(
+        net, members, bool(merged.get("open_registration")), merged.get("invite_codes") or []
+    )
+    if ic_err:
+        errors.append(ic_err)
+    token = merged.get("token")
+    if isinstance(token, dict) and token.get("symbol") and not token.get("canister"):
+        errors.append(
+            "--token-canister is required when --token-symbol is set "
+            "(v1 cannot provision a new token canister)"
+        )
+    if errors:
+        raise StageError("validate", "\n".join(errors))
+
+    for key, label in (("logo", "logo"), ("background", "background")):
+        path = _deep_get(merged, "branding", key, default="")
+        if path:
+            validate_branding_size(str(path), label)
+
+
+def credits_shortfall_message(principal: str, balance: int, network: str) -> str:
+    need = DEPLOYMENT_COST_CREDITS
+    return (
+        f"Insufficient registry credits for founder {principal}: "
+        f"balance {balance}, need {need}.\n"
+        f"Top up (no auto-top-up):\n"
+        f"  realms registry billing add_credits --principal {principal} "
+        f"--amount {need} --network {network}"
+    )
+
+
+def assert_credits_sufficient(balance: int, principal: str, network: str) -> None:
+    if balance < DEPLOYMENT_COST_CREDITS:
+        raise StageError("credits", credits_shortfall_message(principal, balance, network))
+
+
+def classify_identity(
+    name: str,
+    *,
+    web_linked: Optional[bool] = None,
+    pem_file_exists: bool = False,
+) -> str:
+    """Classify ``--identity`` as ``web``, ``pem_deploy``, or ``unknown``."""
+    if (name or "").strip() in PEM_DEPLOY_IDENTITY_NAMES:
+        return "pem_deploy"
+    if web_linked is True:
+        return "web"
+    if web_linked is False:
+        return "pem_deploy"
+    if pem_file_exists:
+        return "pem_deploy"
+    return "unknown"
+
+
+def identity_refuse_message(name: str, network: str) -> str:
+    origin = derivation_origin_for_network(network)
+    return (
+        f"--identity '{name}' looks like an unlinked dfx/PEM deploy key, not an "
+        f"Internet Identity. The installer would record that principal as founder, "
+        f"and browser II login would be a different user.\n"
+        f"Link II first (realm SPA derivation origin):\n"
+        f"  icp identity link web {name} --app {origin}\n"
+        f"Confirm against the realm's /canister_ids.js derivation_origin after deploy, "
+        f"then retry with the same --identity."
+    )
+
+
+def file_to_data_url(path: str) -> str:
+    file_path = Path(path)
+    validate_branding_size(path, file_path.name)
+    mime = _IMAGE_MIME.get(file_path.suffix.lower(), "application/octet-stream")
+    encoded = base64.b64encode(file_path.read_bytes()).decode("ascii")
+    data_url = f"data:{mime};base64,{encoded}"
+    if len(data_url.encode("utf-8")) > BRANDING_MAX_BYTES:
+        raise StageError(
+            "validate",
+            f"{file_path.name} data URL exceeds 1.5 MiB after base64 encoding. "
+            "Use a smaller image.",
+        )
+    return data_url
+
+
+def invite_code_to_checksum(code: str) -> str:
+    text = (code or "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]{64}", text):
+        return text.lower()
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def geister_agent_name(index: int) -> str:
+    return f"{GEISTER_AGENT_PREFIX}_{index:03d}"
+
+
+# ---------------------------------------------------------------------------
+# Identity / canister I/O
+# ---------------------------------------------------------------------------
+
+def _icp_available() -> bool:
+    return shutil.which("icp") is not None
+
+
+def _dfx_env() -> Dict[str, str]:
+    env = os.environ.copy()
+    env.pop("NO_COLOR", None)
+    env.pop("FORCE_COLOR", None)
+    env["TERM"] = env.get("TERM") if env.get("TERM") not in (None, "", "dumb") else "xterm"
+    env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+    return env
+
+
+def _icp_replica_args() -> List[str]:
+    """Cloud/operator hosts have no project icp.yaml — pin the mainnet replica."""
+    if Path("icp.yaml").is_file() or Path("/workspace/icp.yaml").is_file():
+        return ["--network", "ic"]
+    return ["-n", "https://icp0.io", "--root-key", "mainnet"]
+
+
+def _run(cmd: List[str], *, timeout: int = 120, env: Optional[Dict[str, str]] = None) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
+    )
+
+
+def resolve_identity_principal(identity: str) -> str:
+    """``icp identity principal --identity NAME`` (dfx fallback)."""
+    if _icp_available():
+        proc = _run(["icp", "identity", "principal", "--identity", identity], timeout=30)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip().splitlines()[-1].strip()
+    env = _dfx_env()
+    proc = _run(
+        ["dfx", "--run-deprecated", "identity", "get-principal", "--identity", identity],
+        timeout=30,
+        env=env,
+    )
+    if proc.returncode == 0 and proc.stdout.strip():
+        return proc.stdout.strip().splitlines()[-1].strip()
+    err = (proc.stderr or proc.stdout or "identity not found").strip()
+    raise StageError("validate", f"Could not resolve principal for --identity {identity}: {err}")
+
+
+def _icp_identity_web_linked(name: str) -> Optional[bool]:
+    """Best-effort: True if icp reports a web/II-linked identity, False if PEM, None unknown."""
+    list_paths = [
+        Path.home() / ".local/share/icp-cli/identity/identity_list.json",
+        Path.home() / ".config/icp/identity_list.json",
+    ]
+    for path in list_paths:
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        entries: Any = data
+        if isinstance(data, dict):
+            entries = data.get("identities") or data.get("list") or data
+        if isinstance(entries, dict) and name in entries:
+            info = entries[name]
+            if isinstance(info, dict):
+                kind = str(info.get("type") or info.get("kind") or info.get("storage") or "").lower()
+                if kind in ("web", "ii", "internet-identity", "linked"):
+                    return True
+                if kind in ("pem", "plaintext", "key", "file"):
+                    return False
+        if isinstance(entries, list):
+            for item in entries:
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get("name") or "") != name:
+                    continue
+                kind = str(item.get("type") or item.get("kind") or "").lower()
+                if kind in ("web", "ii", "internet-identity", "linked"):
+                    return True
+                if kind in ("pem", "plaintext", "key"):
+                    return False
+    if _icp_available():
+        proc = _run(["icp", "identity", "list"], timeout=30)
+        if proc.returncode == 0:
+            text = proc.stdout.lower()
+            # Heuristic: ``icp identity list`` may annotate web-linked names.
+            for line in proc.stdout.splitlines():
+                if name in line.split() or line.strip().rstrip("*").strip() == name:
+                    lower = line.lower()
+                    if "web" in lower or "ii" in lower or "linked" in lower:
+                        return True
+            if "web" in text and name.lower() in text:
+                pass
+    return None
+
+
+def assert_identity_is_ii_linked(identity: str, network: str) -> str:
+    """Refuse known PEM deploy keys. Warn if we cannot confirm a web link."""
+    web_linked = _icp_identity_web_linked(identity)
+    pem_path = Path.home() / ".config/dfx/identity" / identity / "identity.pem"
+    kind = classify_identity(
+        identity,
+        web_linked=web_linked,
+        pem_file_exists=pem_path.is_file() and web_linked is not True,
+    )
+    if kind == "pem_deploy":
+        raise StageError("validate", identity_refuse_message(identity, network))
+    if kind == "unknown":
+        origin = derivation_origin_for_network(network)
+        console.print(
+            f"[yellow]Warning:[/yellow] could not confirm --identity '{identity}' is "
+            f"II-linked. If this is a dfx PEM key, abort and run:\n"
+            f"  icp identity link web {identity} --app {origin}"
+        )
+    return kind
+
+
+def _candid_text_arg(payload: str) -> str:
+    escaped = payload.replace("\\", "\\\\").replace('"', '\\"')
+    return f'("{escaped}")'
+
+
+def _parse_jsonish(stdout: str) -> Any:
+    raw = (stdout or "").strip()
+    if not raw:
+        raise ValueError("empty canister response")
+    if raw.startswith("(") and raw.endswith(")"):
+        raw = raw[1:-1].strip().rstrip(",")
+    if raw.startswith('"') and raw.endswith('"'):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            raw = raw[1:-1].replace('\\"', '"').replace("\\n", "\n")
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return raw
+    return raw
+
+
+def parse_credits_balance(payload: Any) -> int:
+    """Extract nat64 balance from get_credits JSON or candid-ish dict."""
+    data = payload
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            match = re.search(r"balance\s*=\s*(\d+)", data)
+            if match:
+                return int(match.group(1))
+            raise StageError("credits", f"Could not parse get_credits response: {data[:200]}")
+    if isinstance(data, dict):
+        if "Err" in data:
+            err = data["Err"]
+            raise StageError("credits", f"get_credits error: {err}")
+        inner = data.get("Ok") if "Ok" in data else data
+        if isinstance(inner, dict) and "balance" in inner:
+            return int(inner["balance"])
+        if "balance" in data:
+            return int(data["balance"])
+    raise StageError("credits", f"Could not parse credit balance from: {payload!r}")
+
+
+def _canister_call(
+    canister: str,
+    method: str,
+    arg: str,
+    network: str,
+    identity: str,
+    *,
+    query: bool = False,
+    timeout: int = 180,
+) -> Any:
+    """Call a canister as ``identity``. Prefer icp; dfx --run-deprecated fallback."""
+    arg_file = None
+    try:
+        use_file = len(arg.encode("utf-8")) >= 100 * 1024
+        if _icp_available():
+            cmd = ["icp", "canister", "call", canister, method]
+            cmd.extend(_icp_replica_args())
+            cmd.extend(["--identity", identity])
+            if query:
+                cmd.append("--query")
+            if use_file:
+                fd, arg_file = tempfile.mkstemp(prefix="realms-new-", suffix=".did")
+                with os.fdopen(fd, "w") as fh:
+                    fh.write(arg)
+                cmd.extend(["--args-file", arg_file])
+            else:
+                cmd.append(arg)
+            proc = _run(cmd, timeout=timeout)
+        else:
+            cmd = [
+                "dfx",
+                "--run-deprecated",
+                "canister",
+                "call",
+                canister,
+                method,
+                "--network",
+                network,
+                "--identity",
+                identity,
+                "--output",
+                "json",
+            ]
+            if query:
+                cmd.append("--query")
+            if use_file:
+                fd, arg_file = tempfile.mkstemp(prefix="realms-new-", suffix=".did")
+                with os.fdopen(fd, "w") as fh:
+                    fh.write(arg)
+                cmd.extend(["--argument-file", arg_file])
+            else:
+                cmd.append(arg)
+            proc = _run(cmd, timeout=timeout, env=_dfx_env())
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or "canister call failed").strip()
+            raise RuntimeError(err)
+        return _parse_jsonish(proc.stdout)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"{method} timed out after {timeout}s") from exc
+    finally:
+        if arg_file:
+            try:
+                os.unlink(arg_file)
+            except OSError:
+                pass
+
+
+def query_credit_balance(registry_id: str, principal: str, network: str, identity: str) -> int:
+    payload = _canister_call(
+        registry_id,
+        "get_credits",
+        f'("{principal}")',
+        network,
+        identity,
+        query=True,
+        timeout=60,
+    )
+    return parse_credits_balance(payload)
+
+
+# ---------------------------------------------------------------------------
+# Pipeline stages
+# ---------------------------------------------------------------------------
+
+def _fail(stage: str, message: str) -> None:
+    raise StageError(stage, message)
+
+
+def _job_fields(info: Any) -> Dict[str, Any]:
+    if not isinstance(info, dict):
+        return {}
+    if "Ok" in info and isinstance(info["Ok"], dict):
+        return info["Ok"]
+    if info.get("success") is False:
+        return info
+    return info
+
+
+def poll_installer_until_ready(
+    installer_id: str,
+    job_id: str,
+    network: str,
+    identity: str,
+    *,
+    timeout_s: int = POLL_TIMEOUT_S,
+) -> Dict[str, Any]:
+    """Poll until backend+frontend exist (enter_setup is checked separately)."""
+    start = time.time()
+    last_status = ""
+    while time.time() - start < timeout_s:
+        try:
+            raw = _canister_call(
+                installer_id,
+                "get_deployment_job_status",
+                f'("{job_id}")',
+                network,
+                identity,
+                query=True,
+                timeout=60,
+            )
+        except Exception as exc:
+            console.print(f"[dim]  poll error: {exc}[/dim]")
+            time.sleep(POLL_INTERVAL_S)
+            continue
+        info = _job_fields(raw)
+        if info.get("success") is False and info.get("error"):
+            _fail("poll", str(info.get("error")))
+        status = str(info.get("status") or "unknown")
+        backend = str(info.get("backend_canister_id") or "").strip()
+        frontend = str(info.get("frontend_canister_id") or "").strip()
+        if status != last_status:
+            console.print(f"  installer: {status}")
+            last_status = status
+        if status in ("failed", "failed_verification", "cancelled"):
+            _fail("poll", info.get("error") or status)
+        if backend and frontend:
+            return info
+        time.sleep(POLL_INTERVAL_S)
+    _fail("poll", f"Timed out after {timeout_s}s waiting for canisters (job {job_id})")
+    raise AssertionError("unreachable")
+
+
+def wait_for_enter_setup(
+    backend_id: str,
+    network: str,
+    identity: str,
+    *,
+    timeout_s: int = 600,
+) -> Dict[str, Any]:
+    start = time.time()
+    last_err = ""
+    while time.time() - start < timeout_s:
+        try:
+            state = _canister_call(
+                backend_id,
+                "get_setup_state",
+                "()",
+                network,
+                identity,
+                query=True,
+                timeout=60,
+            )
+            if isinstance(state, dict) and state.get("success"):
+                if state.get("creator") or state.get("status") == "setup":
+                    return state
+        except Exception as exc:
+            last_err = str(exc)
+        time.sleep(POLL_INTERVAL_S)
+    _fail(
+        "poll",
+        f"Timed out waiting for enter_setup on {backend_id}"
+        + (f": {last_err}" if last_err else ""),
+    )
+    raise AssertionError("unreachable")
+
+
+def _setup_json_call(
+    backend_id: str,
+    method: str,
+    payload: Any,
+    network: str,
+    identity: str,
+    *,
+    query: bool = False,
+    timeout: int = 300,
+    stage: str = "setup",
+) -> Dict[str, Any]:
+    if payload is None:
+        arg = "()"
+    elif isinstance(payload, str) and payload == "()":
+        arg = "()"
+    else:
+        arg = _candid_text_arg(json.dumps(payload))
+    raw = _canister_call(
+        backend_id, method, arg, network, identity, query=query, timeout=timeout
+    )
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            _fail(stage, f"{method} returned non-JSON: {raw[:300]}")
+    if not isinstance(raw, dict):
+        _fail(stage, f"{method} returned unexpected payload: {raw!r}")
+    if raw.get("success") is False:
+        _fail(stage, raw.get("error") or f"{method} failed")
+    return raw
+
+
+def run_setup_stage(
+    merged: Dict[str, Any],
+    backend_id: str,
+    network: str,
+    identity: str,
+) -> None:
+    branding = merged.get("branding") or {}
+    token = merged.get("token")
+    draft: Dict[str, Any] = {
+        "codex": {
+            "package": merged["codex"]["package"],
+        }
+    }
+    if merged["codex"].get("version"):
+        draft["codex"]["version"] = merged["codex"]["version"]
+    identity_block: Dict[str, str] = {}
+    if branding.get("manifesto"):
+        identity_block["manifesto"] = branding["manifesto"]
+    if branding.get("welcome_message"):
+        identity_block["welcome_message"] = branding["welcome_message"]
+    if identity_block:
+        draft["identity"] = identity_block
+    if isinstance(token, dict) and token.get("canister"):
+        draft["token"] = {
+            "token_canister_id": token["canister"],
+            "symbol": token.get("symbol") or "",
+        }
+
+    console.print("  setup_save_draft (codex / identity)")
+    _setup_json_call(backend_id, "setup_save_draft", draft, network, identity)
+
+    install_args: Dict[str, Any] = {"package": merged["codex"]["package"]}
+    if merged["codex"].get("version"):
+        install_args["version"] = merged["codex"]["version"]
+    console.print(f"  setup_install_codex {install_args['package']}")
+    _setup_json_call(
+        backend_id, "setup_install_codex", install_args, network, identity, timeout=600
+    )
+
+    if isinstance(token, dict) and token.get("canister"):
+        console.print(f"  setup_configure_token {token['canister']}")
+        token_args: Dict[str, Any] = {"token_canister_id": token["canister"]}
+        if token.get("symbol"):
+            token_args["symbol"] = token["symbol"]
+        _setup_json_call(
+            backend_id, "setup_configure_token", token_args, network, identity, timeout=300
+        )
+
+    branding_args: Dict[str, Any] = {}
+    if branding.get("logo"):
+        branding_args["logo_data_url"] = file_to_data_url(branding["logo"])
+    if branding.get("background"):
+        branding_args["background_data_url"] = file_to_data_url(branding["background"])
+    if branding.get("primary"):
+        branding_args["colors"] = {"primary": branding["primary"]}
+    branding_args.update(identity_block)
+    if branding_args:
+        console.print("  setup_set_branding")
+        _setup_json_call(backend_id, "setup_set_branding", branding_args, network, identity)
+
+    console.print("  setup_launch")
+    _setup_json_call(backend_id, "setup_launch", None, network, identity, timeout=300)
+    poll_setup_launch(backend_id, network, identity)
+
+
+def poll_setup_launch(backend_id: str, network: str, identity: str) -> None:
+    start = time.time()
+    last = ""
+    while time.time() - start < LAUNCH_POLL_TIMEOUT_S:
+        raw = _canister_call(
+            backend_id,
+            "get_setup_launch_status",
+            "()",
+            network,
+            identity,
+            query=True,
+            timeout=60,
+        )
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except json.JSONDecodeError:
+                raw = {}
+        launch = (raw or {}).get("launch") if isinstance(raw, dict) else {}
+        if not isinstance(launch, dict):
+            launch = {}
+        status = str(launch.get("status") or "unknown")
+        phase = launch.get("phase") or ""
+        label = f"{status} {phase}".strip()
+        if label != last:
+            console.print(f"  launch: {label}")
+            last = label
+        if status == "completed":
+            return
+        if status == "failed":
+            _fail("setup", launch.get("error") or "setup_launch failed")
+        time.sleep(POLL_INTERVAL_S)
+    _fail("setup", f"Timed out waiting for setup_launch to complete ({backend_id})")
+
+
+def setup_already_complete(backend_id: str, network: str, identity: str) -> bool:
+    try:
+        raw = _canister_call(
+            backend_id,
+            "get_setup_launch_status",
+            "()",
+            network,
+            identity,
+            query=True,
+            timeout=60,
+        )
+        if isinstance(raw, str):
+            raw = json.loads(raw)
+        launch = (raw or {}).get("launch") if isinstance(raw, dict) else {}
+        if isinstance(launch, dict) and launch.get("status") == "completed":
+            return True
+        state = _canister_call(
+            backend_id, "get_setup_state", "()", network, identity, query=True, timeout=60
+        )
+        if isinstance(state, dict) and state.get("setup_completed_at"):
+            return True
+        status = str((state or {}).get("status") or "") if isinstance(state, dict) else ""
+        if status and status not in ("setup", "unknown"):
+            return True
+    except Exception:
+        return False
+    return False
+
+
+def apply_runtime_config(
+    merged: Dict[str, Any],
+    backend_id: str,
+    network: str,
+    identity: str,
+) -> None:
+    config = merged.get("config")
+    open_reg = bool(merged.get("open_registration"))
+    realm_cfg: Dict[str, Any] = {}
+    if open_reg:
+        realm_cfg["open_registration"] = True
+    if realm_cfg:
+        console.print("  update_realm_config (open_registration)")
+        _setup_json_call(
+            backend_id, "update_realm_config", realm_cfg, network, identity, stage="config"
+        )
+
+    if not isinstance(config, dict) or not config:
+        return
+    auto_scale = config.get("auto_scale_enabled")
+    scaling = config.get("scaling") if isinstance(config.get("scaling"), dict) else {}
+    quarter_capacity = scaling.get("quarter_capacity")
+    if auto_scale is None and quarter_capacity is None:
+        return
+
+    auto_lit = "True" if (True if auto_scale is None else bool(auto_scale)) else "False"
+    cap_stmt = ""
+    if quarter_capacity is not None:
+        cap_stmt = (
+            "md.setdefault('scaling', {})\n"
+            f"md['scaling']['quarter_capacity'] = {int(quarter_capacity)}\n"
+            "realm.manifest_data = json.dumps(md)\n"
+        )
+    code = (
+        "import json\n"
+        "from ggg import Realm\n"
+        "realm = Realm.load('1')\n"
+        "md = json.loads(getattr(realm, 'manifest_data', '') or '{}')\n"
+        "if not isinstance(md, dict):\n"
+        "    md = {}\n"
+        f"{cap_stmt}"
+        f"realm.auto_scale_enabled = {auto_lit}\n"
+        "print('ok')\n"
+    )
+    console.print("  apply config (scaling / auto_scale_enabled) via __shell__")
+    try:
+        raw = _canister_call(
+            backend_id,
+            "__shell__",
+            _candid_text_arg(code),
+            network,
+            identity,
+            timeout=120,
+        )
+        text = raw if isinstance(raw, str) else json.dumps(raw)
+        if "ok" not in str(text).lower() and isinstance(raw, dict) and raw.get("success") is False:
+            _fail("config", raw.get("error") or str(raw))
+    except Exception as exc:
+        _fail("config", f"Failed to apply config as founder: {exc}")
+
+
+def import_data_overlay(
+    merged: Dict[str, Any],
+    backend_id: str,
+    network: str,
+    identity: str,
+) -> None:
+    data = merged.get("data")
+    if data in (None, "", []):
+        return
+    from .import_data import import_data_command
+
+    tmp_path = None
+    try:
+        if isinstance(data, list):
+            fd, tmp_path = tempfile.mkstemp(prefix="realms-new-data-", suffix=".json")
+            with os.fdopen(fd, "w") as fh:
+                json.dump(data, fh)
+            file_path = tmp_path
+        elif isinstance(data, str):
+            file_path = data
+            if not Path(file_path).is_file():
+                _fail("data", f"Data file not found: {file_path}")
+        else:
+            _fail("data", "spec.data must be a path or an array of GGG records")
+        console.print(f"  realms db import overlay → {backend_id}")
+        import_data_command(
+            file_path,
+            entity_type=None,
+            format="json",
+            batch_size=50,
+            dry_run=False,
+            network=network,
+            identity=identity,
+            canister=backend_id,
+            folder=None,
+        )
+    except StageError:
+        raise
+    except typer.Exit as exc:
+        _fail("data", f"db import failed (exit {exc.exit_code})")
+    except Exception as exc:
+        _fail("data", str(exc))
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
+def _existing_geister_indexes() -> List[int]:
+    indexes: List[int] = []
+    if shutil.which("geister"):
+        proc = _run(["geister", "agent", "ls"], timeout=60)
+        text = (proc.stdout or "") + "\n" + (proc.stderr or "")
+        for match in re.finditer(rf"{GEISTER_AGENT_PREFIX}_(\d+)", text):
+            indexes.append(int(match.group(1)))
+    if _icp_available():
+        proc = _run(["icp", "identity", "list"], timeout=30)
+        for match in re.finditer(rf"{GEISTER_AGENT_PREFIX}_(\d+)", proc.stdout or ""):
+            indexes.append(int(match.group(1)))
+    env = _dfx_env()
+    proc = _run(["dfx", "--run-deprecated", "identity", "list"], timeout=30, env=env)
+    for match in re.finditer(rf"{GEISTER_AGENT_PREFIX}_(\d+)", proc.stdout or ""):
+        indexes.append(int(match.group(1)))
+    return indexes
+
+
+def join_geister_members(
+    merged: Dict[str, Any],
+    backend_id: str,
+    network: str,
+    identity: str,
+) -> List[Dict[str, str]]:
+    count = int(merged.get("members") or 0)
+    if count <= 0:
+        return []
+    if not shutil.which("geister"):
+        _fail("members", f"geister not found on PATH. {GEISTER_INSTALL_HINT}")
+
+    ic_err = check_ic_members_policy(
+        network, count, bool(merged.get("open_registration")), merged.get("invite_codes") or []
+    )
+    if ic_err:
+        _fail("members", ic_err)
+
+    existing = _existing_geister_indexes()
+    start = (max(existing) + 1) if existing else 1
+    console.print(f"  geister agent generate {count} (start index {start})")
+    proc = _run(
+        ["geister", "agent", "generate", str(count), "--start", str(start)],
+        timeout=300,
+    )
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "geister agent generate failed").strip()
+        _fail(
+            "members",
+            f"{err}\nAgent generation requires local geister mode "
+            f"(`geister mode local`). {GEISTER_INSTALL_HINT}",
+        )
+
+    invite_codes = [invite_code_to_checksum(c) for c in (merged.get("invite_codes") or [])]
+    created: List[Dict[str, str]] = []
+    for i in range(count):
+        agent_name = geister_agent_name(start + i)
+        checksum = ""
+        if invite_codes:
+            checksum = invite_codes[i % len(invite_codes)]
+        arg = f'("member", "", "{checksum}")'
+        console.print(f"  join_realm as {agent_name}")
+        try:
+            _canister_call(
+                backend_id,
+                "join_realm",
+                arg,
+                network,
+                agent_name,
+                timeout=120,
+            )
+        except Exception as exc:
+            _fail("members", f"join_realm failed for {agent_name}: {exc}")
+        principal = ""
+        try:
+            principal = resolve_identity_principal(agent_name)
+        except StageError:
+            principal = ""
+        created.append({"identity": agent_name, "principal": principal})
+    return created
+
+
+def registry_id_for(network: str) -> str:
+    rid = REGISTRY_IDS.get(network)
+    if not rid:
+        _fail(
+            "deploy",
+            f"No default realm-registry canister for network '{network}'. "
+            "test/staging/demo are supported in v1.",
+        )
+    return rid
+
+
+def installer_id_for(network: str) -> str:
+    iid = INSTALLER_IDS.get(network)
+    if not iid:
+        _fail(
+            "poll",
+            f"No default realm-installer canister for network '{network}'.",
+        )
+    return iid
+
+
+def request_deployment(
+    manifest: Dict[str, Any],
+    registry_id: str,
+    network: str,
+    identity: str,
+) -> str:
+    arg = _candid_text_arg(json.dumps(manifest))
+    console.print(f"  request_deployment → {registry_id}")
+    try:
+        raw = _canister_call(
+            registry_id, "request_deployment", arg, network, identity, timeout=180
+        )
+    except Exception as exc:
+        _fail("deploy", str(exc))
+    info = raw if isinstance(raw, dict) else {}
+    if isinstance(raw, str):
+        try:
+            info = json.loads(raw)
+        except json.JSONDecodeError:
+            _fail("deploy", f"Could not parse request_deployment response: {raw[:300]}")
+    if not info.get("success") and not info.get("job_id"):
+        _fail("deploy", info.get("error") or f"request_deployment failed: {info}")
+    job_id = str(info.get("job_id") or "").strip()
+    if not job_id:
+        _fail("deploy", "request_deployment succeeded but returned no job_id")
+    return job_id
+
+
+# ---------------------------------------------------------------------------
+# Command entry
+# ---------------------------------------------------------------------------
+
+def new_command(
+    spec_file: Optional[str],
+    identity: str,
+    network: str,
+    name: Optional[str] = None,
+    slug: Optional[str] = None,
+    gos: Optional[str] = None,
+    version: Optional[str] = None,
+    subnet: Optional[str] = None,
+    codex: Optional[str] = None,
+    codex_version: Optional[str] = None,
+    logo: Optional[str] = None,
+    background: Optional[str] = None,
+    primary: Optional[str] = None,
+    manifesto: Optional[str] = None,
+    welcome: Optional[str] = None,
+    token_symbol: Optional[str] = None,
+    token_canister: Optional[str] = None,
+    config: Optional[str] = None,
+    data: Optional[str] = None,
+    members: Optional[int] = None,
+    open_registration: Optional[bool] = None,
+    yes: bool = False,
+    resume: Optional[str] = None,
+) -> None:
+    """Run the live wizard-path create pipeline. Never hits IC from unit tests."""
+    stage = "validate"
+    try:
+        spec, spec_dir = load_spec_file(spec_file)
+        merged = merge_spec_and_flags(
+            spec,
+            spec_dir=spec_dir,
+            name=name,
+            slug=slug,
+            gos=gos,
+            version=version,
+            subnet_flag=subnet,
+            codex=codex,
+            codex_version=codex_version,
+            logo=logo,
+            background=background,
+            primary=primary,
+            manifesto=manifesto,
+            welcome=welcome,
+            token_symbol=token_symbol,
+            token_canister=token_canister,
+            config_path=config,
+            data_path=data,
+            members=members,
+            open_registration=open_registration,
+        )
+        network = (network or "").strip().lower()
+        identity = (identity or "").strip()
+        validate_merged_spec(merged, network=network, identity=identity)
+        assert_identity_is_ii_linked(identity, network)
+        founder = resolve_identity_principal(identity)
+        merged["founder"] = founder
+
+        registry_id = registry_id_for(network)
+        installer_id = installer_id_for(network)
+
+        stage = "credits"
+        console.print(f"[bold]credits[/bold] founder {founder} on {network}")
+        try:
+            balance = query_credit_balance(registry_id, founder, network, identity)
+        except StageError:
+            raise
+        except Exception as exc:
+            _fail("credits", f"get_credits failed: {exc}")
+        assert_credits_sufficient(balance, founder, network)
+        console.print(f"  balance {balance} (need {DEPLOYMENT_COST_CREDITS})")
+
+        stage = "confirm"
+        if not yes:
+            subnet_label = merged["subnet"].get("choice")
+            if merged["subnet"].get("id"):
+                subnet_label = f"{subnet_label} ({merged['subnet']['id']})"
+            console.print(
+                f"Create realm?\n"
+                f"  name:     {merged['name']}\n"
+                f"  slug:     {merged['slug']}\n"
+                f"  network:  {network}\n"
+                f"  subnet:   {subnet_label}\n"
+                f"  codex:    {merged['codex']['package']}\n"
+                f"  members:  {merged['members']}\n"
+                f"  founder:  {founder}"
+            )
+            if not typer.confirm("Proceed?"):
+                console.print("[yellow]Aborted.[/yellow]")
+                raise typer.Exit(0)
+
+        job_id = (resume or "").strip()
+        backend_id = ""
+        frontend_id = ""
+        portal = portal_url_for_slug(merged["slug"], network)
+
+        if job_id:
+            stage = "poll"
+            console.print(f"[bold]resume[/bold] job {job_id}")
+            try:
+                raw = _canister_call(
+                    installer_id,
+                    "get_deployment_job_status",
+                    f'("{job_id}")',
+                    network,
+                    identity,
+                    query=True,
+                    timeout=60,
+                )
+                info = _job_fields(raw)
+                backend_id = str(info.get("backend_canister_id") or "").strip()
+                frontend_id = str(info.get("frontend_canister_id") or "").strip()
+            except Exception as exc:
+                _fail("poll", f"Could not load job {job_id}: {exc}")
+            if not (backend_id and frontend_id):
+                info = poll_installer_until_ready(
+                    installer_id, job_id, network, identity
+                )
+                backend_id = str(info.get("backend_canister_id") or "").strip()
+                frontend_id = str(info.get("frontend_canister_id") or "").strip()
+        else:
+            stage = "deploy"
+            manifest = build_portal_manifest(
+                name=merged["name"],
+                slug=merged["slug"],
+                network=network,
+                version=merged["version"],
+                founder=founder,
+                subnet=merged["subnet"],
+                open_registration=bool(merged.get("open_registration")),
+                manifesto=merged["branding"].get("manifesto") or "",
+                welcome_message=merged["branding"].get("welcome_message") or "",
+            )
+            if "artifacts" in manifest or "expected_hashes" in manifest:
+                _fail("deploy", "internal error: GitHub artifact URLs must not appear in the portal manifest")
+            job_id = request_deployment(manifest, registry_id, network, identity)
+            console.print(f"  job_id {job_id}")
+            stage = "poll"
+            info = poll_installer_until_ready(installer_id, job_id, network, identity)
+            backend_id = str(info.get("backend_canister_id") or "").strip()
+            frontend_id = str(info.get("frontend_canister_id") or "").strip()
+
+        wait_for_enter_setup(backend_id, network, identity)
+        console.print(f"  portal {portal}")
+
+        stage = "setup"
+        if setup_already_complete(backend_id, network, identity):
+            console.print("  setup already complete — skipping")
+        else:
+            run_setup_stage(merged, backend_id, network, identity)
+
+        stage = "config"
+        apply_runtime_config(merged, backend_id, network, identity)
+
+        stage = "data"
+        import_data_overlay(merged, backend_id, network, identity)
+
+        stage = "members"
+        member_rows = join_geister_members(merged, backend_id, network, identity)
+
+        result = {
+            "job_id": job_id,
+            "slug": merged["slug"],
+            "portal_url": portal,
+            "backend_id": backend_id,
+            "frontend_id": frontend_id,
+            "members": member_rows,
+        }
+        console.print(json.dumps(result, indent=2))
+    except StageError as exc:
+        console.print(f"[red]realms new failed at stage: {exc.stage}[/red]")
+        console.print(f"[red]{exc.message}[/red]")
+        raise typer.Exit(1) from exc
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        console.print(f"[red]realms new failed at stage: {stage}[/red]")
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+

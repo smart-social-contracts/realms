@@ -56,6 +56,7 @@ from .commands.registry import (
     registry_status_command,
 )
 from .commands.test import test_command
+from .commands.new import new_command
 from .constants import MAX_BATCH_SIZE, REALM_FOLDER
 from .utils import (
     check_dependencies,
@@ -296,6 +297,116 @@ def installer_health(
     """Call realm_installer.health (liveness + chunk limits)."""
     installer_health_command(
         installer=installer, network=network, identity=identity,
+    )
+
+
+@app.command("new", rich_help_panel="Lifecycle")
+def new(
+    spec_file: Optional[str] = typer.Argument(
+        None,
+        help="Optional spec JSON (paths relative to the spec file). Flags override spec fields.",
+    ),
+    identity: str = typer.Option(
+        ...,
+        "--identity",
+        "-i",
+        help="II-linked identity name (manifest.founder + setup signer). Not a PEM deploy key.",
+    ),
+    network: str = typer.Option(
+        ...,
+        "--network",
+        "-n",
+        help="Network: test | staging | demo | ic",
+    ),
+    name: Optional[str] = typer.Option(None, "--name", help="Realm name (≥3 chars)"),
+    slug: Optional[str] = typer.Option(
+        None, "--slug", help="Federation slug (default: slugify name, ≥3)"
+    ),
+    gos: Optional[str] = typer.Option(
+        None, "--gos", help="GOS implementation (v1: realms-gos only)"
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", help="GOS deploy version (default: main)"
+    ),
+    subnet: Optional[str] = typer.Option(
+        None,
+        "--subnet",
+        help="automatic | european | <subnet-id> (default: automatic)",
+    ),
+    codex: Optional[str] = typer.Option(None, "--codex", help="Codex package id (e.g. agora)"),
+    codex_version: Optional[str] = typer.Option(
+        None, "--codex-version", help="Codex version (omit for registry latest)"
+    ),
+    logo: Optional[str] = typer.Option(None, "--logo", help="Logo image path (≤ 1.5 MiB)"),
+    background: Optional[str] = typer.Option(
+        None, "--background", help="Background image path (≤ 1.5 MiB)"
+    ),
+    primary: Optional[str] = typer.Option(None, "--primary", help="Primary color #RRGGBB"),
+    manifesto: Optional[str] = typer.Option(
+        None, "--manifesto", help="Realm manifesto (max 256 chars)"
+    ),
+    welcome: Optional[str] = typer.Option(
+        None, "--welcome", help="Welcome message (max 1024 chars)"
+    ),
+    token_symbol: Optional[str] = typer.Option(
+        None, "--token-symbol", help="Existing token symbol (omit to skip)"
+    ),
+    token_canister: Optional[str] = typer.Option(
+        None, "--token-canister", help="Existing token canister id"
+    ),
+    config: Optional[str] = typer.Option(
+        None, "--config", help="Path to JSON config object (scaling / auto_scale_enabled)"
+    ),
+    data: Optional[str] = typer.Option(
+        None, "--data", help="Path to GGG entity JSON (same as realms db import)"
+    ),
+    members: Optional[int] = typer.Option(
+        None, "--members", help="Geister agents to generate and join_realm (default 0)"
+    ),
+    open_registration: bool = typer.Option(
+        False,
+        "--open-registration",
+        help="Allow join without invite (overrides spec to true)",
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    resume: Optional[str] = typer.Option(
+        None, "--resume", help="Continue from an existing installer job_id"
+    ),
+) -> None:
+    """Create a live realm the same way as the *.gos.earth wizard.
+
+    Charges 5 registry credits to the II principal, enqueues request_deployment
+    with a Casals/federation/founder manifest, then runs in-realm setup as that
+    identity. Does not scaffold a local folder.
+
+    Example:
+      icp identity link web alice --app https://staging.realmsgos.org
+      realms new spec.json --identity alice --network staging --yes
+    """
+    new_command(
+        spec_file=spec_file,
+        identity=identity,
+        network=network,
+        name=name,
+        slug=slug,
+        gos=gos,
+        version=version,
+        subnet=subnet,
+        codex=codex,
+        codex_version=codex_version,
+        logo=logo,
+        background=background,
+        primary=primary,
+        manifesto=manifesto,
+        welcome=welcome,
+        token_symbol=token_symbol,
+        token_canister=token_canister,
+        config=config,
+        data=data,
+        members=members,
+        open_registration=True if open_registration else None,
+        yes=yes,
+        resume=resume,
     )
 
 
