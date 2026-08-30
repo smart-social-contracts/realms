@@ -21,12 +21,13 @@ export function parseVerifiedOnlyParam(
   return value !== '0';
 }
 
-/** Persist the toggle in the URL so reload does not surprise the user. */
+/** Persist the toggle in the URL so reload does not surprise the user.
+ * Checked (default) omits the param; only the off state writes `?verified=0`. */
 export function setVerifiedOnlySearchParam(
   params: URLSearchParams,
   verifiedOnly: boolean,
 ): void {
-  if (verifiedOnly) params.set('verified', '1');
+  if (verifiedOnly) params.delete('verified');
   else params.set('verified', '0');
 }
 

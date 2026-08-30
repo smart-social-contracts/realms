@@ -48,7 +48,18 @@
     "cta_launch": "Lancez votre realm",
     "cta_browse_extensions": "Parcourir les extensions",
     "cta_browse_codices": "Parcourir les codex",
-    "cta_about": "À propos"
+    "cta_about": "À propos",
+    "cta_what": "Qu'est-ce que c'est ?",
+    "cta_browse": "Parcourir le marketplace",
+    "credit": "Construit sur Internet Computer avec ❤️ depuis",
+    "credit_country": "la Suisse",
+    "scroll_hint": "Découvrir",
+    "stat_onchain": "on-chain",
+    "stat_servers": "serveurs",
+    "stat_extensions": "extensions",
+    "stat_codices": "codex",
+    "stat_assistants": "assistants",
+    "trust_label": "Le marketplace en un coup d'œil"
   },
   "discover": {
     "title": "Améliorez l'expérience des membres de votre realm.",

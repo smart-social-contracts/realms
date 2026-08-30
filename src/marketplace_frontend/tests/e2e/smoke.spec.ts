@@ -24,19 +24,19 @@ test.describe('marketplace_frontend smoke', () => {
   test('home door has no env/version chips and keeps the catalog', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'Realms' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The Governance Operating System' })).toBeVisible();
     await expect(page.locator('.landing-wordmark img[src="/images/logo_horizontal.svg"]')).toBeVisible();
-    await expect(page.locator('.landing-bg img[src="/images/hero-bg.jpg"]')).toBeVisible();
+    await expect(page.locator('.landing-bg img[src="/images/hero-mosaic.jpg"]')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Realms GOS' })).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: 'The Governance Operating System' })).toHaveCount(0);
-    await expect(page.getByText('Launch a realm')).toHaveCount(0);
     await expect(page.getByText(/Decentralized governance realms/i)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'What is it?' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Browse marketplace' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Launch your realm' })).toBeVisible();
     await expect(page.getByText(/test environment/i)).toHaveCount(0);
     await expect(page.getByText(/realms gos main/i)).toHaveCount(0);
     await expect(page.locator('.landing-badges, .badge-env, .badge-version')).toHaveCount(0);
 
-    await expect(page.getByRole('link', { name: /^About$/ })).toHaveCount(2);
+    await expect(page.getByRole('link', { name: /^About$/ })).toHaveCount(1);
     await expect(page.getByRole('heading', { name: /Enhance the experience/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Extensions/i })).toBeVisible();
   });
@@ -59,11 +59,10 @@ test.describe('marketplace_frontend smoke', () => {
   test('home catalog below the landing hero still toggles', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('link', { name: /Realms Marketplace/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /^About$/ }).first()).toBeVisible();
-
     const catalog = page.locator('#catalog');
     await catalog.scrollIntoViewIfNeeded();
+    await expect(page.getByRole('link', { name: /Realms Marketplace/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^About$/ }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: /Enhance the experience/i })).toBeVisible();
 
     await expect(page.getByRole('tab', { name: /Extensions/i })).toBeVisible();
