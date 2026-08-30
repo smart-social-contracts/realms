@@ -660,15 +660,19 @@ def _codex_module_stem(path: str) -> Optional[str]:
     """Return the file stem if ``path`` is a top-level governance module.
 
     Registry/runtime install flattens ``backend/``, so package path
-    ``backend/modules/<name>.py`` arrives as ``modules/<name>.py``. Nested
-    paths are ignored — only the top-level stem becomes a Codex entity.
+    ``backend/modules/<name>.py`` arrives as ``modules/<name>.py``. The
+    legacy ``codex/`` catalog pull does not strip ``backend/``, so this
+    also accepts ``backend/modules/<name>.py``. Nested paths are ignored
+    — only the top-level stem becomes a Codex entity.
     """
-    if not (path.startswith("modules/") and path.endswith(".py")):
+    if not path.endswith(".py"):
         return None
-    name = path[len("modules/") : -3]
-    if not name or "/" in name:
-        return None
-    return name
+    for prefix in ("backend/modules/", "modules/"):
+        if path.startswith(prefix):
+            name = path[len(prefix) : -3]
+            if name and "/" not in name:
+                return name
+    return None
 
 
 def _codex_modules_to_seed(
@@ -677,10 +681,11 @@ def _codex_modules_to_seed(
     """Pick which ``modules/*.py`` stems become Codex entities.
 
     Optional manifest key ``codex_modules`` is an allow-list of file stems:
-    - absent: seed every top-level ``modules/*.py`` (legacy default so
-      Dominion and unpublished packages keep working).
+    - absent: seed every top-level ``modules/*.py`` or
+      ``backend/modules/*.py`` (legacy default so Dominion and unflattened
+      ``codex/`` catalog pulls keep working).
     - present list: seed only those stems; each must exist as
-      ``backend/modules/<name>.py`` (flattened here to ``modules/<name>.py``).
+      ``modules/<name>.py`` or ``backend/modules/<name>.py``.
     - empty list ``[]``: seed none.
 
     Listed stems that are missing from the package are skipped (logged).
@@ -711,7 +716,8 @@ def _codex_modules_to_seed(
         content = available.get(stem)
         if content is None:
             logger.warning(
-                f"codex_modules lists '{stem}' but modules/{stem}.py is missing"
+                f"codex_modules lists '{stem}' but "
+                f"modules/{stem}.py (or backend/modules/{stem}.py) is missing"
             )
             continue
         selected.append((stem, content))
@@ -1201,6 +1207,12 @@ def install_codex_from_registry(
             }
         )
 
+    # Legacy catalog pull keeps backend/modules/*.py unflattened. Seed
+    # those stems the same way the unified ext/ path does after flatten.
+    seeded_modules = _seed_codex_module_entities(
+        package_name, files, codex_manifest
+    )
+
     result = {
         "success": True,
         "codex_id": codex_id,
@@ -1210,6 +1222,7 @@ def install_codex_from_registry(
         "source": "registry",
         "dependencies": dependencies,
         "dependencies_installed": installed_deps,
+        "codex_modules": seeded_modules,
     }
     if failed_deps:
         result["dependency_warnings"] = failed_deps

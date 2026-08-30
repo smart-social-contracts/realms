@@ -430,17 +430,18 @@ def claimed_for_manifest(manifest: Optional[dict]) -> List[str]:
 def claimed_for_files(files: Dict[str, str], manifest: Optional[dict] = None) -> List[str]:
     """Codex module stems + manifest claims.
 
-    When ``codex_modules`` is absent, every top-level ``modules/*.py`` stem
-    is claimed (legacy Dominion). When present, only the allow-list.
+    When ``codex_modules`` is absent, every top-level ``modules/*.py`` or
+    ``backend/modules/*.py`` stem is claimed (legacy Dominion / unflattened
+    catalog pull). When present, only the allow-list.
     """
     claimed = claimed_for_manifest(manifest)
     if isinstance(manifest, dict) and "codex_modules" in manifest:
         return claimed
+    from core.runtime_codex import _codex_module_stem
+
     for path in files or {}:
-        if not (path.startswith("modules/") and path.endswith(".py")):
-            continue
-        name = path[len("modules/") : -3]
-        if name and "/" not in name and name not in claimed and name not in PROTECTED_HOST_TYPES:
+        name = _codex_module_stem(path)
+        if name and name not in claimed and name not in PROTECTED_HOST_TYPES:
             claimed.append(name)
     return claimed
 

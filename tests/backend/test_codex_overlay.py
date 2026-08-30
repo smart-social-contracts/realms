@@ -168,6 +168,55 @@ def test_shell_can_invoke_revert():
     assert callable(overlay.set_safe_mode)
 
 
+def test_install_codex_package_seeds_legacy_backend_modules(slots, tmp_path, monkeypatch):
+    """Legacy catalog layout: only backend/modules/membership.py still seeds Codex membership."""
+    import core.runtime_codex as runtime_codex
+
+    monkeypatch.setattr(runtime_codex, "CODEX_PACKAGES_DIR", str(tmp_path / "codex_packages"))
+    FakeCodex.store["_payroll_step_0_1700000000"] = FakeRow("_payroll_step_0_1700000000")
+    files = {
+        "manifest.json": json.dumps(
+            {"kind": "codex", "name": "agora", "version": "0.9.5", "codex_modules": ["membership"]}
+        ),
+        "backend/modules/membership.py": "# membership from legacy catalog",
+    }
+
+    assert runtime_codex.install_codex_package("agora", files) is True
+    assert "membership" in FakeCodex.store
+    assert FakeCodex.store["membership"].code == "# membership from legacy catalog"
+    assert "_payroll_step_0_1700000000" in FakeCodex.store
+    assert overlay.status()["current"]["modules"] == ["membership"]
+
+
+def test_empty_claimed_list_does_not_delete_existing_codex_rows(slots):
+    """A failed/empty seed must not wipe the Codex table (TaskManager shims included)."""
+    FakeCodex.store["membership"] = FakeRow("membership")
+    FakeCodex.store["_payroll_step_0_1700000000"] = FakeRow("_payroll_step_0_1700000000")
+    FakeCodex.store["proposal_abc"] = FakeRow("proposal_abc")
+
+    deleted = overlay.prune_codex_table([])
+    assert deleted == []
+    assert "membership" in FakeCodex.store
+    assert "_payroll_step_0_1700000000" in FakeCodex.store
+    assert "proposal_abc" in FakeCodex.store
+
+    overlay.commit_current("agora", {"manifest.json": "{}"}, [])
+    assert "membership" in FakeCodex.store
+    assert "_payroll_step_0_1700000000" in FakeCodex.store
+
+
+def test_prune_never_deletes_task_manager_shim_rows(slots):
+    FakeCodex.store["leftover_helper"] = FakeRow("leftover_helper")
+    FakeCodex.store["_treasury_step_1_99"] = FakeRow("_treasury_step_1_99")
+    FakeCodex.store["membership"] = FakeRow("membership")
+
+    deleted = overlay.prune_codex_table(["membership"])
+    assert "leftover_helper" in deleted
+    assert "_treasury_step_1_99" not in deleted
+    assert "_treasury_step_1_99" in FakeCodex.store
+    assert "membership" in FakeCodex.store
+
+
 def test_protected_overrides_cannot_cover_voting_or_system():
     cleaned = overlay.filter_protected_overrides(
         {

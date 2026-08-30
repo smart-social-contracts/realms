@@ -300,20 +300,34 @@ def status() -> dict:
     }
 
 
+def _is_task_manager_shim(name: str) -> bool:
+    """TaskManager stores per-step scripts as ``_<task>_step_<idx>_<ts>`` Codex rows."""
+    return bool(name) and name.startswith("_") and "_step_" in name
+
+
 def prune_codex_table(claimed: List[str]) -> List[str]:
     """Delete Codex rows the new package does not claim.
 
     ``proposal_*`` rows are reserved for voting code-execution and are kept.
+    TaskManager shim rows (``_…_step_…``) are never deleted here.
+    An empty claimed list is treated as a failed/empty seed, not as
+    "claim nothing and wipe the table" — skip prune entirely.
     Users / departments / cases are not touched.
     """
     deleted = []
+    claimed_set = {name for name in claimed if name}
+    if not claimed_set:
+        logger.warning(
+            "codex overlay: skip Codex prune — claimed module list is empty"
+        )
+        return deleted
+
     try:
         from ggg import Codex
     except Exception as exc:
         logger.warning(f"codex overlay: cannot prune Codex table — {exc}")
         return deleted
 
-    claimed_set = {name for name in claimed if name}
     try:
         rows = list(Codex.instances())
     except Exception as exc:
@@ -323,6 +337,8 @@ def prune_codex_table(claimed: List[str]) -> List[str]:
     for row in rows:
         name = getattr(row, "name", None) or ""
         if not name or name.startswith(PROPOSAL_CODEX_PREFIX):
+            continue
+        if _is_task_manager_shim(name):
             continue
         if name in claimed_set:
             continue
@@ -344,12 +360,12 @@ def _seed_claimed_modules(files: Dict[str, str], modules: List[str]) -> List[str
         logger.warning(f"codex overlay: cannot seed Codex rows — {exc}")
         return seeded
 
+    from core.runtime_codex import _codex_module_stem
+
     available = {}
     for path, content in files.items():
-        if not (path.startswith("modules/") and path.endswith(".py")):
-            continue
-        name = path[len("modules/") : -3]
-        if name and "/" not in name:
+        name = _codex_module_stem(path)
+        if name:
             available[name] = content
 
     for name in modules:
@@ -377,12 +393,12 @@ def preserve_current_as_previous() -> bool:
     if not _slot_files("current"):
         live_id, live_files = _live_codex_snapshot()
         if live_id and live_files:
+            from core.runtime_codex import _codex_module_stem
+
             modules = [
-                path[len("modules/") : -3]
-                for path in live_files
-                if path.startswith("modules/")
-                and path.endswith(".py")
-                and "/" not in path[len("modules/") : -3]
+                name
+                for name in (_codex_module_stem(path) for path in live_files)
+                if name
             ]
             _write_slot("current", live_id, live_files, modules)
             logger.info(f"codex overlay: captured live '{live_id}' as current before replace")
