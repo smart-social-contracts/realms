@@ -87,3 +87,7 @@ Thumbs.db
 
 # icp-cli local state (canister ID mappings, build cache)
 .icp/
+
+# ── Local sibling checkouts (not submodules; clone separately) ──────────────
+casals/
+gos-as-a-service/

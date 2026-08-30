@@ -852,6 +852,23 @@ def _parse_jsonish(stdout: str) -> Any:
     raw = (stdout or "").strip()
     if not raw:
         raise ValueError("empty canister response")
+    # icp --json wraps the candid text in a JSON envelope
+    try:
+        envelope = json.loads(raw)
+        if isinstance(envelope, dict) and "response_candid" in envelope:
+            candid = envelope["response_candid"]
+            if candid is not None:
+                return _parse_candid_text(candid)
+            # Fall back to response_bytes hex decode if needed
+            if "response_bytes" in envelope:
+                return envelope
+        return envelope
+    except json.JSONDecodeError:
+        pass
+    return _parse_candid_text(raw)
+
+
+def _parse_candid_text(raw: str) -> Any:
     if raw.startswith("(") and raw.endswith(")"):
         raw = raw[1:-1].strip().rstrip(",")
     if raw.startswith('"') and raw.endswith('"'):
@@ -871,13 +888,21 @@ def parse_credits_balance(payload: Any) -> int:
     """Extract nat64 balance from get_credits JSON or candid-ish dict."""
     data = payload
     if isinstance(data, str):
+        # Try JSON first
         try:
             data = json.loads(data)
         except json.JSONDecodeError:
-            match = re.search(r"balance\s*=\s*(\d+)", data)
-            if match:
-                return int(match.group(1))
-            raise StageError("credits", f"Could not parse get_credits response: {data[:200]}")
+            pass
+    if isinstance(data, str):
+        # Candid text: look for balance = N : nat64 or the field hash for "balance"
+        # Field hash 2_329_005_965 is "balance" in candid
+        match = re.search(r"2_329_005_965\s*=\s*(\d+)", data)
+        if match:
+            return int(match.group(1))
+        match = re.search(r"balance\s*=\s*(\d+)", data)
+        if match:
+            return int(match.group(1))
+        raise StageError("credits", f"Could not parse get_credits response: {data[:200]}")
     if isinstance(data, dict):
         if "Err" in data:
             err = data["Err"]
@@ -900,25 +925,12 @@ def _canister_call(
     query: bool = False,
     timeout: int = 180,
 ) -> Any:
-    """Call a canister as ``identity``. Prefer icp; dfx --run-deprecated fallback."""
+    """Call a canister as ``identity``. Prefer dfx for JSON output; icp fallback."""
     arg_file = None
     try:
         use_file = len(arg.encode("utf-8")) >= 100 * 1024
-        if _icp_available():
-            cmd = ["icp", "canister", "call", canister, method]
-            cmd.extend(_icp_replica_args())
-            cmd.extend(["--identity", identity])
-            if query:
-                cmd.append("--query")
-            if use_file:
-                fd, arg_file = tempfile.mkstemp(prefix="realms-new-", suffix=".did")
-                with os.fdopen(fd, "w") as fh:
-                    fh.write(arg)
-                cmd.extend(["--args-file", arg_file])
-            else:
-                cmd.append(arg)
-            proc = _run(cmd, timeout=timeout)
-        else:
+        # Prefer dfx --run-deprecated for clean --output json; icp --json wraps candid in an envelope
+        if shutil.which("dfx") is not None:
             cmd = [
                 "dfx",
                 "--run-deprecated",
@@ -943,6 +955,23 @@ def _canister_call(
             else:
                 cmd.append(arg)
             proc = _run(cmd, timeout=timeout, env=_dfx_env())
+        elif _icp_available():
+            cmd = ["icp", "canister", "call", canister, method]
+            cmd.extend(_icp_replica_args())
+            cmd.extend(["--identity", identity])
+            cmd.append("--json")
+            if query:
+                cmd.append("--query")
+            if use_file:
+                fd, arg_file = tempfile.mkstemp(prefix="realms-new-", suffix=".did")
+                with os.fdopen(fd, "w") as fh:
+                    fh.write(arg)
+                cmd.extend(["--args-file", arg_file])
+            else:
+                cmd.append(arg)
+            proc = _run(cmd, timeout=timeout)
+        else:
+            raise RuntimeError("Neither dfx nor icp found")
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "canister call failed").strip()
             raise RuntimeError(err)

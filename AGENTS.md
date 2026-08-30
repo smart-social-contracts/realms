@@ -1264,6 +1264,59 @@ Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the 
 
 This VM has no `icp.yaml` and no working OS keyring.
 
+### Launching a cloud agent on a **named** environment (Environment2)
+
+Live IC work (deployer PEM, `gaas new`, `realms new`) lives on the named
+Cloud Environment **Environment2**
+([dashboard](https://cursor.com/dashboard/cloud-agents/environments/e/a79bd4f2-a059-11f1-b532-320a589b8025)).
+Its secrets (`IC_IDENTITY_PEM_B64`, optional `DEMO_IDENTITY1_*`) are **not**
+injected unless that environment is the one attached to the run.
+
+**Do not** treat `Task(environment: "cloud")` as “run on Environment2”. That
+flag only means “Cursor-hosted VM”. It uses the **repo’s saved default**
+Cloud Environment (personal, then team). There is **no** Task-tool parameter
+for environment name. Writing “Environment2” in the prompt text does **not**
+select it.
+
+| How you launch | Selects Environment2? |
+|---|---|
+| `Task` tool with `environment: "cloud"` | **No** — repo default only |
+| Prompt text saying “use Environment2” | **No** |
+| Cloud Agents API `env.name` (below) | **Yes** |
+| User starts the agent from the Cloud Agents UI with Environment2 chosen | **Yes** |
+
+To target Environment2 from an agent (or any script), use the
+[Cloud Agents API](https://cursor.com/docs/cloud-agent/api/endpoints)
+`POST /v1/agents` with a named environment. `env` is mutually exclusive with
+explicit `repos` when selecting a named Cursor-hosted environment:
+
+```bash
+# CURSOR_API_KEY from Cursor Dashboard → API Keys
+curl -sS -X POST https://api.cursor.com/v1/agents \
+  -u "$CURSOR_API_KEY:" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "prompt": { "text": "<task>" },
+    "name": "Demo gaas+realms new",
+    "env": { "type": "cloud", "name": "Environment2" }
+  }'
+```
+
+(`env.type` is `cloud` for Cursor-hosted VMs; `env.name` is the dashboard
+environment name, e.g. `Environment2`.)
+
+**Before any IC write**, confirm the attached environment:
+
+1. Agent page → hover the repo name → it must say **Environment2**.
+2. In the VM: `test -n "$IC_IDENTITY_PEM_B64"`. If empty, you are on the
+   **wrong** environment — stop. Do not invent a PEM, do not use
+   `my_dev_identity_1`, do not destroy demo canisters.
+
+If `IC_IDENTITY_PEM_B64` is empty on a run the user expected on Environment2,
+the launch path was the Task default, not the named env. Re-launch via the
+API (or ask the user to start the agent from the Cloud Agents UI with
+Environment2 selected).
+
 **Git.** Do **not** create a branch, commit, push, or open a PR unless the user
 explicitly asks. Stay on the current checkout. Treat this as a standing user
 instruction for this repo, including Cloud agent runs.
@@ -1646,7 +1699,7 @@ await target.locator("text=Advanced").first.click()
 
 - [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — Deployment decision tree (Casals, mundus, extensions, release)
 - `AGENTS.md` — Agent/operator guide (deploy paths, canister IDs, fast iteration)
-- [Cursor Cloud specific instructions](#cursor-cloud-specific-instructions) — plaintext PEM, `icp` replica flags, Playwright Chrome path
+- [Cursor Cloud specific instructions](#cursor-cloud-specific-instructions) — named env (Environment2) vs Task `environment: cloud`, plaintext PEM, `icp` replica flags, Playwright Chrome path
 - `docs/reference/ENVIRONMENTS.md` — Per-env product stacks (`realms env deploy`, `*.realmsgos.org`)
 - `docs/reference/CASALS_ROLLOUT.md` — On-chain (Casals) deploy & upgrade runbook
 - `docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md` — Layered deploy runbook
