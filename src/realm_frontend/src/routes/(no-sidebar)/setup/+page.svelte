@@ -95,9 +95,9 @@
 	let selectedCodexId = $state('');
 	let selectedVersion = $state('');
 	let resolvedCodexVersion = $state('');
-	let tokenSymbol = $state('REALMS');
+	let tokenSymbol = $state('ckEURC');
 	let tokenCanisterId = $state('');
-	let tokenChoice = $state('REALMS');
+	let tokenChoice = $state('ckEURC');
 	let primaryColor = $state('#3b82f6');
 	let logoPreview = $state('');
 	let backgroundPreview = $state('');

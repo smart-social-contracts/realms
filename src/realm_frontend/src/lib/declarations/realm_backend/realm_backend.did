@@ -331,6 +331,7 @@ service : {
   "extension_sync_call" : (text, text, text) -> (ExtensionCallResponse);
   "extension_async_call" : (text, text, text) -> (ExtensionCallResponse);
   "http_request" : (HttpRequest) -> (HttpResponseIncoming) query;
+  "http_request_update" : (HttpRequest) -> (HttpResponseIncoming);
   "http_transform" : (HttpTransformArgs) -> (HttpResponse) query;
   "__shell__" : (text) -> (text);
   "create_multi_step_scheduled_task" : (text, text, nat, nat) -> (text);
@@ -369,11 +370,19 @@ service : {
   "uninstall_codex" : (text) -> (text);
   "reload_codex" : (text) -> (text);
   "list_codex_packages" : () -> (text) query;
+  "revert_codex" : (text) -> (text);
+  "set_codex_safe_mode" : (text) -> (text);
+  "get_codex_overlay_status" : () -> (text) query;
+  "list_packages" : () -> (text) query;
+  "lock_package" : (text) -> (text);
+  "unlock_package" : (text) -> (text);
+  "transfer_package" : (text) -> (text);
   "resync_extension_frontends" : (text) -> (text);
   "install_extension_from_registry" : (text) -> (text);
   "install_codex_from_registry" : (text) -> (text);
   "install_branding_from_registry" : (text) -> (text);
   "register_realm_from_registry" : (text) -> (text);
+  "enter_setup" : (principal, text, text) -> (text);
   "get_setup_state" : () -> (text) query;
   "get_available_codices_cached" : () -> (text) query;
   "list_available_codices" : () -> (text);

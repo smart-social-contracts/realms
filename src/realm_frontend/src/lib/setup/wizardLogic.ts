@@ -273,7 +273,7 @@ function tokenSymbolFromStoredValue(token: unknown): string {
 
 /**
  * Token label for Launch review. Uses persisted draft / applied token only —
- * never the wizard's UI default (REALMS), so a skipped token stays skipped.
+ * never the wizard's UI default (ckEURC), so a skipped token stays skipped.
  * Accepts {symbol}, {id}, {existing}, or a bare "ckEURC" string.
  */
 export function resolveReviewTokenSymbol(setupState: SetupState | null | undefined): string {

@@ -1057,6 +1057,7 @@ export interface _SERVICE {
   'cancel_federal_vote' : ActorMethod<[string], string>,
   'change_quarter' : ActorMethod<[string], RealmResponse>,
   'complete_setup' : ActorMethod<[], string>,
+  'enter_setup' : ActorMethod<[Principal, string, string], string>,
   'create_multi_step_scheduled_task' : ActorMethod<
     [string, string, bigint, bigint],
     string
@@ -1122,6 +1123,11 @@ export interface _SERVICE {
     [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
     Array<string>
   >,
+  'get_codex_overlay_status' : ActorMethod<[], string>,
+  'list_packages' : ActorMethod<[], string>,
+  'lock_package' : ActorMethod<[string], string>,
+  'unlock_package' : ActorMethod<[string], string>,
+  'transfer_package' : ActorMethod<[string], string>,
   'get_extension_frontend_info' : ActorMethod<[string], string>,
   'get_extensions' : ActorMethod<[], RealmResponse>,
   'get_federal_vote' : ActorMethod<[string], string>,
@@ -1158,6 +1164,7 @@ export interface _SERVICE {
   'get_zones' : ActorMethod<[bigint], string>,
   'grant_delegation_json' : ActorMethod<[string], string>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
+  'http_request_update' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
   'http_transform' : ActorMethod<[HttpTransformArgs], HttpResponse>,
   'install_branding_from_registry' : ActorMethod<[string], string>,
   'install_codex' : ActorMethod<[string], string>,
@@ -1202,6 +1209,7 @@ export interface _SERVICE {
   'resolve_ref' : ActorMethod<[string], string>,
   'resolve_token_ledger' : ActorMethod<[string], string>,
   'resync_extension_frontends' : ActorMethod<[string], string>,
+  'revert_codex' : ActorMethod<[string], string>,
   'revoke_delegation_json' : ActorMethod<[string], string>,
   'send_realm_message' : ActorMethod<[string, string, string, string], string>,
   'set_canister_config' : ActorMethod<
@@ -1218,6 +1226,7 @@ export interface _SERVICE {
     RealmResponse
   >,
   'set_canister_config_json' : ActorMethod<[string], string>,
+  'set_codex_safe_mode' : ActorMethod<[string], string>,
   'set_menu_category_order' : ActorMethod<[string], string>,
   'set_menu_item_config' : ActorMethod<[string], string>,
   'set_menu_visibility' : ActorMethod<[string], string>,

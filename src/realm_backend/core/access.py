@@ -453,7 +453,14 @@ def is_bootstrap_admin_caller(caller_principal: str, realm) -> bool:
     if status == "setup" and is_known_bootstrap_principal(caller_principal):
         return True
     installer_id = str(getattr(realm, "installer_canister_id", "") or "").strip()
-    return bool(installer_id and installer_id == caller_principal)
+    if installer_id and installer_id == caller_principal:
+        return True
+    trusted = [
+        p.strip()
+        for p in str(getattr(realm, "trusted_principals", "") or "").split(",")
+        if p.strip()
+    ]
+    return bool(status == "setup" and caller_principal in trusted)
 
 
 def _is_controller_or_trusted(caller_principal: str) -> bool:

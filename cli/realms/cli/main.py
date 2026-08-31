@@ -56,6 +56,7 @@ from .commands.registry import (
     registry_status_command,
 )
 from .commands.test import test_command
+from .commands.new import new_command
 from .constants import MAX_BATCH_SIZE, REALM_FOLDER
 from .utils import (
     check_dependencies,
@@ -296,6 +297,137 @@ def installer_health(
     """Call realm_installer.health (liveness + chunk limits)."""
     installer_health_command(
         installer=installer, network=network, identity=identity,
+    )
+
+
+@app.command("new", rich_help_panel="Lifecycle")
+def new(
+    spec_file: Optional[str] = typer.Argument(
+        None,
+        help="Optional spec JSON (paths relative to the spec file). Flags override spec fields.",
+    ),
+    identity: str = typer.Option(
+        ...,
+        "--identity",
+        "-i",
+        help=(
+            "Identity that pays credits, is manifest.founder, and runs setup. "
+            "II-linked, or a dfx key (e.g. deployer) together with --co-admin."
+        ),
+    ),
+    network: str = typer.Option(
+        ...,
+        "--network",
+        "-n",
+        help="Network: test | staging | demo | ic",
+    ),
+    name: Optional[str] = typer.Option(None, "--name", help="Realm name (≥3 chars)"),
+    slug: Optional[str] = typer.Option(
+        None, "--slug", help="Federation slug (default: slugify name, ≥3)"
+    ),
+    gos: Optional[str] = typer.Option(
+        None, "--gos", help="GOS implementation (v1: realms-gos only)"
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", help="GOS deploy version (default: main)"
+    ),
+    subnet: Optional[str] = typer.Option(
+        None,
+        "--subnet",
+        help="automatic | european | <subnet-id> (default: automatic)",
+    ),
+    codex: Optional[str] = typer.Option(None, "--codex", help="Codex package id (e.g. agora)"),
+    codex_version: Optional[str] = typer.Option(
+        None, "--codex-version", help="Codex version (omit for registry latest)"
+    ),
+    logo: Optional[str] = typer.Option(None, "--logo", help="Logo image path (≤ 1.5 MiB)"),
+    background: Optional[str] = typer.Option(
+        None, "--background", help="Background image path (≤ 1.5 MiB)"
+    ),
+    primary: Optional[str] = typer.Option(None, "--primary", help="Primary color #RRGGBB"),
+    manifesto: Optional[str] = typer.Option(
+        None, "--manifesto", help="Realm manifesto (max 256 chars)"
+    ),
+    welcome: Optional[str] = typer.Option(
+        None, "--welcome", help="Welcome message (max 1024 chars)"
+    ),
+    token_symbol: Optional[str] = typer.Option(
+        None,
+        "--token-symbol",
+        help="Treasury token symbol (default ckEURC, the live catalog pick)",
+    ),
+    token_canister: Optional[str] = typer.Option(
+        None,
+        "--token-canister",
+        help="Treasury ledger canister id (default ckEURC pe5t5-…)",
+    ),
+    config: Optional[str] = typer.Option(
+        None, "--config", help="Path to JSON config object (scaling / auto_scale_enabled)"
+    ),
+    data: Optional[str] = typer.Option(
+        None, "--data", help="Path to GGG entity JSON (same as realms db import)"
+    ),
+    members: Optional[int] = typer.Option(
+        None, "--members", help="Geister agents to generate and join_realm (default 0)"
+    ),
+    open_registration: bool = typer.Option(
+        False,
+        "--open-registration",
+        help="Allow join without invite (overrides spec to true)",
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    resume: Optional[str] = typer.Option(
+        None, "--resume", help="Continue from an existing installer job_id"
+    ),
+    co_admin: Optional[str] = typer.Option(
+        None,
+        "--co-admin",
+        help=(
+            "II principal to register as a second admin after launch "
+            "(admin profile + root org). Required when --identity is a dfx "
+            "deploy key (deployer, my_dev_identity_1)."
+        ),
+    ),
+) -> None:
+    """Create a live realm the same way as the *.gos.earth wizard.
+
+    Charges 5 registry credits to --identity, enqueues request_deployment
+    with a Casals/federation/founder manifest, then runs in-realm setup as that
+    identity. Does not scaffold a local folder.
+
+    When --identity is a dfx key, pass --co-admin <your-II-principal> (copy it
+    from the browser after logging into *.gos.earth). You log in as that II
+    user with real admin rights; deployer remains the founder User.
+
+    Example:
+      realms new spec.json --identity deployer --network demo \\
+        --co-admin <ii-principal> --codex agora --name Acme --yes
+    """
+    new_command(
+        spec_file=spec_file,
+        identity=identity,
+        network=network,
+        name=name,
+        slug=slug,
+        gos=gos,
+        version=version,
+        subnet=subnet,
+        codex=codex,
+        codex_version=codex_version,
+        logo=logo,
+        background=background,
+        primary=primary,
+        manifesto=manifesto,
+        welcome=welcome,
+        token_symbol=token_symbol,
+        token_canister=token_canister,
+        config=config,
+        data=data,
+        members=members,
+        open_registration=True if open_registration else None,
+        yes=yes,
+        resume=resume,
+        co_admin=co_admin,
     )
 
 

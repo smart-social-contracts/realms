@@ -96,15 +96,37 @@ def set_realm_registry_canister_id(realm, registry_id: str) -> None:
     update_setup_config(realm, {"realm_registry_canister_id": registry_id})
 
 
+def is_virgin_setup(realm) -> bool:
+    """True when no founder/installer has claimed first-boot yet.
+
+    A freshly installed realm reports ``status=setup`` with an empty creator
+    ("Default Realm"). GaaS recreate mints a new installer principal each
+    time, so hardcoded NETWORK_INFRA IDs cannot be the only gate.
+    """
+    if not realm or not is_setup_stage(realm):
+        return False
+    setup = get_setup_config(realm)
+    if (setup.get("creator_principal") or "").strip():
+        return False
+    if setup.get("setup_completed_at"):
+        return False
+    if str(getattr(realm, "installer_canister_id", "") or "").strip():
+        return False
+    return True
+
+
 def can_enter_setup(caller: str, is_controller: bool = False) -> bool:
     """Whether the caller may run first-boot enter_setup.
 
     IC controllers still work (legacy mundus). The GOS installer is *not* a
     lasting controller under Casals, so known installer/registry principals
     and a configured installer/trusted principal may also enter once.
+    A virgin realm (no creator, no recorded installer) also accepts the first
+    non-anonymous caller so ``gaas new`` + ``realms new`` works after a
+    from-scratch recreate whose installer ID is not in NETWORK_INFRA.
     """
     caller = (caller or "").strip()
-    if not caller:
+    if not caller or caller == "2vxsx-fae":
         return False
     if is_controller:
         return True
@@ -125,7 +147,9 @@ def can_enter_setup(caller: str, is_controller: bool = False) -> bool:
         for p in str(getattr(realm, "trusted_principals", "") or "").split(",")
         if p.strip()
     ]
-    return caller in trusted
+    if caller in trusted:
+        return True
+    return is_virgin_setup(realm)
 
 
 def record_bootstrap_caller(realm, caller: str) -> None:
