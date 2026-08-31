@@ -22,8 +22,8 @@ describe("marketplace about copy", () => {
       assert.ok(loc.landing.cta_about);
       assert.ok(loc.landing.cta_what);
       assert.ok(loc.landing.cta_browse);
-      assert.ok(loc.landing.scroll_hint);
       assert.ok(loc.landing.credit);
+      assert.ok(loc.landing.scroll_hint);
       assert.equal(loc.landing.badge_env, undefined);
       assert.equal(loc.landing.badge_version, undefined);
       assert.ok(loc.nav.about);
@@ -44,6 +44,8 @@ describe("marketplace about copy", () => {
   it("English home CTA is Launch your realm", () => {
     assert.equal(loadLocale("en.json").landing.cta_launch, "Launch your realm");
     assert.notEqual(loadLocale("en.json").landing.cta_launch, "Launch a realm");
+    assert.equal(loadLocale("en.json").landing.cta_what, "What is it?");
+    assert.equal(loadLocale("en.json").landing.cta_browse, "Browse marketplace");
   });
 
   it("English about copy matches the website landing strings", () => {

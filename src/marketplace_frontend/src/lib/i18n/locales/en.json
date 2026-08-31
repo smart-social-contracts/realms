@@ -51,8 +51,15 @@
     "cta_about": "About",
     "cta_what": "What is it?",
     "cta_browse": "Browse marketplace",
+    "credit": "Built on the Internet Computer with ❤️ from",
+    "credit_country": "Switzerland",
     "scroll_hint": "Discover",
-    "credit": "Built on the Internet Computer with ❤️ from 🇨🇭"
+    "stat_onchain": "on-chain",
+    "stat_servers": "servers",
+    "stat_extensions": "extensions",
+    "stat_codices": "codices",
+    "stat_assistants": "assistants",
+    "trust_label": "Marketplace at a glance"
   },
   "discover": {
     "title": "Enhance the experience of your realm's members.",

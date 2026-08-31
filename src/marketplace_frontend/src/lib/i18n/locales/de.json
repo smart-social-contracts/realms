@@ -50,9 +50,16 @@
     "cta_browse_codices": "Codices durchsuchen",
     "cta_about": "Über",
     "cta_what": "Was ist das?",
-    "cta_browse": "Marketplace durchsuchen",
+    "cta_browse": "Marktplatz durchsuchen",
+    "credit": "Gebaut auf dem Internet Computer mit ❤️ aus",
+    "credit_country": "der Schweiz",
     "scroll_hint": "Entdecken",
-    "credit": "Built on the Internet Computer with ❤️ from 🇨🇭"
+    "stat_onchain": "on-chain",
+    "stat_servers": "Server",
+    "stat_extensions": "Erweiterungen",
+    "stat_codices": "Codices",
+    "stat_assistants": "Assistenten",
+    "trust_label": "Marktplatz auf einen Blick"
   },
   "discover": {
     "title": "Verbessere das Erlebnis der Mitglieder deines Realms.",

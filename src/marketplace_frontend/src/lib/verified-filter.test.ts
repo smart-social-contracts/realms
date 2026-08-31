@@ -27,10 +27,10 @@ describe('parseVerifiedOnlyParam', () => {
 });
 
 describe('setVerifiedOnlySearchParam', () => {
-  it('writes verified=1 when checked and verified=0 when unchecked', () => {
-    const on = new URLSearchParams();
+  it('omits verified when checked and writes verified=0 when unchecked', () => {
+    const on = new URLSearchParams('verified=1');
     setVerifiedOnlySearchParam(on, true);
-    assert.equal(on.get('verified'), '1');
+    assert.equal(on.get('verified'), null);
 
     const off = new URLSearchParams();
     setVerifiedOnlySearchParam(off, false);

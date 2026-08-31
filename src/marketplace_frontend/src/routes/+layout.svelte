@@ -1,6 +1,6 @@
 <script lang="ts">import { onMount } from "svelte";
 import { browser } from "$app/environment";
-import { afterNavigate, goto } from "$app/navigation";
+import { goto } from "$app/navigation";
 import { page } from "$app/stores";
 import { _, locale } from "svelte-i18n";
 import { initI18n, setLocale, supportedLocales } from "$lib/i18n";
@@ -17,15 +17,14 @@ let isController = false;
 let searchTerm = "";
 let i18nReady = false;
 let showLanguageMenu = false;
-let scrolled = false;
+let heroScrolled = false;
 function submitSearch() {
   const q = searchTerm.trim();
   if (!q) return;
   goto(`/?q=${encodeURIComponent(q)}`);
 }
-function onScroll() {
-  if (!browser) return;
-  scrolled = window.scrollY > 24;
+function onWindowScroll() {
+  heroScrolled = window.scrollY > 24;
 }
 onMount(async () => {
   if (!browser) return;
@@ -34,10 +33,7 @@ onMount(async () => {
   await bootstrapAuth();
   booted = true;
   refreshController();
-  onScroll();
-});
-afterNavigate(() => {
-  onScroll();
+  onWindowScroll();
 });
 $: if (browser && $locale) document.documentElement.lang = $locale;
 async function refreshController() {
@@ -65,10 +61,25 @@ $: routeIsActive = (path) => {
 };
 </script>
 
-<svelte:window on:click={() => (showLanguageMenu = false)} on:scroll={onScroll} />
+<svelte:window on:click={() => (showLanguageMenu = false)} on:scroll={onWindowScroll} />
 
 {#if browser && i18nReady}
-<header class="topbar" class:overlay={isHome} class:revealed={!isHome || scrolled}>
+{#if isHome}
+  <div class="hero-chrome" class:hidden={heroScrolled}>
+    {#if $isAuthenticated && $principalStore}
+      <a class="hero-chrome-btn" href="/my-purchases" aria-label={$_('nav.my_purchases')} title={$principalStore.toText()}>
+        <i class="ti ti-user" aria-hidden="true"></i>
+        <span class="hero-chrome-label">{shortPrincipal($principalStore.toText())}</span>
+      </a>
+    {:else}
+      <button class="hero-chrome-btn" on:click={handleLogin} aria-label={$_('nav.sign_in')} title={$_('nav.sign_in')}>
+        <i class="ti ti-login" aria-hidden="true"></i>
+        <span class="hero-chrome-label">{$_('nav.sign_in')}</span>
+      </button>
+    {/if}
+  </div>
+{/if}
+<header class="topbar" class:overlay={isHome} class:revealed={!isHome || heroScrolled}>
   <div class="bar">
     <div class="brand-group">
       <a href="/" class="brand" aria-label="Realms Marketplace home">
@@ -213,6 +224,42 @@ $: routeIsActive = (path) => {
     visibility: visible;
     pointer-events: auto;
   }
+  .hero-chrome {
+    position: fixed;
+    z-index: 31;
+    top: 1.15rem;
+    right: 1.5rem;
+    display: flex;
+    gap: 0.4rem;
+    transition: opacity 0.2s ease, visibility 0.2s;
+  }
+  .hero-chrome.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .hero-chrome-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    height: 2.4rem;
+    padding: 0 0.9rem 0 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: #ffffffdb;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--text);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 1px 2px #0000000a;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .hero-chrome-btn .ti { font-size: 1.15rem; line-height: 1; }
+  .hero-chrome-btn:hover { background: var(--surface); border-color: var(--border-strong); }
   .bar {
     display: flex;
     align-items: center;

@@ -48,6 +48,9 @@ function parseLangs(raw) {
 function langLabel(code) {
   return LANG_NAMES[code] ?? code.toUpperCase();
 }
+function stripBullet(text) {
+  return String(text ?? "").replace(/^\s*•\s*/, "");
+}
 let kind = "ext";
 let metric = "downloads";
 let verifiedOnly = true;
@@ -60,9 +63,23 @@ let items = [];
 let likedSet = new Set();
 let searchQuery = "";
 let catalogSection;
+/** @type {{ value: number, key: string }[]} */
+let catalogStats = [];
 function scrollToCatalog(k) {
-  if (k === "ext" || k === "codex" || k === "assistant") kind = k;
+  if (k) kind = k;
   catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+async function loadCatalogStats() {
+  try {
+    const status = await marketplaceClient.getStatus();
+    catalogStats = [
+      { value: status.extensions_count, key: "landing.stat_extensions" },
+      { value: status.codices_count, key: "landing.stat_codices" },
+      { value: status.assistants_count, key: "landing.stat_assistants" },
+    ].filter((row) => Number(row.value) > 0);
+  } catch {
+    catalogStats = [];
+  }
 }
 onMount(async () => {
   const params = $page.url.searchParams;
@@ -78,6 +95,7 @@ onMount(async () => {
     kind = await resolveKindForQuery(searchQuery.trim(), verifiedOnly);
   }
   mounted = true;
+  void loadCatalogStats();
 });
 $: void load(kind, metric, verifiedOnly, searchQuery);
 $: if (kind !== "ext" && selectedCategory) selectedCategory = "";
@@ -172,14 +190,43 @@ function categoriesFor(it) {
 function extensionThumbnail(ext) {
   return listingScreenshotUrls(ext)[0] || "";
 }
-function stanzaLine(s) {
-  return String(s ?? "").replace(/^\s*•\s*/, "");
-}
 </script>
+
+<svelte:head>
+  <link
+    rel="preload"
+    as="image"
+    type="image/avif"
+    href="/images/hero-mosaic-1920.avif"
+    imagesrcset="/images/hero-mosaic-1280.avif 1280w, /images/hero-mosaic-1920.avif 1920w"
+    imagesizes="100vw"
+  />
+</svelte:head>
 
 <section class="landing-hero" aria-labelledby="landing-title">
   <div class="landing-bg" aria-hidden="true">
-    <img src="/images/hero-bg.jpg" alt="" />
+    <picture>
+      <source
+        type="image/avif"
+        sizes="100vw"
+        srcset="/images/hero-mosaic-1280.avif 1280w, /images/hero-mosaic-1920.avif 1920w"
+      />
+      <source
+        type="image/webp"
+        sizes="100vw"
+        srcset="/images/hero-mosaic-1280.webp 1280w, /images/hero-mosaic-1920.webp 1920w"
+      />
+      <img
+        src="/images/hero-mosaic.jpg"
+        srcset="/images/hero-mosaic-1280.jpg 1280w, /images/hero-mosaic.jpg 1920w"
+        sizes="100vw"
+        alt=""
+        width="1920"
+        height="1280"
+        fetchpriority="high"
+        decoding="async"
+      />
+    </picture>
     <div class="landing-overlay"></div>
   </div>
   <div class="landing-card">
@@ -188,15 +235,13 @@ function stanzaLine(s) {
     </div>
     <h1 id="landing-title" class="landing-tagline">{$_('about.hero.title')}</h1>
     <div class="landing-stanza">
-      <p>{stanzaLine($_('about.hero.subtitle1'))}</p>
-      <p>{stanzaLine($_('about.hero.subtitle2'))}</p>
-      <p>{stanzaLine($_('about.hero.subtitle3'))}</p>
+      <p>{stripBullet($_('about.hero.subtitle1'))}</p>
+      <p>{stripBullet($_('about.hero.subtitle2'))}</p>
+      <p>{stripBullet($_('about.hero.subtitle3'))}</p>
     </div>
     <div class="landing-ctas">
-      <a class="cta ghost" href="/about">
-        {$_('landing.cta_what')}
-      </a>
-      <button type="button" class="cta ghost" on:click={() => scrollToCatalog()}>
+      <a class="cta ghost" href="/about">{$_('landing.cta_what')}</a>
+      <button type="button" class="cta ghost" on:click={() => scrollToCatalog('ext')}>
         {$_('landing.cta_browse')}
       </button>
       <a class="cta primary" href={CONFIG.portal_url || 'https://demo.gos.earth'} target="_blank" rel="noreferrer">
@@ -204,11 +249,36 @@ function stanzaLine(s) {
       </a>
     </div>
   </div>
-  <p class="landing-credit">{$_('landing.credit')}</p>
-  <button type="button" class="scroll-flag" on:click={() => scrollToCatalog()} aria-label={$_('landing.scroll_hint')}>
-    <span class="scroll-line" aria-hidden="true"></span>
+  <p class="landing-credit">
+    <span>{$_('landing.credit')}</span>
+    <svg class="swiss" viewBox="0 0 32 32" aria-label={$_('landing.credit_country')}>
+      <rect width="32" height="32" rx="2.5" fill="#D52B1E" />
+      <path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z" fill="#fff" />
+    </svg>
+  </p>
+  <button type="button" class="scroll-flag" on:click={() => scrollToCatalog()}>
+    <span class="scroll-line"></span>
     <span class="scroll-label">{$_('landing.scroll_hint')}</span>
   </button>
+</section>
+
+<section class="trust" aria-label={$_('landing.trust_label')}>
+  <div class="trust-inner">
+    {#each catalogStats as stat}
+      <div class="trust-item">
+        <span class="trust-num">{stat.value}</span>
+        <span class="trust-label">{$_(stat.key)}</span>
+      </div>
+    {/each}
+    <div class="trust-item">
+      <span class="trust-num">100%</span>
+      <span class="trust-label">{$_('landing.stat_onchain')}</span>
+    </div>
+    <div class="trust-item">
+      <span class="trust-num">0</span>
+      <span class="trust-label">{$_('landing.stat_servers')}</span>
+    </div>
+  </div>
 </section>
 
 <section class="catalog" id="catalog" bind:this={catalogSection}>
@@ -330,71 +400,80 @@ function stanzaLine(s) {
     position: absolute;
     inset: 0;
   }
+  .landing-bg picture {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
   .landing-bg img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    opacity: 0.45;
     transform: scale(1.08);
     animation: kenburns 32s ease-out forwards;
   }
   .landing-overlay {
     position: absolute;
     inset: 0;
-    background:
-      radial-gradient(ellipse at center, rgba(12, 16, 14, 0.08) 0%, rgba(12, 16, 14, 0.42) 100%),
-      linear-gradient(to top, rgba(12, 16, 14, 0.5) 0%, rgba(12, 16, 14, 0.12) 42%, rgba(255, 255, 255, 0.06) 100%);
+    background: linear-gradient(to bottom, #ffffff94, #fafafa66 45%, #ffffff9e);
   }
   .landing-card {
     position: relative;
     z-index: 1;
-    width: min(42rem, 100%);
-    padding: 2.75rem 2.5rem 2.35rem;
-    background: rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(20px) saturate(1.15);
-    -webkit-backdrop-filter: blur(20px) saturate(1.15);
-    border: 1px solid rgba(255, 255, 255, 0.55);
-    border-radius: 1.35rem;
-    box-shadow: 0 30px 80px -28px rgba(0, 0, 0, 0.38);
+    width: min(46rem, 100%);
+    padding: 2.75rem 2.75rem 2.35rem;
+    background: #ffffffc7;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px #0000000a;
     text-align: center;
     animation: hero-rise 0.4s ease-out both;
   }
+  .landing-card > :global(*) {
+    animation: hero-fade 0.5s ease-out both;
+  }
   .landing-wordmark {
-    margin: 0 0 1.35rem;
+    margin: 0 0 1.6rem;
+    animation-delay: 0.14s;
   }
   .landing-wordmark img {
     display: block;
     margin: 0 auto;
-    height: clamp(4.25rem, 10vw, 6.25rem);
+    height: clamp(1.95rem, 4.2vw, 2.7rem);
     width: auto;
   }
   .landing-tagline {
-    margin: 0 0 1.5rem;
+    margin: 0 0 1.6rem;
     text-align: center;
-    font-size: clamp(1.35rem, 2.8vw, 1.85rem);
-    font-weight: 600;
-    letter-spacing: -0.03em;
+    font-size: clamp(1.85rem, 4.2vw, 2.65rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
     color: var(--text);
+    text-wrap: balance;
+    animation-delay: 0.22s;
   }
   .landing-stanza {
     margin: 0 auto 2rem;
-    max-width: 28rem;
-    color: rgba(23, 23, 23, 0.72);
-    font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", serif;
-    font-size: 0.98rem;
+    max-width: 32rem;
+    font-size: 0.95rem;
     font-weight: 400;
-    letter-spacing: 0.03em;
-    line-height: 1.9;
+    line-height: 1.65;
     text-align: center;
+    color: var(--text-muted);
+    animation-delay: 0.3s;
   }
-  .landing-stanza p {
-    margin: 0.15rem 0;
-  }
+  .landing-stanza p { margin: 0.15rem 0; }
   .landing-ctas {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
     gap: 0.15rem 0.35rem;
+    animation-delay: 0.38s;
   }
   .cta {
     display: inline-flex;
@@ -407,9 +486,9 @@ function stanzaLine(s) {
     cursor: pointer;
   }
   .cta.primary {
-    padding: 0.85rem 1.6rem;
+    padding: 0.6rem 1.1rem;
     margin-left: 0.45rem;
-    border-radius: 0.65rem;
+    border-radius: 0.5rem;
     background: var(--primary);
     border: 1px solid var(--primary);
     color: #fff;
@@ -419,15 +498,14 @@ function stanzaLine(s) {
     border-color: var(--primary-hover);
   }
   .cta.ghost {
-    padding: 0.85rem 0.95rem;
+    padding: 0.6rem 0.95rem;
     border: none;
     background: none;
-    color: var(--text);
-    font-weight: 500;
-    opacity: 0.72;
+    color: var(--text-muted);
+    font-weight: 600;
   }
   .cta.ghost:hover {
-    opacity: 1;
+    color: var(--text);
     text-decoration: underline;
     text-underline-offset: 0.22em;
   }
@@ -436,27 +514,36 @@ function stanzaLine(s) {
     z-index: 2;
     right: 1.5rem;
     bottom: 1.15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     margin: 0;
     font-size: 0.7rem;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.72);
-    letter-spacing: 0.02em;
-    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
+    color: var(--text-faint);
+    letter-spacing: 0.01em;
     white-space: nowrap;
+  }
+  .landing-credit .swiss {
+    flex: none;
+    width: 0.82rem;
+    height: 0.82rem;
+    border-radius: 0.15rem;
+    box-shadow: 0 1px 6px #00000059;
   }
   .scroll-flag {
     position: absolute;
     z-index: 2;
     left: 50%;
     bottom: 1.35rem;
-    transform: translateX(-50%);
+    transform: translate(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.45rem;
     border: none;
     background: none;
-    color: rgba(255, 255, 255, 0.78);
+    color: var(--text-muted);
     cursor: pointer;
     animation: scroll-fade 3.2s ease-in-out infinite;
   }
@@ -471,25 +558,61 @@ function stanzaLine(s) {
     letter-spacing: 0.22em;
     text-transform: uppercase;
   }
-  .scroll-flag:hover { color: #fff; }
+  .scroll-flag:hover { color: var(--text); }
+  .trust {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .trust-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.25rem 3.25rem;
+  }
+  .trust-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+  }
+  .trust-num {
+    font-size: 1.45rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .trust-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  @keyframes hero-fade {
+    0% { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
   @keyframes kenburns {
-    from { transform: scale(1.08); }
+    0% { transform: scale(1.08); }
     to { transform: scale(1.16) translate(-1.2%, -0.8%); }
   }
   @keyframes hero-rise {
-    from { opacity: 0; transform: translateY(14px); }
+    0% { opacity: 0; transform: translateY(14px); }
     to { opacity: 1; transform: none; }
   }
   @keyframes scroll-fade {
-    0%, 100% { opacity: 0.28; }
+    0%, to { opacity: 0.28; }
     50% { opacity: 0.9; }
   }
   @media (prefers-reduced-motion: reduce) {
     .landing-bg img,
     .landing-card,
-    .scroll-flag {
-      animation: none;
-    }
+    .landing-card > :global(*),
+    .scroll-flag { animation: none; }
     .landing-bg img { transform: scale(1.06); }
   }
   .catalog {
@@ -509,11 +632,13 @@ function stanzaLine(s) {
   @media (max-width: 600px) {
     .landing-card { padding: 1.85rem 1.25rem 1.6rem; width: min(64rem, 100%); }
     .cta.primary { margin-left: 0; flex: 1 1 100%; }
+    .trust-inner { padding: 1.25rem 1rem; gap: 1rem 2.25rem; }
+    .trust-num { font-size: 1.25rem; }
     .landing-credit {
       left: 50%;
       right: auto;
       bottom: 3.6rem;
-      transform: translateX(-50%);
+      transform: translate(-50%);
       white-space: normal;
       text-align: center;
       max-width: calc(100% - 2rem);
