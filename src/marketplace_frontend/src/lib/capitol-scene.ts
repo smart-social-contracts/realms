@@ -740,7 +740,7 @@ export function createCapitolScene(canvas: HTMLCanvasElement): { destroy: () => 
     for (let b = 0; b < buckets.length; b++) {
       const list = buckets[b];
       if (!list.length) continue;
-      ctx.fillStyle = `rgba(17, 17, 17, ${(0.28 + b / 8 * 0.62)})`;
+      ctx.fillStyle = `rgba(148, 148, 148, ${(0.28 + b / 8 * 0.62)})`;
       ctx.beginPath();
       for (const d of list) {
         ctx.moveTo(d.x + d.r, d.y);
@@ -754,7 +754,7 @@ export function createCapitolScene(canvas: HTMLCanvasElement): { destroy: () => 
     for (const d of glyphs) {
       const tick = Math.floor(t * 0.48 + d.phase * 13);
       ctx.font = `${Math.max(7, Math.min(13, d.r * 2.6))}px "SF Mono", ui-monospace, monospace`;
-      ctx.fillStyle = `rgba(23, 23, 23, ${d.alpha * 1.05})`;
+      ctx.fillStyle = `rgba(148, 148, 148, ${d.alpha * 1.05})`;
       ctx.fillText(tick % 2 === 0 ? '0' : '1', d.x, d.y);
     }
   }
