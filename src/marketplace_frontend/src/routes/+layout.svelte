@@ -12,6 +12,7 @@ import { resolveCasalsUrl } from "$lib/config";
 
 $: casalsUrl = browser ? resolveCasalsUrl() : "";
 $: isHome = $page.url.pathname === "/";
+$: isFlush = isHome || $page.url.pathname === "/about";
 let booted = false;
 let isController = false;
 let searchTerm = "";
@@ -62,30 +63,66 @@ $: routeIsActive = (path) => {
 </script>
 
 <svelte:window on:click={() => (showLanguageMenu = false)} on:scroll={onWindowScroll} />
+<svelte:head>
+  <title>Realms GOS - The Governance Operating System</title>
+</svelte:head>
 
 {#if browser && i18nReady}
 {#if isHome}
   <div class="hero-chrome" class:hidden={heroScrolled}>
+    <a class="hero-chrome-btn hero-chrome-about" href="/about">
+      <span class="hero-chrome-label">{$_('landing.what_is_this')}</span>
+    </a>
     {#if $isAuthenticated && $principalStore}
       <a class="hero-chrome-btn" href="/my-purchases" aria-label={$_('nav.my_purchases')} title={$principalStore.toText()}>
-        <i class="ti ti-user" aria-hidden="true"></i>
         <span class="hero-chrome-label">{shortPrincipal($principalStore.toText())}</span>
       </a>
     {:else}
-      <button class="hero-chrome-btn" on:click={handleLogin} aria-label={$_('nav.sign_in')} title={$_('nav.sign_in')}>
-        <i class="ti ti-login" aria-hidden="true"></i>
-        <span class="hero-chrome-label">{$_('nav.sign_in')}</span>
+      <button class="hero-chrome-btn hero-chrome-icon" on:click={handleLogin} aria-label={$_('nav.sign_in')} title={$_('nav.sign_in')}>
+        <svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+          <path d="M10 17l5-5-5-5" />
+          <path d="M15 12H3" />
+        </svg>
       </button>
     {/if}
+    <div class="lang" on:click|stopPropagation>
+      <button
+        class="hero-chrome-btn hero-chrome-icon"
+        on:click={() => (showLanguageMenu = !showLanguageMenu)}
+        aria-label={$_('lang.select')}
+        title={$_('lang.select')}
+        aria-expanded={showLanguageMenu}
+      >
+        <svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18" />
+          <path d="M12 3c2.6 3 3.9 6 3.9 9s-1.3 6-3.9 9c-2.6-3-3.9-6-3.9-9s1.3-6 3.9-9z" />
+        </svg>
+      </button>
+      {#if showLanguageMenu}
+        <ul class="lang-menu" role="menu">
+          {#each supportedLocales as loc}
+            <li>
+              <button
+                role="menuitemradio"
+                aria-checked={$locale === loc.id}
+                class:active={$locale === loc.id}
+                on:click={() => { setLocale(loc.id); showLanguageMenu = false; }}
+              >{loc.name}</button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
   </div>
 {/if}
 <header class="topbar" class:overlay={isHome} class:revealed={!isHome || heroScrolled}>
   <div class="bar">
     <div class="brand-group">
       <a href="/" class="brand" aria-label="Realms Marketplace home">
-        <img src="/images/logo_horizontal.svg" alt="Realms Marketplace" />
+        <img src="/images/logo_sphere_only.svg" alt="" />
       </a>
-      <a href="/about" class="chrome-link" class:active={routeIsActive('/about')}>{$_('nav.about')}</a>
     </div>
 
     <form class="search" on:submit|preventDefault={submitSearch} role="search">
@@ -96,7 +133,10 @@ $: routeIsActive = (path) => {
         aria-label={$_('nav.search')}
       />
       <button type="submit" class="icon-btn" aria-label={$_('nav.search')} title={$_('nav.search')}>
-        <i class="ti ti-search" aria-hidden="true"></i>
+        <svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
       </button>
     </form>
 
@@ -115,7 +155,11 @@ $: routeIsActive = (path) => {
           title={$_('lang.select')}
           aria-expanded={showLanguageMenu}
         >
-          <i class="ti ti-world" aria-hidden="true"></i>
+          <svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18" />
+            <path d="M12 3c2.6 3 3.9 6 3.9 9s-1.3 6-3.9 9c-2.6-3-3.9-6-3.9-9s1.3-6 3.9-9z" />
+          </svg>
         </button>
         {#if showLanguageMenu}
           <ul class="lang-menu" role="menu">
@@ -147,14 +191,18 @@ $: routeIsActive = (path) => {
         </button>
       {:else}
         <button class="icon-btn" on:click={handleLogin} aria-label={$_('nav.sign_in')} title={$_('nav.sign_in')}>
-          <i class="ti ti-login" aria-hidden="true"></i>
+          <svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <path d="M10 17l5-5-5-5" />
+            <path d="M15 12H3" />
+          </svg>
         </button>
       {/if}
     </nav>
   </div>
 </header>
 
-<main class="main" class:flush={$page.url.pathname === '/'}>
+<main class="main" class:flush={isFlush}>
   <slot />
 </main>
 
@@ -209,16 +257,16 @@ $: routeIsActive = (path) => {
     left: 0;
     right: 0;
     top: 0;
+    overflow: hidden;
     transition: transform 0.25s ease, opacity 0.2s ease, visibility 0.2s;
   }
   .topbar.overlay:not(.revealed) {
-    transform: translateY(-100%);
+    transform: translateY(-110%);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
   }
-  .topbar.overlay.revealed,
-  .topbar.overlay:focus-within {
+  .topbar.overlay.revealed {
     transform: none;
     opacity: 1;
     visibility: visible;
@@ -226,14 +274,44 @@ $: routeIsActive = (path) => {
   }
   .hero-chrome {
     position: fixed;
-    z-index: 31;
-    top: 1.15rem;
-    right: 1.5rem;
-    display: flex;
-    gap: 0.4rem;
+    z-index: 40;
+    box-sizing: border-box;
+    top: max(0.5rem, env(safe-area-inset-top, 0px));
+    left: 0;
+    width: 100%;
+    max-width: 100vw;
+    max-width: 100svw;
+    padding: 0 0.65rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 0.4rem;
+    pointer-events: none;
     transition: opacity 0.2s ease, visibility 0.2s;
+    animation: hero-chrome-appear 0.5s ease-out 2s both;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+  .hero-chrome > * { pointer-events: auto; min-width: 0; }
+  .hero-chrome-about { justify-self: start; }
+  .hero-chrome .lang { justify-self: end; }
+  .hero-chrome-btn.hero-chrome-icon {
+    width: 2.25rem;
+    padding: 0;
+    flex: none;
+  }
+  .nav-svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .hero-chrome.hidden {
+    animation: none;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -244,16 +322,15 @@ $: routeIsActive = (path) => {
     justify-content: center;
     gap: 0.4rem;
     height: 2.4rem;
-    padding: 0 0.9rem 0 0.7rem;
-    border: 1px solid var(--border);
+    padding: 0 0.95rem;
+    border: 1px solid var(--border-strong);
     border-radius: 999px;
-    background: #ffffffdb;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: #ffffff;
     color: var(--text);
     font-size: 0.875rem;
     font-weight: 600;
     text-decoration: none;
+    white-space: nowrap;
     cursor: pointer;
     box-shadow: 0 1px 2px #0000000a;
     transition: background 0.15s ease, border-color 0.15s ease;
@@ -282,22 +359,10 @@ $: routeIsActive = (path) => {
     text-decoration: none;
   }
   .brand img {
-    height: 30px;
+    height: 36px;
     width: auto;
     display: block;
   }
-  .chrome-link {
-    flex-shrink: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-decoration: none;
-    padding: 0.35rem 0.55rem;
-    border-radius: 0.45rem;
-    transition: color 0.15s ease, background 0.15s ease;
-  }
-  .chrome-link:hover { color: var(--text); background: var(--surface-2); }
-  .chrome-link.active { color: var(--text); }
   .search {
     flex: 1;
     display: flex;
@@ -344,6 +409,21 @@ $: routeIsActive = (path) => {
   .icon-btn:hover { background: var(--surface-2); color: var(--text); }
   .icon-btn.active { background: var(--surface-3); color: var(--text); }
   .search .icon-btn { border-color: var(--border); }
+  .text-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 0.75rem;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .text-btn:hover { background: var(--surface-2); }
   .divider {
     width: 1px;
     height: 24px;
@@ -414,6 +494,13 @@ $: routeIsActive = (path) => {
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes hero-chrome-appear {
+    0% { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-chrome { animation: hero-chrome-appear 0.01s linear 2s both; }
+  }
   .main {
     max-width: 1200px;
     margin: 0 auto;
@@ -424,20 +511,14 @@ $: routeIsActive = (path) => {
     padding: 0 0 4rem;
   }
 
-  /* Footer mirrors the realm_frontend footer: a centered card with a
-     GitHub link, a muted text line, and the "Built on the Internet
-     Computer" badge. */
+  /* Footer: centered links and build line, no card chrome. */
   .footer {
-    padding: 0 1.5rem 1.5rem;
+    padding: 0 1.5rem 2rem;
   }
   .footer-card {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 1.5rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    padding: 1.25rem 0 0.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -484,15 +565,23 @@ $: routeIsActive = (path) => {
   .footer-card .icp img { width: 24px; height: 24px; display: block; }
 
   @media (max-width: 760px) {
-    .bar {
-      flex-wrap: wrap;
-      height: auto;
-      padding-top: 0.7rem;
-      padding-bottom: 0.7rem;
-      gap: 0.6rem;
+    .hero-chrome {
+      top: max(0.45rem, env(safe-area-inset-top, 0px));
+      padding: 0 0.55rem;
+      column-gap: 0.3rem;
     }
-    .brand-group { order: 1; }
-    .actions { order: 2; margin-left: auto; }
-    .search { order: 3; flex-basis: 100%; max-width: none; margin: 0; }
+    .hero-chrome-btn { height: 2rem; padding: 0 0.65rem; font-size: 0.75rem; }
+    .hero-chrome-btn.hero-chrome-icon { width: 2rem; padding: 0; }
+    .bar {
+      flex-wrap: nowrap;
+      height: 52px;
+      padding: 0 0.65rem;
+      gap: 0.35rem;
+    }
+    .brand img { height: 28px; }
+    .search { max-width: none; margin: 0; min-width: 0; gap: 0.25rem; }
+    .search input { padding: 0.4rem 0.55rem; font-size: 0.8rem; }
+    .icon-btn { width: 34px; height: 34px; }
+    .divider, .who-id { display: none; }
   }
 </style>

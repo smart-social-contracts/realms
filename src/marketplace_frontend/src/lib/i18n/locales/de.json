@@ -53,13 +53,8 @@
     "cta_browse": "Marktplatz durchsuchen",
     "credit": "Gebaut auf dem Internet Computer mit ❤️ aus",
     "credit_country": "der Schweiz",
-    "scroll_hint": "Entdecken",
-    "stat_onchain": "on-chain",
-    "stat_servers": "Server",
-    "stat_extensions": "Erweiterungen",
-    "stat_codices": "Codices",
-    "stat_assistants": "Assistenten",
-    "trust_label": "Marktplatz auf einen Blick"
+    "scroll_hint": "Nach unten",
+    "what_is_this": "Was ist das?"
   },
   "discover": {
     "title": "Verbessere das Erlebnis der Mitglieder deines Realms.",
@@ -331,8 +326,8 @@
   "about": {
     "hero": {
       "title": "Das Governance-Betriebssystem",
-      "subtitle1": "• Starten Sie eine vollständige öffentliche Verwaltung in Sekunden",
-      "subtitle2": "• Vollständig prüfbar. Vollständig transparent. KI-gestützt",
+      "subtitle1": "• Starten Sie eine vollständige öffentliche Verwaltung in Minuten",
+      "subtitle2": "• Prüfbar. Manipulationssicher. KI-gestützt",
       "subtitle3": "• Entwickelt, um Korruption und Ineffizienzen zu beseitigen",
       "tryDemo": "Demo Ausprobieren",
       "requestInvite": "Einladungscode Anfordern",

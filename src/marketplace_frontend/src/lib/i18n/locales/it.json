@@ -53,13 +53,8 @@
     "cta_browse": "Sfoglia il marketplace",
     "credit": "Costruito su Internet Computer con ❤️ dalla",
     "credit_country": "Svizzera",
-    "scroll_hint": "Scopri",
-    "stat_onchain": "on-chain",
-    "stat_servers": "server",
-    "stat_extensions": "estensioni",
-    "stat_codices": "codici",
-    "stat_assistants": "assistenti",
-    "trust_label": "Il marketplace in sintesi"
+    "scroll_hint": "Scorri",
+    "what_is_this": "Che cos'è?"
   },
   "discover": {
     "title": "Migliora l'esperienza dei membri del tuo realm.",
@@ -331,8 +326,8 @@
   "about": {
     "hero": {
       "title": "Il Sistema Operativo di Governance",
-      "subtitle1": "• Lancia un'amministrazione pubblica completa in pochi secondi",
-      "subtitle2": "• Completamente verificabile. Completamente trasparente. Alimentato dall'IA",
+      "subtitle1": "• Lancia un'amministrazione pubblica completa in pochi minuti",
+      "subtitle2": "• Verificabile. Inviolabile. Alimentato dall'IA",
       "subtitle3": "• Progettato per eliminare corruzione e inefficienze",
       "tryDemo": "Prova la Demo",
       "requestInvite": "Richiedi Codice di Invito",

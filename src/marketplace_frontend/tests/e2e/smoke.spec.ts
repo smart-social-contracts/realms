@@ -24,19 +24,28 @@ test.describe('marketplace_frontend smoke', () => {
   test('home door has no env/version chips and keeps the catalog', async ({ page }) => {
     await page.goto('/');
 
+    await expect(page).toHaveTitle('Realms GOS - The Governance Operating System');
     await expect(page.getByRole('heading', { name: 'The Governance Operating System' })).toBeVisible();
     await expect(page.locator('.landing-wordmark img[src="/images/logo_horizontal.svg"]')).toBeVisible();
-    await expect(page.locator('.landing-bg img[src="/images/hero-mosaic.jpg"]')).toBeVisible();
+    await expect(page.locator('.landing-bg canvas')).toBeVisible();
+    await expect(page.locator('.brand img[src="/images/logo_sphere_only.svg"]')).toHaveCount(1);
+    await expect(page.locator('.scroll-cue')).toBeVisible();
+    await expect(page.locator('.scroll-flag, .scroll-pennant')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Realms GOS' })).toHaveCount(0);
     await expect(page.getByText(/Decentralized governance realms/i)).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'What is it?' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Browse marketplace' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Launch your realm' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'What is it?' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'What is this?' })).toHaveAttribute('href', '/about');
+    await expect(page.getByRole('button', { name: 'Sign in' }).first()).toBeVisible();
+    await expect(page.getByText(/Built on the Internet Computer with/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Browse marketplace' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Launch your realm' })).toHaveCount(0);
     await expect(page.getByText(/test environment/i)).toHaveCount(0);
     await expect(page.getByText(/realms gos main/i)).toHaveCount(0);
     await expect(page.locator('.landing-badges, .badge-env, .badge-version')).toHaveCount(0);
 
-    await expect(page.getByRole('link', { name: /^About$/ })).toHaveCount(1);
+    await expect(page.getByRole('link', { name: /^About$/ })).toHaveCount(0);
+    await expect(page.locator('section.trust')).toHaveCount(0);
+    await expect(page.getByText(/100%\s*on-chain/i)).toHaveCount(0);
     await expect(page.getByRole('heading', { name: /Enhance the experience/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Extensions/i })).toBeVisible();
   });
@@ -51,6 +60,9 @@ test.describe('marketplace_frontend smoke', () => {
     await expect(page.getByRole('heading', { name: 'For People' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'For Institutions' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Get Started' })).toBeVisible();
+    await expect(page.locator('.about-hero .cta')).toHaveText(/Try Demo/i);
+    await expect(page.locator('.about-hero .cta.secondary, .about-hero .mark')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Request Invitation Code' })).toBeVisible();
     await expect(page.getByText(/test environment/i)).toHaveCount(0);
     await expect(page.getByText(/realms gos main/i)).toHaveCount(0);
     await expect(page.locator('iframe')).toHaveCount(0);
@@ -62,7 +74,7 @@ test.describe('marketplace_frontend smoke', () => {
     const catalog = page.locator('#catalog');
     await catalog.scrollIntoViewIfNeeded();
     await expect(page.getByRole('link', { name: /Realms Marketplace/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /^About$/ }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /^About$/ })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: /Enhance the experience/i })).toBeVisible();
 
     await expect(page.getByRole('tab', { name: /Extensions/i })).toBeVisible();
@@ -77,6 +89,10 @@ test.describe('marketplace_frontend smoke', () => {
     await page.getByRole('tab', { name: /Codices/i }).click();
 
     await expect(page.getByText(/built on the/i)).toBeVisible();
+    const footerCard = page.locator('.footer-card');
+    await expect(footerCard).toBeVisible();
+    await expect(footerCard).toHaveCSS('border-top-width', '0px');
+    await expect(footerCard).toHaveCSS('border-left-width', '0px');
   });
 
   test('extensions page renders search input, sort dropdown, and verified-only filter', async ({ page }) => {

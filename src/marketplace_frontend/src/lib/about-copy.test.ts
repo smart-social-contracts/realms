@@ -24,6 +24,7 @@ describe("marketplace about copy", () => {
       assert.ok(loc.landing.cta_browse);
       assert.ok(loc.landing.credit);
       assert.ok(loc.landing.scroll_hint);
+      assert.ok(loc.landing.what_is_this);
       assert.equal(loc.landing.badge_env, undefined);
       assert.equal(loc.landing.badge_version, undefined);
       assert.ok(loc.nav.about);

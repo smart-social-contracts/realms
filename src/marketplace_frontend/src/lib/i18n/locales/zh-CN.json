@@ -53,13 +53,8 @@
     "cta_browse": "浏览市场",
     "credit": "构建于 Internet Computer，❤️ 来自",
     "credit_country": "瑞士",
-    "scroll_hint": "探索",
-    "stat_onchain": "链上",
-    "stat_servers": "服务器",
-    "stat_extensions": "扩展",
-    "stat_codices": "法典",
-    "stat_assistants": "助手",
-    "trust_label": "市场一览"
+    "scroll_hint": "向下滚动",
+    "what_is_this": "这是什么？"
   },
   "discover": {
     "title": "提升您的 realm 成员的体验。",
@@ -331,8 +326,8 @@
   "about": {
     "hero": {
       "title": "治理操作系统",
-      "subtitle1": "• 几秒钟内启动完整的公共管理系统",
-      "subtitle2": "• 完全可审计。完全透明。AI驱动",
+      "subtitle1": "• 几分钟内启动完整的公共管理系统",
+      "subtitle2": "• 可审计。防篡改。AI驱动",
       "subtitle3": "• 旨在消除腐败和低效",
       "tryDemo": "试用演示",
       "requestInvite": "申请邀请码",

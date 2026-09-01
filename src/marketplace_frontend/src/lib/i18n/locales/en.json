@@ -53,13 +53,8 @@
     "cta_browse": "Browse marketplace",
     "credit": "Built on the Internet Computer with ❤️ from",
     "credit_country": "Switzerland",
-    "scroll_hint": "Discover",
-    "stat_onchain": "on-chain",
-    "stat_servers": "servers",
-    "stat_extensions": "extensions",
-    "stat_codices": "codices",
-    "stat_assistants": "assistants",
-    "trust_label": "Marketplace at a glance"
+    "scroll_hint": "Scroll down",
+    "what_is_this": "What is this?"
   },
   "discover": {
     "title": "Enhance the experience of your realm's members.",
@@ -331,8 +326,8 @@
   "about": {
     "hero": {
       "title": "The Governance Operating System",
-      "subtitle1": "• Launch a full public administration in seconds",
-      "subtitle2": "• Fully auditable. Fully transparent. AI-powered",
+      "subtitle1": "• Launch a full public administration in minutes",
+      "subtitle2": "• Auditable. Tamper-proof. AI-powered",
       "subtitle3": "• Engineered to eliminate corruption and inefficiencies",
       "tryDemo": "Try Demo",
       "requestInvite": "Request Invitation Code",

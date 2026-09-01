@@ -1,5 +1,6 @@
 <script lang="ts">
 import { _, json } from "svelte-i18n";
+import CapitolBackdrop from "$lib/components/CapitolBackdrop.svelte";
 
 const DEMO_URL = "https://demo.gos.earth";
 const INVITE_URL = "https://tally.so/r/GxQ8QL";
@@ -7,13 +8,13 @@ const CONTACT_MAIL = "mailto:contact@realmsgos.org";
 const DOCS_URL = "https://github.com/smart-social-contracts/realms/tree/main/docs";
 
 const FEATURES = [
-  { icon: "ti-world", title: "about.features.internetComputer.title", desc: "about.features.internetComputer.description" },
-  { icon: "ti-shield", title: "about.features.secure.title", desc: "about.features.secure.description" },
-  { icon: "ti-code", title: "about.features.developerFriendly.title", desc: "about.features.developerFriendly.description" },
-  { icon: "ti-users", title: "about.features.multiRealm.title", desc: "about.features.multiRealm.description" },
-  { icon: "ti-layers-intersect", title: "about.features.extensionSystem.title", desc: "about.features.extensionSystem.description" },
-  { icon: "ti-bolt", title: "about.features.instantSetup.title", desc: "about.features.instantSetup.description" },
-  { icon: "ti-robot", title: "about.features.aiGovernors.title", desc: "about.features.aiGovernors.description" },
+  { title: "about.features.internetComputer.title", desc: "about.features.internetComputer.description" },
+  { title: "about.features.secure.title", desc: "about.features.secure.description" },
+  { title: "about.features.developerFriendly.title", desc: "about.features.developerFriendly.description" },
+  { title: "about.features.multiRealm.title", desc: "about.features.multiRealm.description" },
+  { title: "about.features.extensionSystem.title", desc: "about.features.extensionSystem.description" },
+  { title: "about.features.instantSetup.title", desc: "about.features.instantSetup.description" },
+  { title: "about.features.aiGovernors.title", desc: "about.features.aiGovernors.description" },
 ];
 
 const PRINCIPLES = [
@@ -33,248 +34,291 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
 
 <article class="about">
   <header class="about-hero">
-    <img class="mark" src="/images/logo_sphere_only.svg" alt="" width="72" height="80" />
-    <p class="product">{$_('about.product_name')}</p>
-    <h1>{$_('about.hero.title')}</h1>
-    <ul class="bullets">
-      <li>{$_('about.hero.subtitle1')}</li>
-      <li>{$_('about.hero.subtitle2')}</li>
-      <li>{$_('about.hero.subtitle3')}</li>
-    </ul>
-    <div class="ctas">
-      <a class="cta primary" href={DEMO_URL} target="_blank" rel="noreferrer">{$_('about.hero.tryDemo')}</a>
-      <a class="cta secondary" href={INVITE_URL} target="_blank" rel="noreferrer">{$_('about.hero.requestInvite')}</a>
+    <div class="about-hero-bg" aria-hidden="true">
+      <CapitolBackdrop />
+      <div class="about-hero-wash"></div>
     </div>
-    <p class="alpha">{$_('about.hero.alphaBadge')}</p>
+    <div class="about-hero-inner">
+      <h1>{$_('about.hero.title')}</h1>
+      <p class="alpha">{$_('about.hero.alphaBadge')}</p>
+      <h2 id="mission-title">{$_('about.mission.title')}</h2>
+      <p class="prose">{@html $_('about.mission.description')}</p>
+      <p class="more">
+        <a href={$_('about.mission.learnMoreUrl')} target="_blank" rel="noreferrer">{$_('about.mission.learnMore')}</a>
+      </p>
+      <a class="cta" href={DEMO_URL} target="_blank" rel="noreferrer">{$_('about.hero.tryDemo')}</a>
+    </div>
   </header>
 
-  <section class="block" aria-labelledby="mission-title">
-    <h2 id="mission-title">{$_('about.mission.title')}</h2>
-    <p class="prose">{@html $_('about.mission.description')}</p>
-  </section>
-
-  <section class="block" aria-labelledby="principles-title">
-    <h2 id="principles-title">{$_('about.principles.title')}</h2>
-    <p class="lede">{$_('about.principles.intro')}</p>
-    <div class="grid-2">
-      {#each PRINCIPLES as p}
-        <div class="card">
-          <div class="num">{p.n}</div>
-          <h3>{$_(p.title)}</h3>
-          <p>{$_(p.desc)}</p>
-        </div>
-      {/each}
-    </div>
-  </section>
-
-  <section class="block" id="features" aria-labelledby="features-title">
-    <h2 id="features-title">{$_('about.features.title')}</h2>
-    <p class="lede">{$_('about.features.subtitle')}</p>
-    <div class="feature-list">
-      {#each FEATURES as f}
-        <div class="feature">
-          <div class="icon" aria-hidden="true"><i class="ti {f.icon}"></i></div>
-          <div>
-            <h3>{$_(f.title)}</h3>
-            <p>{$_(f.desc)}</p>
+  <div class="about-body">
+    <section class="block" aria-labelledby="principles-title">
+      <h2 id="principles-title">{$_('about.principles.title')}</h2>
+      <p class="lede">{$_('about.principles.intro')}</p>
+      <div class="principles">
+        {#each PRINCIPLES as p}
+          <div class="principle">
+            <div class="num">{p.n}</div>
+            <h3>{$_(p.title)}</h3>
+            <p>{$_(p.desc)}</p>
           </div>
-        </div>
-      {/each}
-    </div>
-  </section>
+        {/each}
+      </div>
+    </section>
 
-  <section class="block" id="forpeople" aria-labelledby="people-title">
-    <h2 id="people-title">{$_('about.forPeople.title')}</h2>
-    <p class="lede">{$_('about.forPeople.subtitle')}</p>
-    <div class="grid-3">
-      <div class="card">
-        <div class="icon" aria-hidden="true"><i class="ti ti-fingerprint"></i></div>
+    <section class="block" id="features" aria-labelledby="features-title">
+      <h2 id="features-title">{$_('about.features.title')}</h2>
+      <p class="lede">{$_('about.features.subtitle')}</p>
+      <dl class="defs">
+        {#each FEATURES as f}
+          <div>
+            <dt>{$_(f.title)}</dt>
+            <dd>{$_(f.desc)}</dd>
+          </div>
+        {/each}
+      </dl>
+    </section>
+
+    <section class="audience" aria-label="Who Realms is for">
+      <div class="audience-col" id="forpeople" role="region" aria-labelledby="people-title">
+        <h2 id="people-title">{$_('about.forPeople.title')}</h2>
+        <p class="lede">{$_('about.forPeople.subtitle')}</p>
         <h3>{$_('about.forPeople.identity.title')}</h3>
         <p>{$_('about.forPeople.identity.description')}</p>
-        <ul class="checks">
+        <ul class="plain">
           {#each identityFeatures as item}
-            <li><i class="ti ti-circle-check" aria-hidden="true"></i><span>{item}</span></li>
+            <li>{item}</li>
           {/each}
         </ul>
-      </div>
-      <div class="card">
-        <div class="icon" aria-hidden="true"><i class="ti ti-checkbox"></i></div>
         <h3>{$_('about.forPeople.participate.title')}</h3>
         <p>{$_('about.forPeople.participate.description')}</p>
-      </div>
-      <div class="card">
-        <div class="icon" aria-hidden="true"><i class="ti ti-user-plus"></i></div>
         <h3>{$_('about.forPeople.create.title')}</h3>
         <p>{$_('about.forPeople.create.description')}</p>
       </div>
-    </div>
-  </section>
+      <div class="audience-col" id="forinstitutions" role="region" aria-labelledby="institutions-title">
+        <h2 id="institutions-title">{$_('about.forInstitutions.title')}</h2>
+        <p class="lede">{$_('about.forInstitutions.subtitle')}</p>
+        <h3>{$_('about.forInstitutions.governments.title')}</h3>
+        <p>{$_('about.forInstitutions.governments.description')}</p>
+        <p class="kicker">{$_('about.forInstitutions.benefits_heading')}</p>
+        <ul class="plain">
+          {#each govBenefits as item}
+            <li>{item}</li>
+          {/each}
+        </ul>
+        <h3>{$_('about.forInstitutions.organizations.title')}</h3>
+        <p>{$_('about.forInstitutions.organizations.description')}</p>
+        <h3>{$_('about.forInstitutions.migration.title')}</h3>
+        <p>{$_('about.forInstitutions.migration.description')}</p>
+      </div>
+    </section>
 
-  <section class="block" id="forinstitutions" aria-labelledby="institutions-title">
-    <h2 id="institutions-title">{$_('about.forInstitutions.title')}</h2>
-    <p class="lede">{$_('about.forInstitutions.subtitle')}</p>
-    <div class="card wide">
-      <div class="icon" aria-hidden="true"><i class="ti ti-building-bank"></i></div>
-      <h3>{$_('about.forInstitutions.governments.title')}</h3>
-      <p>{$_('about.forInstitutions.governments.description')}</p>
-      <h4>{$_('about.forInstitutions.benefits_heading')}</h4>
-      <ul class="checks">
-        {#each govBenefits as item}
-          <li><i class="ti ti-circle-check" aria-hidden="true"></i><span>{item}</span></li>
-        {/each}
-      </ul>
-    </div>
-    <div class="ctas">
-      <a class="cta primary" href={CONTACT_MAIL}>{$_('about.forInstitutions.cta')}</a>
-    </div>
-  </section>
-
-  <section class="block" id="getstarted" aria-labelledby="started-title">
-    <h2 id="started-title">{$_('about.getStarted.title')}</h2>
-    <p class="lede">{$_('about.getStarted.subtitle')}</p>
-    <div class="grid-3">
-      <div class="card">
-        <div class="icon" aria-hidden="true"><i class="ti ti-bolt"></i></div>
-        <h3>{$_('about.getStarted.demo.title')}</h3>
-        <p>{$_('about.getStarted.demo.description')}</p>
-        <a class="cta primary" href={DEMO_URL} target="_blank" rel="noreferrer">{$_('about.getStarted.demo.button')}</a>
+    <section class="block start" id="getstarted" aria-labelledby="started-title">
+      <h2 id="started-title">{$_('about.getStarted.title')}</h2>
+      <p class="lede">{$_('about.getStarted.subtitle')}</p>
+      <div class="start-row">
+        <a href={DEMO_URL} target="_blank" rel="noreferrer">
+          <strong>{$_('about.getStarted.demo.title')}</strong>
+          <span>{$_('about.getStarted.demo.description')}</span>
+        </a>
+        <a href={CONTACT_MAIL}>
+          <strong>{$_('about.getStarted.contact.title')}</strong>
+          <span>{$_('about.getStarted.contact.description')}</span>
+        </a>
+        <a href={DOCS_URL} target="_blank" rel="noreferrer">
+          <strong>{$_('about.getStarted.developers.title')}</strong>
+          <span>{$_('about.getStarted.developers.description')}</span>
+        </a>
       </div>
-      <div class="card">
-        <div class="icon" aria-hidden="true"><i class="ti ti-mail"></i></div>
-        <h3>{$_('about.getStarted.contact.title')}</h3>
-        <p>{$_('about.getStarted.contact.description')}</p>
-        <a class="cta secondary" href={CONTACT_MAIL}>{$_('about.getStarted.contact.button')}</a>
-      </div>
-      <div class="card">
-        <div class="icon" aria-hidden="true"><i class="ti ti-code"></i></div>
-        <h3>{$_('about.getStarted.developers.title')}</h3>
-        <p>{$_('about.getStarted.developers.description')}</p>
-        <a class="cta secondary" href={DOCS_URL} target="_blank" rel="noreferrer">{$_('about.getStarted.developers.button')}</a>
-      </div>
-    </div>
-  </section>
+      <p class="invite">
+        <a href={INVITE_URL} target="_blank" rel="noreferrer">{$_('about.hero.requestInvite')}</a>
+      </p>
+    </section>
+  </div>
 </article>
 
 <style>
-  .about { display: flex; flex-direction: column; gap: 2.5rem; }
-  .about-hero, .block {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-    padding: 2rem 2.25rem;
+  .about { background: #ffffff; }
+  .about-hero {
+    position: relative;
+    overflow: hidden;
+    min-height: 28rem;
+    padding: 5.5rem 1.5rem 3.25rem;
   }
-  .about-hero { text-align: center; }
-  .mark {
-    display: block;
-    margin: 0 auto 0.85rem;
-    height: 72px;
-    width: auto;
+  .about-hero-bg {
+    position: absolute;
+    inset: 0;
+    background: #ffffff;
   }
-  .product {
-    margin: 0 0 0.35rem;
+  .about-hero-wash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(#ffffffee, #fffffff5 52%, #fff);
+  }
+  .about-hero-inner {
+    position: relative;
+    z-index: 1;
+    max-width: 42rem;
+    margin: 0 auto;
+  }
+  .about-hero h1 {
+    margin: 0 0 0.55rem;
+    font-size: clamp(1.85rem, 4.2vw, 2.65rem);
     font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .alpha {
+    margin: 0 0 1.75rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .about-hero h2,
+  .block h2,
+  .audience-col h2 {
+    margin: 0 0 0.65rem;
+    font-size: 1.35rem;
     letter-spacing: -0.02em;
   }
-  .about-hero h1, .block h2 {
-    margin: 0 0 0.75rem;
-    letter-spacing: -0.02em;
-  }
-  .about-hero h1 { font-size: clamp(1.5rem, 3vw, 2rem); }
-  .block h2 { font-size: 1.45rem; }
-  .bullets {
-    list-style: none;
-    margin: 0 auto 1.5rem;
-    padding: 0;
-    max-width: 40rem;
-    text-align: left;
+  .prose, .lede, .audience-col p, .principle p, .defs dd {
     color: var(--text-muted);
   }
-  .bullets li { margin: 0.25rem 0; }
-  .lede, .prose {
-    color: var(--text-muted);
-    max-width: 46rem;
-    margin: 0 0 1.5rem;
+  .prose {
+    margin: 0 0 0.85rem;
+    max-width: 42rem;
   }
-  .prose :global(strong) { color: var(--text); }
-  .ctas {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-    justify-content: center;
+  .prose :global(strong) { color: var(--text); font-weight: 650; }
+  .more {
+    margin: 0 0 1.6rem;
+    font-size: 0.9rem;
   }
-  .block .ctas { justify-content: flex-start; margin-top: 1.25rem; }
+  .more a {
+    color: var(--text);
+    text-underline-offset: 0.18em;
+  }
   .cta {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.6rem 1.1rem;
+    padding: 0.6rem 1.15rem;
     border-radius: 0.5rem;
     font-size: 0.9rem;
     font-weight: 600;
     text-decoration: none;
+    background: var(--primary);
+    border: 1px solid var(--primary);
+    color: #fff;
   }
-  .cta.primary { background: var(--primary); border: 1px solid var(--primary); color: #fff; }
-  .cta.primary:hover { background: var(--primary-hover); }
-  .cta.secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
-  .cta.secondary:hover { background: var(--surface-2); border-color: var(--border-strong); }
-  .alpha {
-    display: inline-block;
-    margin: 1rem 0 0;
-    padding: 0.2rem 0.7rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    background: #FEF3C7;
-    color: #92400E;
-    border: 1px solid #FDE68A;
+  .cta:hover { background: var(--primary-hover); }
+
+  .about-body {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 0.5rem 1.5rem 2rem;
   }
-  .grid-2, .grid-3 {
+  .block {
+    padding: 2.75rem 0 0;
+    border-top: 1px solid var(--border);
+  }
+  .lede { margin: 0 0 1.75rem; max-width: 42rem; }
+  .principles {
     display: grid;
-    gap: 1rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem 2.25rem;
   }
-  .grid-2 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-  .grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-  .card {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 0.65rem;
-    padding: 1.25rem 1.35rem;
+  .num {
+    font-size: 1.65rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 0.45rem;
   }
-  .card.wide { max-width: 46rem; }
-  .card h3, .feature h3 { margin: 0 0 0.45rem; font-size: 1.05rem; }
-  .card h4 { margin: 1rem 0 0.5rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); }
-  .card p, .feature p { margin: 0; color: var(--text-muted); }
-  .num { font-weight: 700; color: var(--text-faint); margin-bottom: 0.35rem; }
-  .feature-list { display: flex; flex-direction: column; gap: 1.25rem; }
-  .feature { display: flex; gap: 1rem; align-items: flex-start; }
-  .icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 0.6rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    color: var(--text);
+  .principle h3, .audience-col h3, .defs dt {
+    margin: 0 0 0.35rem;
+    font-size: 1.02rem;
   }
-  .icon .ti { font-size: 1.2rem; }
-  .checks { list-style: none; margin: 0.85rem 0 0; padding: 0; }
-  .checks li {
-    display: flex;
-    gap: 0.45rem;
-    align-items: flex-start;
-    margin: 0.35rem 0;
+  .principle p { margin: 0; }
+
+  .defs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem 2.25rem;
+    margin: 0;
+  }
+  .defs dt { font-weight: 650; }
+  .defs dd { margin: 0; font-size: 0.95rem; }
+
+  .audience {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem 3rem;
+    padding: 2.75rem 0 0;
+    border-top: 1px solid var(--border);
+  }
+  .audience-col h3 { margin-top: 1.35rem; }
+  .audience-col h3:first-of-type { margin-top: 0.15rem; }
+  .audience-col p { margin: 0; }
+  .kicker {
+    margin: 0.9rem 0 0.35rem !important;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .plain {
+    list-style: none;
+    margin: 0.55rem 0 0;
+    padding: 0;
+  }
+  .plain li {
+    position: relative;
+    padding-left: 0.9rem;
+    margin: 0.3rem 0;
     color: var(--text-muted);
     font-size: 0.9rem;
   }
-  .checks .ti { color: var(--success); margin-top: 0.15rem; }
-  .card .cta { margin-top: 1.1rem; }
+  .plain li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 0.35rem;
+    height: 1px;
+    background: var(--text-faint);
+  }
 
-  @media (max-width: 600px) {
-    .about-hero, .block { padding: 1.5rem 1.25rem; }
-    .ctas .cta { flex: 1 1 100%; }
+  .start-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.35rem 1.75rem;
+  }
+  .start-row a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    text-decoration: none;
+    color: inherit;
+  }
+  .start-row a:hover strong { text-decoration: underline; text-underline-offset: 0.16em; }
+  .start-row strong { font-size: 1.02rem; }
+  .start-row span { color: var(--text-muted); font-size: 0.9rem; }
+  .invite {
+    margin: 1.5rem 0 0;
+    font-size: 0.9rem;
+  }
+  .invite a {
+    color: var(--text);
+    text-underline-offset: 0.18em;
+  }
+
+  @media (max-width: 760px) {
+    .about-hero { padding: 4.75rem 1.25rem 2.5rem; min-height: 0; }
+    .principles, .defs, .audience, .start-row { grid-template-columns: 1fr; }
+    .audience { gap: 2.25rem; }
   }
 </style>

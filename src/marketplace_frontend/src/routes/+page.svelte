@@ -6,13 +6,13 @@ import { _ } from "svelte-i18n";
 import ItemCard from "$lib/components/ItemCard.svelte";
 import SkeletonCard from "$lib/components/SkeletonCard.svelte";
 import InfoTip from "$lib/components/InfoTip.svelte";
+import CapitolBackdrop from "$lib/components/CapitolBackdrop.svelte";
 import { categories as parseCategories } from "$lib/format";
 import { listingScreenshotUrls } from "$lib/file-registry-client";
 import {
   marketplaceClient
 } from "$lib/marketplace-client";
 import { isAuthenticated, principalStore } from "$lib/auth";
-import { CONFIG } from "$lib/config";
 import { parseVerifiedOnlyParam, setVerifiedOnlySearchParam } from "$lib/verified-filter";
 const KIND_VALUES = ["ext", "codex", "assistant"];
 const KIND_I18N = {
@@ -63,23 +63,9 @@ let items = [];
 let likedSet = new Set();
 let searchQuery = "";
 let catalogSection;
-/** @type {{ value: number, key: string }[]} */
-let catalogStats = [];
 function scrollToCatalog(k) {
   if (k) kind = k;
   catalogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-async function loadCatalogStats() {
-  try {
-    const status = await marketplaceClient.getStatus();
-    catalogStats = [
-      { value: status.extensions_count, key: "landing.stat_extensions" },
-      { value: status.codices_count, key: "landing.stat_codices" },
-      { value: status.assistants_count, key: "landing.stat_assistants" },
-    ].filter((row) => Number(row.value) > 0);
-  } catch {
-    catalogStats = [];
-  }
 }
 onMount(async () => {
   const params = $page.url.searchParams;
@@ -95,7 +81,6 @@ onMount(async () => {
     kind = await resolveKindForQuery(searchQuery.trim(), verifiedOnly);
   }
   mounted = true;
-  void loadCatalogStats();
 });
 $: void load(kind, metric, verifiedOnly, searchQuery);
 $: if (kind !== "ext" && selectedCategory) selectedCategory = "";
@@ -192,41 +177,9 @@ function extensionThumbnail(ext) {
 }
 </script>
 
-<svelte:head>
-  <link
-    rel="preload"
-    as="image"
-    type="image/avif"
-    href="/images/hero-mosaic-1920.avif"
-    imagesrcset="/images/hero-mosaic-1280.avif 1280w, /images/hero-mosaic-1920.avif 1920w"
-    imagesizes="100vw"
-  />
-</svelte:head>
-
 <section class="landing-hero" aria-labelledby="landing-title">
   <div class="landing-bg" aria-hidden="true">
-    <picture>
-      <source
-        type="image/avif"
-        sizes="100vw"
-        srcset="/images/hero-mosaic-1280.avif 1280w, /images/hero-mosaic-1920.avif 1920w"
-      />
-      <source
-        type="image/webp"
-        sizes="100vw"
-        srcset="/images/hero-mosaic-1280.webp 1280w, /images/hero-mosaic-1920.webp 1920w"
-      />
-      <img
-        src="/images/hero-mosaic.jpg"
-        srcset="/images/hero-mosaic-1280.jpg 1280w, /images/hero-mosaic.jpg 1920w"
-        sizes="100vw"
-        alt=""
-        width="1920"
-        height="1280"
-        fetchpriority="high"
-        decoding="async"
-      />
-    </picture>
+    <CapitolBackdrop />
     <div class="landing-overlay"></div>
   </div>
   <div class="landing-card">
@@ -239,15 +192,6 @@ function extensionThumbnail(ext) {
       <p>{stripBullet($_('about.hero.subtitle2'))}</p>
       <p>{stripBullet($_('about.hero.subtitle3'))}</p>
     </div>
-    <div class="landing-ctas">
-      <a class="cta ghost" href="/about">{$_('landing.cta_what')}</a>
-      <button type="button" class="cta ghost" on:click={() => scrollToCatalog('ext')}>
-        {$_('landing.cta_browse')}
-      </button>
-      <a class="cta primary" href={CONFIG.portal_url || 'https://demo.gos.earth'} target="_blank" rel="noreferrer">
-        {$_('landing.cta_launch')}
-      </a>
-    </div>
   </div>
   <p class="landing-credit">
     <span>{$_('landing.credit')}</span>
@@ -256,29 +200,9 @@ function extensionThumbnail(ext) {
       <path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z" fill="#fff" />
     </svg>
   </p>
-  <button type="button" class="scroll-flag" on:click={() => scrollToCatalog()}>
-    <span class="scroll-line"></span>
-    <span class="scroll-label">{$_('landing.scroll_hint')}</span>
+  <button type="button" class="scroll-cue" on:click={() => scrollToCatalog()} aria-label={$_('landing.scroll_hint')}>
+    <span class="scroll-chevron" aria-hidden="true"></span>
   </button>
-</section>
-
-<section class="trust" aria-label={$_('landing.trust_label')}>
-  <div class="trust-inner">
-    {#each catalogStats as stat}
-      <div class="trust-item">
-        <span class="trust-num">{stat.value}</span>
-        <span class="trust-label">{$_(stat.key)}</span>
-      </div>
-    {/each}
-    <div class="trust-item">
-      <span class="trust-num">100%</span>
-      <span class="trust-label">{$_('landing.stat_onchain')}</span>
-    </div>
-    <div class="trust-item">
-      <span class="trust-num">0</span>
-      <span class="trust-label">{$_('landing.stat_servers')}</span>
-    </div>
-  </div>
 </section>
 
 <section class="catalog" id="catalog" bind:this={catalogSection}>
@@ -395,120 +319,68 @@ function extensionThumbnail(ext) {
     min-height: 100vh;
     padding: 2.5rem 1.25rem 5.5rem;
     overflow: hidden;
+    background: #ffffff;
   }
   .landing-bg {
     position: absolute;
     inset: 0;
-  }
-  .landing-bg picture {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-  .landing-bg img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    opacity: 0.45;
-    transform: scale(1.08);
-    animation: kenburns 32s ease-out forwards;
+    background: #ffffff;
   }
   .landing-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom, #ffffff94, #fafafa66 45%, #ffffff9e);
+    pointer-events: none;
+    background: linear-gradient(to bottom, #ffffff55, #ffffff00 48%, #ffffffaa);
   }
   .landing-card {
     position: relative;
     z-index: 1;
-    width: min(46rem, 100%);
-    padding: 2.75rem 2.75rem 2.35rem;
-    background: #ffffffc7;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
+    width: min(32rem, calc(100% - 2.5rem));
+    padding: 2.35rem 2.1rem 2.05rem;
+    background: #ffffff55;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid #ffffff99;
     border-radius: 0.75rem;
     box-shadow: 0 1px 2px #0000000a;
     text-align: center;
-    animation: hero-rise 0.4s ease-out both;
+    animation: hero-rise 0.5s ease-out 2s both;
   }
   .landing-card > :global(*) {
     animation: hero-fade 0.5s ease-out both;
   }
   .landing-wordmark {
     margin: 0 0 1.6rem;
-    animation-delay: 0.14s;
+    animation-delay: 2.14s;
   }
   .landing-wordmark img {
     display: block;
     margin: 0 auto;
-    height: clamp(1.95rem, 4.2vw, 2.7rem);
+    height: clamp(3.5rem, 8vw, 5.25rem);
     width: auto;
   }
   .landing-tagline {
-    margin: 0 0 1.6rem;
+    margin: 0 0 1.25rem;
     text-align: center;
-    font-size: clamp(1.85rem, 4.2vw, 2.65rem);
+    font-size: clamp(1.55rem, 3.2vw, 2.15rem);
     font-weight: 700;
-    line-height: 1.15;
+    line-height: 1.18;
     letter-spacing: -0.02em;
     color: var(--text);
     text-wrap: balance;
-    animation-delay: 0.22s;
+    animation-delay: 2.22s;
   }
   .landing-stanza {
-    margin: 0 auto 2rem;
-    max-width: 32rem;
+    margin: 0 auto;
+    max-width: 26rem;
     font-size: 0.95rem;
     font-weight: 400;
     line-height: 1.65;
     text-align: center;
     color: var(--text-muted);
-    animation-delay: 0.3s;
+    animation-delay: 2.3s;
   }
   .landing-stanza p { margin: 0.15rem 0; }
-  .landing-ctas {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.15rem 0.35rem;
-    animation-delay: 0.38s;
-  }
-  .cta {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.95rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: color 0.18s ease, background 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
-    cursor: pointer;
-  }
-  .cta.primary {
-    padding: 0.6rem 1.1rem;
-    margin-left: 0.45rem;
-    border-radius: 0.5rem;
-    background: var(--primary);
-    border: 1px solid var(--primary);
-    color: #fff;
-  }
-  .cta.primary:hover {
-    background: var(--primary-hover);
-    border-color: var(--primary-hover);
-  }
-  .cta.ghost {
-    padding: 0.6rem 0.95rem;
-    border: none;
-    background: none;
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-  .cta.ghost:hover {
-    color: var(--text);
-    text-decoration: underline;
-    text-underline-offset: 0.22em;
-  }
   .landing-credit {
     position: absolute;
     z-index: 2;
@@ -516,104 +388,76 @@ function extensionThumbnail(ext) {
     bottom: 1.15rem;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
     margin: 0;
-    font-size: 0.7rem;
+    font-size: 1.05rem;
     font-weight: 400;
     color: var(--text-faint);
     letter-spacing: 0.01em;
     white-space: nowrap;
+    animation: hero-appear 0.5s ease-out 2s both;
   }
   .landing-credit .swiss {
     flex: none;
-    width: 0.82rem;
-    height: 0.82rem;
+    width: 1.23rem;
+    height: 1.23rem;
     border-radius: 0.15rem;
     box-shadow: 0 1px 6px #00000059;
   }
-  .scroll-flag {
+  .scroll-cue {
     position: absolute;
     z-index: 2;
     left: 50%;
     bottom: 1.35rem;
     transform: translate(-50%);
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0.45rem;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    padding: 0;
     border: none;
     background: none;
-    color: var(--text-muted);
+    color: #111;
     cursor: pointer;
-    animation: scroll-fade 3.2s ease-in-out infinite;
+    animation: hero-appear 0.5s ease-out 2s both;
   }
-  .scroll-line {
-    width: 1px;
-    height: 1.65rem;
-    background: currentColor;
+  .scroll-chevron {
+    width: 0.72rem;
+    height: 0.72rem;
+    margin-top: -0.2rem;
+    border-right: 2px solid #111;
+    border-bottom: 2px solid #111;
+    transform: rotate(45deg);
+    animation: scroll-chevron 1.45s ease-in-out 2s infinite;
   }
-  .scroll-label {
-    font-size: 0.62rem;
-    font-weight: 500;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-  }
-  .scroll-flag:hover { color: var(--text); }
-  .trust {
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-  }
-  .trust-inner {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 1.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 1.25rem 3.25rem;
-  }
-  .trust-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.15rem;
-  }
-  .trust-num {
-    font-size: 1.45rem;
-    font-weight: 600;
-    letter-spacing: -0.03em;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-  .trust-label {
-    font-size: 0.7rem;
-    font-weight: 500;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-faint);
+  .scroll-cue:hover { opacity: 0.7; }
+  @keyframes scroll-chevron {
+    0%, 100% { opacity: 0.25; transform: rotate(45deg) translateY(-3px); }
+    45% { opacity: 1; transform: rotate(45deg) translateY(2px); }
   }
   @keyframes hero-fade {
     0% { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: none; }
   }
-  @keyframes kenburns {
-    0% { transform: scale(1.08); }
-    to { transform: scale(1.16) translate(-1.2%, -0.8%); }
-  }
   @keyframes hero-rise {
     0% { opacity: 0; transform: translateY(14px); }
     to { opacity: 1; transform: none; }
   }
-  @keyframes scroll-fade {
-    0%, to { opacity: 0.28; }
-    50% { opacity: 0.9; }
+  @keyframes hero-appear {
+    0% { opacity: 0; }
+    to { opacity: 1; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .landing-bg img,
-    .landing-card,
-    .landing-card > :global(*),
-    .scroll-flag { animation: none; }
-    .landing-bg img { transform: scale(1.06); }
+    .landing-card {
+      animation: hero-appear 0.01s linear 2s both;
+    }
+    .landing-card > :global(*) { animation: none; }
+    .landing-credit,
+    .scroll-cue {
+      animation: hero-appear 0.01s linear 2s both;
+    }
+    .scroll-chevron { animation: none; }
   }
   .catalog {
     max-width: 1200px;
@@ -629,20 +473,39 @@ function extensionThumbnail(ext) {
     margin: 0 0 1.5rem;
   }
 
-  @media (max-width: 600px) {
-    .landing-card { padding: 1.85rem 1.25rem 1.6rem; width: min(64rem, 100%); }
-    .cta.primary { margin-left: 0; flex: 1 1 100%; }
-    .trust-inner { padding: 1.25rem 1rem; gap: 1rem 2.25rem; }
-    .trust-num { font-size: 1.25rem; }
+  @media (max-width: 760px) {
+    .landing-hero {
+      align-items: center;
+      padding: 5.5rem 1.5rem 4.25rem;
+    }
+    .landing-overlay {
+      background: linear-gradient(to bottom, #ffffff77, #ffffff22 42%, #ffffff11 55%, #ffffffc4);
+    }
+    .landing-card {
+      width: 100%;
+      padding: 1.5rem 1.2rem 1.35rem;
+      background: #ffffff59;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid #ffffff99;
+    }
+    .landing-wordmark { margin-bottom: 0.9rem; }
+    .landing-wordmark img { height: 2.4rem; }
+    .landing-tagline { font-size: 1.35rem; margin-bottom: 0.75rem; }
+    .landing-stanza { font-size: 0.86rem; line-height: 1.5; max-width: none; }
     .landing-credit {
-      left: 50%;
-      right: auto;
-      bottom: 3.6rem;
-      transform: translate(-50%);
+      display: flex;
+      left: 0.75rem;
+      right: 0.75rem;
+      bottom: 3.05rem;
+      justify-content: center;
       white-space: normal;
       text-align: center;
-      max-width: calc(100% - 2rem);
+      font-size: 0.62rem;
+      line-height: 1.35;
     }
+    .landing-credit .swiss { width: 0.72rem; height: 0.72rem; }
+    .scroll-cue { bottom: 0.85rem; }
   }
 
   /* Primary navigation between listing types â reads as content tabs. */

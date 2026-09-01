@@ -1,7 +1,7 @@
 /* Marketplace global styles. */
 
 :root {
-  --bg: #FAFAFA;
+  --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #F5F5F5;
   --surface-3: #EEEEEE;
@@ -29,6 +29,8 @@ html, body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.55;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 a { color: inherit; }

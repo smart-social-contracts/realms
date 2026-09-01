@@ -53,13 +53,8 @@
     "cta_browse": "Explorar el marketplace",
     "credit": "Construido en Internet Computer con ❤️ desde",
     "credit_country": "Suiza",
-    "scroll_hint": "Descubrir",
-    "stat_onchain": "on-chain",
-    "stat_servers": "servidores",
-    "stat_extensions": "extensiones",
-    "stat_codices": "códices",
-    "stat_assistants": "asistentes",
-    "trust_label": "El marketplace de un vistazo"
+    "scroll_hint": "Desplázate",
+    "what_is_this": "¿Qué es esto?"
   },
   "discover": {
     "title": "Mejora la experiencia de los miembros de tu realm.",
@@ -331,8 +326,8 @@
   "about": {
     "hero": {
       "title": "El Sistema Operativo de Gobernanza",
-      "subtitle1": "• Lanza una administración pública completa en segundos",
-      "subtitle2": "• Totalmente auditable. Totalmente transparente. Impulsado por IA",
+      "subtitle1": "• Lanza una administración pública completa en minutos",
+      "subtitle2": "• Auditable. A prueba de manipulación. Impulsado por IA",
       "subtitle3": "• Diseñado para eliminar la corrupción y las ineficiencias",
       "tryDemo": "Probar Demo",
       "requestInvite": "Solicitar Código de Invitación",
