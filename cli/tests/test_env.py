@@ -156,6 +156,7 @@ class TestCreateCanisterSubnet:
         assert cid == "aaaaa-aa"
         cmd = mock_run.call_args.args[0]
         assert cmd[cmd.index("--subnet-type") + 1] == "application"
+        assert cmd[cmd.index("--with-cycles") + 1] == "1800000000000"
         assert "--identity" in cmd
 
     @patch("realms.cli.commands.env._dfx_canister_id", return_value="aaaaa-aa")

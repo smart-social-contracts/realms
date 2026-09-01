@@ -171,6 +171,10 @@ def _create_canister(
     # refuses to pick one unless we say application vs system.
     if network not in ("local", "localhost"):
         cmd.extend(["--subnet-type", "application"])
+        # Default dfx create amount can exceed a thin cycles ledger. 1.8T is
+        # enough to install WASM under the 30-day freeze without starving a
+        # four-canister product-stack mint from ~8 TC.
+        cmd.extend(["--with-cycles", "1800000000000"])
     if identity:
         cmd.extend(["--identity", identity])
     rc = run_command(cmd, env=_dfx_subprocess_env(), logger=logger)
