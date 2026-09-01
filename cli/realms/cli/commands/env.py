@@ -275,6 +275,24 @@ def _fetch_gos_frontend_artifacts(project_root: Path, *, logger) -> None:
         raise typer.Exit(1)
 
 
+def _fetch_gos_file_registry_wasm(project_root: Path, *, logger) -> None:
+    script = project_root / "scripts" / "fetch_gos_artifacts.py"
+    wasm = project_root / ".external-wasms" / "file_registry.wasm.gz"
+    if wasm.is_file():
+        return
+    if not script.is_file():
+        console.print(f"[red]❌ {script} not found — cannot deploy file_registry[/red]")
+        raise typer.Exit(1)
+    rc = run_command(
+        [sys.executable, str(script), "--what", "wasms"],
+        cwd=str(project_root),
+        logger=logger,
+    )
+    if rc.returncode != 0 or not wasm.is_file():
+        console.print("[red]❌ fetch_gos_artifacts.py --what wasms failed[/red]")
+        raise typer.Exit(rc.returncode if rc.returncode else 1)
+
+
 def _ensure_marketplace_declarations(
     project_root: Path,
     *,
@@ -555,6 +573,7 @@ def env_deploy_command(
 
     # b. file_registry + file_registry_frontend
     console.print(Panel.fit("📦 Deploying file_registry", style="bold blue"))
+    _fetch_gos_file_registry_wasm(project_root, logger=logger)
     _dfx_deploy(FILE_REGISTRY, network, mode, identity, env=dfx_env, logger=logger)
 
     console.print(Panel.fit("📦 Deploying file_registry_frontend", style="bold blue"))
