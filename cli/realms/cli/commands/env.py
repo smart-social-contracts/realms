@@ -167,6 +167,10 @@ def _create_canister(
     logger,
 ) -> str:
     cmd = _dfx_cmd("canister", "create", canister_name, "--network", network, "--no-wallet")
+    # Mainnet-style networks (demo/staging/test/ic) have many subnets; dfx
+    # refuses to pick one unless we say application vs system.
+    if network not in ("local", "localhost"):
+        cmd.extend(["--subnet-type", "application"])
     if identity:
         cmd.extend(["--identity", identity])
     rc = run_command(cmd, env=_dfx_subprocess_env(), logger=logger)

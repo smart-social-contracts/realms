@@ -10,6 +10,7 @@ import pytest
 import typer
 
 from realms.cli.commands.env import (
+    _create_canister,
     _dfx_deploy,
     _is_canister_dead,
     _read_canister_ids,
@@ -144,3 +145,23 @@ class TestEnvDeployBasiliskEnv:
             assert call.kwargs.get("env") == mock_dfx_env.return_value
         mock_build_fe.assert_called_once()
         assert mock_build_fe.call_args.kwargs.get("dfx_env") == mock_dfx_env.return_value
+
+
+class TestCreateCanisterSubnet:
+    @patch("realms.cli.commands.env._dfx_canister_id", return_value="aaaaa-aa")
+    @patch("realms.cli.commands.env.run_command")
+    def test_demo_create_sets_application_subnet(self, mock_run, _mock_id):
+        mock_run.return_value = MagicMock(returncode=0)
+        cid = _create_canister("file_registry", "demo", "deployer", logger=None)
+        assert cid == "aaaaa-aa"
+        cmd = mock_run.call_args.args[0]
+        assert cmd[cmd.index("--subnet-type") + 1] == "application"
+        assert "--identity" in cmd
+
+    @patch("realms.cli.commands.env._dfx_canister_id", return_value="aaaaa-aa")
+    @patch("realms.cli.commands.env.run_command")
+    def test_local_create_omits_subnet_type(self, mock_run, _mock_id):
+        mock_run.return_value = MagicMock(returncode=0)
+        _create_canister("file_registry", "local", None, logger=None)
+        cmd = mock_run.call_args.args[0]
+        assert "--subnet-type" not in cmd
