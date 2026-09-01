@@ -88,6 +88,13 @@ jobs:
           pip install -r requirements.txt
           pip install cli/
 
+      - name: Resolve file registry
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          REGISTRY=$(python3 -c "import json; print(json.load(open('canister_ids.json'))['file_registry']['$NETWORK'])")
+          test -n "$REGISTRY" || { echo "::error::no file_registry for $NETWORK in canister_ids.json" >&2; exit 1; }
+          echo "FILE_REGISTRY=$REGISTRY" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -120,6 +127,7 @@ jobs:
         run: |
           realms files reset \
             --network "${{ inputs.environment }}" \
+            --registry "$FILE_REGISTRY" \
             --identity ci
 
       - name: Publish to file registry
@@ -127,6 +135,7 @@ jobs:
         run: |
           ARGS=(
             --network "${{ inputs.environment }}"
+            --registry "$FILE_REGISTRY"
             --identity ci
           )
           if [ "${{ inputs.scope }}" = "extensions-only" ]; then
@@ -147,12 +156,13 @@ jobs:
         run: |
           realms files publish-branding \
             --network "${{ inputs.environment }}" \
+            --registry "$FILE_REGISTRY" \
             --identity ci
 
       - name: Review
         run: |
           NETWORK="${{ inputs.environment }}"
-          REGISTRY=$(python3 -c "import json; print(json.load(open('canister_ids.json'))['file_registry']['$NETWORK'])")
+          REGISTRY="$FILE_REGISTRY"
           echo "Querying file registry stats..."
           dfx canister call "$REGISTRY" get_stats '()' --network "$NETWORK" --query || true
           echo ""

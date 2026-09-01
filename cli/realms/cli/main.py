@@ -390,6 +390,24 @@ def new(
             "deploy key (deployer, my_dev_identity_1)."
         ),
     ),
+    credit_voucher: Optional[str] = typer.Option(
+        None,
+        "--credit-voucher",
+        help=(
+            "Redeem this billing voucher before the 5-credit check "
+            "(e.g. BETA50). Credits the GaaS registry from --gaas-config."
+        ),
+    ),
+    file_registry: Optional[str] = typer.Option(
+        None,
+        "--file-registry",
+        help="Realms file_registry canister ID (required for /canister_ids.js wiring).",
+    ),
+    marketplace: Optional[str] = typer.Option(
+        None,
+        "--marketplace",
+        help="marketplace_backend canister ID (no baked lookup).",
+    ),
     log_file: Optional[Path] = typer.Option(
         None,
         "--log-file",
@@ -436,7 +454,8 @@ def new(
     Example:
       gaas new environments/demo.json --identity deployer --network ic --yes
       realms new --gaas-config logs/gaas-config-demo_YYYYMMDD_HHMMSS.json \\
-        --identity deployer --co-admin <ii-principal> --codex agora --name Acme --yes
+        --identity deployer --co-admin <ii-principal> --credit-voucher BETA50 \\
+        --codex agora --name Acme --yes
       realms new --deploy-mode standalone --network demo --identity deployer \\
         --codex agora --name Acme --yes
     """
@@ -474,6 +493,9 @@ def new(
             co_admin=co_admin,
             gaas_config=str(gaas_config) if gaas_config else None,
             deploy_mode=deploy_mode,
+            credit_voucher=credit_voucher,
+            file_registry=file_registry,
+            marketplace=marketplace,
         )
     finally:
         print_log_path()
@@ -873,7 +895,7 @@ def files_publish(
         "staging", "--network", "-n", help="Target network: staging, demo, test"
     ),
     registry: Optional[str] = typer.Option(
-        None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
+        None, "--registry", "-r", help="File registry canister ID (required)"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"
@@ -907,7 +929,7 @@ def files_publish_assistant(
         "staging", "--network", "-n", help="Target network: staging, demo, test"
     ),
     registry: Optional[str] = typer.Option(
-        None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
+        None, "--registry", "-r", help="File registry canister ID (required)"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"
@@ -926,7 +948,7 @@ def files_publish_branding(
         "staging", "--network", "-n", help="Target network: staging, demo, test"
     ),
     registry: Optional[str] = typer.Option(
-        None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
+        None, "--registry", "-r", help="File registry canister ID (required)"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"
@@ -958,7 +980,7 @@ def files_publish_release(
         None, "--frontend-dist", help="Path to the built frontend dist/ directory"
     ),
     registry: Optional[str] = typer.Option(
-        None, "--registry", "-r", help="file_registry canister ID (auto-resolved from network)"
+        None, "--registry", "-r", help="file_registry canister ID (required)"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"
@@ -990,7 +1012,7 @@ def files_reset(
         "staging", "--network", "-n", help="Target network: staging, demo, test"
     ),
     registry: Optional[str] = typer.Option(
-        None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
+        None, "--registry", "-r", help="File registry canister ID (required)"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"

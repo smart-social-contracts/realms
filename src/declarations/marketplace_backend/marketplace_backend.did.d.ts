@@ -1,6 +1,6 @@
-import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 
 export interface Account {
   'owner' : Principal,
@@ -127,7 +127,7 @@ export type Callback = ActorMethod<
 >;
 export interface CallbackStrategy {
   'token' : StreamingToken,
-  'callback' : Callback,
+  'callback' : [Principal, string],
 }
 export interface CanisterInfo {
   'canister_id' : string,
@@ -457,7 +457,7 @@ export interface HttpResponseIncoming {
   'status_code' : number,
 }
 export interface HttpTransform {
-  'function' : HttpTransformFunc,
+  'function' : [Principal, string],
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -741,7 +741,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : QueryArchiveFn,
+  'callback' : [Principal, string],
   'start' : bigint,
   'length' : bigint,
 }
@@ -1034,12 +1034,12 @@ export interface _SERVICE {
   'get_my_purchases' : ActorMethod<[], Array<PurchaseRecord>>,
   'grant_manual_license' : ActorMethod<[string, bigint, string], GenericResult>,
   'greet' : ActorMethod<[string], string>,
-  'http_request' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
-  'http_request_update' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
   'has_liked' : ActorMethod<[string, string, string], boolean>,
   'has_purchased_assistant' : ActorMethod<[string, string], boolean>,
   'has_purchased_codex' : ActorMethod<[string, string], boolean>,
   'has_purchased_extension' : ActorMethod<[string, string], boolean>,
+  'http_request' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
+  'http_request_update' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
   'like_item' : ActorMethod<[string, string], GenericResult>,
   'list_marketplace_assistants' : ActorMethod<
     [bigint, bigint, boolean],

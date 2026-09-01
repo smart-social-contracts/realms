@@ -158,6 +158,7 @@ python3 scripts/fetch_gos_artifacts.py --what all
 
 # 2. Upload into file_registry and authorize in Casals (registry family)
 realms files publish-release --network staging --family registry --version 0.1.0 \
+  --registry iebdk-kqaaa-aaaau-agoxq-cai \
   --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
   --frontend-dist .external-assets/realm_registry_frontend/dist \
   --assets-wasm /tmp/realms-assetstorage.wasm.gz \
@@ -462,6 +463,7 @@ Notes:
 # Per environment (example: staging) — registry/installer: fetch GOS, then publish + rollout
 python3 scripts/fetch_gos_artifacts.py --what all
 realms files publish-release --network staging --family registry --version 0.1.0 \
+  --registry iebdk-kqaaa-aaaau-agoxq-cai \
   --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
   --frontend-dist .external-assets/realm_registry_frontend/dist \
   --assets-wasm /tmp/realms-assetstorage.wasm.gz --identity deployer
@@ -815,7 +817,7 @@ chrome under `/images/` is unrelated and may stay.
 For the demo realms, publish their source images into the registry first:
 
 ```bash
-realms files publish-branding --network test          # or: deploy-files.yml -f scope=branding-only
+realms files publish-branding --network test --registry uq2mu-kaaaa-aaaah-avqcq-cai          # or: deploy-files.yml -f scope=branding-only
 ```
 
 Optimize source PNGs before publishing (logos ~25 KB, backgrounds <1 MB) so they stay
@@ -847,9 +849,11 @@ Reinstalling the whole orchestra is three stages. Each stage completes before th
 gh workflow run publish-build.yml -f environment=test -f family=realm -f component=both -f from_main=true -f update_catalog=true
 python3 scripts/fetch_gos_artifacts.py --what all
 realms files publish-release --network test --family registry --version 0.1.0 \
+  --registry uq2mu-kaaaa-aaaah-avqcq-cai \
   --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
   --frontend-dist .external-assets/realm_registry_frontend/dist --identity deployer
 realms files publish-release --network test --family installer --version 0.1.0 \
+  --registry uq2mu-kaaaa-aaaah-avqcq-cai \
   --backend-wasm .external-wasms/realm_installer.wasm.gz --identity deployer
 # repeat per Realms-built family: dashboard, marketplace, file-registry
 
@@ -954,7 +958,7 @@ dfx --run-deprecated identity use my_dev_identity_1
 
 ```bash
 realms files build --extensions <ext_id> \
-  && realms files publish --network test --extensions-only --extensions <ext_id> \
+  && realms files publish --network test --registry <file_registry_id> --extensions-only --extensions <ext_id> \
   && dfx --run-deprecated canister call <backend_canister_id> install_extension_from_registry \
      '("{\"registry_canister_id\": \"<file_registry_id>\", \"ext_id\": \"<ext_id>\", \"version\": \"<version>\"}")' \
      --network test
@@ -963,14 +967,14 @@ realms files build --extensions <ext_id> \
 | Step | Command | Time | What it does |
 |------|---------|------|-------------|
 | Build | `realms files build --extensions <ext_id>` | ~4s | Runs `npm install && npm run build` in `frontend-rt/` |
-| Publish | `realms files publish --network test ...` | ~8s | Uploads bundle to the file_registry canister |
+| Publish | `realms files publish --network test --registry <file_registry_id> ...` | ~8s | Uploads bundle to the file_registry canister |
 | Install | `dfx --run-deprecated canister call ... install_extension_from_registry` | ~14s | Backend pulls bundle from registry and installs it |
 
 **Concrete example** — `public_dashboard` on Agora (test):
 
 ```bash
 realms files build --extensions public_dashboard \
-  && realms files publish --network test --extensions-only --extensions public_dashboard \
+  && realms files publish --network test --registry uq2mu-kaaaa-aaaah-avqcq-cai --extensions-only --extensions public_dashboard \
   && dfx --run-deprecated canister call rnghe-haaaa-aaaak-qyxyq-cai install_extension_from_registry \
      '("{\"registry_canister_id\": \"uq2mu-kaaaa-aaaah-avqcq-cai\", \"ext_id\": \"public_dashboard\", \"version\": \"1.3.0\"}")' \
      --network test
@@ -1062,7 +1066,7 @@ dfx --run-deprecated canister install <backend-id> \
 
 # 3. Extensions (one at a time; full resync-frontends can IC0506)
 realms files build --extensions <ext_id>
-realms files publish --network test --extensions-only --extensions <ext_id>
+realms files publish --network test --registry <file_registry_id> --extensions-only --extensions <ext_id>
 realms extension registry-install \
   --canister <backend-id> \
   --registry uq2mu-kaaaa-aaaah-avqcq-cai \
@@ -1252,7 +1256,7 @@ panics on the conflict. **Unset both** and use a color-capable TERM:
 
 ```bash
 env -u NO_COLOR -u FORCE_COLOR TERM=xterm-256color DFX_WARNING=-mainnet_plaintext_identity \
-  realms files publish --network staging --extensions-only --extensions <ext_id>
+  realms files publish --network staging --registry <file_registry_id> --extensions-only --extensions <ext_id>
 ```
 
 Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the panic

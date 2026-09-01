@@ -5612,11 +5612,36 @@ def _kick_off_proposal_index_backfill() -> void:
     logger.info("Proposal field-index backfill scheduled")
 
 
+def _opt_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return ""
+        value = value[0]
+        if value is None:
+            return ""
+    return str(value).strip()
+
+
 @init
-def init_() -> void:
+def init_(installer: Opt[text] = None) -> void:
+    """Optional installer principal (GOS installer, via Casals install_arg)."""
     logger.info("Initializing Realm canister")
     set_controller(ic.caller().to_str())
     initialize()
+    installer_id = _opt_text(installer)
+    if installer_id:
+        try:
+            from ggg import Realm
+            from core.setup import set_installer_principal
+
+            realm = Realm.load("1")
+            if realm:
+                set_installer_principal(realm, installer_id)
+                logger.info(f"Recorded installer_canister_id={installer_id}")
+        except Exception as e:
+            logger.warning(f"Could not record installer principal: {e}")
     logger.info("Realm canister initialized")
 
 

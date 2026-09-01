@@ -99,18 +99,15 @@ def set_realm_registry_canister_id(realm, registry_id: str) -> None:
 def can_enter_setup(caller: str, is_controller: bool = False) -> bool:
     """Whether the caller may run first-boot enter_setup.
 
-    IC controllers still work (legacy mundus). The GOS installer is *not* a
-    lasting controller under Casals, so known installer/registry principals
-    and a configured installer/trusted principal may also enter once.
+    IC controllers (founder heal / mundus) and the installer recorded at
+    ``@init`` may enter. There is no baked installer allowlist and no
+    first-caller race: if ``installer_canister_id`` is empty, only a
+    controller can enter.
     """
     caller = (caller or "").strip()
     if not caller:
         return False
     if is_controller:
-        return True
-    from .network_infra import is_known_bootstrap_principal
-
-    if is_known_bootstrap_principal(caller):
         return True
     from ggg import Realm
 
@@ -128,30 +125,31 @@ def can_enter_setup(caller: str, is_controller: bool = False) -> bool:
     return caller in trusted
 
 
-def record_bootstrap_caller(realm, caller: str) -> None:
-    """Remember the first-boot installer so later @require(realm.admin) passes."""
-    caller = (caller or "").strip()
-    if not caller:
+def set_installer_principal(realm, installer: str) -> None:
+    """Record the GOS installer from ``@init`` (once). Not a User, not trusted.
+
+    A founder PEM that later calls ``enter_setup`` as IC controller must not
+    occupy this field. Never write ``trusted_principals``.
+    """
+    installer = (installer or "").strip()
+    if not installer:
         return
-    if not str(getattr(realm, "installer_canister_id", "") or "").strip():
-        realm.installer_canister_id = caller
-    trusted = [
-        p.strip()
-        for p in str(getattr(realm, "trusted_principals", "") or "").split(",")
-        if p.strip()
-    ]
-    if caller not in trusted:
-        trusted.append(caller)
-        realm.trusted_principals = ",".join(trusted)
+    existing = str(getattr(realm, "installer_canister_id", "") or "").strip()
+    if existing:
+        return
+    realm.installer_canister_id = installer
 
 
 def enter_setup(
     creator: str, registry_id: str, environment: str = "", caller: str = ""
 ) -> dict:
-    """Record founding creator and registry link when GOS enters in-realm setup."""
-    from ggg import Realm
+    """Record founding creator and registry link when GOS enters in-realm setup.
 
-    from .network_infra import apply_network_infra
+    ``environment`` is a label stored on ``realm.network``. File registry and
+    marketplace IDs are not looked up here — pass them via
+    ``set_canister_config_json``. ``caller`` is unused (installer is set at init).
+    """
+    from ggg import Realm
 
     realm = Realm.load("1")
     if not realm:
@@ -171,11 +169,6 @@ def enter_setup(
     network = (environment or "").strip()
     if network:
         realm.network = network
-    infra_err = apply_network_infra(realm, network)
-    if infra_err:
-        return infra_err
-    if caller:
-        record_bootstrap_caller(realm, caller)
     return {"ok": True}
 
 

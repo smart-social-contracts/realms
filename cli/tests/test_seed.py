@@ -1,5 +1,6 @@
 """Unit tests for ``realms seed``."""
 
+import re
 from unittest.mock import patch
 
 import typer
@@ -12,12 +13,14 @@ from realms.cli.main import app
 runner = CliRunner()
 
 
-def test_seed_help():
+def test_seed_help(monkeypatch):
+    monkeypatch.setenv("COLUMNS", "200")
     result = runner.invoke(app, ["seed", "--help"])
     assert result.exit_code == 0
-    assert "--env" in result.output
-    assert "--skip-catalog" in result.output
-    assert "marketplace" in result.output.lower() or "catalog" in result.output.lower()
+    plain = re.sub(r"\s+", " ", re.sub(r"\x1b\[[0-9;]*m", "", result.output))
+    assert "--env" in plain
+    assert "--skip-catalog" in plain
+    assert "marketplace" in plain.lower() or "catalog" in plain.lower()
 
 
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
@@ -110,3 +113,27 @@ def test_live_file_registry_id_prefers_canister_ids(tmp_path):
 
     _set_canister_id(tmp_path, "file_registry", "demo", "krch6-ryaaa-aaaas-amw3q-cai")
     assert _live_file_registry_id("demo", tmp_path) == "krch6-ryaaa-aaaas-amw3q-cai"
+
+
+@patch("realms.cli.commands.seed._live_file_registry_id", return_value="")
+@patch("realms.cli.commands.seed.files_publish_branding_command")
+@patch("realms.cli.commands.seed.files_publish_command")
+@patch("realms.cli.commands.seed.env_deploy_command")
+@patch(
+    "realms.cli.commands.seed.load_env_config",
+    return_value={"name": "demo", "network": "demo"},
+)
+def test_seed_catalog_fails_without_registry(
+    _load,
+    _env_deploy,
+    mock_publish,
+    mock_branding,
+    _registry,
+):
+    try:
+        seed_command(env_name="demo", skip_product=True, yes=True)
+    except typer.BadParameter:
+        mock_publish.assert_not_called()
+        mock_branding.assert_not_called()
+        return
+    raise AssertionError("expected BadParameter when file_registry is missing")

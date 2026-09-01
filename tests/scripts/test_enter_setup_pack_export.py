@@ -93,3 +93,14 @@ def test_pack_assert_required_exports_rejects_missing(tmp_path):
         assert "enter_setup" in str(exc)
     else:
         raise AssertionError("expected SystemExit when enter_setup is missing")
+
+
+def test_pack_assert_required_exports_rejects_missing_init_arg(tmp_path):
+    did = tmp_path / "no_init.did"
+    did.write_text('service : { "enter_setup" : (principal, text, text) -> (text); }\n')
+    try:
+        pack._assert_required_exports(did)
+    except SystemExit as exc:
+        assert "opt text" in str(exc)
+    else:
+        raise AssertionError("expected SystemExit when @init installer arg is missing")

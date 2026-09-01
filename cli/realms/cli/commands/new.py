@@ -22,6 +22,7 @@ import subprocess
 import tempfile
 import time
 import tarfile
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +38,7 @@ from ..runlog import get_run_log
 # ---------------------------------------------------------------------------
 
 DEPLOYMENT_COST_CREDITS = 5
+DEFAULT_BILLING_URL = "https://billing.realmsgos.dev"
 ALLOWED_GOS = "realms-gos"
 ALLOWED_NETWORKS = ("test", "staging", "demo", "ic")
 ALLOWED_DEPLOY_MODES = ("gaas", "standalone")
@@ -146,9 +148,9 @@ def derivation_origin_for_network(network: str) -> str:
 
 
 def network_test_flags(network: str) -> Dict[str, Any]:
-    """Port of ``networkTestFlags`` (non-production wizard test_flags)."""
+    """Port of ``networkTestFlags``. Demo is a public showcase, not a test env."""
     net = (network or "staging").lower()
-    if net in ("ic", "production"):
+    if net in ("ic", "production", "demo"):
         return {}
     if net == "test":
         return {
@@ -163,14 +165,6 @@ def network_test_flags(network: str) -> Dict[str, Any]:
             "test_mode": True,
             "user_self_registration": True,
             "demo_data": False,
-            "ii_bypass": False,
-            "skip_terms": False,
-        }
-    if net == "demo":
-        return {
-            "test_mode": True,
-            "user_self_registration": True,
-            "demo_data": True,
             "ii_bypass": False,
             "skip_terms": False,
         }
@@ -308,10 +302,9 @@ def build_portal_manifest(
     deriv = derivation_origin_for_network(network)
     if deriv:
         manifest["infra"] = {"ii_derivation_origin": deriv}
-    if network not in ("ic", "production"):
-        manifest["can_test_mode"] = True
     flags = network_test_flags(network)
     if flags:
+        manifest["can_test_mode"] = True
         manifest["test_flags"] = flags
     return manifest
 
@@ -631,14 +624,23 @@ def pem_deploy_requires_co_admin(identity: str, co_admin: str) -> Optional[str]:
     )
 
 
+def voucher_credit_amount(code: str) -> int:
+    """Credits granted for a voucher code. ``BETA50`` → 50, else deployment cost."""
+    match = re.search(r"(\d+)$", (code or "").strip())
+    if match:
+        return max(int(match.group(1)), DEPLOYMENT_COST_CREDITS)
+    return DEPLOYMENT_COST_CREDITS
+
+
 def credits_shortfall_message(principal: str, balance: int, network: str) -> str:
     need = DEPLOYMENT_COST_CREDITS
     return (
         f"Insufficient registry credits for founder {principal}: "
         f"balance {balance}, need {need}.\n"
         f"Top up (no auto-top-up):\n"
+        f"  realms new ... --credit-voucher BETA50\n"
         f"  realms registry billing add_credits --principal {principal} "
-        f"--amount {need} --network {network}"
+        f"--amount {need} --network {network} --canister-id <gaas-registry>"
     )
 
 
@@ -874,6 +876,8 @@ def _parse_jsonish(stdout: str) -> Any:
     # icp --json wraps the candid text in a JSON envelope
     try:
         envelope = json.loads(raw)
+        if isinstance(envelope, str):
+            return _parse_candid_text(envelope)
         if isinstance(envelope, dict) and "response_candid" in envelope:
             candid = envelope["response_candid"]
             if candid is not None:
@@ -994,6 +998,8 @@ def _canister_call(
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "canister call failed").strip()
             raise RuntimeError(err)
+        if not (proc.stdout or "").strip():
+            return {}
         return _parse_jsonish(proc.stdout)
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(f"{method} timed out after {timeout}s") from exc
@@ -1016,6 +1022,161 @@ def query_credit_balance(registry_id: str, principal: str, network: str, identit
         timeout=60,
     )
     return parse_credits_balance(payload)
+
+
+def _load_ii_identity_proof(identity: str) -> Optional[Dict[str, Any]]:
+    """Load an II delegation JSON for the billing ``identity`` field, if present."""
+    name = (identity or "").strip()
+    if not name:
+        return None
+    candidates = [
+        Path.home() / ".local/share/icp-cli/identity/delegations" / f"{name}.json",
+        Path.home() / ".config/icp/identity/delegations" / f"{name}.json",
+    ]
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict) and data.get("delegations") and data.get("publicKey"):
+            return data
+    return None
+
+
+def redeem_voucher_via_billing(
+    *,
+    principal: str,
+    code: str,
+    billing_url: str,
+    registry_id: str,
+    identity_name: str,
+) -> Dict[str, Any]:
+    """POST /voucher/redeem. Raises StageError on HTTP/transport failure."""
+    url = (billing_url or DEFAULT_BILLING_URL).rstrip("/") + "/voucher/redeem"
+    body: Dict[str, Any] = {
+        "principal_id": principal,
+        "code": (code or "").strip(),
+        "registry_canister_id": registry_id,
+    }
+    proof = _load_ii_identity_proof(identity_name)
+    if proof:
+        body["identity"] = proof
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = json.loads(exc.read().decode("utf-8")).get("detail") or ""
+        except Exception:
+            detail = str(exc)
+        raise StageError("credits", f"voucher redeem HTTP {exc.code}: {detail or exc}") from exc
+    except urllib.error.URLError as exc:
+        raise StageError("credits", f"voucher redeem failed: {exc.reason}") from exc
+    except json.JSONDecodeError as exc:
+        raise StageError("credits", f"voucher redeem returned non-JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise StageError("credits", f"voucher redeem returned unexpected payload: {payload!r}")
+    return payload
+
+
+def grant_registry_credits(
+    registry_id: str,
+    principal: str,
+    amount: int,
+    network: str,
+    identity: str,
+    *,
+    note: str,
+) -> Any:
+    """Controller ``add_credits`` on the GaaS registry (billing service may target another canister)."""
+    safe_note = (note or "voucher").replace('"', "")[:120]
+    arg = f'("{principal}", {int(amount)} : nat64, "", "{safe_note}")'
+    return _canister_call(
+        registry_id,
+        "add_credits",
+        arg,
+        network,
+        identity,
+        timeout=60,
+    )
+
+
+def _add_credits_failed(payload: Any) -> Optional[str]:
+    if isinstance(payload, dict):
+        if payload.get("Err") is not None:
+            return str(payload.get("Err"))
+        err = payload.get("error") or payload.get("err")
+        if err:
+            return str(err)
+    return None
+
+
+def apply_credit_voucher(
+    *,
+    code: str,
+    registry_id: str,
+    founder: str,
+    network: str,
+    identity: str,
+    billing_url: str,
+) -> None:
+    """Redeem ``code`` against this GaaS registry, then grant on-chain if still short."""
+    voucher = (code or "").strip()
+    if not voucher:
+        return
+    url = (billing_url or DEFAULT_BILLING_URL).strip() or DEFAULT_BILLING_URL
+    console.print(f"  voucher {voucher} via {url} → {registry_id}")
+    try:
+        resp = redeem_voucher_via_billing(
+            principal=founder,
+            code=voucher,
+            billing_url=url,
+            registry_id=registry_id,
+            identity_name=identity,
+        )
+        if resp.get("success"):
+            added = (resp.get("data") or {}).get("credits")
+            extra = f" (+{added})" if added else ""
+            console.print(f"  billing: {resp.get('message') or 'redeemed'}{extra}")
+        else:
+            console.print(
+                f"  [yellow]billing:[/yellow] {resp.get('message') or 'redeem failed'}"
+            )
+    except StageError as exc:
+        console.print(f"  [yellow]billing:[/yellow] {exc.message}")
+
+    try:
+        balance = query_credit_balance(registry_id, founder, network, identity)
+    except Exception as exc:
+        _fail("credits", f"get_credits after voucher failed: {exc}")
+    if balance >= DEPLOYMENT_COST_CREDITS:
+        return
+
+    amount = voucher_credit_amount(voucher)
+    console.print(f"  add_credits {amount} on {registry_id} ({voucher})")
+    try:
+        granted = grant_registry_credits(
+            registry_id,
+            founder,
+            amount,
+            network,
+            identity,
+            note=f"voucher:{voucher}",
+        )
+    except Exception as exc:
+        _fail("credits", f"add_credits after voucher failed: {exc}")
+    err = _add_credits_failed(granted)
+    if err:
+        _fail("credits", f"add_credits after voucher failed: {err}")
 
 
 # ---------------------------------------------------------------------------
@@ -1071,10 +1232,15 @@ def poll_installer_until_ready(
         if status != last_status:
             console.print(f"  installer: {status}")
             last_status = status
+        if backend and frontend:
+            if status in ("failed", "failed_verification", "cancelled"):
+                console.print(
+                    "  [yellow]installer job failed after minting canisters — "
+                    "continuing founder bootstrap (canister_ids.js / config / slug)[/yellow]"
+                )
+            return info
         if status in ("failed", "failed_verification", "cancelled"):
             _fail("poll", info.get("error") or status)
-        if backend and frontend:
-            return info
         time.sleep(POLL_INTERVAL_S)
     _fail("poll", f"Timed out after {timeout_s}s waiting for canisters (job {job_id})")
     raise AssertionError("unreachable")
@@ -1147,30 +1313,42 @@ def _setup_json_call(
 
 
 _CO_ADMIN_SHELL = """
-from api.user import user_register
-from core.membership import add_department_member, user_in_department
-from core.org_policy import ensure_root_org, grant_root_authority_over_local_orgs
-from ggg import User
 p = {principal!r}
-user_register(p, "admin")
-root = ensure_root_org()
-grant_root_authority_over_local_orgs()
-u = User[p]
-if u and not user_in_department(u, root):
-    add_department_member(root, u)
+r = api.call("register_founder", p)
+print(r)
 print("ok")
 """
 
 
-def _co_admin_method_missing(err: str) -> bool:
+def _candid_method_missing(err: str, method: str) -> bool:
     lower = (err or "").lower()
-    return "register_co_admin" in lower and (
+    name = (method or "").lower()
+    return name in lower and (
         "no update method" in lower
         or "has no method" in lower
         or "not found" in lower
         or "unknown method" in lower
         or "ic0536" in lower
     )
+
+
+def _co_admin_method_missing(err: str) -> bool:
+    return _candid_method_missing(err, "register_co_admin")
+
+
+def _register_founder_ok(raw: Any) -> bool:
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return "success" in raw.lower() and "false" not in raw.lower()
+    if isinstance(raw, dict):
+        if raw.get("success") is False:
+            return False
+        if raw.get("Err") is not None:
+            return False
+        return True
+    return False
 
 
 def register_co_admin_principal(
@@ -1181,18 +1359,20 @@ def register_co_admin_principal(
 ) -> None:
     """After launch, register --co-admin as a second admin User. Idempotent.
 
-    Prefers ``register_co_admin``. If this realm WASM does not have that
-    method yet, falls back to founder ``__shell__`` using existing APIs.
+    Prefers ``register_co_admin``. Older leftover-free realm WASMs expose
+    controller ``register_founder`` instead (head is only set when empty).
+    Last resort: leftover-free ``__shell__`` via ``api.call``.
     """
     principal = str(merged.get("co_admin") or "").strip()
     if not principal:
         return
     console.print(f"  register_co_admin {principal}")
+    arg = f'("{principal}")'
     try:
         raw = _canister_call(
             backend_id,
             "register_co_admin",
-            f'("{principal}")',
+            arg,
             network,
             identity,
             timeout=180,
@@ -1202,21 +1382,45 @@ def register_co_admin_principal(
         if not _co_admin_method_missing(err):
             _fail("co-admin", err)
         console.print(
-            "  register_co_admin not on this WASM — falling back to __shell__"
+            "  register_co_admin not on this WASM — trying register_founder"
         )
-        code = _CO_ADMIN_SHELL.format(principal=principal)
-        raw = _canister_call(
-            backend_id,
-            "__shell__",
-            _candid_text_arg(code),
-            network,
-            identity,
-            timeout=180,
+        try:
+            raw = _canister_call(
+                backend_id,
+                "register_founder",
+                arg,
+                network,
+                identity,
+                timeout=180,
+            )
+        except RuntimeError as founder_exc:
+            founder_err = str(founder_exc)
+            if not _candid_method_missing(founder_err, "register_founder"):
+                _fail("co-admin", founder_err)
+            console.print(
+                "  register_founder not on this WASM — falling back to __shell__"
+            )
+            code = _CO_ADMIN_SHELL.format(principal=principal)
+            raw = _canister_call(
+                backend_id,
+                "__shell__",
+                _candid_text_arg(code),
+                network,
+                identity,
+                timeout=180,
+            )
+            text = raw if isinstance(raw, str) else json.dumps(raw)
+            if "ok" not in text.lower() and "success" not in text.lower():
+                _fail("co-admin", f"__shell__ co-admin failed: {text[:400]}")
+            console.print(
+                f"  co-admin {principal} (admin profile + root org, via __shell__)"
+            )
+            return
+        if not _register_founder_ok(raw):
+            _fail("co-admin", f"register_founder failed: {raw!r}"[:400])
+        console.print(
+            f"  co-admin {principal} (admin profile via register_founder)"
         )
-        text = raw if isinstance(raw, str) else json.dumps(raw)
-        if "ok" not in text.lower() and "success" not in text.lower():
-            _fail("co-admin", f"__shell__ co-admin failed: {text[:400]}")
-        console.print(f"  co-admin {principal} (admin profile + root org, via __shell__)")
         return
     if isinstance(raw, str):
         try:
@@ -1558,6 +1762,7 @@ class GaasConfig:
     installer_id: str
     canisters: Dict[str, str]
     path: Path
+    billing_url: str = ""
 
     @property
     def portal_host(self) -> str:
@@ -1587,6 +1792,10 @@ def load_gaas_config(path: str | Path) -> GaasConfig:
         raise StageError("validate", "--gaas-config canisters must be an object")
     registry_id = str(canisters.get("realm_registry_backend") or "").strip()
     installer_id = str(canisters.get("realm_installer") or "").strip()
+    services = data.get("services") or {}
+    billing_url = ""
+    if isinstance(services, dict):
+        billing_url = str(services.get("billing_url") or "").strip()
     missing: List[str] = []
     if not env_name:
         missing.append("name")
@@ -1607,6 +1816,7 @@ def load_gaas_config(path: str | Path) -> GaasConfig:
         installer_id=installer_id,
         canisters={str(k): str(v) for k, v in canisters.items()},
         path=config_path,
+        billing_url=billing_url,
     )
 
 
@@ -1739,13 +1949,80 @@ def _run_in_dir(
     return result
 
 
-def _file_registry_id_or_empty(network: str) -> str:
-    try:
-        from .files import _resolve_registry
+def build_frontend_canister_ids_js(
+    *,
+    backend_id: str,
+    file_registry_id: str = "",
+    derivation_origin: str = "",
+    portal_url: str = "",
+    test_mode_ii_bypass: bool = False,
+) -> str:
+    """SPA runtime config served at /canister_ids.js (not part of the Vite bundle)."""
+    payload: Dict[str, Any] = {
+        "realm_backend": backend_id,
+        "internet_identity": "https://identity.ic0.app",
+    }
+    if file_registry_id:
+        payload["file_registry"] = file_registry_id
+    if derivation_origin:
+        payload["derivation_origin"] = derivation_origin
+    if portal_url:
+        payload["portal_url"] = portal_url
+    if test_mode_ii_bypass:
+        payload["test_mode_ii_bypass"] = True
+    return "globalThis.__CANISTER_IDS = " + json.dumps(payload) + ";\n"
 
-        return _resolve_registry(network, None)
-    except Exception:
-        return ""
+
+def authorize_frontend_committer(
+    frontend_id: str,
+    principal: str,
+    network: str,
+    identity: str,
+) -> None:
+    """Asset canisters require Commit; IC controllers can authorize themselves."""
+    principal = (principal or "").strip()
+    if not principal:
+        return
+    arg = f'(principal "{principal}")'
+    try:
+        _canister_call(
+            frontend_id, "authorize", arg, network, identity, timeout=120
+        )
+        console.print(f"  authorized {principal} to Commit on frontend")
+    except Exception as exc:
+        console.print(f"  [yellow]frontend authorize (non-fatal): {exc}[/yellow]")
+
+
+def store_frontend_canister_ids(
+    frontend_id: str,
+    js: str,
+    network: str,
+    identity: str,
+) -> None:
+    """Write /canister_ids.js onto the realm frontend asset canister."""
+    escaped = js.replace("\\", "\\\\").replace('"', '\\"')
+    arg = (
+        '(record { key = "/canister_ids.js"; content_type = "application/javascript"; '
+        'content_encoding = "identity"; content = blob "'
+        + escaped
+        + '"; sha256 = null })'
+    )
+    console.print(f"  store /canister_ids.js → {frontend_id}")
+    try:
+        _canister_call(frontend_id, "store", arg, network, identity, timeout=180)
+    except Exception as exc:
+        _fail("config", f"Failed to store /canister_ids.js on {frontend_id}: {exc}")
+
+
+def _enter_setup_already_done(payload: Any) -> bool:
+    if isinstance(payload, dict):
+        err = str(payload.get("error") or "").lower()
+        if payload.get("ok") is False and "already" in err:
+            return True
+        if payload.get("ok") is True or payload.get("success") is True:
+            return False
+    text = str(payload or "").lower()
+    return "already" in text
 
 
 def call_enter_setup(
@@ -1759,9 +2036,201 @@ def call_enter_setup(
     arg = f'(principal "{founder}", "{registry_id}", "{environment}")'
     console.print(f"  enter_setup {backend_id}")
     try:
-        _canister_call(backend_id, "enter_setup", arg, network, identity, timeout=180)
+        raw = _canister_call(
+            backend_id, "enter_setup", arg, network, identity, timeout=180
+        )
     except Exception as exc:
         raise StageError("deploy", f"enter_setup failed: {exc}") from exc
+    if isinstance(raw, dict) and raw.get("ok") is False:
+        if _enter_setup_already_done(raw):
+            console.print(f"  enter_setup already done ({raw.get('error')})")
+            return
+        raise StageError("deploy", raw.get("error") or "enter_setup failed")
+
+
+def apply_founder_canister_config(
+    *,
+    backend_id: str,
+    frontend_id: str,
+    network: str,
+    identity: str,
+    file_registry_id: str,
+    marketplace_id: str,
+    registry_id: str,
+    founder: str,
+) -> None:
+    """Installer bootstrap that Casals-provisioned WASMs often cannot run."""
+    payload: Dict[str, Any] = {
+        "frontend_canister_id": frontend_id,
+        "network": network,
+        "creator_principal": founder,
+    }
+    if file_registry_id:
+        payload["file_registry_canister_id"] = file_registry_id
+    if marketplace_id:
+        payload["marketplace_canister_id"] = marketplace_id
+    if registry_id:
+        payload["realm_registry_canister_id"] = registry_id
+    flags = network_test_flags(network)
+    if flags:
+        payload["test_flags"] = flags
+        if "ii_bypass" in flags:
+            payload["can_test_mode"] = True
+    console.print(f"  set_canister_config_json {backend_id}")
+    try:
+        raw = _canister_call(
+            backend_id,
+            "set_canister_config_json",
+            _candid_text_arg(json.dumps(payload)),
+            network,
+            identity,
+            timeout=180,
+        )
+    except Exception as exc:
+        _fail("config", f"set_canister_config_json failed: {exc}")
+    if isinstance(raw, dict) and raw.get("success") is False:
+        _fail("config", raw.get("error") or "set_canister_config_json failed")
+
+
+def grant_frontend_commit(
+    frontend_id: str,
+    backend_id: str,
+    network: str,
+    identity: str,
+) -> None:
+    arg = (
+        f'(record {{ to_principal = principal "{backend_id}"; '
+        "permission = variant { Commit } })"
+    )
+    try:
+        _canister_call(
+            frontend_id, "grant_permission", arg, network, identity, timeout=120
+        )
+        console.print("  granted Commit on frontend to realm backend")
+    except Exception as exc:
+        console.print(f"  [yellow]grant_permission Commit (non-fatal): {exc}[/yellow]")
+
+
+def claim_portal_slug(
+    *,
+    slug: str,
+    frontend_id: str,
+    backend_id: str,
+    portal_url: str,
+    registry_id: str,
+    network: str,
+    identity: str,
+) -> None:
+    """Register + claim so https://*.gos.earth/r/<slug> resolves."""
+    if not registry_id:
+        return
+    portal_base = portal_url.rsplit("/r/", 1)[0] if "/r/" in portal_url else portal_url
+    frontend_url = f"https://{frontend_id}.icp0.io"
+    register_payload = {
+        "registry_canister_id": registry_id,
+        "realm_name": slug,
+        "frontend_url": frontend_url,
+        "canister_ids": {"frontend_canister_id": frontend_id},
+    }
+    console.print(f"  register_realm_from_registry {slug}")
+    try:
+        raw = _canister_call(
+            backend_id,
+            "register_realm_from_registry",
+            _candid_text_arg(json.dumps(register_payload)),
+            network,
+            identity,
+            timeout=180,
+        )
+        if isinstance(raw, dict) and raw.get("success") is False:
+            console.print(
+                f"  [yellow]register_realm_from_registry: {raw.get('error')}[/yellow]"
+            )
+    except Exception as exc:
+        console.print(f"  [yellow]register_realm_from_registry (non-fatal): {exc}[/yellow]")
+
+    claim_arg = (
+        f'("{slug}", "{frontend_id}", "{backend_id}", "{portal_base}", "", '
+        "null, null, null, null)"
+    )
+    console.print(f"  claim_slug {slug}")
+    try:
+        raw = _canister_call(
+            registry_id, "claim_slug", claim_arg, network, identity, timeout=180
+        )
+    except Exception as exc:
+        _fail("config", f"claim_slug failed: {exc}")
+    if isinstance(raw, dict):
+        inner = raw.get("Ok") if "Ok" in raw else raw
+        if isinstance(inner, str):
+            try:
+                inner = json.loads(inner)
+            except json.JSONDecodeError:
+                inner = {"raw": inner}
+        if isinstance(inner, dict) and inner.get("success") is False:
+            _fail("config", inner.get("error") or "claim_slug failed")
+
+
+def wire_live_realm(
+    *,
+    backend_id: str,
+    frontend_id: str,
+    founder: str,
+    network: str,
+    identity: str,
+    slug: str,
+    portal: str,
+    registry_id: str,
+    file_registry_id: str,
+    marketplace_id: str = "",
+) -> None:
+    """Founder-side wiring the GOS installer often cannot finish under Casals.
+
+    The installer is recorded at realm @init (Casals install_arg). Founder
+    heal still writes /canister_ids.js and slug; pass --file-registry
+    explicitly (no baked lookup).
+    """
+    file_registry_id = (file_registry_id or "").strip()
+    if not file_registry_id:
+        raise StageError(
+            "config",
+            "pass --file-registry <canister-id> (no baked or file-based lookup)",
+        )
+    marketplace_id = (marketplace_id or "").strip()
+    env_registry = registry_id or file_registry_id
+    call_enter_setup(
+        backend_id, founder, env_registry, network, network, identity
+    )
+    apply_founder_canister_config(
+        backend_id=backend_id,
+        frontend_id=frontend_id,
+        network=network,
+        identity=identity,
+        file_registry_id=file_registry_id,
+        marketplace_id=marketplace_id,
+        registry_id=registry_id,
+        founder=founder,
+    )
+    js = build_frontend_canister_ids_js(
+        backend_id=backend_id,
+        file_registry_id=file_registry_id,
+        derivation_origin=derivation_origin_for_network(network),
+        portal_url=portal,
+        test_mode_ii_bypass=bool(network_test_flags(network).get("ii_bypass")),
+    )
+    authorize_frontend_committer(frontend_id, founder, network, identity)
+    store_frontend_canister_ids(frontend_id, js, network, identity)
+    grant_frontend_commit(frontend_id, backend_id, network, identity)
+    if registry_id:
+        claim_portal_slug(
+            slug=slug,
+            frontend_id=frontend_id,
+            backend_id=backend_id,
+            portal_url=portal,
+            registry_id=registry_id,
+            network=network,
+            identity=identity,
+        )
 
 
 def deploy_standalone_realm(
@@ -1770,6 +2239,7 @@ def deploy_standalone_realm(
     network: str,
     identity: str,
     slug: str,
+    file_registry_id: str = "",
 ) -> Tuple[str, str]:
     """Mint realm_backend + realm_frontend from a GitHub release. Returns IDs."""
     project_root = get_project_root()
@@ -1836,7 +2306,7 @@ def deploy_standalone_realm(
     if not backend_id or not frontend_id:
         raise StageError("deploy", f"could not read canister IDs from {ids_path}")
 
-    file_registry_id = _file_registry_id_or_empty(network)
+    file_registry_id = (file_registry_id or "").strip()
     _write_standalone_canister_ids_js(
         dist,
         backend_id=backend_id,
@@ -1860,6 +2330,8 @@ def deploy_standalone_realm(
         "--identity",
         identity,
         "--yes",
+        "--argument",
+        "(null)",
     ]
     console.print(f"  install realm_backend {backend_id}")
     proc = _run_in_dir(install_backend, cwd=work, timeout=300)
@@ -1951,6 +2423,9 @@ def new_command(
     co_admin: Optional[str] = None,
     gaas_config: Optional[str] = None,
     deploy_mode: Optional[str] = None,
+    credit_voucher: Optional[str] = None,
+    file_registry: Optional[str] = None,
+    marketplace: Optional[str] = None,
 ) -> None:
     """Run the live wizard-path create pipeline. Never hits IC from unit tests."""
     stage = "validate"
@@ -2041,15 +2516,21 @@ def new_command(
                 network=network,
                 identity=identity,
                 slug=merged["slug"],
+                file_registry_id=file_registry or "",
             )
             portal = f"https://{frontend_id}.icp0.io/"
-            call_enter_setup(
-                backend_id,
-                founder,
-                _file_registry_id_or_empty(network),
-                network,
-                network,
-                identity,
+            stage = "config"
+            wire_live_realm(
+                backend_id=backend_id,
+                frontend_id=frontend_id,
+                founder=founder,
+                network=network,
+                identity=identity,
+                slug=merged["slug"],
+                portal=portal,
+                registry_id="",
+                file_registry_id=file_registry or "",
+                marketplace_id=marketplace or "",
             )
             wait_for_enter_setup(backend_id, network, identity)
             console.print(f"  portal {portal}")
@@ -2088,6 +2569,16 @@ def new_command(
 
         stage = "credits"
         console.print(f"[bold]credits[/bold] founder {founder} on {network}")
+        voucher = (credit_voucher or "").strip()
+        if voucher:
+            apply_credit_voucher(
+                code=voucher,
+                registry_id=registry_id,
+                founder=founder,
+                network=network,
+                identity=identity,
+                billing_url=gaas.billing_url,
+            )
         try:
             balance = query_credit_balance(registry_id, founder, network, identity)
         except StageError:
@@ -2171,6 +2662,22 @@ def new_command(
             backend_id = str(info.get("backend_canister_id") or "").strip()
             frontend_id = str(info.get("frontend_canister_id") or "").strip()
 
+        if not (backend_id and frontend_id):
+            _fail("poll", "installer returned no backend/frontend canister ids")
+
+        stage = "config"
+        wire_live_realm(
+            backend_id=backend_id,
+            frontend_id=frontend_id,
+            founder=founder,
+            network=network,
+            identity=identity,
+            slug=merged["slug"],
+            portal=portal,
+            registry_id=registry_id,
+            file_registry_id=file_registry or "",
+            marketplace_id=marketplace or "",
+        )
         wait_for_enter_setup(backend_id, network, identity)
         console.print(f"  portal {portal}")
 

@@ -23,7 +23,7 @@ from ..utils import console, get_project_root
 
 
 def _live_file_registry_id(network: str, project_root=None) -> Optional[str]:
-    """Prefer canister_ids.json (updated by env deploy) over baked NETWORK_INFRA."""
+    """file_registry from canister_ids.json or dfx (operator inventory)."""
     root = project_root or get_project_root()
     cid = (_read_canister_ids(root).get("file_registry") or {}).get(network)
     if cid:
@@ -72,6 +72,11 @@ def seed_command(
     if not skip_catalog:
         console.print(Panel.fit("📚 Publishing extension/codex catalog", style="bold blue"))
         registry = _live_file_registry_id(network, project_root)
+        if not registry:
+            raise typer.BadParameter(
+                f"no file_registry id for {network} in canister_ids.json "
+                "(seed looks it up and passes --registry; files publish has no fallback)"
+            )
         files_publish_command(
             network=network,
             identity=identity,

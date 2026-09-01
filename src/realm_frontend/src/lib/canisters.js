@@ -14,9 +14,11 @@ async function initializeImports() {
 
 	// Canister ID comes from /canister_ids.js (uploaded by the installer at deploy time).
 	// Falls back to build-time declarations for local dev.
+	// GOS installer historically wrote `backend`; Realms SPA reads `realm_backend`.
 	const runtimeIds = globalThis.__CANISTER_IDS;
-	if (runtimeIds?.realm_backend) {
-		canisterId = runtimeIds.realm_backend;
+	const runtimeBackend = runtimeIds?.realm_backend || runtimeIds?.backend;
+	if (runtimeBackend) {
+		canisterId = runtimeBackend;
 		console.log(`✅ realm_backend from canister_ids.js: ${canisterId}`);
 	}
 

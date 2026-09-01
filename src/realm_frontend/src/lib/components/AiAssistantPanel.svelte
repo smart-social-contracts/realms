@@ -35,11 +35,17 @@
 
 	function runtimeCanisterIds(): {
 		realm_backend?: string;
+		backend?: string;
 		network?: string;
 		file_registry?: string;
 	} {
 		return (globalThis as {
-			__CANISTER_IDS?: { realm_backend?: string; network?: string; file_registry?: string };
+			__CANISTER_IDS?: {
+				realm_backend?: string;
+				backend?: string;
+				network?: string;
+				file_registry?: string;
+			};
 		}).__CANISTER_IDS ?? {};
 	}
 
@@ -61,7 +67,12 @@
 	}
 
 	function getRealmBackendCanisterId(): string {
-		return runtimeCanisterIds().realm_backend ?? backendCanisterId?.toString?.() ?? '';
+		return (
+			runtimeCanisterIds().realm_backend
+			?? runtimeCanisterIds().backend
+			?? backendCanisterId?.toString?.()
+			?? ''
+		);
 	}
 
 	function openSettings() {

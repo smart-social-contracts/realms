@@ -449,6 +449,14 @@ def _check_marketplace_approval(
     if not require:
         logger.info(f"approval enforcement off; installing '{namespace}' unchecked")
         return ""
+    if _is_founding_setup():
+        # Founder wizard / `realms new` installs from the file_registry they
+        # wired. Older registries have no get_namespace_approval_icc; fail-open
+        # here, fail-closed after setup completes.
+        logger.info(
+            f"founding setup: installing '{namespace}' without marketplace ICC"
+        )
+        return ""
 
     hint = (
         "A realm operator with the realm.configure.trust_policy right can allow "
@@ -1114,10 +1122,13 @@ def install_codex_from_registry(
     if unified.get("success"):
         return unified_raw
     unified_error = str(unified.get("error") or "")
-    if (
-        "No published version" not in unified_error
-        and "not found" not in unified_error.lower()
-    ):
+    err_l = unified_error.lower()
+    missing_under_ext = (
+        "no published version" in err_l
+        or "not found" in err_l
+        or "no versions found" in err_l
+    )
+    if unified_error and not missing_under_ext:
         # The package exists under ext/ but failed for a real reason
         # (singleton conflict, unsupported API version, load failure) —
         # surface that instead of silently installing a stale legacy copy.

@@ -323,9 +323,9 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     except Exception:
         pass
 
-    # 1b. GOS installer/registry first-boot. Casals is not a lasting
-    # controller; the installer (fltjm on test) must be able to call
-    # set_canister_config_json during setup without realm.admin on a User.
+    # 1b. GOS installer first-boot. Casals is not a lasting controller;
+    # the installer recorded at @init may call set_canister_config_json
+    # during setup without a User. After setup this bypass expires.
     try:
         realm = Realm.load("1")
         if is_bootstrap_admin_caller(caller_principal, realm):
@@ -439,21 +439,21 @@ def require(operation: str):
 
 
 def is_bootstrap_admin_caller(caller_principal: str, realm) -> bool:
-    """Installer/registry may act as admin for first-boot without IC control.
+    """Recorded installer may act as admin during setup only.
 
-    During setup, any known GOS installer/registry principal is allowed.
-    After setup completes, only the recorded ``installer_canister_id``
-    keeps this bypass — not every GOS installer in every environment.
+    Set at ``@init``. Not a User, not ``trusted_principals``. After setup
+    completes the bypass expires; ``installer_canister_id`` stays for
+    outbound broker calls (quarter provision).
     """
     if not realm:
         return False
-    from core.network_infra import is_known_bootstrap_principal
+    from core.setup import is_setup_stage
 
-    status = str(getattr(realm, "status", "") or "").strip()
-    if status == "setup" and is_known_bootstrap_principal(caller_principal):
-        return True
+    caller = (caller_principal or "").strip()
+    if not caller or not is_setup_stage(realm):
+        return False
     installer_id = str(getattr(realm, "installer_canister_id", "") or "").strip()
-    return bool(installer_id and installer_id == caller_principal)
+    return bool(installer_id and installer_id == caller)
 
 
 def _is_controller_or_trusted(caller_principal: str) -> bool:

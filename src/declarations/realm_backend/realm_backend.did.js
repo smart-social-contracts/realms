@@ -467,4 +467,4 @@ export const idlFactory = ({ IDL }) => {
     'update_realm_config' : IDL.Func([IDL.Text], [IDL.Text], []),
   });
 };
-export const init = ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return [IDL.Opt(IDL.Text)]; };

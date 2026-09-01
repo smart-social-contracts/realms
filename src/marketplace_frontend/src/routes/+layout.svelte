@@ -64,7 +64,7 @@ $: routeIsActive = (path) => {
 
 <svelte:window on:click={() => (showLanguageMenu = false)} on:scroll={onWindowScroll} />
 <svelte:head>
-  <title>Realms GOS - The Governance Operating System</title>
+  <title>Realms GOS</title>
 </svelte:head>
 
 {#if browser && i18nReady}

@@ -24,7 +24,7 @@ test.describe('marketplace_frontend smoke', () => {
   test('home door has no env/version chips and keeps the catalog', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page).toHaveTitle('Realms GOS - The Governance Operating System');
+    await expect(page).toHaveTitle('Realms GOS');
     await expect(page.getByRole('heading', { name: 'The Governance Operating System' })).toBeVisible();
     await expect(page.locator('.landing-wordmark img[src="/images/logo_horizontal.svg"]')).toBeVisible();
     await expect(page.locator('.landing-bg canvas')).toBeVisible();

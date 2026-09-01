@@ -325,10 +325,11 @@ def test_enter_setup_sets_creator_and_registry():
     assert setup_cfg["realm_registry_canister_id"] == "registry-canister"
     assert realm.network == "staging"
     assert realm.file_registry_canister_id == "file-reg-id"
-    assert realm.marketplace_canister_id == "h3hkh-3yaaa-aaaac-bfxoa-cai"
+    assert realm.marketplace_canister_id == ""
+    assert realm.installer_canister_id == ""
 
 
-def test_enter_setup_fills_empty_infra_ids_for_test():
+def test_enter_setup_does_not_fill_infra_ids_from_environment():
     realm = _FakeRealm(
         status=RealmStatus.SETUP,
         manifest_data="{}",
@@ -343,11 +344,12 @@ def test_enter_setup_fills_empty_infra_ids_for_test():
     )
 
     assert result == {"ok": True}
-    assert realm.file_registry_canister_id == "uq2mu-kaaaa-aaaah-avqcq-cai"
-    assert realm.marketplace_canister_id == "2wldc-niaaa-aaaad-qlxga-cai"
+    assert realm.file_registry_canister_id == ""
+    assert realm.marketplace_canister_id == ""
+    assert realm.network == "test"
 
 
-def test_enter_setup_rejects_unknown_environment():
+def test_enter_setup_accepts_any_environment_label():
     realm = _FakeRealm(
         status=RealmStatus.SETUP,
         manifest_data="{}",
@@ -361,9 +363,8 @@ def test_enter_setup_rejects_unknown_environment():
         "creator-1", "registry-canister", "production"
     )
 
-    assert result == {"ok": False, "error": "unknown environment: production"}
-    assert realm.file_registry_canister_id == ""
-    assert realm.marketplace_canister_id == ""
+    assert result == {"ok": True}
+    assert realm.network == "production"
 
 
 def test_enter_setup_empty_environment_preserves_existing_network():
@@ -451,6 +452,7 @@ def test_enter_setup_rejects_random_principal():
 
 def test_enter_setup_allows_installer_without_controller():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    realm.installer_canister_id = _TEST_INSTALLER
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = False
     mock_ic.caller.return_value.to_str.return_value = _TEST_INSTALLER
@@ -463,11 +465,12 @@ def test_enter_setup_allows_installer_without_controller():
     setup_cfg = json.loads(realm.manifest_data)["setup"]
     assert setup_cfg["creator_principal"] == "creator-1"
     assert realm.installer_canister_id == _TEST_INSTALLER
-    assert _TEST_INSTALLER in realm.trusted_principals.split(",")
+    assert realm.trusted_principals == ""
 
 
 def test_enter_setup_installer_once_is_idempotent_same_creator():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    realm.installer_canister_id = _TEST_INSTALLER
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = False
 
@@ -487,6 +490,7 @@ def test_enter_setup_installer_once_is_idempotent_same_creator():
 
 def test_enter_setup_rejects_random_after_installer_bootstrapped():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    realm.installer_canister_id = _TEST_INSTALLER
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = False
 
@@ -499,27 +503,81 @@ def test_enter_setup_rejects_random_after_installer_bootstrapped():
     assert denied == {"ok": False, "error": "unauthorized"}
 
 
-def test_bootstrap_admin_allows_installer_during_setup_not_random():
+def test_bootstrap_admin_only_recorded_installer_during_setup():
     from core.access import is_bootstrap_admin_caller
 
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is False
+    realm.installer_canister_id = _TEST_INSTALLER
     assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is True
-    assert is_bootstrap_admin_caller("yhw3g-fyaaa-aaaas-qgorq-cai", realm) is True
-    assert is_bootstrap_admin_caller(_DEMO_LIVE_INSTALLER, realm) is True
-    assert is_bootstrap_admin_caller("mjrky-pyaaa-aaaah-qu27a-cai", realm) is True
+    assert is_bootstrap_admin_caller(_DEMO_LIVE_INSTALLER, realm) is False
     assert is_bootstrap_admin_caller("random-attacker", realm) is False
     assert is_bootstrap_admin_caller(_TEST_INSTALLER, None) is False
 
 
-def test_bootstrap_admin_recorded_installer_survives_setup_complete():
+def test_bootstrap_admin_recorded_installer_expires_after_setup():
     from core.access import is_bootstrap_admin_caller
 
     realm = _FakeRealm(status=RealmStatus.ALPHA, manifest_data="{}")
     realm.installer_canister_id = _TEST_INSTALLER
-    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is True
+    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is False
     assert is_bootstrap_admin_caller("random-attacker", realm) is False
     realm.installer_canister_id = ""
     assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is False
+
+
+_UNKNOWN_INSTALLER = "new-gos-installer-aaaaa-aaaah-av3zz-cai"
+
+
+def test_enter_setup_rejects_unknown_canister_on_virgin_realm():
+    """No first-caller race: unrecorded installer cannot enter_setup."""
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _FakeRealm.reset(realm)
+    mock_ic.is_controller.return_value = False
+    mock_ic.caller.return_value.to_str.return_value = _UNKNOWN_INSTALLER
+
+    result = _enter_setup_with_auth_gate(
+        "creator-1", "registry-canister", "demo", caller=_UNKNOWN_INSTALLER
+    )
+
+    assert result == {"ok": False, "error": "unauthorized"}
+    assert realm.installer_canister_id == ""
+
+
+def test_init_arg_installer_may_enter_setup_and_expires():
+    from core.access import is_bootstrap_admin_caller
+    from core.setup import set_installer_principal
+
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _FakeRealm.reset(realm)
+    set_installer_principal(realm, _UNKNOWN_INSTALLER)
+    assert realm.installer_canister_id == _UNKNOWN_INSTALLER
+    set_installer_principal(realm, _TEST_INSTALLER)
+    assert realm.installer_canister_id == _UNKNOWN_INSTALLER
+
+    mock_ic.is_controller.return_value = False
+    result = _enter_setup_with_auth_gate(
+        "creator-1", "registry-canister", "demo", caller=_UNKNOWN_INSTALLER
+    )
+    assert result == {"ok": True}
+    assert is_bootstrap_admin_caller(_UNKNOWN_INSTALLER, realm) is True
+    realm.status = RealmStatus.ALPHA
+    assert is_bootstrap_admin_caller(_UNKNOWN_INSTALLER, realm) is False
+
+
+def test_enter_setup_controller_does_not_record_founder_as_installer():
+    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
+    _FakeRealm.reset(realm)
+    mock_ic.is_controller.return_value = True
+    mock_ic.caller.return_value.to_str.return_value = "founder-pem-principal"
+
+    result = _enter_setup_with_auth_gate(
+        "founder-pem-principal", "registry-canister", "demo", caller="founder-pem-principal"
+    )
+
+    assert result == {"ok": True}
+    assert realm.installer_canister_id == ""
+    assert realm.trusted_principals == ""
 
 
 def test_enter_setup_rejects_when_completed():

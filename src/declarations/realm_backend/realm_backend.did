@@ -241,7 +241,7 @@ type TimerId = nat64;
 type Duration = nat64;
 type Address = text;
 
-service : {
+service : (opt text) -> {
   "policy_status" : () -> (text) query;
   "status" : () -> (RealmResponse) query;
   "get_runtime_flags" : () -> (text) query;

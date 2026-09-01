@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -32,6 +33,13 @@ def _assert_required_exports(did_path: Path) -> None:
         raise SystemExit(
             f"realm_backend pack dropped required update exports: {missing}"
         )
+    if "service : (opt text) -> {" not in text:
+        raise SystemExit(
+            "realm_backend pack dropped @init installer arg; "
+            "expected `service : (opt text) -> {`. "
+            "A nested src/realm_backend/.basilisk copy of main.py usually won "
+            "the basilisk candid merge."
+        )
 
 
 def pack_realm_backend(repo_root: Optional[Path] = None) -> int:
@@ -40,6 +48,11 @@ def pack_realm_backend(repo_root: Optional[Path] = None) -> int:
     main_py = root / "src" / "realm_backend" / "main.py"
     if not main_py.is_file():
         raise SystemExit(f"realm_backend main.py not found at {main_py}")
+
+    nested_basilisk = main_py.parent / ".basilisk"
+    if nested_basilisk.is_dir():
+        print(f"   🧹 removing stale {nested_basilisk} (poisons @init candid merge)")
+        shutil.rmtree(nested_basilisk)
 
     env = apply_cedar_template_env()
     did = root / "src" / "realm_backend" / "realm_backend.did"

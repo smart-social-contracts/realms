@@ -264,10 +264,28 @@ class TestCheckAccess:
 
         from core.access import _check_access
         installer = "fltjm-tyaaa-aaaap-qunhq-cai"
-        demo_installer = "moqmm-caaaa-aaaah-qu27q-cai"
+        assert _check_access(installer, Operations.REALM_ADMIN) is False
+        realm.installer_canister_id = installer
         assert _check_access(installer, Operations.REALM_ADMIN) is True
-        assert _check_access(demo_installer, Operations.REALM_ADMIN) is True
+        assert _check_access("tzip5-vaaaa-aaaah-av3ca-cai", Operations.REALM_ADMIN) is False
         assert _check_access("random-attacker", Operations.REALM_ADMIN) is False
+
+    @patch("ggg.Realm")
+    @patch("ggg.User")
+    def test_unknown_canister_without_init_arg_has_no_admin(self, MockUser, MockRealm):
+        realm = MagicMock()
+        realm.trusted_principals = ""
+        realm.status = "setup"
+        realm.installer_canister_id = ""
+        realm.test_mode_skip_authentication = False
+        MockRealm.load.return_value = realm
+        MockUser.__getitem__ = MagicMock(return_value=None)
+
+        from core.access import _check_access
+
+        unknown = "new-gos-installer-aaaaa-aaaah-av3zz-cai"
+        assert _check_access(unknown, Operations.REALM_ADMIN) is False
+        assert realm.installer_canister_id == ""
 
     @patch("ggg.Realm")
     @patch("ggg.User")
@@ -285,7 +303,7 @@ class TestCheckAccess:
 
     @patch("ggg.Realm")
     @patch("ggg.User")
-    def test_recorded_installer_keeps_admin_after_setup(self, MockUser, MockRealm):
+    def test_recorded_installer_loses_admin_after_setup(self, MockUser, MockRealm):
         realm = MagicMock()
         realm.trusted_principals = ""
         realm.status = "alpha"
@@ -295,7 +313,7 @@ class TestCheckAccess:
         MockUser.__getitem__ = MagicMock(return_value=None)
 
         from core.access import _check_access
-        assert _check_access("fltjm-tyaaa-aaaap-qunhq-cai", Operations.REALM_ADMIN) is True
+        assert _check_access("fltjm-tyaaa-aaaap-qunhq-cai", Operations.REALM_ADMIN) is False
         assert _check_access("random-attacker", Operations.REALM_ADMIN) is False
 
     @patch("ggg.Realm")

@@ -14,7 +14,9 @@ from realms.cli.commands.new import (
     DEPLOYMENT_COST_CREDITS,
     StageError,
     _identity_kind_is_web,
+    apply_credit_voucher,
     assert_credits_sufficient,
+    build_frontend_canister_ids_js,
     build_portal_manifest,
     check_ic_members_policy,
     classify_identity,
@@ -24,12 +26,15 @@ from realms.cli.commands.new import (
     new_command,
     normalize_deploy_mode,
     parse_subnet,
+    poll_installer_until_ready,
     portal_url_for_slug,
     resolve_gos_queue,
     slugify,
     standalone_artifact_urls,
+    voucher_credit_amount,
     validate_branding_size,
     validate_merged_spec,
+    _parse_jsonish,
 )
 from realms.cli.main import app
 
@@ -194,6 +199,20 @@ class TestPortalManifest:
         assert manifest["federation"]["portal_url"] == "https://registry.realmsgos.org/r/acme"
         assert manifest["deploy_version"] == "main"
         assert "test_flags" not in manifest
+        assert "can_test_mode" not in manifest
+
+    def test_demo_omits_test_flags(self):
+        manifest = build_portal_manifest(
+            name="SeedDemo",
+            slug="seeddemo",
+            network="demo",
+            version="main",
+            founder="aaaaa-aa",
+            subnet={"choice": "automatic"},
+        )
+        assert manifest["federation"]["portal_url"] == "https://demo.gos.earth/r/seeddemo"
+        assert "test_flags" not in manifest
+        assert "can_test_mode" not in manifest
 
 
 class TestCreditsFail:
@@ -368,6 +387,7 @@ class TestHelp:
         assert "--log-file" in output
         assert "--gaas-config" in output
         assert "--deploy-mode" in output
+        assert "--credit-voucher" in output
         assert "wizard" in output.lower() or "live" in output.lower() or "standalone" in output.lower()
 
 
@@ -393,6 +413,15 @@ class TestGaasConfig:
         assert gaas.registry_id == "5ocwl-eiaaa-aaaah-av2bq-cai"
         assert gaas.installer_id == "53fhg-faaaa-aaaah-av2ca-cai"
         assert gaas.portal_host == "https://demo.gos.earth"
+        assert gaas.billing_url == ""
+
+    def test_load_reads_billing_url(self, tmp_path: Path):
+        path = self._write(
+            tmp_path,
+            services={"billing_url": "https://billing.example.test"},
+        )
+        gaas = load_gaas_config(path)
+        assert gaas.billing_url == "https://billing.example.test"
 
     def test_resolve_infers_network_from_name(self, tmp_path: Path):
         path = self._write(tmp_path)
@@ -477,7 +506,7 @@ class TestDeployMode:
     @patch("realms.cli.commands.new.run_setup_stage")
     @patch("realms.cli.commands.new.setup_already_complete", return_value=True)
     @patch("realms.cli.commands.new.wait_for_enter_setup")
-    @patch("realms.cli.commands.new.call_enter_setup")
+    @patch("realms.cli.commands.new.wire_live_realm")
     @patch(
         "realms.cli.commands.new.deploy_standalone_realm",
         return_value=("aaaaa-aaaaa-aaaaa-aaaaa-aaa", "bbbbb-bbbbb-bbbbb-bbbbb-bbb"),
@@ -492,7 +521,7 @@ class TestDeployMode:
         _linked,
         _principal,
         mock_deploy,
-        mock_enter,
+        mock_wire,
         _wait,
         _complete,
         _setup,
@@ -511,11 +540,165 @@ class TestDeployMode:
             codex="agora",
             yes=True,
             deploy_mode="standalone",
+            credit_voucher="BETA50",
         )
         mock_deploy.assert_called_once()
-        mock_enter.assert_called_once()
+        mock_wire.assert_called_once()
         out = capsys.readouterr().out
         assert "standalone" in out
         assert "bbbbb-bbbbb-bbbbb-bbbbb-bbb" in out
+
+
+class TestCreditVoucher:
+    def test_amount_from_trailing_digits(self):
+        assert voucher_credit_amount("BETA50") == 50
+        assert voucher_credit_amount("beta5") == DEPLOYMENT_COST_CREDITS
+        assert voucher_credit_amount("FREE") == DEPLOYMENT_COST_CREDITS
+
+    def test_billing_success_skips_add_credits(self):
+        with patch(
+            "realms.cli.commands.new.redeem_voucher_via_billing",
+            return_value={"success": True, "message": "ok", "data": {"credits": 50}},
+        ), patch(
+            "realms.cli.commands.new.query_credit_balance", return_value=50
+        ), patch("realms.cli.commands.new.grant_registry_credits") as grant:
+            apply_credit_voucher(
+                code="BETA50",
+                registry_id="tmp6q-uiaaa-aaaah-av3bq-cai",
+                founder="aaaaa-aa",
+                network="demo",
+                identity="deployer",
+                billing_url="https://billing.example.test",
+            )
+            grant.assert_not_called()
+
+    def test_falls_back_to_on_chain_add_credits(self):
+        with patch(
+            "realms.cli.commands.new.redeem_voucher_via_billing",
+            side_effect=StageError("credits", "Missing Internet Identity proof"),
+        ), patch(
+            "realms.cli.commands.new.query_credit_balance", return_value=0
+        ), patch(
+            "realms.cli.commands.new.grant_registry_credits", return_value={"Ok": {}}
+        ) as grant:
+            apply_credit_voucher(
+                code="BETA50",
+                registry_id="tmp6q-uiaaa-aaaah-av3bq-cai",
+                founder="aaaaa-aa",
+                network="demo",
+                identity="deployer",
+                billing_url="",
+            )
+            grant.assert_called_once()
+            assert grant.call_args.args[2] == 50
+
+    def test_command_redeems_voucher_before_balance_check(self, tmp_path: Path):
+        cfg = tmp_path / "gaas.json"
+        cfg.write_text(
+            json.dumps(
+                {
+                    "name": "staging",
+                    "domain": "staging.gos.earth",
+                    "canisters": {
+                        "realm_registry_backend": "7wzxh-wyaaa-aaaau-aggyq-cai",
+                        "realm_installer": "lusjm-wqaaa-aaaah-av2ca-cai",
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        with patch(
+            "realms.cli.commands.new.assert_identity_is_ii_linked", return_value="web"
+        ), patch(
+            "realms.cli.commands.new.resolve_identity_principal", return_value="aaaaa-aa"
+        ), patch(
+            "realms.cli.commands.new.apply_credit_voucher"
+        ) as redeem, patch(
+            "realms.cli.commands.new.query_credit_balance", return_value=1
+        ):
+            with pytest.raises(typer.Exit):
+                new_command(
+                    spec_file=None,
+                    identity="alice",
+                    network="staging",
+                    name="Acme Realm",
+                    codex="agora",
+                    yes=True,
+                    gaas_config=str(cfg),
+                    credit_voucher="BETA50",
+                )
+            redeem.assert_called_once()
+            assert redeem.call_args.kwargs["code"] == "BETA50"
+
+
+def test_parse_jsonish_unwraps_dfx_json_string():
+    raw = json.dumps('{"success":true,"status":"setup","creator":null}')
+    parsed = _parse_jsonish(raw)
+    assert parsed["success"] is True
+    assert parsed["status"] == "setup"
+
+
+class TestFrontendCanisterIdsJs:
+    def test_includes_backend_and_portal(self):
+        js = build_frontend_canister_ids_js(
+            backend_id="lvpim-iyaaa-aaaas-amw5q-cai",
+            file_registry_id="krch6-ryaaa-aaaas-amw3q-cai",
+            derivation_origin="https://demo.realmsgos.org",
+            portal_url="https://demo.gos.earth/r/seeddemo",
+        )
+        assert "globalThis.__CANISTER_IDS" in js
+        assert "lvpim-iyaaa-aaaas-amw5q-cai" in js
+        assert "https://demo.gos.earth/r/seeddemo" in js
+        assert "test_mode_ii_bypass" not in js
+
+    def test_ii_bypass_only_when_requested(self):
+        js = build_frontend_canister_ids_js(
+            backend_id="aaaaa-aa",
+            test_mode_ii_bypass=True,
+        )
+        assert '"test_mode_ii_bypass": true' in js
+
+
+class TestPollInstaller:
+    def test_failed_job_with_canisters_continues(self):
+        payload = {
+            "Ok": {
+                "status": "failed",
+                "error": "set_canister_config_json failed",
+                "backend_canister_id": "lvpim-iyaaa-aaaas-amw5q-cai",
+                "frontend_canister_id": "laizb-jqaaa-aaaas-amw6a-cai",
+            }
+        }
+        with patch("realms.cli.commands.new._canister_call", return_value=payload):
+            info = poll_installer_until_ready(
+                "tzip5-vaaaa-aaaah-av3ca-cai",
+                "job_1",
+                "demo",
+                "deployer",
+            )
+        assert info["backend_canister_id"].startswith("lvpim-")
+        assert info["frontend_canister_id"].startswith("laizb-")
+
+    def test_failed_job_without_canisters_raises(self):
+        payload = {
+            "Ok": {
+                "status": "failed",
+                "error": "out of cycles",
+                "backend_canister_id": "",
+                "frontend_canister_id": "",
+            }
+        }
+        with patch("realms.cli.commands.new._canister_call", return_value=payload):
+            with pytest.raises(StageError) as exc:
+                poll_installer_until_ready(
+                    "tzip5-vaaaa-aaaah-av3ca-cai",
+                    "job_1",
+                    "demo",
+                    "deployer",
+                )
+            assert "out of cycles" in exc.value.message
+
+
 
 
