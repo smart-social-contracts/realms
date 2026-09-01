@@ -168,9 +168,10 @@ def _create_canister(
 ) -> str:
     cmd = _dfx_cmd("canister", "create", canister_name, "--network", network, "--no-wallet")
     # Mainnet-style networks (demo/staging/test/ic) have many subnets; dfx
-    # refuses to pick one unless we say application vs system.
+    # refuses to pick one unless we name a type. ``application`` is not a
+    # cycles-ledger subnet type; ``european`` matches ``realms new --subnet``.
     if network not in ("local", "localhost"):
-        cmd.extend(["--subnet-type", "application"])
+        cmd.extend(["--subnet-type", "european"])
         # Default dfx create amount can exceed a thin cycles ledger. 1.8T is
         # enough to install WASM under the 30-day freeze without starving a
         # four-canister product-stack mint from ~8 TC.
