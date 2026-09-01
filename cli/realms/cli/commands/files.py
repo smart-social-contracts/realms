@@ -26,13 +26,25 @@ console = Console()
 _CORE = Path(__file__).resolve().parents[2] / "src" / "realm_backend" / "core"
 if str(_CORE) not in sys.path:
     sys.path.insert(0, str(_CORE))
-from network_infra import NETWORK_INFRA, file_registry_id_for  # noqa: E402
+from network_infra import file_registry_id_for  # noqa: E402
+
+
+def _registry_from_canister_ids(network: str) -> str:
+    """Live inventory in canister_ids.json beats the baked NETWORK_INFRA table."""
+    path = _find_project_root() / "canister_ids.json"
+    if not path.is_file():
+        return ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    return ((data.get("file_registry") or {}).get(network) or "").strip()
 
 
 def _resolve_registry(network: str, registry: Optional[str]) -> str:
     if registry:
         return registry
-    rid = file_registry_id_for(network)
+    rid = _registry_from_canister_ids(network) or file_registry_id_for(network)
     if not rid:
         raise typer.BadParameter(
             f"No file_registry canister ID for network '{network}'. Use --registry."
@@ -182,6 +194,8 @@ def files_publish_command(
     root = _find_project_root()
     ext_root = root / "extensions" / "extensions"
     codex_root = root / "codices" / "codices"
+    successes = 0
+    failures = 0
 
     if not extensions_only:
         if codex_root.is_dir():
@@ -209,7 +223,9 @@ def files_publish_command(
                         identity=identity,
                         version="main",
                     )
+                    successes += 1
                 except (typer.Exit, SystemExit):
+                    failures += 1
                     console.print(f"[red]Failed to publish codex {cd.name}, continuing...[/red]")
         else:
             console.print(f"[yellow]Codices directory not found: {codex_root}[/yellow]")
@@ -235,12 +251,26 @@ def files_publish_command(
                         network=network,
                         identity=identity,
                     )
+                    successes += 1
                 except (typer.Exit, SystemExit):
+                    failures += 1
                     console.print(f"[red]Failed to publish extension {ed.name}, continuing...[/red]")
         else:
             console.print(f"[yellow]Extensions directory not found: {ext_root}[/yellow]")
 
-    console.print("\n[bold green]File registry publish complete.[/bold green]")
+    if failures and not successes:
+        console.print(
+            f"\n[bold red]File registry publish failed: 0 packages landed on {reg} "
+            f"({failures} errors).[/bold red]"
+        )
+        raise typer.Exit(1)
+    if failures:
+        console.print(
+            f"\n[yellow]File registry publish finished with {failures} failures "
+            f"({successes} ok) on {reg}.[/yellow]"
+        )
+    else:
+        console.print("\n[bold green]File registry publish complete.[/bold green]")
 
 
 def files_publish_assistant_command(

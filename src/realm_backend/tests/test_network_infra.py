@@ -7,6 +7,8 @@ from core.network_infra import (
 
 _DEMO_LIVE_INSTALLER = "moqmm-caaaa-aaaah-qu27q-cai"
 _DEMO_LIVE_REGISTRY = "mjrky-pyaaa-aaaah-qu27a-cai"
+_DEMO_GAAS_INSTALLER = "tzip5-vaaaa-aaaah-av3ca-cai"
+_DEMO_GAAS_REGISTRY = "tmp6q-uiaaa-aaaah-av3bq-cai"
 _DEMO_LEGACY_INSTALLER = "2s4td-daaaa-aaaao-bazmq-cai"
 _DEMO_LEGACY_REGISTRY = "rhw4p-gqaaa-aaaac-qbw7q-cai"
 _TEST_INSTALLER = "fltjm-tyaaa-aaaap-qunhq-cai"
@@ -17,8 +19,12 @@ def test_known_bootstrap_principals_includes_live_demo_installer():
     principals = known_bootstrap_principals()
     assert _DEMO_LIVE_INSTALLER in principals
     assert _DEMO_LIVE_REGISTRY in principals
+    assert _DEMO_GAAS_INSTALLER in principals
+    assert _DEMO_GAAS_REGISTRY in principals
     assert is_known_bootstrap_principal(_DEMO_LIVE_INSTALLER) is True
     assert is_known_bootstrap_principal(_DEMO_LIVE_REGISTRY) is True
+    assert is_known_bootstrap_principal(_DEMO_GAAS_INSTALLER) is True
+    assert is_known_bootstrap_principal(_DEMO_GAAS_REGISTRY) is True
 
 
 def test_known_bootstrap_principals_keeps_legacy_demo_and_test():

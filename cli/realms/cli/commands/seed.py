@@ -16,9 +16,19 @@ from typing import Optional
 import typer
 from rich.panel import Panel
 
-from .env import env_deploy_command, load_env_config
+from .env import env_deploy_command, load_env_config, _read_canister_ids
 from .files import files_publish_branding_command, files_publish_command
+from .marketplace import FILE_REGISTRY, _dfx_canister_id
 from ..utils import console, get_project_root
+
+
+def _live_file_registry_id(network: str, project_root=None) -> Optional[str]:
+    """Prefer canister_ids.json (updated by env deploy) over baked NETWORK_INFRA."""
+    root = project_root or get_project_root()
+    cid = (_read_canister_ids(root).get("file_registry") or {}).get(network)
+    if cid:
+        return cid
+    return _dfx_canister_id(FILE_REGISTRY, network)
 
 
 def seed_command(
@@ -61,15 +71,18 @@ def seed_command(
 
     if not skip_catalog:
         console.print(Panel.fit("📚 Publishing extension/codex catalog", style="bold blue"))
+        registry = _live_file_registry_id(network, project_root)
         files_publish_command(
             network=network,
             identity=identity,
+            registry=registry,
         )
         if not skip_branding:
             try:
                 files_publish_branding_command(
                     network=network,
                     identity=identity,
+                    registry=registry,
                 )
             except typer.Exit:
                 console.print(

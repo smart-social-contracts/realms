@@ -6,17 +6,19 @@ NETWORK_INFRA = {
         "registry": "yhw3g-fyaaa-aaaas-qgorq-cai",
     },
     "demo": {
-        "file_registry": "vi64l-3aaaa-aaaae-qj4va-cai",
-        "marketplace": "ehyfg-wyaaa-aaaae-qg3qq-cai",
-        # Historical GOS IDs plus the live Casals-managed stack. rhw4p is
-        # IC0301; demo.gos.earth uses moqmm (installer) / mjrky (registry).
+        "file_registry": "krch6-ryaaa-aaaas-amw3q-cai",
+        "marketplace": "l3nfe-tiaaa-aaaas-amw4q-cai",
+        # Historical GOS IDs plus later stacks. rhw4p / moqmm / mjrky may be
+        # IC0301 after a gaas new; current demo installer/registry are tzip5 / tmp6q.
         "installer": (
             "2s4td-daaaa-aaaao-bazmq-cai",
             "moqmm-caaaa-aaaah-qu27q-cai",
+            "tzip5-vaaaa-aaaah-av3ca-cai",
         ),
         "registry": (
             "rhw4p-gqaaa-aaaac-qbw7q-cai",
             "mjrky-pyaaa-aaaah-qu27a-cai",
+            "tmp6q-uiaaa-aaaah-av3bq-cai",
         ),
     },
     "staging": {

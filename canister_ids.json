@@ -1,13 +1,13 @@
 {
-  "casals_frontend": {
-    "test": "qic2k-baaaa-aaaae-agvga-cai",
-    "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
-    "staging": "mcqbx-hyaaa-aaaaj-qsarq-cai"
-  },
   "casals_backend": {
-    "test": "qthgp-3yaaa-aaaae-agveq-cai",
     "demo": "jo3cj-faaaa-aaaac-bffea-cai",
-    "staging": "jj2e5-iyaaa-aaaac-bffeq-cai"
+    "staging": "jj2e5-iyaaa-aaaac-bffeq-cai",
+    "test": "qthgp-3yaaa-aaaae-agveq-cai"
+  },
+  "casals_frontend": {
+    "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
+    "staging": "mcqbx-hyaaa-aaaaj-qsarq-cai",
+    "test": "qic2k-baaaa-aaaae-agvga-cai"
   },
   "ckbtc_indexer": {
     "demo": "n5wcd-faaaa-aaaar-qaaea-cai"
@@ -16,23 +16,23 @@
     "demo": "mxzaz-hqaaa-aaaar-qaada-cai"
   },
   "file_registry": {
-    "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
+    "demo": "krch6-ryaaa-aaaas-amw3q-cai",
     "staging": "hacwc-baaaa-aaaac-bfxmq-cai",
     "test": "uq2mu-kaaaa-aaaah-avqcq-cai"
   },
   "file_registry_frontend": {
-    "demo": "7ja5c-dqaaa-aaaae-qj5oa-cai",
+    "demo": "l4mdq-6qaaa-aaaas-amw4a-cai",
     "ic": "rbex3-xyaaa-aaaah-qumma-cai",
     "staging": "hoa3k-2qaaa-aaaac-bfxnq-cai",
     "test": "2no7h-xqaaa-aaaad-qlxeq-cai"
   },
   "marketplace_backend": {
-    "demo": "ehyfg-wyaaa-aaaae-qg3qq-cai",
+    "demo": "l3nfe-tiaaa-aaaas-amw4q-cai",
     "staging": "h3hkh-3yaaa-aaaac-bfxoa-cai",
     "test": "2wldc-niaaa-aaaad-qlxga-cai"
   },
   "marketplace_frontend": {
-    "demo": "ulsvn-pyaaa-aaaae-qj4tq-cai",
+    "demo": "lsooy-faaaa-aaaas-amw5a-cai",
     "staging": "h4gmt-waaaa-aaaac-bfxoq-cai",
     "test": "mxyd5-3qaaa-aaaao-ba2xq-cai"
   },
