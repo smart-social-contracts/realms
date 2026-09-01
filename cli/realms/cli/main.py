@@ -1,6 +1,7 @@
 """Main CLI application for Realms."""
 
 from typing import List, Optional
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -16,6 +17,7 @@ from .commands.extension import extension_command, codex_command
 from .commands.wasm_registry import wasm_command
 from .commands.installer import installer_health_command
 from .commands.env import env_deploy_command, env_status_command
+from .commands.seed import seed_command
 from .commands.marketplace import (
     marketplace_call_command,
     marketplace_deploy_command,
@@ -58,6 +60,7 @@ from .commands.registry import (
 from .commands.test import test_command
 from .commands.new import new_command
 from .constants import MAX_BATCH_SIZE, REALM_FOLDER
+from .runlog import print_log_path, start_run_log, stop_run_log
 from .utils import (
     check_dependencies,
     display_info_panel,
@@ -315,11 +318,14 @@ def new(
             "II-linked, or a dfx key (e.g. deployer) together with --co-admin."
         ),
     ),
-    network: str = typer.Option(
-        ...,
+    network: Optional[str] = typer.Option(
+        None,
         "--network",
         "-n",
-        help="Network: test | staging | demo | ic",
+        help=(
+            "Environment: test | staging | demo | ic. "
+            "Default: `name` from --gaas-config."
+        ),
     ),
     name: Optional[str] = typer.Option(None, "--name", help="Realm name (≥3 chars)"),
     slug: Optional[str] = typer.Option(
@@ -384,47 +390,94 @@ def new(
             "deploy key (deployer, my_dev_identity_1)."
         ),
     ),
+    log_file: Optional[Path] = typer.Option(
+        None,
+        "--log-file",
+        help=(
+            "Write the full run transcript (console + dfx/icp output) to this path. "
+            "A file path gets _YYYYMMDD_HHMMSS before the extension; a directory "
+            "gets realms-new-<env>_YYYYMMDD_HHMMSS.log. "
+            "Default: <repo>/logs/realms-new-<env>_YYYYMMDD_HHMMSS.log"
+        ),
+    ),
+    gaas_config: Optional[Path] = typer.Option(
+        None,
+        "--gaas-config",
+        help=(
+            "GaaS config JSON from `gaas new` "
+            "(registry + installer canister IDs, domain, env name). "
+            "Required for --deploy-mode=gaas. Default write path is "
+            "`<gos-repo>/logs/gaas-config-<env>_YYYYMMDD_HHMMSS.json`."
+        ),
+    ),
+    deploy_mode: str = typer.Option(
+        "gaas",
+        "--deploy-mode",
+        help=(
+            "gaas: enqueue via the GaaS registry/installer (needs --gaas-config). "
+            "standalone: mint realm_backend + realm_frontend from a GitHub "
+            "release; not registered with any GaaS."
+        ),
+    ),
 ) -> None:
-    """Create a live realm the same way as the *.gos.earth wizard.
+    """Create a live realm.
 
-    Charges 5 registry credits to --identity, enqueues request_deployment
-    with a Casals/federation/founder manifest, then runs in-realm setup as that
-    identity. Does not scaffold a local folder.
+    --deploy-mode=gaas (default) mirrors the *.gos.earth wizard: charges 5
+    registry credits, enqueues request_deployment, then runs in-realm setup.
+
+    --deploy-mode=standalone deploys two canisters from the Realms GitHub
+    release (or --version latest). No credits, no installer, not listed on
+    any GaaS portal.
 
     When --identity is a dfx key, pass --co-admin <your-II-principal> (copy it
     from the browser after logging into *.gos.earth). You log in as that II
     user with real admin rights; deployer remains the founder User.
 
     Example:
-      realms new spec.json --identity deployer --network demo \\
-        --co-admin <ii-principal> --codex agora --name Acme --yes
+      gaas new environments/demo.json --identity deployer --network ic --yes
+      realms new --gaas-config logs/gaas-config-demo_YYYYMMDD_HHMMSS.json \\
+        --identity deployer --co-admin <ii-principal> --codex agora --name Acme --yes
+      realms new --deploy-mode standalone --network demo --identity deployer \\
+        --codex agora --name Acme --yes
     """
-    new_command(
-        spec_file=spec_file,
-        identity=identity,
-        network=network,
-        name=name,
-        slug=slug,
-        gos=gos,
-        version=version,
-        subnet=subnet,
-        codex=codex,
-        codex_version=codex_version,
-        logo=logo,
-        background=background,
-        primary=primary,
-        manifesto=manifesto,
-        welcome=welcome,
-        token_symbol=token_symbol,
-        token_canister=token_canister,
-        config=config,
-        data=data,
-        members=members,
-        open_registration=True if open_registration else None,
-        yes=yes,
-        resume=resume,
-        co_admin=co_admin,
+    start_run_log(
+        network or (gaas_config.stem if gaas_config else "new"),
+        log_file=log_file,
+        command="realms new",
     )
+    print_log_path()
+    try:
+        new_command(
+            spec_file=spec_file,
+            identity=identity,
+            network=network or "",
+            name=name,
+            slug=slug,
+            gos=gos,
+            version=version,
+            subnet=subnet,
+            codex=codex,
+            codex_version=codex_version,
+            logo=logo,
+            background=background,
+            primary=primary,
+            manifesto=manifesto,
+            welcome=welcome,
+            token_symbol=token_symbol,
+            token_canister=token_canister,
+            config=config,
+            data=data,
+            members=members,
+            open_registration=True if open_registration else None,
+            yes=yes,
+            resume=resume,
+            co_admin=co_admin,
+            gaas_config=str(gaas_config) if gaas_config else None,
+            deploy_mode=deploy_mode,
+        )
+    finally:
+        print_log_path()
+        stop_run_log()
 
 
 @app.command("deploy", rich_help_panel="Lifecycle")
@@ -1733,6 +1786,71 @@ def env_status(
 ) -> None:
     """Show canister IDs and dfx status for an environment product stack."""
     env_status_command(env_name=env, identity=identity)
+
+
+@app.command("seed", rich_help_panel="Lifecycle")
+def seed(
+    env: str = typer.Option(
+        ...,
+        "--env",
+        "-e",
+        help="Environment name (demo, staging, test) — loads environments/<name>.json",
+    ),
+    mode: str = typer.Option(
+        "auto",
+        "--mode",
+        "-m",
+        help="Product-stack deploy mode: auto, install, upgrade, reinstall",
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity name or PEM file"
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip confirmations (stale-id recreate, reinstall)"
+    ),
+    skip_frontend_build: bool = typer.Option(
+        False,
+        "--skip-frontend-build",
+        help="Skip npm build for marketplace_frontend (deploy existing dist/)",
+    ),
+    skip_product: bool = typer.Option(
+        False,
+        "--skip-product",
+        help="Skip marketplace + file_registry deploy (catalog only)",
+    ),
+    skip_catalog: bool = typer.Option(
+        False,
+        "--skip-catalog",
+        help="Skip extension/codex catalog publish",
+    ),
+    skip_branding: bool = typer.Option(
+        False,
+        "--skip-branding",
+        help="Skip demo branding publish",
+    ),
+    with_domain: bool = typer.Option(
+        True,
+        "--domain/--no-domain",
+        help="Write .well-known/ic-domains before frontend build",
+    ),
+) -> None:
+    """Deploy Realms GOS product infra (``*.realmsgos.org``) and publish the catalog.
+
+    Superset of ``realms env deploy``: marketplace + file_registry, then
+    extensions/codices into that file_registry. Does not deploy a GaaS portal
+    (``gaas new``).
+    """
+    seed_command(
+        env_name=env,
+        mode=mode,
+        identity=identity,
+        yes=yes,
+        skip_frontend_build=skip_frontend_build,
+        skip_product=skip_product,
+        skip_catalog=skip_catalog,
+        skip_branding=skip_branding,
+        with_domain=with_domain,
+    )
 
 
 # ============== Marketplace Commands ==============

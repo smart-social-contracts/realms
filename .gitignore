@@ -41,6 +41,8 @@ declarations
 
 # ── Logs / test artifacts ───────────────────────────────────────────────────
 *.log
+logs/*
+!logs/.gitkeep
 integration-test-logs/
 playwright-report/
 test-results/

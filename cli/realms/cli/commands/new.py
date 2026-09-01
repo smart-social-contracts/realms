@@ -1,11 +1,13 @@
-"""``realms new`` — live wizard-path realm create (issue #389).
+"""``realms new`` — live realm create.
 
-Mirrors the ``*.gos.earth`` portal wizard: registry ``request_deployment`` with
-a Casals/federation/founder manifest, in-realm setup as the founder Internet
-Identity, then optional config / data / geister members.
+``--deploy-mode=gaas`` (default) mirrors the ``*.gos.earth`` wizard: registry
+``request_deployment``, installer job, then in-realm setup as the founder.
 
-Do not confuse with ``realms mundus deploy-new`` (GitHub artifact URLs) or
-``realms realm create`` (local ``.realms/`` scaffold).
+``--deploy-mode=standalone`` mints ``realm_backend`` + ``realm_frontend`` from a
+Realms GitHub release. No credits, no installer, not listed on any GaaS portal.
+
+Do not confuse with ``realms mundus deploy-new`` (GitHub artifact URLs into an
+existing descriptor) or ``realms realm create`` (local ``.realms/`` scaffold).
 """
 
 from __future__ import annotations
@@ -19,12 +21,16 @@ import shutil
 import subprocess
 import tempfile
 import time
+import tarfile
+import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import typer
 
-from ..utils import console
+from ..utils import console, get_project_root
+from ..runlog import get_run_log
 
 # ---------------------------------------------------------------------------
 # Constants (portal / GOS)
@@ -33,6 +39,9 @@ from ..utils import console
 DEPLOYMENT_COST_CREDITS = 5
 ALLOWED_GOS = "realms-gos"
 ALLOWED_NETWORKS = ("test", "staging", "demo", "ic")
+ALLOWED_DEPLOY_MODES = ("gaas", "standalone")
+REALMS_RELEASE_REPO = "smart-social-contracts/realms"
+STANDALONE_CREATE_CYCLES = 1_000_000_000_000
 PEM_DEPLOY_IDENTITY_NAMES = frozenset({"deployer", "my_dev_identity_1"})
 ANONYMOUS_PRINCIPAL = "2vxsx-fae"
 _PRINCIPAL_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+$")
@@ -65,17 +74,8 @@ DERIVATION_ORIGINS = {
     "ic": "https://realmsgos.org",
 }
 
-# Live GOS queue IDs (demo.gos.earth is mjrky/moqmm; rhw4p/2s4td are IC0301).
-REGISTRY_IDS = {
-    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
-    "demo": "mjrky-pyaaa-aaaah-qu27a-cai",
-    "test": "yhw3g-fyaaa-aaaas-qgorq-cai",
-}
-INSTALLER_IDS = {
-    "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
-    "demo": "moqmm-caaaa-aaaah-qu27q-cai",
-    "test": "fltjm-tyaaa-aaaap-qunhq-cai",
-}
+# Live GOS queue IDs come from ``--gaas-config`` (``gaas new --output-file``).
+# Do not hardcode registry/installer principals here — they change on rebuild.
 
 GEISTER_INSTALL_HINT = (
     "Install geister (do not vendor it into Realms): "
@@ -128,8 +128,15 @@ def normalize_deploy_version(version: Optional[str]) -> str:
     return v[1:] if v.startswith("v") else v
 
 
-def portal_url_for_slug(slug: str, network: str) -> str:
+def portal_url_for_slug(
+    slug: str, network: str, *, portal_host: Optional[str] = None
+) -> str:
     """Port of ``portalUrlForSlug`` (production host = JS helper's ``ic`` entry)."""
+    if portal_host:
+        base = portal_host.rstrip("/")
+        if not base.startswith("http://") and not base.startswith("https://"):
+            base = f"https://{base}"
+        return f"{base}/r/{slugify(slug)}"
     base = PORTAL_HOSTS.get((network or "").lower(), PORTAL_HOSTS["staging"])
     return f"{base.rstrip('/')}/r/{slugify(slug)}"
 
@@ -271,6 +278,7 @@ def build_portal_manifest(
     open_registration: bool = False,
     manifesto: str = "",
     welcome_message: str = "",
+    portal_host: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Portal wizard manifest (useCasals: true). No GitHub artifact URLs."""
     normalized = normalize_deploy_version(version)
@@ -293,7 +301,7 @@ def build_portal_manifest(
         "casals": build_casals_block(name, normalized, subnet),
         "federation": {
             "slug": slug,
-            "portal_url": portal_url_for_slug(slug, network),
+            "portal_url": portal_url_for_slug(slug, network, portal_host=portal_host),
         },
         "founder": founder,
     }
@@ -723,13 +731,24 @@ def _icp_replica_args() -> List[str]:
 
 
 def _run(cmd: List[str], *, timeout: int = 120, env: Optional[Dict[str, str]] = None) -> subprocess.CompletedProcess:
-    return subprocess.run(
+    log = get_run_log()
+    if log is not None:
+        log.log_command(cmd)
+    result = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         timeout=timeout,
         env=env,
     )
+    if log is not None:
+        if result.stdout:
+            log.log_output(result.stdout)
+        if result.stderr:
+            log.log_output(result.stderr)
+        if result.returncode != 0:
+            log.write(f"exit {result.returncode}")
+    return result
 
 
 def resolve_identity_principal(identity: str) -> str:
@@ -1531,25 +1550,346 @@ def join_geister_members(
     return created
 
 
-def registry_id_for(network: str) -> str:
-    rid = REGISTRY_IDS.get(network)
-    if not rid:
-        _fail(
+@dataclass(frozen=True)
+class GaasConfig:
+    env_name: str
+    domain: str
+    registry_id: str
+    installer_id: str
+    canisters: Dict[str, str]
+    path: Path
+
+    @property
+    def portal_host(self) -> str:
+        host = (self.domain or "").strip()
+        if not host:
+            return ""
+        if host.startswith("http://") or host.startswith("https://"):
+            return host
+        return f"https://{host}"
+
+
+def load_gaas_config(path: str | Path) -> GaasConfig:
+    """Read the pretty JSON written by ``gaas new --output-file``."""
+    config_path = Path(path).expanduser()
+    if not config_path.is_file():
+        raise StageError("validate", f"--gaas-config not found: {config_path}")
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise StageError("validate", f"--gaas-config is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise StageError("validate", "--gaas-config must be a JSON object")
+    env_name = str(data.get("name") or "").strip().lower()
+    domain = str(data.get("domain") or "").strip()
+    canisters = data.get("canisters") or {}
+    if not isinstance(canisters, dict):
+        raise StageError("validate", "--gaas-config canisters must be an object")
+    registry_id = str(canisters.get("realm_registry_backend") or "").strip()
+    installer_id = str(canisters.get("realm_installer") or "").strip()
+    missing: List[str] = []
+    if not env_name:
+        missing.append("name")
+    if not registry_id:
+        missing.append("canisters.realm_registry_backend")
+    if not installer_id:
+        missing.append("canisters.realm_installer")
+    if missing:
+        raise StageError(
+            "validate",
+            f"--gaas-config {config_path} missing {', '.join(missing)} "
+            "(write it with `gaas new --output-file`).",
+        )
+    return GaasConfig(
+        env_name=env_name,
+        domain=domain,
+        registry_id=registry_id,
+        installer_id=installer_id,
+        canisters={str(k): str(v) for k, v in canisters.items()},
+        path=config_path,
+    )
+
+
+def resolve_gos_queue(
+    *,
+    gaas_config: Optional[str],
+    network: str,
+) -> Tuple[GaasConfig, str]:
+    """Return (config, environment name). ``--gaas-config`` is required."""
+    if not gaas_config:
+        raise StageError(
+            "validate",
+            "--gaas-config is required: pass the pretty JSON written by "
+            "`gaas new --output-file` (needs canisters.realm_registry_backend "
+            "and canisters.realm_installer).",
+        )
+    gaas = load_gaas_config(gaas_config)
+    net = (network or "").strip().lower()
+    if net and net != gaas.env_name:
+        raise StageError(
+            "validate",
+            f"--network {net} does not match gaas config name {gaas.env_name!r}",
+        )
+    return gaas, gaas.env_name
+
+
+def normalize_deploy_mode(value: Optional[str]) -> str:
+    mode = (value or "gaas").strip().lower()
+    if mode not in ALLOWED_DEPLOY_MODES:
+        raise StageError(
+            "validate",
+            f"--deploy-mode must be 'gaas' or 'standalone', got {value!r}",
+        )
+    return mode
+
+
+def standalone_artifact_urls(
+    version: str,
+    *,
+    repo: str = REALMS_RELEASE_REPO,
+) -> Tuple[str, str]:
+    """GitHub URLs for ``realm_backend.wasm.gz`` and ``realm_frontend.tar.gz``."""
+    ref = (version or "latest").strip()
+    if ref in ("build",):
+        raise StageError(
             "deploy",
-            f"No default realm-registry canister for network '{network}'. "
-            "test/staging/demo are supported in v1.",
+            "standalone --version build is not supported; use latest or a "
+            "GitHub semver tag (e.g. v0.3.5)",
         )
-    return rid
+    if ref in ("main", "latest", ""):
+        base = f"https://github.com/{repo}/releases/latest/download"
+    else:
+        tag = ref if ref.startswith("v") else f"v{ref}"
+        base = f"https://github.com/{repo}/releases/download/{tag}"
+    return (
+        f"{base}/realm_backend.wasm.gz",
+        f"{base}/realm_frontend.tar.gz",
+    )
 
 
-def installer_id_for(network: str) -> str:
-    iid = INSTALLER_IDS.get(network)
-    if not iid:
-        _fail(
-            "poll",
-            f"No default realm-installer canister for network '{network}'.",
+def _download_release_file(url: str, dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    console.print(f"  download {url}")
+    try:
+        urllib.request.urlretrieve(url, dest)
+    except Exception as exc:
+        raise StageError("deploy", f"Failed to download {url}: {exc}") from exc
+    if not dest.is_file() or dest.stat().st_size < 100:
+        size = dest.stat().st_size if dest.is_file() else 0
+        raise StageError("deploy", f"Download too small ({size} B): {url}")
+    return dest
+
+
+def _extract_frontend_archive(archive: Path, dest: Path) -> Path:
+    dest.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive, "r:gz") as tar:
+        tar.extractall(dest)
+    nested = dest / "dist"
+    if nested.is_dir() and any(nested.iterdir()):
+        return nested
+    return dest
+
+
+def _write_standalone_canister_ids_js(
+    dist: Path,
+    *,
+    backend_id: str,
+    frontend_id: str,
+    network: str,
+    file_registry_id: str,
+) -> None:
+    origin = DERIVATION_ORIGINS.get(network, "")
+    payload = {
+        "realm_backend": backend_id,
+        "file_registry": file_registry_id,
+        "derivation_origin": origin,
+        "portal_url": f"https://{frontend_id}.icp0.io/",
+        "test_mode_ii_bypass": network == "test",
+    }
+    (dist / "canister_ids.js").write_text(
+        "globalThis.__CANISTER_IDS = " + json.dumps(payload) + ";\n",
+        encoding="utf-8",
+    )
+
+
+def _run_in_dir(
+    cmd: List[str],
+    *,
+    cwd: Path,
+    timeout: int = 300,
+) -> subprocess.CompletedProcess:
+    log = get_run_log()
+    if log is not None:
+        log.log_command(cmd)
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=_dfx_env(),
+        cwd=str(cwd),
+    )
+    if log is not None:
+        if result.stdout:
+            log.log_output(result.stdout)
+        if result.stderr:
+            log.log_output(result.stderr)
+        if result.returncode != 0:
+            log.write(f"exit {result.returncode}")
+    return result
+
+
+def _file_registry_id_or_empty(network: str) -> str:
+    try:
+        from .files import _resolve_registry
+
+        return _resolve_registry(network, None)
+    except Exception:
+        return ""
+
+
+def call_enter_setup(
+    backend_id: str,
+    founder: str,
+    registry_id: str,
+    environment: str,
+    network: str,
+    identity: str,
+) -> None:
+    arg = f'(principal "{founder}", "{registry_id}", "{environment}")'
+    console.print(f"  enter_setup {backend_id}")
+    try:
+        _canister_call(backend_id, "enter_setup", arg, network, identity, timeout=180)
+    except Exception as exc:
+        raise StageError("deploy", f"enter_setup failed: {exc}") from exc
+
+
+def deploy_standalone_realm(
+    *,
+    version: str,
+    network: str,
+    identity: str,
+    slug: str,
+) -> Tuple[str, str]:
+    """Mint realm_backend + realm_frontend from a GitHub release. Returns IDs."""
+    project_root = get_project_root()
+    backend_url, frontend_url = standalone_artifact_urls(version)
+    work = Path(tempfile.mkdtemp(prefix=f"realms-standalone-{slug}-"))
+    console.print(f"  standalone work {work}")
+    wasm = _download_release_file(backend_url, work / "realm_backend.wasm.gz")
+    archive = _download_release_file(frontend_url, work / "realm_frontend.tar.gz")
+    dist = _extract_frontend_archive(archive, work / "frontend")
+
+    dfx_src = project_root / "dfx.json"
+    networks = {}
+    if dfx_src.is_file():
+        networks = json.loads(dfx_src.read_text(encoding="utf-8")).get("networks") or {}
+    candid = project_root / "src" / "realm_backend" / "realm_backend.did"
+    dfx_json = {
+        "version": 1,
+        "canisters": {
+            "realm_backend": {
+                "type": "custom",
+                "candid": str(candid) if candid.is_file() else "",
+                "wasm": str(wasm),
+                "gzip": True,
+            },
+            "realm_frontend": {
+                "type": "assets",
+                "source": [str(dist)],
+            },
+        },
+        "networks": networks,
+    }
+    (work / "dfx.json").write_text(json.dumps(dfx_json, indent=2) + "\n", encoding="utf-8")
+
+    for name in ("realm_backend", "realm_frontend"):
+        cmd = [
+            "dfx",
+            "--run-deprecated",
+            "canister",
+            "create",
+            name,
+            "--network",
+            network,
+            "--identity",
+            identity,
+            "--no-wallet",
+            "--with-cycles",
+            str(STANDALONE_CREATE_CYCLES),
+        ]
+        console.print(f"  create {name}")
+        proc = _run_in_dir(cmd, cwd=work, timeout=180)
+        if proc.returncode != 0:
+            raise StageError(
+                "deploy",
+                f"dfx canister create {name} failed: "
+                f"{(proc.stderr or proc.stdout or '').strip()[:400]}",
+            )
+
+    ids_path = work / "canister_ids.json"
+    if not ids_path.is_file():
+        raise StageError("deploy", f"missing {ids_path} after canister create")
+    ids = json.loads(ids_path.read_text(encoding="utf-8"))
+    backend_id = str((ids.get("realm_backend") or {}).get(network) or "").strip()
+    frontend_id = str((ids.get("realm_frontend") or {}).get(network) or "").strip()
+    if not backend_id or not frontend_id:
+        raise StageError("deploy", f"could not read canister IDs from {ids_path}")
+
+    file_registry_id = _file_registry_id_or_empty(network)
+    _write_standalone_canister_ids_js(
+        dist,
+        backend_id=backend_id,
+        frontend_id=frontend_id,
+        network=network,
+        file_registry_id=file_registry_id,
+    )
+
+    install_backend = [
+        "dfx",
+        "--run-deprecated",
+        "canister",
+        "install",
+        "realm_backend",
+        "--wasm",
+        str(wasm),
+        "--mode",
+        "install",
+        "--network",
+        network,
+        "--identity",
+        identity,
+        "--yes",
+    ]
+    console.print(f"  install realm_backend {backend_id}")
+    proc = _run_in_dir(install_backend, cwd=work, timeout=300)
+    if proc.returncode != 0:
+        raise StageError(
+            "deploy",
+            f"backend install failed: {(proc.stderr or proc.stdout or '').strip()[:400]}",
         )
-    return iid
+
+    deploy_frontend = [
+        "dfx",
+        "--run-deprecated",
+        "deploy",
+        "realm_frontend",
+        "--network",
+        network,
+        "--identity",
+        identity,
+        "--yes",
+        "--mode",
+        "install",
+    ]
+    console.print(f"  deploy realm_frontend {frontend_id}")
+    proc = _run_in_dir(deploy_frontend, cwd=work, timeout=600)
+    if proc.returncode != 0:
+        raise StageError(
+            "deploy",
+            f"frontend deploy failed: {(proc.stderr or proc.stdout or '').strip()[:400]}",
+        )
+    return backend_id, frontend_id
 
 
 def request_deployment(
@@ -1609,6 +1949,8 @@ def new_command(
     yes: bool = False,
     resume: Optional[str] = None,
     co_admin: Optional[str] = None,
+    gaas_config: Optional[str] = None,
+    deploy_mode: Optional[str] = None,
 ) -> None:
     """Run the live wizard-path create pipeline. Never hits IC from unit tests."""
     stage = "validate"
@@ -1639,13 +1981,110 @@ def new_command(
         )
         network = (network or "").strip().lower()
         identity = (identity or "").strip()
+        mode = normalize_deploy_mode(deploy_mode)
+        gaas: Optional[GaasConfig] = None
+        if mode == "standalone":
+            if gaas_config:
+                raise StageError(
+                    "validate",
+                    "--gaas-config is not used with --deploy-mode=standalone",
+                )
+            if not network:
+                raise StageError(
+                    "validate",
+                    "--network is required with --deploy-mode=standalone",
+                )
+            if (resume or "").strip():
+                raise StageError(
+                    "validate",
+                    "--resume is only valid with --deploy-mode=gaas",
+                )
+        elif gaas_config:
+            gaas, network = resolve_gos_queue(gaas_config=gaas_config, network=network)
+        elif not network:
+            raise StageError(
+                "validate",
+                "--gaas-config is required: pass the pretty JSON written by "
+                "`gaas new --output-file` (needs canisters.realm_registry_backend "
+                "and canisters.realm_installer).",
+            )
         validate_merged_spec(merged, network=network, identity=identity)
+        if mode == "gaas" and gaas is None:
+            raise StageError(
+                "validate",
+                "--gaas-config is required: pass the pretty JSON written by "
+                "`gaas new --output-file` (needs canisters.realm_registry_backend "
+                "and canisters.realm_installer).",
+            )
         assert_identity_is_ii_linked(identity, network, merged.get("co_admin") or "")
         founder = resolve_identity_principal(identity)
         merged["founder"] = founder
 
-        registry_id = registry_id_for(network)
-        installer_id = installer_id_for(network)
+        if mode == "standalone":
+            stage = "confirm"
+            if not yes:
+                console.print(
+                    f"Create standalone realm?\n"
+                    f"  name:     {merged['name']}\n"
+                    f"  slug:     {merged['slug']}\n"
+                    f"  network:  {network}\n"
+                    f"  version:  {merged['version']}\n"
+                    f"  codex:    {merged['codex']['package']}\n"
+                    f"  founder:  {founder}"
+                )
+                if not typer.confirm("Proceed?"):
+                    console.print("[yellow]Aborted.[/yellow]")
+                    raise typer.Exit(0)
+            stage = "deploy"
+            backend_id, frontend_id = deploy_standalone_realm(
+                version=merged["version"],
+                network=network,
+                identity=identity,
+                slug=merged["slug"],
+            )
+            portal = f"https://{frontend_id}.icp0.io/"
+            call_enter_setup(
+                backend_id,
+                founder,
+                _file_registry_id_or_empty(network),
+                network,
+                network,
+                identity,
+            )
+            wait_for_enter_setup(backend_id, network, identity)
+            console.print(f"  portal {portal}")
+            stage = "setup"
+            if setup_already_complete(backend_id, network, identity):
+                console.print("  setup already complete — skipping")
+            else:
+                run_setup_stage(merged, backend_id, network, identity)
+            stage = "co-admin"
+            register_co_admin_principal(merged, backend_id, network, identity)
+            stage = "config"
+            apply_runtime_config(merged, backend_id, network, identity)
+            stage = "data"
+            import_data_overlay(merged, backend_id, network, identity)
+            stage = "members"
+            member_rows = join_geister_members(merged, backend_id, network, identity)
+            result = {
+                "deploy_mode": "standalone",
+                "slug": merged["slug"],
+                "portal_url": portal,
+                "backend_id": backend_id,
+                "frontend_id": frontend_id,
+                "founder": founder,
+                "co_admin": merged.get("co_admin") or "",
+                "members": member_rows,
+            }
+            console.print(json.dumps(result, indent=2))
+            return
+
+        assert gaas is not None
+        registry_id = gaas.registry_id
+        installer_id = gaas.installer_id
+        console.print(f"  gaas-config {gaas.path}")
+        console.print(f"  registry {registry_id}")
+        console.print(f"  installer {installer_id}")
 
         stage = "credits"
         console.print(f"[bold]credits[/bold] founder {founder} on {network}")
@@ -1681,7 +2120,9 @@ def new_command(
         job_id = (resume or "").strip()
         backend_id = ""
         frontend_id = ""
-        portal = portal_url_for_slug(merged["slug"], network)
+        portal = portal_url_for_slug(
+            merged["slug"], network, portal_host=gaas.portal_host or None
+        )
 
         if job_id:
             stage = "poll"
@@ -1719,6 +2160,7 @@ def new_command(
                 open_registration=bool(merged.get("open_registration")),
                 manifesto=merged["branding"].get("manifesto") or "",
                 welcome_message=merged["branding"].get("welcome_message") or "",
+                portal_host=gaas.portal_host or None,
             )
             if "artifacts" in manifest or "expected_hashes" in manifest:
                 _fail("deploy", "internal error: GitHub artifact URLs must not appear in the portal manifest")
@@ -1764,11 +2206,19 @@ def new_command(
     except StageError as exc:
         console.print(f"[red]realms new failed at stage: {exc.stage}[/red]")
         console.print(f"[red]{exc.message}[/red]")
+        log = get_run_log()
+        if log is not None:
+            log.write(f"FAILED stage={exc.stage}")
+            log.write(exc.message)
         raise typer.Exit(1) from exc
     except typer.Exit:
         raise
     except Exception as exc:
         console.print(f"[red]realms new failed at stage: {stage}[/red]")
         console.print(f"[red]{exc}[/red]")
+        log = get_run_log()
+        if log is not None:
+            log.write(f"FAILED stage={stage}")
+            log.write(str(exc))
         raise typer.Exit(1) from exc
 

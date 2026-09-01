@@ -1,6 +1,7 @@
 """Unit tests for ``realms new`` (issue #389). No replica / live IC."""
 
 import json
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,10 +19,15 @@ from realms.cli.commands.new import (
     check_ic_members_policy,
     classify_identity,
     identity_refuse_message,
+    load_gaas_config,
     merge_spec_and_flags,
     new_command,
+    normalize_deploy_mode,
     parse_subnet,
+    portal_url_for_slug,
+    resolve_gos_queue,
     slugify,
+    standalone_artifact_urls,
     validate_branding_size,
     validate_merged_spec,
 )
@@ -199,7 +205,23 @@ class TestCreditsFail:
         assert "aaaaa-aa" in exc.value.message
         assert str(DEPLOYMENT_COST_CREDITS) in exc.value.message
 
-    def test_command_credit_fail_mocked(self):
+    def test_command_credit_fail_mocked(self, tmp_path):
+        cfg = tmp_path / "gaas.json"
+        cfg.write_text(
+            json.dumps(
+                {
+                    "name": "staging",
+                    "domain": "staging.gos.earth",
+                    "canisters": {
+                        "realm_registry_backend": "7wzxh-wyaaa-aaaau-aggyq-cai",
+                        "realm_installer": "lusjm-wqaaa-aaaau-ago7q-cai",
+                    },
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         with patch("realms.cli.commands.new.assert_identity_is_ii_linked", return_value="web"), patch(
             "realms.cli.commands.new.resolve_identity_principal", return_value="aaaaa-aa"
         ), patch("realms.cli.commands.new.query_credit_balance", return_value=1):
@@ -211,6 +233,7 @@ class TestCreditsFail:
                     name="Acme Realm",
                     codex="agora",
                     yes=True,
+                    gaas_config=str(cfg),
                 )
             assert exc.value.exit_code == 1
 
@@ -336,9 +359,163 @@ class TestHelp:
     def test_realms_new_help(self):
         result = runner.invoke(app, ["new", "--help"])
         assert result.exit_code == 0
-        assert "--identity" in result.output
-        assert "--network" in result.output
-        assert "--codex" in result.output
-        assert "--resume" in result.output
-        assert "--co-admin" in result.output
-        assert "wizard" in result.output.lower() or "live" in result.output.lower()
+        output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "--identity" in output
+        assert "--network" in output
+        assert "--codex" in output
+        assert "--resume" in output
+        assert "--co-admin" in output
+        assert "--log-file" in output
+        assert "--gaas-config" in output
+        assert "--deploy-mode" in output
+        assert "wizard" in output.lower() or "live" in output.lower() or "standalone" in output.lower()
+
+
+class TestGaasConfig:
+    def _write(self, tmp_path: Path, **overrides) -> Path:
+        payload = {
+            "name": "demo",
+            "domain": "demo.gos.earth",
+            "canisters": {
+                "realm_registry_backend": "5ocwl-eiaaa-aaaah-av2bq-cai",
+                "realm_installer": "53fhg-faaaa-aaaah-av2ca-cai",
+            },
+        }
+        payload.update(overrides)
+        path = tmp_path / "demo-gaas.json"
+        path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        return path
+
+    def test_load_extracts_queue_ids(self, tmp_path: Path):
+        path = self._write(tmp_path)
+        gaas = load_gaas_config(path)
+        assert gaas.env_name == "demo"
+        assert gaas.registry_id == "5ocwl-eiaaa-aaaah-av2bq-cai"
+        assert gaas.installer_id == "53fhg-faaaa-aaaah-av2ca-cai"
+        assert gaas.portal_host == "https://demo.gos.earth"
+
+    def test_resolve_infers_network_from_name(self, tmp_path: Path):
+        path = self._write(tmp_path)
+        gaas, network = resolve_gos_queue(gaas_config=str(path), network="")
+        assert network == "demo"
+        assert gaas.registry_id.endswith("-cai")
+
+    def test_resolve_rejects_network_mismatch(self, tmp_path: Path):
+        path = self._write(tmp_path)
+        with pytest.raises(StageError) as exc:
+            resolve_gos_queue(gaas_config=str(path), network="staging")
+        assert "does not match" in exc.value.message
+
+    def test_missing_file_is_required(self):
+        with pytest.raises(StageError) as exc:
+            resolve_gos_queue(gaas_config=None, network="demo")
+        assert "--gaas-config is required" in exc.value.message
+
+    def test_command_requires_gaas_config(self):
+        with pytest.raises(typer.Exit):
+            new_command(
+                spec_file=None,
+                identity="alice",
+                network="demo",
+                name="Acme Realm",
+                codex="agora",
+                yes=True,
+            )
+
+    def test_portal_url_uses_config_domain(self, tmp_path: Path):
+        path = self._write(tmp_path)
+        gaas = load_gaas_config(path)
+        url = portal_url_for_slug("acme", "demo", portal_host=gaas.portal_host)
+        assert url == "https://demo.gos.earth/r/acme"
+
+
+class TestDeployMode:
+    def test_normalize_defaults_to_gaas(self):
+        assert normalize_deploy_mode(None) == "gaas"
+        assert normalize_deploy_mode("GAAS") == "gaas"
+
+    def test_normalize_rejects_unknown(self):
+        with pytest.raises(StageError) as exc:
+            normalize_deploy_mode("casals")
+        assert "gaas" in exc.value.message
+        assert "standalone" in exc.value.message
+
+    def test_standalone_latest_urls(self):
+        backend, frontend = standalone_artifact_urls("latest")
+        assert backend.endswith("/releases/latest/download/realm_backend.wasm.gz")
+        assert frontend.endswith("/releases/latest/download/realm_frontend.tar.gz")
+
+    def test_standalone_semver_urls(self):
+        backend, frontend = standalone_artifact_urls("0.3.5")
+        assert "/releases/download/v0.3.5/realm_backend.wasm.gz" in backend
+        assert "/releases/download/v0.3.5/realm_frontend.tar.gz" in frontend
+
+    def test_standalone_rejects_build(self):
+        with pytest.raises(StageError) as exc:
+            standalone_artifact_urls("build")
+        assert "build" in exc.value.message.lower()
+
+    def test_standalone_rejects_gaas_config(self, tmp_path: Path):
+        path = tmp_path / "demo-gaas.json"
+        path.write_text("{}", encoding="utf-8")
+        with pytest.raises(typer.Exit):
+            new_command(
+                spec_file=None,
+                identity="alice",
+                network="demo",
+                name="Acme Realm",
+                codex="agora",
+                yes=True,
+                gaas_config=str(path),
+                deploy_mode="standalone",
+            )
+
+    @patch("realms.cli.commands.new.join_geister_members", return_value=[])
+    @patch("realms.cli.commands.new.import_data_overlay")
+    @patch("realms.cli.commands.new.apply_runtime_config")
+    @patch("realms.cli.commands.new.register_co_admin_principal")
+    @patch("realms.cli.commands.new.run_setup_stage")
+    @patch("realms.cli.commands.new.setup_already_complete", return_value=True)
+    @patch("realms.cli.commands.new.wait_for_enter_setup")
+    @patch("realms.cli.commands.new.call_enter_setup")
+    @patch(
+        "realms.cli.commands.new.deploy_standalone_realm",
+        return_value=("aaaaa-aaaaa-aaaaa-aaaaa-aaa", "bbbbb-bbbbb-bbbbb-bbbbb-bbb"),
+    )
+    @patch(
+        "realms.cli.commands.new.resolve_identity_principal",
+        return_value="aaaaa-aaaaa-aaaaa-aaaaa-aaa",
+    )
+    @patch("realms.cli.commands.new.assert_identity_is_ii_linked")
+    def test_standalone_skips_credits_and_installer(
+        self,
+        _linked,
+        _principal,
+        mock_deploy,
+        mock_enter,
+        _wait,
+        _complete,
+        _setup,
+        _co_admin,
+        _config,
+        _data,
+        _members,
+        capsys,
+    ):
+        new_command(
+            spec_file=None,
+            identity="alice",
+            network="demo",
+            name="Acme Realm",
+            slug="acme",
+            codex="agora",
+            yes=True,
+            deploy_mode="standalone",
+        )
+        mock_deploy.assert_called_once()
+        mock_enter.assert_called_once()
+        out = capsys.readouterr().out
+        assert "standalone" in out
+        assert "bbbbb-bbbbb-bbbbb-bbbbb-bbb" in out
+
+
