@@ -874,6 +874,67 @@ def top_up_canister_cycles(
     )
 
 
+def install_gos_file_registry_wasm(
+    canister_id: str,
+    *,
+    identity: Optional[str],
+    project_root: Path,
+) -> None:
+    """Replace Casals' bundled file_registry with the GOS WASM (step finalize)."""
+    env = (os.environ.get("GAAS_SRC") or os.environ.get("GOS_SRC") or "").strip()
+    candidates = []
+    if env:
+        candidates.append(Path(env) / ".basilisk" / "file_registry" / "file_registry.wasm")
+    candidates.append(
+        project_root.parent / "gos-as-a-service" / ".basilisk" / "file_registry" / "file_registry.wasm"
+    )
+    cached = project_root / ".external-wasms" / "file_registry.wasm.gz"
+    wasm: Path | None = None
+    for plain in candidates:
+        if plain.is_file():
+            gz = Path("/tmp/realms-gos-file_registry.wasm.gz")
+            import gzip as gzip_mod
+
+            with plain.open("rb") as src, gzip_mod.open(gz, "wb") as out:
+                out.write(src.read())
+            wasm = gz
+            break
+    if wasm is None and cached.is_file():
+        wasm = cached
+    if wasm is None:
+        raise RuntimeError(
+            "no GOS file_registry WASM (build gos-as-a-service file_registry "
+            "or place file_registry.wasm.gz in .external-wasms/)"
+        )
+    cmd = [
+        "dfx",
+        "canister",
+        "install",
+        canister_id,
+        "--wasm",
+        str(wasm),
+        "--mode",
+        "upgrade",
+        "--network",
+        "ic",
+        "--yes",
+        "--argument",
+        "(null)",
+    ]
+    if identity:
+        cmd.extend(["--identity", identity])
+    env_vars = os.environ.copy()
+    env_vars["TERM"] = "xterm-256color"
+    env_vars["DFX_WARNING"] = "-mainnet_plaintext_identity"
+    env_vars.pop("NO_COLOR", None)
+    env_vars.pop("FORCE_COLOR", None)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env_vars)
+    if result.returncode != 0:
+        stderr = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"install GOS file_registry on {canister_id} failed: {stderr}")
+    console.print(f"[dim]installed GOS file_registry WASM on {canister_id}[/dim]")
+
+
 def rebuild_casals_conductor(
     *,
     env_name: str,
@@ -912,6 +973,9 @@ def rebuild_casals_conductor(
             file_registry,
             identity=identity,
             amount=_CASALS_FILE_REGISTRY_TOPUP,
+        )
+        install_gos_file_registry_wasm(
+            file_registry, identity=identity, project_root=root
         )
     run_casals_seed_catalog(
         network=network,
