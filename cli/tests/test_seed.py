@@ -27,6 +27,8 @@ def test_seed_help():
 
 
 @patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.authorize_product_wasms")
+@patch("realms.cli.commands.seed.rebuild_casals_conductor")
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
 @patch("realms.cli.commands.seed.files_publish_command")
@@ -41,6 +43,8 @@ def test_seed_runs_product_then_catalog(
     mock_publish,
     mock_branding,
     _registry,
+    mock_rebuild,
+    mock_authorize,
     _sheet,
 ):
     seed_command(env_name="demo", identity="deployer", yes=True)
@@ -51,6 +55,8 @@ def test_seed_runs_product_then_catalog(
     assert mock_publish.call_args.kwargs["registry"] == "krch6-ryaaa-aaaas-amw3q-cai"
     mock_branding.assert_called_once()
     assert mock_branding.call_args.kwargs["registry"] == "krch6-ryaaa-aaaas-amw3q-cai"
+    mock_rebuild.assert_not_called()
+    mock_authorize.assert_not_called()
 
 
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
@@ -123,6 +129,8 @@ def test_live_file_registry_id_prefers_canister_ids(tmp_path):
 
 
 @patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.authorize_product_wasms")
+@patch("realms.cli.commands.seed.rebuild_casals_conductor")
 @patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
@@ -141,6 +149,8 @@ def test_seed_destroy_except_frontend_then_product_and_catalog(
     mock_branding,
     _registry,
     mock_destroy,
+    mock_rebuild,
+    mock_authorize,
     _sheet,
     tmp_path,
 ):
@@ -154,8 +164,12 @@ def test_seed_destroy_except_frontend_then_product_and_catalog(
     mock_destroy.assert_called_once()
     assert mock_destroy.call_args.kwargs["network"] == "demo"
     assert mock_destroy.call_args.kwargs["yes"] is True
+    mock_rebuild.assert_called_once()
+    assert mock_rebuild.call_args.kwargs["env_name"] == "demo"
+    assert mock_rebuild.call_args.kwargs["network"] == "demo"
     mock_env_deploy.assert_called_once()
     assert mock_env_deploy.call_args.kwargs["mode"] == "auto"
+    mock_authorize.assert_called_once()
     mock_publish.assert_called_once()
     assert mock_publish.call_args.kwargs["registry"] == "krch6-ryaaa-aaaas-amw3q-cai"
 

@@ -379,6 +379,8 @@ def _wasm_type_for_publish(family: str, kind: str) -> str:
     if kind == "frontend":
         return "assets"
     if kind == "backend":
+        if family in ("token", "nft"):
+            return "motoko"
         return "basilisk"
     return ""
 

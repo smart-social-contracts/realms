@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional, Tuple
 import typer
 
 from .commands.env import _read_canister_ids, load_env_config
-from .utils import get_project_root
+from .utils import console, get_project_root
 
 _SRV_CASALS = Path("/srv/dev/Casals")
 
@@ -39,9 +39,13 @@ _GAAS_REGISTRATIONS: tuple[tuple[str, str, str, str], ...] = (
 
 
 def casals_env(network: str) -> str:
-    if network in ("ic", "mainnet"):
-        return "ic"
-    return "local"
+    """Map a Realms/dfx network name to a Casals/icp environment.
+
+    ``test`` / ``demo`` / ``staging`` are IC replica networks, not icp ``local``.
+    """
+    if (network or "").strip().lower() in ("local", "localhost"):
+        return "local"
+    return "ic"
 
 
 def _is_casals_checkout(path: Path) -> bool:
@@ -93,15 +97,10 @@ def resolve_conductor_id(
         if cid:
             return cid
 
-    gos_path = root.parent / "gos-as-a-service" / "environments" / f"{env_name}.json"
-    if gos_path.is_file():
-        try:
-            gos = json.loads(gos_path.read_text(encoding="utf-8"))
-            cid = ((gos.get("canisters") or {}).get("casals_backend") or "").strip()
-            if cid:
-                return cid
-        except (json.JSONDecodeError, OSError):
-            pass
+    gos = load_gos_canisters(env_name, root)
+    cid = (gos.get("casals_backend") or "").strip()
+    if cid:
+        return cid
 
     cid = os.environ.get("CASALS_BACKEND", "").strip()
     return cid or None
@@ -593,6 +592,447 @@ def register_gaas_canisters(
             "missing GaaS canister ids for union sheet register: "
             + ", ".join(missing)
             + f" (gos-as-a-service/environments/{env_name}.json)"
+        )
+
+
+_CASALS_STACK_GOS_KEYS: tuple[str, ...] = (
+    "casals_backend",
+    "casals_frontend",
+    "casals_file_registry",
+)
+
+_CASALS_NEW_TO_GOS: dict[str, str] = {
+    "casals_backend": "casals_backend",
+    "casals_frontend": "casals_frontend",
+    "ic_file_registry": "casals_file_registry",
+}
+
+_IC_TOKENS_VERSION = "0.1.0"
+_IC_TOKENS_BASE = (
+    "https://github.com/smart-social-contracts/ic-tokens/releases/download/"
+    f"v{_IC_TOKENS_VERSION}"
+)
+_CERTIFIED_ASSETS_URL = (
+    "https://github.com/smart-social-contracts/certified-assets"
+    "/releases/download/v0.3.0/assetstorage.wasm.gz"
+)
+_CERTIFIED_ASSETS_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
+# Keep in sync with scripts/fetch_gos_artifacts.py GOS_RELEASE (no leading v).
+_GOS_CATALOG_VERSION = "0.3.2"
+
+
+def gos_descriptor_path(
+    env_name: str, project_root: Optional[Path] = None
+) -> Path:
+    root = (project_root or get_project_root()).resolve()
+    env = (os.environ.get("GAAS_SRC") or os.environ.get("GOS_SRC") or "").strip()
+    if env:
+        candidate = Path(env) / "environments" / f"{env_name}.json"
+        if candidate.is_file():
+            return candidate
+    return root.parent / "gos-as-a-service" / "environments" / f"{env_name}.json"
+
+
+def persist_casals_ids_to_gos(
+    env_name: str,
+    canisters: dict,
+    project_root: Optional[Path] = None,
+) -> Path:
+    """Write ``casals new`` principals into the GaaS environment descriptor."""
+    path = gos_descriptor_path(env_name, project_root)
+    if not path.is_file():
+        raise RuntimeError(f"GaaS descriptor missing at {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    dest = data.setdefault("canisters", {})
+    if not isinstance(dest, dict):
+        raise RuntimeError(f"{path} canisters must be an object")
+    for casals_key, cid in (canisters or {}).items():
+        gos_key = _CASALS_NEW_TO_GOS.get(casals_key)
+        if not gos_key or not isinstance(cid, str) or not cid.strip():
+            continue
+        dest[gos_key] = cid.strip()
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def persist_casals_ids_to_realms(
+    network: str,
+    canisters: dict,
+    project_root: Optional[Path] = None,
+) -> None:
+    """Write new conductor IDs into realms ``canister_ids.json`` for this network."""
+    from .commands.env import _set_canister_id
+
+    root = project_root or get_project_root()
+    mapping = {
+        "casals_backend": "casals_backend",
+        "casals_frontend": "casals_frontend",
+    }
+    for casals_key, realms_key in mapping.items():
+        cid = (canisters.get(casals_key) or "").strip()
+        if cid:
+            _set_canister_id(root, realms_key, network, cid)
+
+
+def destroy_casals_stack(
+    *,
+    env_name: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+    yes: bool = False,
+) -> Dict[str, list]:
+    """Sweep cycles and delete the Casals conductor stack (not GaaS portal IDs)."""
+    from .commands.env import (
+        _delete_canister_recover_cycles,
+        _is_canister_dead,
+        _read_canister_ids,
+    )
+
+    root = project_root or get_project_root()
+    gos = load_gos_canisters(env_name, root)
+    targets: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    def _add(name: str, cid: str) -> None:
+        cid = (cid or "").strip()
+        if not cid or cid in seen:
+            return
+        seen.add(cid)
+        targets.append((name, cid))
+
+    for key in _CASALS_STACK_GOS_KEYS:
+        _add(key, gos.get(key) or "")
+
+    realms_ids = _read_canister_ids(root)
+    for key in ("casals_backend", "casals_frontend"):
+        _add(key, (realms_ids.get(key) or {}).get(network) or "")
+
+    path = gos_descriptor_path(env_name, root)
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            mid = ((data.get("multisig") or {}).get("backend_id") or "").strip()
+            _add("casals-multisig", mid)
+        except (json.JSONDecodeError, OSError, AttributeError):
+            pass
+
+    if not targets:
+        console.print("[dim]No Casals stack IDs to destroy.[/dim]")
+        return {"destroyed": []}
+
+    from rich.panel import Panel
+
+    console.print(
+        Panel.fit(
+            "Destroy Casals stack (recover cycles)\n"
+            f"Keep GaaS installer + realm-registry (including DNS frontend).\n"
+            "Delete: " + ", ".join(f"{n} ({c})" for n, c in targets),
+            style="yellow",
+        )
+    )
+    if not yes and not typer.confirm(
+        "Stop, recover cycles, and destroy the Casals conductor?",
+        default=False,
+    ):
+        console.print("[yellow]Aborted.[/yellow]")
+        raise typer.Exit(0)
+
+    destroyed: list[str] = []
+    for name, cid in targets:
+        if _is_canister_dead(cid, network):
+            console.print(f"[dim]{name} {cid} already gone[/dim]")
+        else:
+            console.print(f"[dim]Destroying {name} {cid} (recover cycles)…[/dim]")
+            _delete_canister_recover_cycles(cid, network, identity)
+        destroyed.append(cid)
+        console.print(f"  recovered+deleted {name} {cid}")
+
+    if path.is_file():
+        data = json.loads(path.read_text(encoding="utf-8"))
+        cans = data.get("canisters")
+        if isinstance(cans, dict):
+            for key in _CASALS_STACK_GOS_KEYS:
+                cans.pop(key, None)
+        multi = data.get("multisig")
+        if isinstance(multi, dict):
+            multi["backend_id"] = None
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return {"destroyed": destroyed}
+
+
+def run_casals_new_fresh(
+    *,
+    network: str,
+    identity: Optional[str],
+    casals_src: Path,
+) -> dict:
+    """Mint a new Casals conductor. Never pass existing IDs (never upgrade/adopt)."""
+    env = casals_env(network)
+    argv: list[str] = [
+        sys.executable,
+        str(casals_src / "scripts" / "casals.py"),
+        "-e",
+        env,
+        "new",
+        "-y",
+        "--no-seed",
+    ]
+    if identity:
+        argv.extend(["--identity", identity])
+
+    result = subprocess.run(
+        argv,
+        cwd=casals_src,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"casals new failed (exit {result.returncode}): {stderr}")
+    stdout = result.stdout.strip()
+    if not stdout:
+        raise RuntimeError("casals new produced no JSON on stdout")
+    parsed = json.loads(stdout)
+    if not parsed.get("ok"):
+        raise RuntimeError(
+            f"casals new returned ok=false: {parsed.get('error', parsed)}"
+        )
+    if parsed.get("mode") == "upgrade":
+        raise RuntimeError(
+            "casals new upgraded an existing conductor; seed requires a fresh create"
+        )
+    return parsed
+
+
+def run_casals_seed_catalog(
+    *,
+    network: str,
+    identity: Optional[str],
+    casals_src: Path,
+) -> None:
+    """Authorize Casals default templates (orchestration) without deploying a sheet."""
+    env = casals_env(network)
+    argv: list[str] = [
+        sys.executable,
+        str(casals_src / "scripts" / "seed.py"),
+        "-e",
+        env,
+    ]
+    if identity:
+        argv.extend(["--identity", identity])
+
+    result = subprocess.run(
+        argv,
+        cwd=casals_src,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(
+            f"casals seed catalog failed (exit {result.returncode}): {stderr}"
+        )
+
+
+def rebuild_casals_conductor(
+    *,
+    env_name: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+    yes: bool = False,
+) -> Tuple[str, dict]:
+    """Destroy the Casals stack, ``casals new``, persist IDs. Returns (conductor, parsed)."""
+    root = project_root or get_project_root()
+    casals_src = resolve_casals_src(root)
+    if not casals_src:
+        raise RuntimeError("no Casals checkout (set CASALS_SRC or clone ../Casals)")
+
+    destroy_casals_stack(
+        env_name=env_name,
+        network=network,
+        identity=identity,
+        project_root=root,
+        yes=yes,
+    )
+    parsed = run_casals_new_fresh(
+        network=network,
+        identity=identity,
+        casals_src=casals_src,
+    )
+    canisters = parsed.get("canisters") or {}
+    persist_casals_ids_to_gos(env_name, canisters, root)
+    persist_casals_ids_to_realms(network, canisters, root)
+    conductor = (canisters.get("casals_backend") or "").strip()
+    if not conductor:
+        raise RuntimeError("casals new did not return casals_backend")
+    run_casals_seed_catalog(
+        network=network,
+        identity=identity,
+        casals_src=casals_src,
+    )
+    console.print(
+        f"[green]✓ casals new[/green] conductor {conductor} "
+        f"[dim](mode={parsed.get('mode')}, catalog seeded)[/dim]"
+    )
+    return conductor, parsed
+
+
+def _download_url(url: str, dest: Path) -> Path:
+    import urllib.request
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve(url, dest)
+    return dest
+
+
+def _certified_assets_wasm() -> Path:
+    if _CERTIFIED_ASSETS_CACHE.is_file():
+        return _CERTIFIED_ASSETS_CACHE
+    _download_url(_CERTIFIED_ASSETS_URL, _CERTIFIED_ASSETS_CACHE)
+    return _CERTIFIED_ASSETS_CACHE
+
+
+def _ensure_gos_release_artifacts(root: Path) -> None:
+    installer = root / ".external-wasms" / "realm_installer.wasm.gz"
+    registry = root / ".external-wasms" / "realm_registry_backend.wasm.gz"
+    registry_dist = root / ".external-assets" / "realm_registry_frontend" / "dist"
+    if installer.is_file() and registry.is_file() and registry_dist.is_dir():
+        return
+    script = root / "scripts" / "fetch_gos_artifacts.py"
+    if not script.is_file():
+        raise RuntimeError(f"missing {script} (needed to authorize installer/registry WASMs)")
+    result = subprocess.run(
+        [sys.executable, str(script), "--what", "all"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"fetch_gos_artifacts.py failed: {stderr}")
+
+
+def authorize_product_wasms(
+    *,
+    env_name: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+    conductor: Optional[str] = None,
+) -> None:
+    """Upload union-sheet WASMs into Casals' file-registry and authorize them."""
+    from .commands.files import files_publish_release_command
+
+    root = project_root or get_project_root()
+    conductor = conductor or resolve_conductor_id(env_name, root)
+    if not conductor:
+        raise RuntimeError("no Casals conductor id for product WASM authorize")
+    gos = load_gos_canisters(env_name, root)
+    casals_fr = (gos.get("casals_file_registry") or "").strip()
+    if not casals_fr:
+        raise RuntimeError("casals_file_registry id required to authorize product WASMs")
+
+    assets = _certified_assets_wasm()
+    cache = Path("/tmp/realms-seed-wasms")
+    cache.mkdir(parents=True, exist_ok=True)
+    empty_dist = cache / "empty-frontend-dist"
+    empty_dist.mkdir(parents=True, exist_ok=True)
+    keep = empty_dist / ".keep"
+    if not keep.is_file():
+        keep.write_text("", encoding="utf-8")
+
+    _ensure_gos_release_artifacts(root)
+
+    marketplace_wasm = (
+        root / ".basilisk" / "marketplace_backend" / "marketplace_backend.wasm"
+    )
+    marketplace_dist = root / "src" / "marketplace_frontend" / "dist"
+    file_registry_wasm = root / ".external-wasms" / "file_registry.wasm.gz"
+    file_registry_dist = (
+        root / ".external-assets" / "file_registry_frontend" / "dist"
+    )
+    installer_wasm = root / ".external-wasms" / "realm_installer.wasm.gz"
+    registry_wasm = root / ".external-wasms" / "realm_registry_backend.wasm.gz"
+    registry_dist = root / ".external-assets" / "realm_registry_frontend" / "dist"
+    token_wasm = cache / "token_backend.wasm"
+    nft_wasm = cache / "nft_backend.wasm"
+    if not token_wasm.is_file():
+        _download_url(f"{_IC_TOKENS_BASE}/token_backend.wasm", token_wasm)
+    if not nft_wasm.is_file():
+        _download_url(f"{_IC_TOKENS_BASE}/nft_backend.wasm", nft_wasm)
+
+    missing: list[str] = []
+    for path, label in (
+        (marketplace_wasm, "marketplace backend WASM (.basilisk/marketplace_backend)"),
+        (file_registry_wasm, "fleet file_registry WASM (.external-wasms)"),
+        (installer_wasm, "realm_installer WASM (.external-wasms)"),
+        (registry_wasm, "realm_registry_backend WASM (.external-wasms)"),
+    ):
+        if not path.is_file():
+            missing.append(label)
+    if missing:
+        raise RuntimeError("missing artifacts to authorize: " + "; ".join(missing))
+
+    jobs: list[dict] = [
+        {
+            "family": "installer",
+            "version": _GOS_CATALOG_VERSION,
+            "backend_wasm": str(installer_wasm),
+            "frontend_dist": None,
+        },
+        {
+            "family": "registry",
+            "version": _GOS_CATALOG_VERSION,
+            "backend_wasm": str(registry_wasm),
+            "frontend_dist": str(registry_dist) if registry_dist.is_dir() else None,
+        },
+        {
+            "family": "marketplace",
+            "version": "main",
+            "backend_wasm": str(marketplace_wasm),
+            "frontend_dist": str(marketplace_dist) if marketplace_dist.is_dir() else None,
+        },
+        {
+            "family": "file-registry",
+            "version": "main",
+            "backend_wasm": str(file_registry_wasm),
+            "frontend_dist": str(file_registry_dist)
+            if file_registry_dist.is_dir()
+            else None,
+        },
+        {
+            "family": "token",
+            "version": _IC_TOKENS_VERSION,
+            "backend_wasm": str(token_wasm),
+            "frontend_dist": str(empty_dist),
+        },
+        {
+            "family": "nft",
+            "version": _IC_TOKENS_VERSION,
+            "backend_wasm": str(nft_wasm),
+            "frontend_dist": str(empty_dist),
+        },
+    ]
+
+    for job in jobs:
+        console.print(
+            f"[dim]authorize {job['family']}@{job['version']} in Casals catalog…[/dim]"
+        )
+        files_publish_release_command(
+            network=network,
+            family=job["family"],
+            version=job["version"],
+            backend_wasm=job["backend_wasm"],
+            frontend_dist=job["frontend_dist"],
+            registry=casals_fr,
+            identity=identity,
+            casals=conductor,
+            assets_wasm=str(assets),
         )
 
 

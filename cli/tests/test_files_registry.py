@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from realms.cli.commands.files import _resolve_registry
+from realms.cli.commands.files import _resolve_registry, _wasm_type_for_publish
 
 
 def test_resolve_registry_explicit_wins():
@@ -18,3 +18,11 @@ def test_resolve_registry_prefers_canister_ids(tmp_path):
     )
     with patch("realms.cli.commands.files._find_project_root", return_value=tmp_path):
         assert _resolve_registry("demo", None) == "krch6-ryaaa-aaaas-amw3q-cai"
+
+
+def test_wasm_type_for_publish_token_nft_motoko():
+    assert _wasm_type_for_publish("token", "backend") == "motoko"
+    assert _wasm_type_for_publish("nft", "backend") == "motoko"
+    assert _wasm_type_for_publish("marketplace", "backend") == "basilisk"
+    assert _wasm_type_for_publish("installer", "backend") == "basilisk"
+    assert _wasm_type_for_publish("token", "frontend") == "assets"

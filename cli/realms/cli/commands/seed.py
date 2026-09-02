@@ -17,7 +17,11 @@ from typing import Optional
 import typer
 from rich.panel import Panel
 
-from ..casals_product import deploy_product_sheet_on_casals
+from ..casals_product import (
+    authorize_product_wasms,
+    deploy_product_sheet_on_casals,
+    rebuild_casals_conductor,
+)
 from .env import (
     env_deploy_command,
     load_env_config,
@@ -69,7 +73,7 @@ def seed_command(
         if skip_product:
             console.print(
                 "[red]❌ --destroy-except-marketplace-frontend cannot be combined "
-                "with --skip-product (the three non-DNS canisters would stay gone).[/red]"
+                "with --skip-product (the non-DNS canisters would stay gone).[/red]"
             )
             raise typer.Exit(1)
         destroy_product_stack_except_frontend(
@@ -78,6 +82,17 @@ def seed_command(
             identity=identity,
             yes=yes,
         )
+        try:
+            rebuild_casals_conductor(
+                env_name=env_name,
+                network=network,
+                identity=identity,
+                project_root=project_root,
+                yes=yes,
+            )
+        except RuntimeError as exc:
+            console.print(f"[red]❌ casals new failed: {exc}[/red]")
+            raise typer.Exit(1) from exc
 
     if not skip_product:
         deploy_mode = "auto" if destroy_except_frontend else mode
@@ -89,6 +104,19 @@ def seed_command(
             skip_frontend_build=skip_frontend_build,
             with_domain=with_domain,
         )
+
+        if destroy_except_frontend:
+            try:
+                authorize_product_wasms(
+                    env_name=env_name,
+                    network=network,
+                    identity=identity,
+                    project_root=project_root,
+                )
+                console.print("[green]✓ Product WASMs authorized in Casals catalog[/green]")
+            except RuntimeError as exc:
+                console.print(f"[red]❌ Product WASM authorize failed: {exc}[/red]")
+                raise typer.Exit(1) from exc
 
         try:
             deployed, detail = deploy_product_sheet_on_casals(

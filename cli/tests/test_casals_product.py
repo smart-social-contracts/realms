@@ -345,3 +345,188 @@ def test_union_sheet_from_repo_includes_gaas_and_product():
     assert "marketplace-frontend" in canisters
     assert "token-backend" in canisters
     assert stand_names.count("file-registry") == 1
+
+
+def test_casals_env_maps_ic_networks():
+    from realms.cli.casals_product import casals_env
+
+    assert casals_env("local") == "local"
+    assert casals_env("localhost") == "local"
+    assert casals_env("test") == "ic"
+    assert casals_env("demo") == "ic"
+    assert casals_env("staging") == "ic"
+    assert casals_env("ic") == "ic"
+
+
+def test_persist_casals_ids_to_gos_maps_file_registry(tmp_path: Path, monkeypatch):
+    from realms.cli.casals_product import persist_casals_ids_to_gos
+
+    gos = tmp_path / "gos-as-a-service"
+    (gos / "environments").mkdir(parents=True)
+    desc = gos / "environments" / "test.json"
+    desc.write_text(
+        json.dumps({"canisters": {"realm_installer": "fltjm-tyaaa-aaaap-qunhq-cai"}}),
+        encoding="utf-8",
+    )
+    realms = tmp_path / "realms"
+    realms.mkdir()
+    monkeypatch.setenv("GAAS_SRC", str(gos))
+
+    persist_casals_ids_to_gos(
+        "test",
+        {
+            "casals_backend": "aaaaa-aa",
+            "casals_frontend": "bbbbb-aa",
+            "ic_file_registry": "ccccc-aa",
+            "ic_file_registry_frontend": "ddddd-aa",
+        },
+        realms,
+    )
+    saved = json.loads(desc.read_text(encoding="utf-8"))
+    assert saved["canisters"]["casals_backend"] == "aaaaa-aa"
+    assert saved["canisters"]["casals_frontend"] == "bbbbb-aa"
+    assert saved["canisters"]["casals_file_registry"] == "ccccc-aa"
+    assert "ic_file_registry" not in saved["canisters"]
+    assert "ic_file_registry_frontend" not in saved["canisters"]
+    assert saved["canisters"]["realm_installer"] == "fltjm-tyaaa-aaaap-qunhq-cai"
+
+
+@patch("realms.cli.casals_product.subprocess.run")
+def test_run_casals_new_fresh_argv_no_ids_file(mock_run, tmp_path: Path):
+    from realms.cli.casals_product import run_casals_new_fresh
+
+    casals = _make_casals_checkout(tmp_path)
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = json.dumps(
+        {
+            "ok": True,
+            "mode": "create",
+            "canisters": {"casals_backend": "aaaaa-aa"},
+            "seeded": False,
+        }
+    )
+    mock_run.return_value.stderr = ""
+
+    parsed = run_casals_new_fresh(
+        network="test",
+        identity="deployer",
+        casals_src=casals,
+    )
+    assert parsed["mode"] == "create"
+    argv = mock_run.call_args.args[0]
+    assert argv[argv.index("-e") + 1] == "ic"
+    assert "new" in argv
+    assert "-y" in argv
+    assert "--no-seed" in argv
+    assert "--identity" in argv
+    assert not any(str(arg).endswith(".ids.json") for arg in argv)
+    assert mock_run.call_args.kwargs["cwd"] == casals
+
+
+@patch("realms.cli.casals_product.subprocess.run")
+def test_run_casals_new_fresh_rejects_upgrade(mock_run, tmp_path: Path):
+    from realms.cli.casals_product import run_casals_new_fresh
+
+    casals = _make_casals_checkout(tmp_path)
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = json.dumps({"ok": True, "mode": "upgrade"})
+    mock_run.return_value.stderr = ""
+
+    with pytest.raises(RuntimeError, match="fresh create"):
+        run_casals_new_fresh(network="test", identity=None, casals_src=casals)
+
+
+@patch("realms.cli.casals_product.subprocess.run")
+def test_run_casals_seed_catalog_argv(mock_run, tmp_path: Path):
+    from realms.cli.casals_product import run_casals_seed_catalog
+
+    casals = _make_casals_checkout(tmp_path)
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = ""
+    mock_run.return_value.stderr = ""
+
+    run_casals_seed_catalog(network="test", identity="deployer", casals_src=casals)
+    argv = mock_run.call_args.args[0]
+    assert str(casals / "scripts" / "seed.py") in argv
+    assert argv[argv.index("-e") + 1] == "ic"
+    assert "--deploy" not in argv
+    assert mock_run.call_args.kwargs["cwd"] == casals
+
+
+@patch("realms.cli.casals_product._download_url")
+@patch("realms.cli.casals_product._certified_assets_wasm")
+@patch("realms.cli.casals_product._ensure_gos_release_artifacts")
+@patch("realms.cli.commands.files.files_publish_release_command")
+def test_authorize_product_wasms_covers_union_families(
+    mock_publish,
+    _ensure,
+    mock_assets,
+    _dl,
+    tmp_path: Path,
+    monkeypatch,
+):
+    from realms.cli.casals_product import authorize_product_wasms
+
+    realms = tmp_path / "realms"
+    gos = tmp_path / "gos-as-a-service"
+    (realms / "environments").mkdir(parents=True)
+    (gos / "environments").mkdir(parents=True)
+    (gos / "environments" / "test.json").write_text(
+        json.dumps(
+            {
+                "canisters": {
+                    "casals_backend": "aaaaa-aa",
+                    "casals_file_registry": "bbbbb-aa",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GAAS_SRC", str(gos))
+
+    wasm_dir = realms / ".external-wasms"
+    wasm_dir.mkdir()
+    for name in (
+        "file_registry.wasm.gz",
+        "realm_installer.wasm.gz",
+        "realm_registry_backend.wasm.gz",
+    ):
+        (wasm_dir / name).write_bytes(b"wasm")
+    basilisk = realms / ".basilisk" / "marketplace_backend"
+    basilisk.mkdir(parents=True)
+    (basilisk / "marketplace_backend.wasm").write_bytes(b"wasm")
+    (realms / ".external-assets" / "realm_registry_frontend" / "dist").mkdir(
+        parents=True
+    )
+    mock_assets.return_value = tmp_path / "assetstorage.wasm.gz"
+    mock_assets.return_value.write_bytes(b"assets")
+
+    cache = Path("/tmp/realms-seed-wasms")
+    cache.mkdir(parents=True, exist_ok=True)
+    (cache / "token_backend.wasm").write_bytes(b"tok")
+    (cache / "nft_backend.wasm").write_bytes(b"nft")
+
+    authorize_product_wasms(
+        env_name="test",
+        network="test",
+        identity="deployer",
+        project_root=realms,
+    )
+    families = [c.kwargs["family"] for c in mock_publish.call_args_list]
+    assert families == [
+        "installer",
+        "registry",
+        "marketplace",
+        "file-registry",
+        "token",
+        "nft",
+    ]
+    assert all(c.kwargs["registry"] == "bbbbb-aa" for c in mock_publish.call_args_list)
+    assert all(c.kwargs["casals"] == "aaaaa-aa" for c in mock_publish.call_args_list)
+    token_job = next(c for c in mock_publish.call_args_list if c.kwargs["family"] == "token")
+    assert token_job.kwargs["frontend_dist"]
+    installer_job = next(
+        c for c in mock_publish.call_args_list if c.kwargs["family"] == "installer"
+    )
+    assert installer_job.kwargs["frontend_dist"] is None
+    assert installer_job.kwargs["version"] == "0.3.2"

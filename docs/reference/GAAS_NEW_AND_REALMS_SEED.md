@@ -25,7 +25,9 @@ A full platform rebuild is **`gaas new` then `realms seed`**. Seed **destroys Ca
 | Sheet deploy | `gaas new` deploys `gos-as-a-service/casals.json`. `realms seed` deploys the **union** with `realms/casals.json` (must not send Product-only). |
 | Token/NFT catalog | Authorize [ic-tokens v0.1.0](https://github.com/smart-social-contracts/ic-tokens/releases/tag/v0.1.0) backends plus certified-assets for the frontends. No new GitHub release required. |
 
-**Not implemented yet:** `realms seed` does not yet call `casals new` (always-destroy conductor). Union sheet deploy, Product-owned fleet `file-registry`, and token/nft on the product stack **are** in the CLI. Do not live-destroy test until that remaining step is wired and confirmed.
+**Wired, still opt-in:** `realms seed --destroy-except-marketplace-frontend --yes` destroys the Casals stack, runs `casals new -y --no-seed`, seeds the Casals catalog, recreates product canisters (DNS keep-ID for `marketplace-frontend`), authorizes union-sheet WASMs (installer, registry, marketplace, fleet file-registry, token, nft) into **Casals'** file-registry, then deploys the union sheet. Do not run that on live test until confirmed.
+
+Plain `realms seed` (no destroy flag) still deploys product canisters + union sheet without destroying Casals.
 
 ---
 
@@ -99,10 +101,10 @@ A full platform rebuild is **`gaas new` then `realms seed`**. Seed **destroys Ca
 ### Steps
 
 1. **Destroy except `marketplace-frontend`** — sweep cycles, delete the Casals stack, fleet file-registry (backend + frontend), marketplace backend, token backend/frontend, nft backend/frontend. Leave the DNS frontend ID.
-2. **`casals new`** — always mint a new conductor (never adopt).
+2. **`casals new`** — always mint a new conductor (never adopt). Invoked as `casals new -y --no-seed` so Casals’ default sheet is not deployed before the union sheet. Then `scripts/seed.py` (catalog only, no `--deploy`) authorizes orchestration templates.
 3. **Create** new principals for fleet file-registry, file-registry frontend, marketplace backend, token backend/frontend, nft backend/frontend. **Adopt** `marketplace-frontend`.
 4. **dfx install (reinstall)** those product canisters. Token/NFT backends from ic-tokens v0.1.0; frontends are certified-assets.
-5. **Authorize** marketplace, file-registry, token, nft WASMs in the Casals catalog (and certified-assets for UIs).
+5. **Authorize** installer, registry, marketplace, file-registry, token, and nft WASMs in the **Casals** catalog (Casals’ own file-registry, not the fleet). Token/NFT frontends use an empty certified-assets bundle.
 6. **Register** GaaS IDs (installer, registry backend/frontend) and product IDs (marketplace, file-registry, token, nft) on the **new** conductor. Include both DNS frontends so sheet deploy does not stop them.
 7. **`casals sheet deploy` the union** of `gos-as-a-service/casals.json` and `realms/casals.json`. Reinstalls listed canisters in place. Must not deploy Product-only JSON.
 8. **Publish** extension/codex catalog (and branding) into the **fleet** `file-registry`.

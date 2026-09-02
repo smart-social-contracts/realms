@@ -1837,10 +1837,11 @@ def seed(
         False,
         "--destroy-except-marketplace-frontend",
         help=(
-            "Stop, recover cycles, and delete product canisters except "
-            "marketplace_frontend (*.realmsgos.org DNS). Then recreate "
-            "file_registry, marketplace_backend, token, and nft. Does not "
-            "touch GaaS portal canisters."
+            "Full rebuild: destroy Casals (then casals new), destroy product "
+            "canisters except marketplace_frontend (*.realmsgos.org DNS), "
+            "recreate file_registry / marketplace_backend / token / nft, "
+            "authorize WASMs, and deploy the union sheet. Does not touch "
+            "GaaS installer or realm-registry-frontend."
         ),
     ),
 ) -> None:
