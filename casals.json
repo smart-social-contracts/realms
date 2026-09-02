@@ -1,7 +1,7 @@
 {
-  "$comment": "Realms product sheet for `realms seed` → `casals sheet deploy` on the GaaS Casals conductor. One fleet file_registry backend per network: put it on this sheet and adopt by name (register_canister then deploy_sheet) — never mint a second registry. marketplace_frontend is DNS adopt-only (*.realmsgos.org). Batons are minted by Casals (no canister_ids.json). Catalog bytes, npm builds, and DNS stay in realms seed / env deploy. Demo realm stands (Agora, Dominion, Syntropia) live in casals-config/sheets/realms.json, not here.",
+  "$comment": "Realms product sheet for `realms seed` → `casals sheet deploy` on the GaaS Casals conductor. One fleet file_registry backend per network: put it on this sheet and adopt by name (register_canister then deploy_sheet) — never mint a second registry. marketplace_frontend is DNS adopt-only (*.realmsgos.org). No per-stand batons: those belong on realm stands (installer) and infra-baton (GaaS sheet). Catalog bytes, npm builds, and DNS stay in realms seed / env deploy. Demo realm stands (Agora, Dominion, Syntropia) live in casals-config/sheets/realms.json, not here.",
   "name": "realms-product",
-  "description": "Realms *.realmsgos.org product surface: marketplace and fleet file_registry, each with an orchestration baton.",
+  "description": "Realms *.realmsgos.org product surface: marketplace and fleet file_registry.",
   "sections": [
     {
       "name": "Product",
@@ -9,16 +9,8 @@
       "stands": [
         {
           "name": "marketplace",
-          "description": "Marketplace baton, backend, and landing/marketplace frontend.",
+          "description": "Marketplace backend and landing/marketplace frontend.",
           "canisters": [
-            {
-              "name": "marketplace-baton",
-              "wasm_key": "orchestration-baton",
-              "kind": "backend",
-              "wasm_type": "baton",
-              "teardown_priority": 40,
-              "install_arg": { "top_commander": "$self" }
-            },
             {
               "name": "marketplace-backend",
               "wasm_key": "marketplace-backend",
@@ -39,14 +31,6 @@
           "name": "file-registry",
           "description": "Fleet file_registry backend (adopt by name) and browse/admin UI.",
           "canisters": [
-            {
-              "name": "file-registry-baton",
-              "wasm_key": "orchestration-baton",
-              "kind": "backend",
-              "wasm_type": "baton",
-              "teardown_priority": 40,
-              "install_arg": { "top_commander": "$self" }
-            },
             {
               "name": "file-registry",
               "wasm_key": "file-registry-backend",

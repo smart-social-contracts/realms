@@ -310,7 +310,7 @@ casals sheet deploy casals.json
 
 via a local Casals checkout (`CASALS_SRC`, sibling `../Casals`, or `/srv/dev/Casals`). The conductor is resolved from `environments/<env>.json` (`casals_backend`), sibling `gos-as-a-service/environments/<env>.json`, or `CASALS_BACKEND`.
 
-**One shared `file_registry` backend** — seed never mints a second registry. The product sheet includes the backend (and an orchestration baton) so Casals can adopt the existing canister by name.
+**One shared `file_registry` backend** — seed never mints a second registry. The product sheet includes the backend so Casals can adopt the existing canister by name. Per-stand batons stay on realm stands and GaaS `infra-baton`, not here.
 
 ```bash
 realms seed --env test --identity deployer --yes

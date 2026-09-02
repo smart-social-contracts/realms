@@ -142,7 +142,7 @@ def test_deploy_product_sheet_missing_conductor(tmp_path: Path, monkeypatch):
     assert "no Casals conductor" in detail
 
 
-def test_product_sheet_includes_file_registry_and_batons():
+def test_product_sheet_includes_file_registry_without_batons():
     root = Path(__file__).resolve().parents[2]
     sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))
     stands = {
@@ -152,17 +152,13 @@ def test_product_sheet_includes_file_registry_and_batons():
     assert set(stands) == {"marketplace", "file-registry"}
     market = [c["name"] for c in stands["marketplace"]["canisters"]]
     assert market == [
-        "marketplace-baton",
         "marketplace-backend",
         "marketplace-frontend",
     ]
     registry = [c["name"] for c in stands["file-registry"]["canisters"]]
     assert registry == [
-        "file-registry-baton",
         "file-registry",
         "file-registry-frontend",
     ]
-    assert stands["marketplace"]["canisters"][0]["install_arg"] == {
-        "top_commander": "$self"
-    }
-    assert stands["file-registry"]["canisters"][1]["wasm_key"] == "file-registry-backend"
+    assert all(c.get("wasm_type") != "baton" for stand in stands.values() for c in stand["canisters"])
+    assert stands["file-registry"]["canisters"][0]["wasm_key"] == "file-registry-backend"

@@ -18,7 +18,6 @@ from .utils import get_project_root
 _SRV_CASALS = Path("/srv/dev/Casals")
 
 # (stand, registered name, canister_ids.json key, kind)
-# Batons are minted by Casals from the sheet — not registered from canister_ids.json.
 _PRODUCT_REGISTRATIONS: tuple[tuple[str, str, str, str], ...] = (
     ("marketplace", "marketplace-backend", "marketplace_backend", "backend"),
     ("marketplace", "marketplace-frontend", "marketplace_frontend", "frontend"),
