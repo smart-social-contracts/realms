@@ -125,6 +125,50 @@ def _set_canister_id(
     data = _read_canister_ids(project_root)
     data.setdefault(canister_name, {})[network] = canister_id
     _write_canister_ids(project_root, data)
+    _set_dfx_remote_id(project_root, canister_name, network, canister_id)
+
+
+def _dfx_remote_ids(project_root: Path, canister_name: str) -> Optional[Dict[str, str]]:
+    path = project_root / "dfx.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    can = ((data.get("canisters") or {}).get(canister_name) or {})
+    remote = (can.get("remote") or {}).get("id")
+    return remote if isinstance(remote, dict) else None
+
+
+def _write_dfx_remote_ids(
+    project_root: Path, canister_name: str, remote: Dict[str, str]
+) -> None:
+    path = project_root / "dfx.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    can = ((data.get("canisters") or {}).get(canister_name) or {})
+    if "remote" not in can:
+        return
+    can.setdefault("remote", {})["id"] = remote
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _set_dfx_remote_id(
+    project_root: Path, canister_name: str, network: str, canister_id: str
+) -> None:
+    remote = _dfx_remote_ids(project_root, canister_name)
+    if remote is None:
+        return
+    remote[network] = canister_id
+    _write_dfx_remote_ids(project_root, canister_name, remote)
+
+
+def _clear_dfx_remote_id(project_root: Path, canister_name: str, network: str) -> None:
+    remote = _dfx_remote_ids(project_root, canister_name)
+    if not remote or network not in remote:
+        return
+    del remote[network]
+    _write_dfx_remote_ids(project_root, canister_name, remote)
 
 
 def _clear_canister_id(project_root: Path, canister_name: str, network: str) -> None:
@@ -134,6 +178,7 @@ def _clear_canister_id(project_root: Path, canister_name: str, network: str) -> 
         if not data[canister_name]:
             del data[canister_name]
         _write_canister_ids(project_root, data)
+    _clear_dfx_remote_id(project_root, canister_name, network)
 
 
 def _product_canister_id(
@@ -471,7 +516,9 @@ def resolve_or_create_canister(
     if not existing:
         console.print(f"[dim]No live id for {canister_name} on {network} — creating…[/dim]")
 
-    return _create_canister(canister_name, network, identity, logger=logger)
+    cid = _create_canister(canister_name, network, identity, logger=logger)
+    _set_canister_id(project_root, canister_name, network, cid)
+    return cid
 
 
 def _dfx_deploy(

@@ -10,6 +10,7 @@ import pytest
 import typer
 
 from realms.cli.commands.env import (
+    _clear_canister_id,
     _create_canister,
     _dfx_deploy,
     _is_canister_dead,
@@ -51,6 +52,29 @@ class TestCanisterIds:
         _set_canister_id(tmp_path, "file_registry", "demo", "aaaaa-aa")
         data = _read_canister_ids(tmp_path)
         assert data["file_registry"]["demo"] == "aaaaa-aa"
+
+    def test_clear_canister_id_drops_dfx_remote(self, tmp_path):
+        (tmp_path / "dfx.json").write_text(
+            json.dumps(
+                {
+                    "canisters": {
+                        "token_backend": {
+                            "remote": {"id": {"test": "old-id", "demo": "keep-demo"}}
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        (tmp_path / "canister_ids.json").write_text(
+            json.dumps({"token_backend": {"test": "old-id"}}),
+            encoding="utf-8",
+        )
+        _clear_canister_id(tmp_path, "token_backend", "test")
+        leftover = json.loads((tmp_path / "dfx.json").read_text(encoding="utf-8"))
+        assert "test" not in leftover["canisters"]["token_backend"]["remote"]["id"]
+        assert leftover["canisters"]["token_backend"]["remote"]["id"]["demo"] == "keep-demo"
+        assert "token_backend" not in _read_canister_ids(tmp_path)
 
 
 class TestDeadCanisterDetection:
