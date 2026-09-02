@@ -126,7 +126,7 @@
       "remote": {
         "id": {
           "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
-          "test": "nusyl-jiaaa-aaaae-qj6mq-cai"
+          "test": "af3x2-iaaaa-aaaas-amxda-cai"
         }
       },
       "init_arg": "(record { name = \"Simple Token\"; symbol = \"SMPL\"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt true })"
@@ -137,7 +137,7 @@
       "remote": {
         "id": {
           "demo": "xglmt-7aaaa-aaaah-qq3yq-cai",
-          "test": "33mmr-pyaaa-aaaam-ai47q-cai"
+          "test": "ac2ro-fyaaa-aaaas-amxdq-cai"
         }
       }
     },
@@ -148,7 +148,7 @@
       "remote": {
         "id": {
           "demo": "6hrip-iiaaa-aaaaf-qdoha-cai",
-          "test": "eelas-yyaaa-aaaao-qps7a-cai"
+          "test": "bpuva-kqaaa-aaaas-amxea-cai"
         }
       },
       "init_arg": "(record { name = \"Land NFT\"; symbol = \"LAND\"; description = opt \"Land ownership NFT for realm\"; supply_cap = opt 10000 : opt nat; test = opt true })"
@@ -159,7 +159,7 @@
       "remote": {
         "id": {
           "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai",
-          "test": "ysrkl-eqaaa-aaaas-qgosa-cai"
+          "test": "bivtu-hiaaa-aaaas-amxeq-cai"
         }
       }
     },

@@ -621,6 +621,7 @@ _CERTIFIED_ASSETS_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
 # icp create leaves Casals file-registry ~0.4T after WASM install; catalog
 # seed then OOGs. Top up before seed.py uploads.
 _CASALS_FILE_REGISTRY_TOPUP = 2_000_000_000_000
+_CASALS_CONDUCTOR_TOPUP = 8_000_000_000_000
 # Keep in sync with scripts/fetch_gos_artifacts.py GOS_RELEASE (no leading v).
 _GOS_CATALOG_VERSION = "0.3.2"
 
@@ -976,6 +977,12 @@ def rebuild_casals_conductor(
         )
         install_gos_file_registry_wasm(
             file_registry, identity=identity, project_root=root
+        )
+    if conductor:
+        top_up_canister_cycles(
+            conductor,
+            identity=identity,
+            amount=_CASALS_CONDUCTOR_TOPUP,
         )
     run_casals_seed_catalog(
         network=network,
