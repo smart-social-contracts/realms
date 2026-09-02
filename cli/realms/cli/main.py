@@ -1833,12 +1833,22 @@ def seed(
         "--domain/--no-domain",
         help="Write .well-known/ic-domains before frontend build",
     ),
+    destroy_except_frontend: bool = typer.Option(
+        False,
+        "--destroy-except-marketplace-frontend",
+        help=(
+            "Stop, recover cycles, and delete file_registry, "
+            "file_registry_frontend, and marketplace_backend. Keeps "
+            "marketplace_frontend (*.realmsgos.org DNS). Then recreates the "
+            "three and upgrades the frontend. Does not touch GaaS file_registry."
+        ),
+    ),
 ) -> None:
     """Deploy Realms GOS product infra (``*.realmsgos.org``) and publish the catalog.
 
     Superset of ``realms env deploy``: marketplace + file_registry, then
     extensions/codices into that file_registry. Does not deploy a GaaS portal
-    (``gaas new``).
+    (``gaas new``) and never writes the GaaS file_registry.
     """
     seed_command(
         env_name=env,
@@ -1850,6 +1860,7 @@ def seed(
         skip_catalog=skip_catalog,
         skip_branding=skip_branding,
         with_domain=with_domain,
+        destroy_except_frontend=destroy_except_frontend,
     )
 
 

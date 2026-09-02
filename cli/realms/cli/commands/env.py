@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -51,6 +52,15 @@ PRODUCT_STACK = (
     MARKETPLACE_BACKEND,
     MARKETPLACE_FRONTEND,
 )
+
+# DNS-mapped ``*.realmsgos.org`` frontend. Destroy recovers cycles from the
+# other three product canisters and leaves this id in place.
+PRODUCT_STACK_DESTROY = (
+    FILE_REGISTRY,
+    FILE_REGISTRY_FRONTEND,
+    MARKETPLACE_BACKEND,
+)
+DNS_PRODUCT_FRONTEND = MARKETPLACE_FRONTEND
 
 
 def _environments_dir(project_root: Path) -> Path:
@@ -109,6 +119,186 @@ def _clear_canister_id(project_root: Path, canister_name: str, network: str) -> 
         if not data[canister_name]:
             del data[canister_name]
         _write_canister_ids(project_root, data)
+
+
+def _product_canister_id(
+    canister_name: str, network: str, project_root: Path
+) -> Optional[str]:
+    cid = _dfx_canister_id(canister_name, network)
+    if cid:
+        return cid
+    return (_read_canister_ids(project_root).get(canister_name) or {}).get(network)
+
+
+def _icp_replica_args(network: str) -> List[str]:
+    if (network or "").lower() in ("local", "localhost"):
+        return ["-e", "local"]
+    return ["-n", "https://icp0.io", "--root-key", "mainnet"]
+
+
+def _icp_canister_cmd(
+    *args: str,
+    network: str,
+    identity: Optional[str] = None,
+) -> List[str]:
+    cmd = ["icp", "canister", *args]
+    cmd.extend(_icp_replica_args(network))
+    if identity:
+        cmd.extend(["--identity", identity])
+    return cmd
+
+
+def _run_canister_mgmt(
+    cmd: List[str],
+    *,
+    timeout: int = 300,
+    logger=None,
+) -> subprocess.CompletedProcess:
+    if logger:
+        logger.info("Running: %s", " ".join(cmd))
+    else:
+        console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
+    env = os.environ.copy()
+    if cmd and cmd[0] == "dfx":
+        env = _dfx_subprocess_env()
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
+    )
+    if logger:
+        if result.stdout:
+            logger.info(result.stdout)
+        if result.stderr:
+            logger.info(result.stderr)
+    return result
+
+
+def _delete_canister_recover_cycles(
+    canister_id: str,
+    network: str,
+    identity: Optional[str],
+    *,
+    logger=None,
+) -> None:
+    """Stop then delete ``canister_id``, recovering leftover cycles to the ledger.
+
+    Prefer ``icp canister delete`` (installs a shim and refunds cycles). Never
+    pass ``--no-recover-cycles``. dfx fallback uses default withdrawal, not
+    ``--no-withdrawal``.
+    """
+    if shutil.which("icp"):
+        stop_cmd = _icp_canister_cmd(
+            "stop", canister_id, network=network, identity=identity
+        )
+        delete_cmd = _icp_canister_cmd(
+            "delete", canister_id, network=network, identity=identity
+        )
+    else:
+        stop_cmd = _dfx_cmd("canister", "stop", canister_id, "--network", network)
+        delete_cmd = _dfx_cmd(
+            "canister", "delete", canister_id, "--network", network, "--yes"
+        )
+        if identity:
+            stop_cmd.extend(["--identity", identity])
+            delete_cmd.extend(["--identity", identity])
+
+    stop_result = _run_canister_mgmt(stop_cmd, timeout=120, logger=logger)
+    if stop_result.returncode != 0:
+        combined = f"{stop_result.stderr}\n{stop_result.stdout}".lower()
+        if not any(
+            marker in combined
+            for marker in ("not found", "already stopped", "is stopped")
+        ):
+            console.print(
+                f"[yellow]stop {canister_id} warning: "
+                f"{(stop_result.stderr or stop_result.stdout or '').strip()[:200]}[/yellow]"
+            )
+
+    delete_result = _run_canister_mgmt(delete_cmd, timeout=300, logger=logger)
+    if delete_result.returncode != 0:
+        combined = f"{delete_result.stderr}\n{delete_result.stdout}".lower()
+        if any(marker in combined for marker in ("not found", "does not exist")):
+            return
+        console.print(f"[red]❌ Failed to delete {canister_id} (cycles not recovered)[/red]")
+        detail = (delete_result.stderr or delete_result.stdout or "").strip()
+        if detail:
+            console.print(f"[dim]{detail[-800:]}[/dim]")
+        raise typer.Exit(delete_result.returncode or 1)
+
+
+def destroy_product_stack_except_frontend(
+    *,
+    network: str,
+    project_root: Path,
+    identity: Optional[str] = None,
+    yes: bool = False,
+    logger=None,
+) -> Dict[str, List[str]]:
+    """Drain-destroy product canisters except the ``*.realmsgos.org`` frontend.
+
+    Recovers cycles into the caller's cycles-ledger account, then removes the
+    destroyed ids from ``canister_ids.json`` so the next deploy mints replacements.
+    Does not touch GaaS (``gaas new``) canisters.
+    """
+    keep_id = _product_canister_id(DNS_PRODUCT_FRONTEND, network, project_root) or ""
+    if keep_id and _is_canister_dead(keep_id, network):
+        console.print(
+            f"[red]⚠️  {DNS_PRODUCT_FRONTEND} {keep_id} is not live on {network}. "
+            "It will be recreated with a NEW id and the *.realmsgos.org DNS "
+            "mapping will break until re-registered.[/red]"
+        )
+    targets: List[tuple[str, str]] = []
+    for name in PRODUCT_STACK_DESTROY:
+        cid = (_product_canister_id(name, network, project_root) or "").strip()
+        if not cid:
+            continue
+        if keep_id and cid == keep_id:
+            console.print(
+                f"[yellow]Refusing to destroy DNS frontend {name} ({cid})[/yellow]"
+            )
+            continue
+        targets.append((name, cid))
+
+    if not targets:
+        console.print("[dim]No product canisters to destroy (except marketplace_frontend).[/dim]")
+        return {"destroyed": [], "kept": [keep_id] if keep_id else []}
+
+    console.print(
+        Panel.fit(
+            "Destroy product stack (recover cycles)\n"
+            f"Network: [bold]{network}[/bold]\n"
+            f"Keep: [cyan]{DNS_PRODUCT_FRONTEND}[/cyan] "
+            f"{keep_id or '(no id)'}\n"
+            "Delete: " + ", ".join(f"{n} ({c})" for n, c in targets),
+            style="yellow",
+        )
+    )
+    if not yes and not typer.confirm(
+        "Stop, recover cycles, and destroy those canisters?",
+        default=False,
+    ):
+        console.print("[yellow]Aborted.[/yellow]")
+        raise typer.Exit(0)
+
+    destroyed: List[str] = []
+    for name, cid in targets:
+        if _is_canister_dead(cid, network):
+            console.print(f"[dim]{name} {cid} already gone — clearing id[/dim]")
+        else:
+            console.print(f"[dim]Destroying {name} {cid} (recover cycles)…[/dim]")
+            _delete_canister_recover_cycles(cid, network, identity, logger=logger)
+        _clear_canister_id(project_root, name, network)
+        destroyed.append(cid)
+        console.print(f"  recovered+deleted {name} {cid}")
+
+    if keep_id:
+        console.print(
+            f"[green]Kept {DNS_PRODUCT_FRONTEND} {keep_id} (*.realmsgos.org DNS)[/green]"
+        )
+    return {"destroyed": destroyed, "kept": [keep_id] if keep_id else []}
 
 
 def _canister_status_line(canister_ref: str, network: str) -> str:

@@ -180,7 +180,48 @@ class TestPortalManifest:
         assert "artifacts" not in manifest
         assert "github.com" not in json.dumps(manifest)
         assert manifest["gos"]["implementation"] == "realms-gos"
-        assert manifest["test_flags"]["user_self_registration"] is True
+        assert "test_flags" not in manifest
+        assert "can_test_mode" not in manifest
+
+    def test_uses_gaas_config_flags_not_network(self):
+        manifest = build_portal_manifest(
+            name="Acme",
+            slug="acme",
+            network="demo",
+            version="main",
+            founder="aaaaa-aa",
+            subnet={"choice": "automatic"},
+            can_test_mode=False,
+            test_flags={
+                "test_mode": False,
+                "user_self_registration": False,
+                "demo_data": False,
+                "ii_bypass": False,
+                "skip_terms": False,
+            },
+        )
+        assert manifest["can_test_mode"] is False
+        assert manifest["test_flags"]["test_mode"] is False
+        assert manifest["test_flags"]["ii_bypass"] is False
+
+        on = build_portal_manifest(
+            name="Acme",
+            slug="acme",
+            network="demo",
+            version="main",
+            founder="aaaaa-aa",
+            subnet={"choice": "automatic"},
+            can_test_mode=True,
+            test_flags={
+                "test_mode": True,
+                "user_self_registration": True,
+                "demo_data": True,
+                "ii_bypass": True,
+                "skip_terms": True,
+            },
+        )
+        assert on["can_test_mode"] is True
+        assert on["test_flags"]["ii_bypass"] is True
 
     def test_ic_portal_host_and_no_test_flags(self):
         manifest = build_portal_manifest(
@@ -393,6 +434,19 @@ class TestGaasConfig:
         assert gaas.registry_id == "5ocwl-eiaaa-aaaah-av2bq-cai"
         assert gaas.installer_id == "53fhg-faaaa-aaaah-av2ca-cai"
         assert gaas.portal_host == "https://demo.gos.earth"
+        assert gaas.can_test_mode is None
+        assert gaas.test_flags == {}
+
+    def test_load_reads_test_flag_config(self, tmp_path: Path):
+        path = self._write(
+            tmp_path,
+            flags={"can_test_mode": False},
+            test_flags={"test_mode": False, "ii_bypass": True},
+        )
+        gaas = load_gaas_config(path)
+        assert gaas.can_test_mode is False
+        assert gaas.test_flags["test_mode"] is False
+        assert gaas.test_flags["ii_bypass"] is True
 
     def test_resolve_infers_network_from_name(self, tmp_path: Path):
         path = self._write(tmp_path)

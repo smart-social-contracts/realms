@@ -23,7 +23,7 @@ import tempfile
 import time
 import tarfile
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -145,38 +145,6 @@ def derivation_origin_for_network(network: str) -> str:
     return DERIVATION_ORIGINS.get((network or "").lower(), DERIVATION_ORIGINS["staging"])
 
 
-def network_test_flags(network: str) -> Dict[str, Any]:
-    """Port of ``networkTestFlags`` (non-production wizard test_flags)."""
-    net = (network or "staging").lower()
-    if net in ("ic", "production"):
-        return {}
-    if net == "test":
-        return {
-            "test_mode": True,
-            "user_self_registration": True,
-            "demo_data": True,
-            "ii_bypass": True,
-            "skip_terms": True,
-        }
-    if net == "staging":
-        return {
-            "test_mode": True,
-            "user_self_registration": True,
-            "demo_data": False,
-            "ii_bypass": False,
-            "skip_terms": False,
-        }
-    if net == "demo":
-        return {
-            "test_mode": True,
-            "user_self_registration": True,
-            "demo_data": True,
-            "ii_bypass": False,
-            "skip_terms": False,
-        }
-    return {}
-
-
 def looks_like_subnet_id(value: str) -> bool:
     text = (value or "").strip()
     if not text or text.lower() in ("automatic", "european", "other"):
@@ -279,8 +247,14 @@ def build_portal_manifest(
     manifesto: str = "",
     welcome_message: str = "",
     portal_host: Optional[str] = None,
+    can_test_mode: Optional[bool] = None,
+    test_flags: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Portal wizard manifest (useCasals: true). No GitHub artifact URLs."""
+    """Portal wizard manifest (useCasals: true). No GitHub artifact URLs.
+
+    ``can_test_mode`` / ``test_flags`` come from GaaS config (``gaas new``
+    descriptor). This function does not invent flags from ``--network``.
+    """
     normalized = normalize_deploy_version(version)
     realm_block: Dict[str, Any] = {
         "name": name,
@@ -308,11 +282,12 @@ def build_portal_manifest(
     deriv = derivation_origin_for_network(network)
     if deriv:
         manifest["infra"] = {"ii_derivation_origin": deriv}
-    if network not in ("ic", "production"):
-        manifest["can_test_mode"] = True
-    flags = network_test_flags(network)
-    if flags:
-        manifest["test_flags"] = flags
+    if can_test_mode is not None:
+        manifest["can_test_mode"] = bool(can_test_mode)
+    if test_flags:
+        manifest["test_flags"] = {
+            str(k): bool(v) for k, v in test_flags.items()
+        }
     return manifest
 
 
@@ -759,7 +734,7 @@ def resolve_identity_principal(identity: str) -> str:
             return proc.stdout.strip().splitlines()[-1].strip()
     env = _dfx_env()
     proc = _run(
-        ["dfx", "--run-deprecated", "identity", "get-principal", "--identity", identity],
+        ["dfx", "identity", "get-principal", "--identity", identity],
         timeout=30,
         env=env,
     )
@@ -948,11 +923,10 @@ def _canister_call(
     arg_file = None
     try:
         use_file = len(arg.encode("utf-8")) >= 100 * 1024
-        # Prefer dfx --run-deprecated for clean --output json; icp --json wraps candid in an envelope
+        # Prefer dfx for clean --output json; icp --json wraps candid in an envelope
         if shutil.which("dfx") is not None:
             cmd = [
                 "dfx",
-                "--run-deprecated",
                 "canister",
                 "call",
                 canister,
@@ -1482,7 +1456,7 @@ def _existing_geister_indexes() -> List[int]:
         for match in re.finditer(rf"{GEISTER_AGENT_PREFIX}_(\d+)", proc.stdout or ""):
             indexes.append(int(match.group(1)))
     env = _dfx_env()
-    proc = _run(["dfx", "--run-deprecated", "identity", "list"], timeout=30, env=env)
+    proc = _run(["dfx", "identity", "list"], timeout=30, env=env)
     for match in re.finditer(rf"{GEISTER_AGENT_PREFIX}_(\d+)", proc.stdout or ""):
         indexes.append(int(match.group(1)))
     return indexes
@@ -1558,6 +1532,8 @@ class GaasConfig:
     installer_id: str
     canisters: Dict[str, str]
     path: Path
+    can_test_mode: Optional[bool] = None
+    test_flags: Dict[str, bool] = field(default_factory=dict)
 
     @property
     def portal_host(self) -> str:
@@ -1600,6 +1576,16 @@ def load_gaas_config(path: str | Path) -> GaasConfig:
             f"--gaas-config {config_path} missing {', '.join(missing)} "
             "(write it with `gaas new --output-file`).",
         )
+    flags_block = data.get("flags") if isinstance(data.get("flags"), dict) else {}
+    can_test_mode: Optional[bool] = None
+    if "can_test_mode" in flags_block:
+        can_test_mode = bool(flags_block["can_test_mode"])
+    elif "open_mode" in flags_block:
+        can_test_mode = bool(flags_block["open_mode"])
+    raw_test_flags = data.get("test_flags")
+    test_flags: Dict[str, bool] = {}
+    if isinstance(raw_test_flags, dict):
+        test_flags = {str(k): bool(v) for k, v in raw_test_flags.items()}
     return GaasConfig(
         env_name=env_name,
         domain=domain,
@@ -1607,6 +1593,8 @@ def load_gaas_config(path: str | Path) -> GaasConfig:
         installer_id=installer_id,
         canisters={str(k): str(v) for k, v in canisters.items()},
         path=config_path,
+        can_test_mode=can_test_mode,
+        test_flags=test_flags,
     )
 
 
@@ -1704,7 +1692,7 @@ def _write_standalone_canister_ids_js(
         "file_registry": file_registry_id,
         "derivation_origin": origin,
         "portal_url": f"https://{frontend_id}.icp0.io/",
-        "test_mode_ii_bypass": network == "test",
+        "test_mode_ii_bypass": False,
     }
     (dist / "canister_ids.js").write_text(
         "globalThis.__CANISTER_IDS = " + json.dumps(payload) + ";\n",
@@ -1806,7 +1794,6 @@ def deploy_standalone_realm(
     for name in ("realm_backend", "realm_frontend"):
         cmd = [
             "dfx",
-            "--run-deprecated",
             "canister",
             "create",
             name,
@@ -1847,7 +1834,6 @@ def deploy_standalone_realm(
 
     install_backend = [
         "dfx",
-        "--run-deprecated",
         "canister",
         "install",
         "realm_backend",
@@ -1871,7 +1857,6 @@ def deploy_standalone_realm(
 
     deploy_frontend = [
         "dfx",
-        "--run-deprecated",
         "deploy",
         "realm_frontend",
         "--network",
@@ -2161,6 +2146,8 @@ def new_command(
                 manifesto=merged["branding"].get("manifesto") or "",
                 welcome_message=merged["branding"].get("welcome_message") or "",
                 portal_host=gaas.portal_host or None,
+                can_test_mode=gaas.can_test_mode,
+                test_flags=gaas.test_flags,
             )
             if "artifacts" in manifest or "expected_hashes" in manifest:
                 _fail("deploy", "internal error: GitHub artifact URLs must not appear in the portal manifest")

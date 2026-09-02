@@ -15,6 +15,7 @@ from realms.cli.commands.env import (
     _is_canister_dead,
     _read_canister_ids,
     _set_canister_id,
+    destroy_product_stack_except_frontend,
     env_deploy_command,
     load_env_config,
 )
@@ -84,7 +85,7 @@ class TestDfxDeployBasiliskEnv:
         mock_run.assert_called_once()
         args, kwargs = mock_run.call_args
         cmd = args[0]
-        assert cmd[:3] == ["dfx", "--run-deprecated", "deploy"]
+        assert cmd[:2] == ["dfx", "deploy"]
         env = kwargs["env"]
         assert env["PATH"] == dfx_env["PATH"]
         assert env["VIRTUAL_ENV"] == dfx_env["VIRTUAL_ENV"]
@@ -131,6 +132,9 @@ class TestEnvDeployBasiliskEnv:
         )
         mock_root.return_value = tmp_path
         mock_load.return_value = {"name": "test", "network": "test", "domain": ""}
+        wasm = tmp_path / ".external-wasms" / "file_registry.wasm.gz"
+        wasm.parent.mkdir(parents=True)
+        wasm.write_bytes(b"gz")
         mock_dfx_env.return_value = {
             "PATH": f"{tmp_path}/.venv-basilisk/bin:/usr/bin",
             "VIRTUAL_ENV": str(tmp_path / ".venv-basilisk"),
@@ -166,3 +170,65 @@ class TestCreateCanisterSubnet:
         _create_canister("file_registry", "local", None, logger=None)
         cmd = mock_run.call_args.args[0]
         assert "--subnet-type" not in cmd
+
+
+class TestDestroyProductStack:
+    def test_destroys_three_keeps_marketplace_frontend(self, tmp_path):
+        ids = {
+            "file_registry": {"demo": "aaaaa-aaaaa-aaaaa-aaaaa-aaa"},
+            "file_registry_frontend": {"demo": "bbbbb-bbbbb-bbbbb-bbbbb-bbb"},
+            "marketplace_backend": {"demo": "ccccc-ccccc-ccccc-ccccc-ccc"},
+            "marketplace_frontend": {"demo": "ddddd-ddddd-ddddd-ddddd-ddd"},
+        }
+        (tmp_path / "canister_ids.json").write_text(json.dumps(ids), encoding="utf-8")
+
+        with patch(
+            "realms.cli.commands.env._dfx_canister_id",
+            side_effect=lambda name, network: ids[name]["demo"],
+        ), patch(
+            "realms.cli.commands.env._is_canister_dead", return_value=False
+        ), patch(
+            "realms.cli.commands.env._delete_canister_recover_cycles"
+        ) as mock_delete:
+            result = destroy_product_stack_except_frontend(
+                network="demo",
+                project_root=tmp_path,
+                identity="deployer",
+                yes=True,
+            )
+
+        deleted = {call.args[0] for call in mock_delete.call_args_list}
+        assert deleted == {
+            "aaaaa-aaaaa-aaaaa-aaaaa-aaa",
+            "bbbbb-bbbbb-bbbbb-bbbbb-bbb",
+            "ccccc-ccccc-ccccc-ccccc-ccc",
+        }
+        assert "ddddd-ddddd-ddddd-ddddd-ddd" not in deleted
+        leftover = _read_canister_ids(tmp_path)
+        assert leftover["marketplace_frontend"]["demo"] == "ddddd-ddddd-ddddd-ddddd-ddd"
+        assert "file_registry" not in leftover
+        assert "marketplace_backend" not in leftover
+        assert result["kept"] == ["ddddd-ddddd-ddddd-ddddd-ddd"]
+
+    def test_refuses_to_delete_when_id_matches_dns_frontend(self, tmp_path):
+        same = "ddddd-ddddd-ddddd-ddddd-ddd"
+        ids = {
+            "file_registry": {"demo": same},
+            "marketplace_frontend": {"demo": same},
+        }
+        (tmp_path / "canister_ids.json").write_text(json.dumps(ids), encoding="utf-8")
+        with patch(
+            "realms.cli.commands.env._dfx_canister_id",
+            side_effect=lambda name, network: (ids.get(name) or {}).get("demo"),
+        ), patch(
+            "realms.cli.commands.env._delete_canister_recover_cycles"
+        ) as mock_delete:
+            destroy_product_stack_except_frontend(
+                network="demo",
+                project_root=tmp_path,
+                identity="deployer",
+                yes=True,
+            )
+        mock_delete.assert_not_called()
+        leftover = _read_canister_ids(tmp_path)
+        assert leftover["marketplace_frontend"]["demo"] == same

@@ -16,7 +16,12 @@ from typing import Optional
 import typer
 from rich.panel import Panel
 
-from .env import env_deploy_command, load_env_config, _read_canister_ids
+from .env import (
+    env_deploy_command,
+    load_env_config,
+    _read_canister_ids,
+    destroy_product_stack_except_frontend,
+)
 from .files import files_publish_branding_command, files_publish_command
 from .marketplace import FILE_REGISTRY, _dfx_canister_id
 from ..utils import console, get_project_root
@@ -42,6 +47,7 @@ def seed_command(
     skip_catalog: bool = False,
     skip_branding: bool = False,
     with_domain: bool = True,
+    destroy_except_frontend: bool = False,
 ) -> None:
     """Deploy Realms product infra and publish the package catalog."""
     project_root = get_project_root()
@@ -57,10 +63,25 @@ def seed_command(
         )
     )
 
+    if destroy_except_frontend:
+        if skip_product:
+            console.print(
+                "[red]❌ --destroy-except-marketplace-frontend cannot be combined "
+                "with --skip-product (the three non-DNS canisters would stay gone).[/red]"
+            )
+            raise typer.Exit(1)
+        destroy_product_stack_except_frontend(
+            network=network,
+            project_root=project_root,
+            identity=identity,
+            yes=yes,
+        )
+
     if not skip_product:
+        deploy_mode = "auto" if destroy_except_frontend else mode
         env_deploy_command(
             env_name=env_name,
-            mode=mode,
+            mode=deploy_mode,
             identity=identity,
             yes=yes,
             skip_frontend_build=skip_frontend_build,
