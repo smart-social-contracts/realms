@@ -71,6 +71,9 @@ def test_resolve_casals_src_sibling(tmp_path: Path, monkeypatch):
 
 
 @patch("realms.cli.commands.seed.deploy_product_sheet_on_casals")
+@patch("realms.cli.commands.seed.authorize_product_wasms")
+@patch("realms.cli.commands.seed.rebuild_casals_conductor")
+@patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
 @patch("realms.cli.commands.seed.files_publish_command")
@@ -85,6 +88,9 @@ def test_seed_invokes_product_sheet_deploy(
     mock_publish,
     mock_branding,
     _registry,
+    mock_destroy,
+    mock_rebuild,
+    mock_authorize,
     mock_sheet_deploy,
 ):
     from realms.cli.commands.seed import seed_command
@@ -93,6 +99,9 @@ def test_seed_invokes_product_sheet_deploy(
 
     seed_command(env_name="test", identity="deployer", yes=True)
 
+    mock_destroy.assert_called_once()
+    mock_rebuild.assert_called_once()
+    mock_authorize.assert_called_once()
     mock_env_deploy.assert_called_once()
     mock_sheet_deploy.assert_called_once()
     assert mock_sheet_deploy.call_args.kwargs["env_name"] == "test"
@@ -100,6 +109,8 @@ def test_seed_invokes_product_sheet_deploy(
     assert mock_sheet_deploy.call_args.kwargs["identity"] == "deployer"
 
 
+@patch("realms.cli.commands.seed.rebuild_casals_conductor")
+@patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
 @patch("realms.cli.commands.seed.deploy_product_sheet_on_casals")
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
@@ -116,11 +127,15 @@ def test_seed_skips_sheet_deploy_when_skip_product(
     _branding,
     _registry,
     mock_sheet_deploy,
+    mock_destroy,
+    mock_rebuild,
 ):
     from realms.cli.commands.seed import seed_command
 
     seed_command(env_name="test", skip_product=True, yes=True)
 
+    mock_destroy.assert_not_called()
+    mock_rebuild.assert_not_called()
     mock_env_deploy.assert_not_called()
     mock_sheet_deploy.assert_not_called()
 

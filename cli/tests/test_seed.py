@@ -21,14 +21,13 @@ def test_seed_help():
     plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "--env" in plain
     assert "--skip-catalog" in plain
-    # Rich truncates long option names with an ellipsis in the help table.
-    assert "--destroy-except" in plain
-    assert "marketplace" in plain.lower() or "catalog" in plain.lower()
+    assert "destroy" in plain.lower() or "casals" in plain.lower()
 
 
 @patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
 @patch("realms.cli.commands.seed.authorize_product_wasms")
 @patch("realms.cli.commands.seed.rebuild_casals_conductor")
+@patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
 @patch("realms.cli.commands.seed.files_publish_command")
@@ -37,28 +36,33 @@ def test_seed_help():
     "realms.cli.commands.seed.load_env_config",
     return_value={"name": "demo", "network": "demo", "domain": "demo.realmsgos.org"},
 )
-def test_seed_runs_product_then_catalog(
+def test_seed_always_destroys_casals_then_product_and_catalog(
     _load,
     mock_env_deploy,
     mock_publish,
     mock_branding,
     _registry,
+    mock_destroy,
     mock_rebuild,
     mock_authorize,
     _sheet,
 ):
     seed_command(env_name="demo", identity="deployer", yes=True)
+    mock_destroy.assert_called_once()
+    mock_rebuild.assert_called_once()
+    assert mock_rebuild.call_args.kwargs["env_name"] == "demo"
+    mock_authorize.assert_called_once()
     mock_env_deploy.assert_called_once()
-    assert mock_env_deploy.call_args.kwargs["env_name"] == "demo"
+    assert mock_env_deploy.call_args.kwargs["mode"] == "auto"
     mock_publish.assert_called_once()
     assert mock_publish.call_args.kwargs["network"] == "demo"
     assert mock_publish.call_args.kwargs["registry"] == "krch6-ryaaa-aaaas-amw3q-cai"
     mock_branding.assert_called_once()
     assert mock_branding.call_args.kwargs["registry"] == "krch6-ryaaa-aaaas-amw3q-cai"
-    mock_rebuild.assert_not_called()
-    mock_authorize.assert_not_called()
 
 
+@patch("realms.cli.commands.seed.rebuild_casals_conductor")
+@patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
 @patch("realms.cli.commands.seed.files_publish_command")
@@ -73,14 +77,21 @@ def test_seed_skip_product_catalog_only(
     mock_publish,
     mock_branding,
     _registry,
+    mock_destroy,
+    mock_rebuild,
 ):
     seed_command(env_name="demo", skip_product=True, yes=True)
+    mock_destroy.assert_not_called()
+    mock_rebuild.assert_not_called()
     mock_env_deploy.assert_not_called()
     mock_publish.assert_called_once()
     mock_branding.assert_called_once()
 
 
 @patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.authorize_product_wasms")
+@patch("realms.cli.commands.seed.rebuild_casals_conductor")
+@patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
 @patch("realms.cli.commands.seed.files_publish_command")
 @patch("realms.cli.commands.seed.env_deploy_command")
@@ -93,9 +104,15 @@ def test_seed_skip_catalog(
     mock_env_deploy,
     mock_publish,
     mock_branding,
+    mock_destroy,
+    mock_rebuild,
+    mock_authorize,
     _sheet,
 ):
     seed_command(env_name="staging", skip_catalog=True, yes=True)
+    mock_destroy.assert_called_once()
+    mock_rebuild.assert_called_once()
+    mock_authorize.assert_called_once()
     mock_env_deploy.assert_called_once()
     mock_publish.assert_not_called()
     mock_branding.assert_not_called()

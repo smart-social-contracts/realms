@@ -25,9 +25,7 @@ A full platform rebuild is **`gaas new` then `realms seed`**. Seed **destroys Ca
 | Sheet deploy | `gaas new` deploys `gos-as-a-service/casals.json`. `realms seed` deploys the **union** with `realms/casals.json` (must not send Product-only). |
 | Token/NFT catalog | Authorize [ic-tokens v0.1.0](https://github.com/smart-social-contracts/ic-tokens/releases/tag/v0.1.0) backends plus certified-assets for the frontends. No new GitHub release required. |
 
-**Wired, still opt-in:** `realms seed --destroy-except-marketplace-frontend --yes` destroys the Casals stack, runs `casals new -y --no-seed`, seeds the Casals catalog, recreates product canisters (DNS keep-ID for `marketplace-frontend`), authorizes union-sheet WASMs (installer, registry, marketplace, fleet file-registry, token, nft) into **Casals'** file-registry, then deploys the union sheet. Do not run that on live test until confirmed.
-
-Plain `realms seed` (no destroy flag) still deploys product canisters + union sheet without destroying Casals.
+**Always destructive:** `realms seed --env test --yes` destroys the Casals stack, runs `casals new -y --no-seed`, seeds the Casals catalog, recreates product canisters (DNS keep-ID for `marketplace-frontend`), authorizes union-sheet WASMs (installer, registry, marketplace, fleet file-registry, token, nft) into **Casals'** file-registry, then deploys the union sheet. `--skip-product` is catalog-only and does not destroy. `gaas new` still needs `--destroy-except-realm-registry-frontend` for the GaaS orchestra wipe.
 
 ---
 

@@ -1836,22 +1836,22 @@ def seed(
     destroy_except_frontend: bool = typer.Option(
         False,
         "--destroy-except-marketplace-frontend",
+        hidden=True,
         help=(
-            "Full rebuild: destroy Casals (then casals new), destroy product "
-            "canisters except marketplace_frontend (*.realmsgos.org DNS), "
-            "recreate file_registry / marketplace_backend / token / nft, "
-            "authorize WASMs, and deploy the union sheet. Does not touch "
-            "GaaS installer or realm-registry-frontend."
+            "Deprecated: realms seed always destroys Casals and product "
+            "canisters except marketplace_frontend. Kept so existing scripts "
+            "still parse. Cannot be combined with --skip-product."
         ),
     ),
 ) -> None:
     """Deploy Realms GOS product infra (``*.realmsgos.org``) and publish the catalog.
 
-    Superset of ``realms env deploy``: marketplace, fleet file_registry, token,
-    and nft, then extensions/codices into that file_registry. Registers GaaS
-    plus product canisters on the Casals conductor and deploys the union of
+    Always destroys and re-creates Casals, then marketplace, fleet
+    file_registry, token, and nft (keeps marketplace_frontend for DNS).
+    Then publishes extensions/codices into that file_registry. Registers
+    GaaS plus product canisters on the new conductor and deploys the union of
     ``gos-as-a-service/casals.json`` and ``casals.json``. Does not deploy a GaaS
-    portal (``gaas new``).
+    portal (``gaas new``). ``--skip-product`` is catalog-only and does not destroy.
     """
     seed_command(
         env_name=env,

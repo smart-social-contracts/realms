@@ -1,11 +1,13 @@
 """``realms seed`` — Realms GOS product infrastructure per network.
 
-Deploys the ``*.realmsgos.org`` stack (marketplace, fleet file_registry,
+Always destroys and re-creates the Casals conductor (``casals new``), then
+deploys the ``*.realmsgos.org`` stack (marketplace, fleet file_registry,
 token, nft) and publishes the extension/codex catalog. GaaS (``gaas new``)
-does not own these canisters.
+does not own these canisters. ``--skip-product`` is catalog-only and does not
+destroy anything.
 
 After the product stack is deployed, registers GaaS + product canister IDs
-on the Casals conductor and runs ``casals sheet deploy`` of the **union** of
+on the new conductor and runs ``casals sheet deploy`` of the **union** of
 ``gos-as-a-service/casals.json`` and repo-root ``casals.json``. Product-only
 deploy is forbidden (Pass 2 would stop installer/registry).
 """
@@ -55,27 +57,34 @@ def seed_command(
     with_domain: bool = True,
     destroy_except_frontend: bool = False,
 ) -> None:
-    """Deploy Realms product infra and publish the package catalog."""
+    """Deploy Realms product infra and publish the package catalog.
+
+    Destroys Casals and product canisters (except marketplace_frontend) unless
+    ``skip_product`` is set.
+    """
     project_root = get_project_root()
     env_config = load_env_config(env_name, project_root)
     network = env_config.get("network", env_name)
+    rebuild = not skip_product
 
     console.print(
         Panel.fit(
             f"🌱 realms seed\n"
             f"Environment: [bold]{env_name}[/bold]  Network: [bold]{network}[/bold]\n"
+            f"Destroys Casals + product (keeps marketplace_frontend DNS).\n"
             f"Owns marketplace + file_registry + token/nft + catalog — not the GaaS portal.",
             style="bold blue",
         )
     )
 
-    if destroy_except_frontend:
-        if skip_product:
-            console.print(
-                "[red]❌ --destroy-except-marketplace-frontend cannot be combined "
-                "with --skip-product (the non-DNS canisters would stay gone).[/red]"
-            )
-            raise typer.Exit(1)
+    if skip_product and destroy_except_frontend:
+        console.print(
+            "[red]❌ --destroy-except-marketplace-frontend cannot be combined "
+            "with --skip-product (the non-DNS canisters would stay gone).[/red]"
+        )
+        raise typer.Exit(1)
+
+    if rebuild:
         destroy_product_stack_except_frontend(
             network=network,
             project_root=project_root,
@@ -94,29 +103,26 @@ def seed_command(
             console.print(f"[red]❌ casals new failed: {exc}[/red]")
             raise typer.Exit(1) from exc
 
-    if not skip_product:
-        deploy_mode = "auto" if destroy_except_frontend else mode
         env_deploy_command(
             env_name=env_name,
-            mode=deploy_mode,
+            mode="auto",
             identity=identity,
             yes=yes,
             skip_frontend_build=skip_frontend_build,
             with_domain=with_domain,
         )
 
-        if destroy_except_frontend:
-            try:
-                authorize_product_wasms(
-                    env_name=env_name,
-                    network=network,
-                    identity=identity,
-                    project_root=project_root,
-                )
-                console.print("[green]✓ Product WASMs authorized in Casals catalog[/green]")
-            except RuntimeError as exc:
-                console.print(f"[red]❌ Product WASM authorize failed: {exc}[/red]")
-                raise typer.Exit(1) from exc
+        try:
+            authorize_product_wasms(
+                env_name=env_name,
+                network=network,
+                identity=identity,
+                project_root=project_root,
+            )
+            console.print("[green]✓ Product WASMs authorized in Casals catalog[/green]")
+        except RuntimeError as exc:
+            console.print(f"[red]❌ Product WASM authorize failed: {exc}[/red]")
+            raise typer.Exit(1) from exc
 
         try:
             deployed, detail = deploy_product_sheet_on_casals(
