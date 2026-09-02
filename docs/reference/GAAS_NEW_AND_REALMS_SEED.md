@@ -1,6 +1,6 @@
 # `gaas new` and `realms seed` — canister actions
 
-Both commands call **`casals new`** when they need a conductor. That call **destroys and re-creates** the Casals stack (new principals) unless it is passed existing IDs and upgrades in place.
+Both commands call **`casals new`**. That **always destroys and re-creates** the Casals stack (new principals). There is no adopt/upgrade path.
 
 - **Destroy and re-create** — recover cycles, delete, mint a new canister (new principal).
 - **Reinstall (keep principal)** — wipe code/state on the same ID. Required for DNS.
@@ -8,7 +8,7 @@ Both commands call **`casals new`** when they need a conductor. That call **dest
 
 DNS keep-ID canisters: **`realm-registry-frontend`** (`*.gos.earth`) and **`marketplace-frontend`** (`*.realmsgos.org`).
 
-A full platform rebuild is **`gaas new` then `realms seed`**. The second command must **adopt** the conductor `gaas new` just created — not run a second destroy/re-create of Casals.
+A full platform rebuild is **`gaas new` then `realms seed`**. Seed **destroys Casals again**, mints a new conductor, and re-registers GaaS + product canisters on it.
 
 ---
 
@@ -17,7 +17,7 @@ A full platform rebuild is **`gaas new` then `realms seed`**. The second command
 | Topic | Verdict |
 |---|---|
 | DNS pair | Only those two frontends keep their principal. Backends may be new IDs. |
-| Casals on both commands | Correct for a **standalone** run. Sequential full rebuild: `gaas new` creates Casals; `realms seed` must **not** destroy it again. |
+| Casals on both commands | **Always** destroy and re-create. Seed never adopts a conductor from `gaas new`. |
 | `infra-baton` / `realm-installer` | GaaS-owned; destroy and re-create in `gaas new`. |
 | Fleet `file-registry` + frontend | Product-owned; destroy and re-create in `realms seed`. Different from Casals’ own file-registry. |
 | Token / NFT backends **and** frontends | Product-owned; destroy and re-create in `realms seed`. |
@@ -82,11 +82,11 @@ A full platform rebuild is **`gaas new` then `realms seed`**. The second command
 
 | Canister | Action |
 |---|---|
-| `casals-backend` | destroy and re-create (`casals new`) — **standalone only**; adopt if `gaas new` already ran |
-| `casals-frontend` | destroy and re-create (`casals new`) — standalone only |
-| `casals-multisig` | destroy and re-create (`casals new`) — standalone only |
-| `casals-file-registry-backend` | destroy and re-create (`casals new`) — standalone only |
-| `casals-file-registry-frontend` | destroy and re-create (`casals new`) — standalone only |
+| `casals-backend` | destroy and re-create (`casals new`) |
+| `casals-frontend` | destroy and re-create (`casals new`) |
+| `casals-multisig` | destroy and re-create (`casals new`) |
+| `casals-file-registry-backend` | destroy and re-create (`casals new`) |
+| `casals-file-registry-frontend` | destroy and re-create (`casals new`) |
 | `file-registry` (fleet) | destroy and re-create |
 | `file-registry-frontend` | destroy and re-create |
 | `marketplace-backend` | destroy and re-create |
@@ -98,11 +98,11 @@ A full platform rebuild is **`gaas new` then `realms seed`**. The second command
 
 ### Steps
 
-1. **Destroy except `marketplace-frontend`** — sweep cycles, delete fleet file-registry (backend + frontend), marketplace backend, token backend/frontend, nft backend/frontend. Leave the DNS frontend ID. If this is a **standalone** seed (no prior `gaas new`), also destroy the Casals stack here. If `gaas new` already ran, **skip** Casals destroy.
-2. **`casals new`** — standalone: mint a new conductor. After `gaas new`: **adopt** the existing conductor IDs (upgrade, do not delete).
+1. **Destroy except `marketplace-frontend`** — sweep cycles, delete the Casals stack, fleet file-registry (backend + frontend), marketplace backend, token backend/frontend, nft backend/frontend. Leave the DNS frontend ID.
+2. **`casals new`** — always mint a new conductor (never adopt).
 3. **Create** new principals for fleet file-registry, file-registry frontend, marketplace backend, token backend/frontend, nft backend/frontend. **Adopt** `marketplace-frontend`.
 4. **dfx install (reinstall)** those product canisters. Token/NFT backends from ic-tokens v0.1.0; frontends are certified-assets.
 5. **Authorize** marketplace, file-registry, token, nft WASMs in the Casals catalog (and certified-assets for UIs).
-6. **Register** product canister IDs on the conductor (Product stands: marketplace, file-registry, token, nft). Include the DNS frontend so sheet deploy does not stop it.
-7. **`casals sheet deploy` the union** of the live GaaS sheet and `realms/casals.json`. Reinstalls listed product canisters in place. Must not deploy Product-only JSON.
+6. **Register** GaaS IDs (installer, registry backend/frontend) and product IDs (marketplace, file-registry, token, nft) on the **new** conductor. Include both DNS frontends so sheet deploy does not stop them.
+7. **`casals sheet deploy` the union** of `gos-as-a-service/casals.json` and `realms/casals.json`. Reinstalls listed canisters in place. Must not deploy Product-only JSON.
 8. **Publish** extension/codex catalog (and branding) into the **fleet** `file-registry`.
