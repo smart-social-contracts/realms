@@ -20,6 +20,7 @@ Complete documentation for building and deploying governance systems on the Inte
 
 ### 👨‍💼 Realm Operators  
 - [Casals Rollout](./reference/CASALS_ROLLOUT.md) - Deploy and upgrade realms (`AGENTS.md` in repo root)
+- [gaas new / realms seed](./reference/GAAS_NEW_AND_REALMS_SEED.md) - Which canisters each command destroys, recreates, or reinstalls
 - [Realm Registration](./reference/REALM_REGISTRATION_GUIDE.md) - Register with central registry
 - [CLI Reference](./reference/CLI_REFERENCE.md) - All commands
 

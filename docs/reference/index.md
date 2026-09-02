@@ -25,6 +25,7 @@ Complete reference documentation for the Realms GOS platform.
 
 ### Deployment & Operations
 - **[Casals Rollout](./CASALS_ROLLOUT)** — Publish-build → rollout (preferred deploy path; see also `AGENTS.md` in repo root)
+- **[gaas new / realms seed](./GAAS_NEW_AND_REALMS_SEED)** — Destroy / re-create / DNS-reinstall per command
 - **[On-chain `deploy_realm` (removed)](./ONCHAIN_REALM_DEPLOY)** - See queue + dfx path instead
 - **[Realm Registration](./REALM_REGISTRATION_GUIDE)** - Join the registry
 - **[Troubleshooting](./TROUBLESHOOTING)** - Common issues and solutions
