@@ -23,6 +23,8 @@ from ..casals_product import (
     authorize_product_wasms,
     deploy_product_sheet_on_casals,
     rebuild_casals_conductor,
+    resolve_casals_src,
+    run_casals_seed_catalog,
 )
 from .env import (
     env_deploy_command,
@@ -56,16 +58,26 @@ def seed_command(
     skip_branding: bool = False,
     with_domain: bool = True,
     destroy_except_frontend: bool = False,
+    from_phase: Optional[str] = None,
 ) -> None:
     """Deploy Realms product infra and publish the package catalog.
 
     Destroys Casals and product canisters (except marketplace_frontend) unless
-    ``skip_product`` is set.
+    ``skip_product`` is set. ``from_phase`` resumes after a failed rebuild:
+    ``catalog`` retries Casals catalog seed then product deploy; ``env_deploy``
+    skips destroy and Casals recreate.
     """
     project_root = get_project_root()
     env_config = load_env_config(env_name, project_root)
     network = env_config.get("network", env_name)
     rebuild = not skip_product
+    phase = (from_phase or "destroy").replace("-", "_")
+    if phase not in ("destroy", "catalog", "env_deploy"):
+        console.print(
+            f"[red]❌ unknown --from-phase {from_phase!r} "
+            "(destroy, catalog, env_deploy)[/red]"
+        )
+        raise typer.Exit(1)
 
     console.print(
         Panel.fit(
@@ -84,25 +96,47 @@ def seed_command(
         )
         raise typer.Exit(1)
 
-    if rebuild:
-        destroy_product_stack_except_frontend(
-            network=network,
-            project_root=project_root,
-            identity=identity,
-            yes=yes,
-            env_name=env_name,
+    if skip_product and phase != "destroy":
+        console.print(
+            "[red]❌ --from-phase cannot be combined with --skip-product[/red]"
         )
-        try:
-            rebuild_casals_conductor(
-                env_name=env_name,
+        raise typer.Exit(1)
+
+    if rebuild:
+        if phase == "destroy":
+            destroy_product_stack_except_frontend(
                 network=network,
-                identity=identity,
                 project_root=project_root,
+                identity=identity,
                 yes=yes,
+                env_name=env_name,
             )
-        except RuntimeError as exc:
-            console.print(f"[red]❌ casals new failed: {exc}[/red]")
-            raise typer.Exit(1) from exc
+            try:
+                rebuild_casals_conductor(
+                    env_name=env_name,
+                    network=network,
+                    identity=identity,
+                    project_root=project_root,
+                    yes=yes,
+                )
+            except RuntimeError as exc:
+                console.print(f"[red]❌ casals new failed: {exc}[/red]")
+                raise typer.Exit(1) from exc
+        elif phase == "catalog":
+            casals_src = resolve_casals_src(project_root)
+            if not casals_src:
+                console.print("[red]❌ no Casals checkout (set CASALS_SRC)[/red]")
+                raise typer.Exit(1)
+            try:
+                run_casals_seed_catalog(
+                    network=network,
+                    identity=identity,
+                    casals_src=casals_src,
+                )
+                console.print("[green]✓ Casals catalog seeded[/green]")
+            except RuntimeError as exc:
+                console.print(f"[red]❌ casals seed catalog failed: {exc}[/red]")
+                raise typer.Exit(1) from exc
 
         env_deploy_command(
             env_name=env_name,

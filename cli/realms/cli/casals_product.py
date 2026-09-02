@@ -598,12 +598,14 @@ _CASALS_STACK_GOS_KEYS: tuple[str, ...] = (
     "casals_backend",
     "casals_frontend",
     "casals_file_registry",
+    "casals_file_registry_frontend",
 )
 
 _CASALS_NEW_TO_GOS: dict[str, str] = {
     "casals_backend": "casals_backend",
     "casals_frontend": "casals_frontend",
     "ic_file_registry": "casals_file_registry",
+    "ic_file_registry_frontend": "casals_file_registry_frontend",
 }
 
 _IC_TOKENS_VERSION = "0.1.0"
@@ -616,6 +618,9 @@ _CERTIFIED_ASSETS_URL = (
     "/releases/download/v0.3.0/assetstorage.wasm.gz"
 )
 _CERTIFIED_ASSETS_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
+# icp create leaves Casals file-registry ~0.4T after WASM install; catalog
+# seed then OOGs. Top up before seed.py uploads.
+_CASALS_FILE_REGISTRY_TOPUP = 2_000_000_000_000
 # Keep in sync with scripts/fetch_gos_artifacts.py GOS_RELEASE (no leading v).
 _GOS_CATALOG_VERSION = "0.3.2"
 
@@ -835,6 +840,40 @@ def run_casals_seed_catalog(
         )
 
 
+def top_up_canister_cycles(
+    canister_id: str,
+    *,
+    identity: Optional[str],
+    amount: int,
+) -> None:
+    """Deposit cycles from the identity's ledger into ``canister_id``."""
+    cmd = [
+        "dfx",
+        "cycles",
+        "top-up",
+        canister_id,
+        str(amount),
+        "--network",
+        "ic",
+    ]
+    if identity:
+        cmd.extend(["--identity", identity])
+    env = os.environ.copy()
+    env["TERM"] = "xterm-256color"
+    env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+    env.pop("NO_COLOR", None)
+    env.pop("FORCE_COLOR", None)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+    if result.returncode != 0:
+        stderr = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(
+            f"dfx cycles top-up {canister_id} {amount} failed: {stderr}"
+        )
+    console.print(
+        f"[dim]topped up {canister_id} with {amount / 1_000_000_000_000:.1f} TC[/dim]"
+    )
+
+
 def rebuild_casals_conductor(
     *,
     env_name: str,
@@ -867,6 +906,13 @@ def rebuild_casals_conductor(
     conductor = (canisters.get("casals_backend") or "").strip()
     if not conductor:
         raise RuntimeError("casals new did not return casals_backend")
+    file_registry = (canisters.get("ic_file_registry") or "").strip()
+    if file_registry:
+        top_up_canister_cycles(
+            file_registry,
+            identity=identity,
+            amount=_CASALS_FILE_REGISTRY_TOPUP,
+        )
     run_casals_seed_catalog(
         network=network,
         identity=identity,

@@ -1843,6 +1843,15 @@ def seed(
             "still parse. Cannot be combined with --skip-product."
         ),
     ),
+    from_phase: Optional[str] = typer.Option(
+        None,
+        "--from-phase",
+        "--from",
+        help=(
+            "Resume after a failed rebuild: catalog (retry Casals catalog "
+            "seed then product deploy) or env_deploy (skip destroy + casals new)."
+        ),
+    ),
 ) -> None:
     """Deploy Realms GOS product infra (``*.realmsgos.org``) and publish the catalog.
 
@@ -1864,6 +1873,7 @@ def seed(
         skip_branding=skip_branding,
         with_domain=with_domain,
         destroy_except_frontend=destroy_except_frontend,
+        from_phase=from_phase,
     )
 
 
