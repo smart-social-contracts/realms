@@ -14,6 +14,7 @@ from realms.cli.commands.env import (
     _dfx_deploy,
     _is_canister_dead,
     _read_canister_ids,
+    _run_canister_mgmt,
     _set_canister_id,
     destroy_product_stack_except_frontend,
     env_deploy_command,
@@ -66,6 +67,18 @@ class TestDeadCanisterDetection:
         mock_run.return_value.stderr = "Error: canister not found"
         mock_run.return_value.stdout = ""
         assert _is_canister_dead("aaaaa-aa", "demo") is True
+
+
+class TestCanisterMgmtRetry:
+    @patch("realms.cli.commands.env.time.sleep")
+    @patch("realms.cli.commands.env.subprocess.run")
+    def test_retries_replica_502(self, mock_run, _sleep):
+        fail = MagicMock(returncode=1, stdout="", stderr="Http Error: status 502 Bad Gateway")
+        ok = MagicMock(returncode=0, stdout="deleted", stderr="")
+        mock_run.side_effect = [fail, ok]
+        result = _run_canister_mgmt(["icp", "canister", "delete", "aaaaa-aa"], retries=5)
+        assert result.returncode == 0
+        assert mock_run.call_count == 2
 
 
 class TestDfxDeployBasiliskEnv:

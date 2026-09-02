@@ -19,6 +19,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -162,11 +163,17 @@ def _icp_canister_cmd(
     return cmd
 
 
+def _transient_replica_error(result: subprocess.CompletedProcess) -> bool:
+    text = f"{result.stderr}\n{result.stdout}".lower()
+    return "502" in text or "bad gateway" in text or "http error" in text
+
+
 def _run_canister_mgmt(
     cmd: List[str],
     *,
     timeout: int = 300,
     logger=None,
+    retries: int = 5,
 ) -> subprocess.CompletedProcess:
     if logger:
         logger.info("Running: %s", " ".join(cmd))
@@ -175,19 +182,28 @@ def _run_canister_mgmt(
     env = os.environ.copy()
     if cmd and cmd[0] == "dfx":
         env = _dfx_subprocess_env()
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        env=env,
-    )
-    if logger:
-        if result.stdout:
-            logger.info(result.stdout)
-        if result.stderr:
-            logger.info(result.stderr)
-    return result
+    last: subprocess.CompletedProcess | None = None
+    for attempt in range(max(1, retries)):
+        last = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+        )
+        if logger:
+            if last.stdout:
+                logger.info(last.stdout)
+            if last.stderr:
+                logger.info(last.stderr)
+        if last.returncode == 0:
+            return last
+        if attempt + 1 < retries and _transient_replica_error(last):
+            time.sleep(2 * (attempt + 1))
+            continue
+        return last
+    assert last is not None
+    return last
 
 
 def _delete_canister_recover_cycles(
