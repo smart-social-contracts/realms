@@ -217,6 +217,7 @@ def require_setup_authorized() -> Optional[dict]:
         return None
     return {
         "success": False,
+        "error_code": "setup_forbidden",
         "error": "Access denied: setup wizard requires creator or realm admin",
     }
 

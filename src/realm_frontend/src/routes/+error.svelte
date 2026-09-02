@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.pcss';
 	import { page } from '$app/stores';
+	import { _ } from 'svelte-i18n';
 	import NotFound from './utils/pages/NotFound.svelte';
 	import Maintenance from './utils/pages/Maintenance.svelte';
 	import ServerError from './utils/pages/ServerError.svelte';
@@ -32,9 +33,8 @@
 
 {#if index === 500}
 	<ServerError
-		description={errMessage ||
-			"We're having trouble loading this page. Try refreshing, or wait a few seconds and try again."}
-		btnTitle={errMessage ? 'Refresh page' : 'Go back home'}
+		description={errMessage || $_('errors.server_error_description')}
+		btnTitle={errMessage ? $_('errors.refresh_page') : $_('errors.go_back_home')}
 		reloadOnClick={!!errMessage}
 	/>
 {:else}

@@ -4,9 +4,10 @@ Deploys the ``*.realmsgos.org`` stack (marketplace + file_registry) and
 publishes the extension/codex catalog. GaaS (``gaas new``) does not own these
 canisters.
 
-The Realms Casals orchestra (second stack) is created when Casals GitHub
-release assets ship (``casals_backend.wasm.gz`` etc.). Until then this command
-prints that skip rather than minting a half-wired conductor.
+After the product stack is deployed, registers existing canister IDs on the
+GaaS Casals conductor and runs ``casals sheet deploy`` for repo-root
+``casals.json``. The fleet ``file_registry`` backend is on that sheet and
+adopted by name — seed never mints a second registry.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import Optional
 import typer
 from rich.panel import Panel
 
+from ..casals_product import deploy_product_sheet_on_casals
 from .env import (
     env_deploy_command,
     load_env_config,
@@ -87,6 +89,25 @@ def seed_command(
             skip_frontend_build=skip_frontend_build,
             with_domain=with_domain,
         )
+
+        try:
+            deployed, detail = deploy_product_sheet_on_casals(
+                env_name=env_name,
+                network=network,
+                identity=identity,
+                project_root=project_root,
+            )
+            if deployed:
+                console.print(
+                    f"[green]✓ Product sheet deployed on GaaS Casals[/green] "
+                    f"[dim]({detail})[/dim]"
+                )
+            else:
+                console.print(
+                    f"[dim]Product Casals sheet skipped: {detail}[/dim]"
+                )
+        except RuntimeError as exc:
+            console.print(f"[yellow]⚠️  Product Casals sheet failed: {exc}[/yellow]")
     else:
         console.print("[dim]skip product stack (--skip-product)[/dim]")
 
@@ -112,9 +133,4 @@ def seed_command(
     else:
         console.print("[dim]skip catalog (--skip-catalog)[/dim]")
 
-    console.print(
-        "[dim]Realms Casals orchestra not minted: Casals GitHub releases do not "
-        "yet publish casals_backend.wasm.gz / orchestration templates. "
-        "GaaS Casals stays with `gaas new`.[/dim]"
-    )
     console.print(f"\n[green]✅ realms seed complete for {env_name} ({network})[/green]")

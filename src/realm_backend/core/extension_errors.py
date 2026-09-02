@@ -36,6 +36,14 @@ class PermissionDenied(PermissionError):
         self.operation = operation
 
 
+class CodedError(ValueError):
+    """Validation/user error with a stable ``error_code`` for the UI."""
+
+    def __init__(self, error_code: str, message: str):
+        super().__init__(message)
+        self.error_code = error_code
+
+
 def error_payload(error_code: str, message: str, **extra) -> dict:
     payload = {
         "success": False,

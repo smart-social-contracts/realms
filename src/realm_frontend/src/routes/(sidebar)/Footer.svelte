@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Frame, type LinkType } from 'flowbite-svelte';
 	import { GithubSolid } from 'flowbite-svelte-icons';
+	import { _ } from 'svelte-i18n';
 	import { testMode } from '$lib/stores/realmInfo';
 	import TestFlagsModal from '$lib/components/TestFlagsModal.svelte';
 
@@ -124,7 +125,7 @@
 				class="rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-400 dark:hover:bg-gray-700"
 				onclick={() => (testFlagsOpen = true)}
 			>
-				Test flags
+				{$_('footer.test_flags')}
 			</button>
 		</div>
 		<TestFlagsModal bind:open={testFlagsOpen} />
@@ -134,7 +135,7 @@
 	<div class="mt-3 flex justify-center">
 		<a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-normal text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400">
 			<img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="12" height="12" class="block h-3 w-3 grayscale" />
-			<span>Built on the Internet Computer</span>
+			<span>{$_('footer.built_on_ic')}</span>
 		</a>
 	</div>
 </Frame>

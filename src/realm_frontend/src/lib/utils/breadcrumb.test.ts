@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { SidebarConfig } from '$lib/config/sidebar';
-import { extensionLoadingMessage, resolveBreadcrumb, resolveExtensionLabel } from './breadcrumb';
+import type { SidebarConfig } from '../config/sidebar';
+import { bootI18n } from '../i18n/boot';
+import { extensionLoadingMessage, resolveBreadcrumb, resolveExtensionLabel, shouldShowPageBreadcrumb } from './breadcrumb';
+
+bootI18n('en');
 
 const config: SidebarConfig = {
 	welcomeItems: [
@@ -65,5 +68,22 @@ describe('resolveBreadcrumb', () => {
 	it('builds user-facing loading message', () => {
 		expect(extensionLoadingMessage('member_dashboard', config)).toBe('Loading My Dashboard...');
 		expect(extensionLoadingMessage('public_dashboard', null)).toBe('Loading Public Dashboard...');
+	});
+});
+
+describe('shouldShowPageBreadcrumb', () => {
+	it('hides the crumb on ME utility pages that already have a title', () => {
+		expect(shouldShowPageBreadcrumb('/messages', [{ label: 'Messages' }])).toBe(false);
+		expect(shouldShowPageBreadcrumb('/identities', [{ label: 'Account' }])).toBe(false);
+		expect(shouldShowPageBreadcrumb('/settings', [{ label: 'Settings' }])).toBe(false);
+	});
+
+	it('keeps crumbs on extension routes', () => {
+		expect(
+			shouldShowPageBreadcrumb('/extensions/voting', [
+				{ label: 'Governance' },
+				{ label: 'Voting' },
+			]),
+		).toBe(true);
 	});
 });

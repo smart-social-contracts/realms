@@ -4,10 +4,10 @@
 	import { onMount, tick } from 'svelte';
 	import { get } from 'svelte/store';
 	import type { SidebarConfig } from '$lib/config/sidebar';
-	import { locale } from 'svelte-i18n';
+	import { locale, _ } from 'svelte-i18n';
 	
 	import { styles, cn } from '$lib/theme/utilities';
-	import { topUtilityItems, SECTION_HEADER_ME, SECTION_HEADER_REALM, SECTION_HEADER_MUNDUS } from '$lib/config/sidebar';
+	import { topUtilityItems } from '$lib/config/sidebar';
 	import { sidebarConfig, sidebarLoading, loadSidebar } from '$lib/stores/sidebar';
 	import { profilesLoading, userProfiles } from '$lib/stores/profiles';
 	import { isAuthenticated } from '$lib/stores/auth';
@@ -26,6 +26,7 @@
 	let showScrollIndicator = true;
 	let sidebarContainer: HTMLElement;
 	let lastSidebarActor: unknown = null;
+	let lastLocale = '';
 
 	const ACTIVE_ITEM_CLASSES =
 		'sidebar-nav-active bg-gray-200 text-gray-900 font-medium hover:bg-gray-200 hover:text-gray-900 dark:bg-[var(--color-gray-700)] dark:hover:bg-[var(--color-gray-600)]';
@@ -120,10 +121,16 @@
 	// guest menu and admin/member extensions vanish from the sidebar.
 	$: {
 		const actor = $quarterBackendStore || backend;
-		if (actor && actor !== lastSidebarActor) {
+		const currentLocale = $locale || 'en';
+		if (actor && (actor !== lastSidebarActor || currentLocale !== lastLocale)) {
 			lastSidebarActor = actor;
-			loadSidebar(actor, get(locale) || 'en');
+			lastLocale = currentLocale;
+			loadSidebar(actor, currentLocale);
 		}
+	}
+
+	function categoryLabel(category: { id: string; label: string }): string {
+		return $_(`categories.${category.id}`, { default: category.label });
 	}
 	
 	function checkScrollPosition() {
@@ -296,19 +303,19 @@
 	aria-modal={!drawerHidden}
 	aria-hidden={drawerHidden}
 	inert={drawerHidden ? true : undefined}
-	aria-label="Navigation menu"
+	aria-label={$_('chrome.navigation_menu')}
 >
 	<button
 		type="button"
 		class="drawer-backdrop absolute inset-0 border-0 bg-gray-900/50 p-0 cursor-pointer touch-manipulation {drawerHidden ? 'is-closed' : ''}"
-		aria-label="Close menu"
+		aria-label={$_('chrome.close_menu')}
 		tabindex={drawerHidden ? -1 : 0}
 		onclick={closeDrawer}
 	></button>
 	<aside
 		class="drawer-panel absolute inset-y-0 left-0 z-10 flex w-64 max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl touch-manipulation {drawerHidden ? 'is-closed' : ''}"
 	>
-			<h4 class="sr-only">Main menu</h4>
+			<h4 class="sr-only">{$_('chrome.main_menu')}</h4>
 			<div
 				class={cn(styles.sidebar.container(), 'overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain')}
 			>
@@ -317,13 +324,13 @@
 						<ul class="pt-5 pb-1 space-y-1">
 							<li class="px-3 pb-2">
 								<p class="text-xs text-gray-500 leading-relaxed">
-									Sign in to access your realm navigation and extensions.
+									{$_('chrome.sign_in_prompt')}
 								</p>
 							</li>
 							<li>
 								<a href="/join" class={cn(styles.sidebar.item(), 'font-medium')} onclick={handleNavClick}>
 									<IconLogin size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
-									<span class="ml-3">Sign in</span>
+									<span class="ml-3">{$_('chrome.sign_in')}</span>
 								</a>
 							</li>
 							<li>
@@ -335,7 +342,7 @@
 									onclick={handleNavClick}
 								>
 									<IconLayoutDashboard size={22} class={iconClasses('/extensions/public_dashboard', 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
-									<span class="ml-3">Public Dashboard</span>
+									<span class="ml-3">{$_('chrome.public_dashboard')}</span>
 								</a>
 							</li>
 						</ul>
@@ -344,21 +351,21 @@
 						<div class="pt-5 pb-1">
 							<SidebarFold bind:open={foldOpen['__section_me__']} setOpen={(nextOpen) => setFoldOpen('__section_me__', nextOpen)}>
 								<div slot="header" class="flex w-full min-w-0 items-center justify-between">
-									<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_ME}</h3>
+									<h3 class={styles.sidebar.sectionHeader()}>{$_('chrome.me')}</h3>
 									<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 " fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 								</div>
 							<ul class="pb-1 space-y-1">
 								{#each topUtilityItems as item}
 									{@const IconComp = getTablerIcon(item.icon)}
 									<li>
-										<a href={item.href} use:sidebarTooltip={item.tooltip} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} onclick={handleNavClick}>
+										<a href={item.href} use:sidebarTooltip={item.tooltipKey ? $_(item.tooltipKey) : undefined} class={itemClasses(item.href, $page.url.pathname, $page.url.search)} data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined} aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined} onclick={handleNavClick}>
 											<span class="relative flex-shrink-0">
 												<svelte:component this={IconComp} size={22} class={iconClasses(item.href, 'w-5 h-5', $page.url.pathname, $page.url.search)} />
 												{#if item.href === '/messages' && $unreadCount > 0}
 													<span class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 {isActive(item.href, $page.url.pathname, $page.url.search) ? 'ring-gray-200' : 'ring-white'}" aria-hidden="true"></span>
 												{/if}
 											</span>
-											<span class="ml-3">{item.label}</span>
+											<span class="ml-3">{$_(item.labelKey)}</span>
 										</a>
 									</li>
 								{/each}
@@ -375,7 +382,7 @@
 							<div class="pt-3 pb-1">
 							<SidebarFold bind:open={foldOpen['__section_realm__']} setOpen={(nextOpen) => setFoldOpen('__section_realm__', nextOpen)}>
 								<div slot="header" class="flex w-full min-w-0 items-center justify-between">
-									<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_REALM}</h3>
+									<h3 class={styles.sidebar.sectionHeader()}>{$_('chrome.my_realm')}</h3>
 									<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 " fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 								</div>
 								<ul class="pb-1 space-y-1">
@@ -397,7 +404,7 @@
 										setOpen={(nextOpen) => setFoldOpen(category.id, nextOpen)}
 									>
 										<div slot="header" class="flex w-full min-w-0 items-center justify-between">
-											<h3 class={styles.sidebar.categoryHeader()}>{category.label}</h3>
+											<h3 class={styles.sidebar.categoryHeader()}>{categoryLabel(category)}</h3>
 											<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 " fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 										</div>
 										<ul class="pb-1 space-y-1">
@@ -423,7 +430,7 @@
 									setOpen={(nextOpen) => setFoldOpen('__section_mundus__', nextOpen)}
 								>
 									<div slot="header" class="flex w-full min-w-0 items-center justify-between">
-										<h3 class={styles.sidebar.sectionHeader()}>{SECTION_HEADER_MUNDUS}</h3>
+										<h3 class={styles.sidebar.sectionHeader()}>{$_('chrome.my_mundus')}</h3>
 										<svg class="fold-chevron w-3.5 h-3.5 text-gray-400 " fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
 									</div>
 									<ul class="pb-1 space-y-1">
@@ -453,7 +460,7 @@
 	aria-hidden={desktopHidden ? true : undefined}
 	inert={desktopHidden ? true : undefined}
 >
-	<h4 class="sr-only">Main menu</h4>
+	<h4 class="sr-only">{$_('chrome.main_menu')}</h4>
 	<div
 		bind:this={sidebarContainer}
 		class={cn(styles.sidebar.container(), 'w-64 overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain border-r-0')}
@@ -463,7 +470,7 @@
 				<ul class="pt-5 lg:pt-3 pb-1 space-y-1">
 					<li class="px-3 pb-2">
 						<p class="text-xs text-gray-500 leading-relaxed">
-							Sign in to access your realm navigation and extensions.
+							{$_('chrome.sign_in_prompt')}
 						</p>
 					</li>
 					<li>
@@ -472,7 +479,7 @@
 							class={cn(styles.sidebar.item(), 'font-medium')}
 						>
 							<IconLogin size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
-							<span class="ml-3">Sign in</span>
+							<span class="ml-3">{$_('chrome.sign_in')}</span>
 						</a>
 					</li>
 					<li>
@@ -483,7 +490,7 @@
 							aria-current={isActive('/extensions/public_dashboard', $page.url.pathname, $page.url.search) ? 'page' : undefined}
 						>
 							<IconLayoutDashboard size={22} class={iconClasses('/extensions/public_dashboard', 'flex-shrink-0 w-5 h-5', $page.url.pathname, $page.url.search)} />
-							<span class="ml-3">Public Dashboard</span>
+							<span class="ml-3">{$_('chrome.public_dashboard')}</span>
 						</a>
 					</li>
 				</ul>
@@ -494,7 +501,7 @@
 			<SidebarFold bind:open={foldOpen['__section_me__']} setOpen={(nextOpen) => setFoldOpen('__section_me__', nextOpen)}>
 				<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 					<h3 class={styles.sidebar.sectionHeader()}>
-						{SECTION_HEADER_ME}
+						{$_('chrome.me')}
 					</h3>
 					<svg
 						class="fold-chevron w-3.5 h-3.5 text-gray-400 "
@@ -509,7 +516,7 @@
 						<li>
 							<a 
 								href={item.href}
-								use:sidebarTooltip={item.tooltip}
+								use:sidebarTooltip={item.tooltipKey ? $_(item.tooltipKey) : undefined}
 								class={itemClasses(item.href, $page.url.pathname, $page.url.search)}
 								data-sidebar-active={isActive(item.href, $page.url.pathname, $page.url.search) ? 'true' : undefined}
 								aria-current={isActive(item.href, $page.url.pathname, $page.url.search) ? 'page' : undefined}
@@ -523,7 +530,7 @@
 										></span>
 									{/if}
 								</span>
-								<span class="ml-3">{item.label}</span>
+								<span class="ml-3">{$_(item.labelKey)}</span>
 							</a>
 						</li>
 					{/each}
@@ -545,7 +552,7 @@
 				<SidebarFold bind:open={foldOpen['__section_realm__']} setOpen={(nextOpen) => setFoldOpen('__section_realm__', nextOpen)}>
 					<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 						<h3 class={styles.sidebar.sectionHeader()}>
-							{SECTION_HEADER_REALM}
+							{$_('chrome.my_realm')}
 						</h3>
 						<svg
 							class="fold-chevron w-3.5 h-3.5 text-gray-400 "
@@ -583,7 +590,7 @@
 						>
 							<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 								<h3 class={styles.sidebar.categoryHeader()}>
-									{category.label}
+									{categoryLabel(category)}
 								</h3>
 								<svg
 									class="fold-chevron w-3.5 h-3.5 text-gray-400 "
@@ -624,7 +631,7 @@
 					>
 						<div slot="header" class="flex w-full min-w-0 items-center justify-between">
 							<h3 class={styles.sidebar.sectionHeader()}>
-								{SECTION_HEADER_MUNDUS}
+								{$_('chrome.my_mundus')}
 							</h3>
 							<svg
 								class="fold-chevron w-3.5 h-3.5 text-gray-400 "

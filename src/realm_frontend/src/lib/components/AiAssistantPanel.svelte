@@ -252,7 +252,7 @@
 			]);
 			if (!version) {
 				status = 'error';
-				errorMsg = 'AI Assistant extension is not installed.';
+				errorMsg = get(_)('errors.ai_not_installed');
 				return;
 			}
 			await loadExtensionTranslation(EXTENSION_ID, version, get(locale as any) || 'en');
@@ -331,25 +331,25 @@
 		on:dblclick|stopPropagation={resetPanelWidth}
 		role="separator"
 		aria-orientation="vertical"
-		aria-label="Resize AI Assistant panel"
-		title="Drag to resize. Double-click to reset."
+		aria-label={$_('chrome.ai_resize')}
+		title={$_('chrome.ai_resize_hint')}
 	></div>
 	<!-- Panel header -->
 	<div class="panel-header flex items-center gap-2 px-4 py-3 border-b border-gray-200">
-		<h3 class="text-sm font-semibold text-gray-700 flex-1 min-w-0 truncate">AI Assistant</h3>
+		<h3 class="text-sm font-semibold text-gray-700 flex-1 min-w-0 truncate">{$_('common.assistant')}</h3>
 		<span class="text-[11px] text-gray-400 font-medium shrink-0">{modelLabel}</span>
 		<button
 			on:click={openSettings}
 			class="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
-			title="Open AI Assistant settings"
-			aria-label="Open AI Assistant settings"
+			title={$_('chrome.ai_open_settings')}
+			aria-label={$_('chrome.ai_open_settings')}
 		>
 			<IconSettings size={16} />
 		</button>
 		<button
 			on:click={onClose}
 			class="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors shrink-0"
-			aria-label="Close AI Assistant"
+			aria-label={$_('chrome.ai_close')}
 		>
 			<IconX size={18} />
 		</button>

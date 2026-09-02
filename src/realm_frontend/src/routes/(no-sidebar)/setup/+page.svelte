@@ -1206,8 +1206,8 @@
 				</section>
 			{:else if currentStep === 'codex'}
 				<section class="setup-wizard__panel">
-					<Heading tag="h2" class="text-xl font-semibold">Choose a codex</Heading>
-					<P class="text-gray-600">Pick the governance package that defines how this realm runs.</P>
+					<Heading tag="h2" class="text-xl font-semibold">{$_('setup.wizard.codex_title')}</Heading>
+					<P class="text-gray-600">{$_('setup.wizard.codex_help')}</P>
 
 					<div class="setup-wizard__codex-list setup-wizard__codex-list--gallery">
 						{#each codices as codex (codex.id)}
@@ -1258,7 +1258,7 @@
 									</h3>
 									{#if selectedCodex.versions.length > 0}
 										<label class="setup-wizard__codex-version">
-											<span>Version</span>
+											<span>{$_('setup.wizard.version')}</span>
 											<select
 												class="setup-wizard__version-select setup-wizard__version-select--inline"
 												bind:value={selectedVersion}
@@ -1281,7 +1281,7 @@
 									target="_blank"
 									rel="noopener noreferrer"
 								>
-									Official repository
+									{$_('setup.wizard.official_repository')}
 								</a>
 							</div>
 						</div>
@@ -1289,9 +1289,9 @@
 				</section>
 			{:else if currentStep === 'token'}
 				<section class="setup-wizard__panel">
-					<Heading tag="h2" class="text-xl font-semibold">Token</Heading>
+					<Heading tag="h2" class="text-xl font-semibold">{$_('setup.wizard.token_title')}</Heading>
 					<P class="text-gray-600">
-						Use a shared token already on the network, or point at your own ICRC-1 ledger.
+						{$_('setup.wizard.token_help')}
 					</P>
 					<TokenChoiceList
 						selectedId={tokenChoice}
@@ -1301,7 +1301,7 @@
 					/>
 					{#if tokenChoice === CUSTOM_TOKEN_ID}
 						<div class="setup-wizard__field">
-							<Label for="token-symbol">Token symbol</Label>
+							<Label for="token-symbol">{$_('setup.wizard.token_symbol')}</Label>
 							<Input
 								id="token-symbol"
 								bind:value={tokenSymbol}
@@ -1310,7 +1310,7 @@
 							/>
 						</div>
 						<div class="setup-wizard__field">
-							<Label for="token-canister">Ledger canister ID</Label>
+							<Label for="token-canister">{$_('setup.wizard.ledger_canister')}</Label>
 							<Input
 								id="token-canister"
 								bind:value={tokenCanisterId}
@@ -1323,13 +1323,13 @@
 			{:else if currentStep === 'branding'}
 				<section class="setup-wizard__panel setup-wizard__panel--branding">
 					<div>
-						<Heading tag="h2" class="text-xl font-semibold">Branding</Heading>
+						<Heading tag="h2" class="text-xl font-semibold">{$_('setup.wizard.branding_title')}</Heading>
 						<P class="text-gray-600">
-							Write the realm's voice first. Then generate a mark, or upload your own.
+							{$_('setup.wizard.branding_help')}
 						</P>
 
 						<div class="setup-wizard__field">
-							<Label for="welcome-message">Welcome message</Label>
+							<Label for="welcome-message">{$_('setup.wizard.welcome_message')}</Label>
 							<textarea
 								id="welcome-message"
 								class="setup-wizard__textarea"
@@ -1339,7 +1339,7 @@
 									scheduleIdentityDraftSave();
 								}}
 								onblur={scheduleIdentityDraftSave}
-								placeholder="A short greeting shown under the realm name"
+								placeholder={$_('setup.wizard.welcome_placeholder')}
 								rows="3"
 								maxlength={WELCOME_MESSAGE_MAX + 64}
 							></textarea>
@@ -1351,7 +1351,7 @@
 							</p>
 						</div>
 						<div class="setup-wizard__field">
-							<Label for="manifesto">Manifesto</Label>
+							<Label for="manifesto">{$_('setup.wizard.manifesto')}</Label>
 							<textarea
 								id="manifesto"
 								class="setup-wizard__textarea"
@@ -1361,7 +1361,7 @@
 									scheduleIdentityDraftSave();
 								}}
 								onblur={scheduleIdentityDraftSave}
-								placeholder="What this realm stands for"
+								placeholder={$_('setup.wizard.manifesto_placeholder')}
 								rows="4"
 								maxlength={MANIFESTO_MAX + 32}
 							></textarea>
@@ -1375,21 +1375,21 @@
 						{#if brandingTextInvalid}
 							<p class="setup-wizard__field-error" role="alert">
 								{#if welcomeMessageOverLimit}
-									Welcome message exceeds {WELCOME_MESSAGE_MAX} characters.
+									{$_('setup.wizard.welcome_over_limit', { values: { max: WELCOME_MESSAGE_MAX } })}
 								{:else}
-									Manifesto exceeds {MANIFESTO_MAX} characters.
+									{$_('setup.wizard.manifesto_over_limit', { values: { max: MANIFESTO_MAX } })}
 								{/if}
 							</p>
 						{/if}
 
-						<div class="setup-wizard__source" role="tablist" aria-label="Branding source">
+						<div class="setup-wizard__source" role="tablist" aria-label={$_('setup.wizard.branding_source')}>
 							<button
 								type="button"
 								class="setup-wizard__source-btn"
 								class:setup-wizard__source-btn--active={brandingSource === 'upload'}
 								onclick={() => (brandingSource = 'upload')}
 							>
-								Upload
+								{$_('setup.wizard.upload')}
 							</button>
 							<button
 								type="button"
@@ -1397,7 +1397,7 @@
 								class:setup-wizard__source-btn--active={brandingSource === 'generate'}
 								onclick={() => (brandingSource = 'generate')}
 							>
-								Random
+								{$_('setup.wizard.random')}
 							</button>
 						</div>
 
@@ -1409,17 +1409,17 @@
 									disabled={busy || generatingBranding}
 									onclick={generateBrandingFromIdentity}
 								>
-									{generatingBranding ? 'Composing…' : 'Random'}
+									{generatingBranding ? $_('setup.wizard.composing') : $_('setup.wizard.random')}
 								</button>
 								<p class="setup-wizard__generate-hint">
-									Each press draws a new random mark and backdrop from the realm name and manifesto.
+									{$_('setup.wizard.random_hint')}
 								</p>
 							</div>
 						{:else}
 							<div class="setup-wizard__uploads">
-								<BrandingDropzone label="Logo" preview={logoPreview} onFile={onLogoFile} />
+								<BrandingDropzone label={$_('setup.wizard.logo')} preview={logoPreview} onFile={onLogoFile} />
 								<BrandingDropzone
-									label="Background"
+									label={$_('setup.wizard.background')}
 									preview={backgroundPreview}
 									onFile={onBackgroundFile}
 								/>
@@ -1427,20 +1427,20 @@
 						{/if}
 
 						<div class="setup-wizard__field">
-							<Label for="primary-color">Primary color</Label>
+							<Label for="primary-color">{$_('setup.wizard.primary_color')}</Label>
 							<Input id="primary-color" type="color" bind:value={primaryColor} class="h-11 w-24 p-1" />
 						</div>
 
 					</div>
 
 					<div class="setup-wizard__preview-wrap">
-						<p class="setup-wizard__preview-label">Public dashboard preview</p>
+						<p class="setup-wizard__preview-label">{$_('setup.wizard.preview_label')}</p>
 						<PublicDashboardPreview
 							logoPreview={logoPreview}
 							backgroundPreview={backgroundPreview}
 							welcomeMessage={welcomeMessage}
 							manifesto={manifesto}
-							realmName={$realmName || 'Your realm'}
+							realmName={$realmName || $_('setup.wizard.unnamed_realm')}
 							primaryColor={primaryColor}
 						/>
 					</div>
@@ -1495,22 +1495,22 @@
 			{:else}
 				<section class="setup-wizard__panel setup-wizard__panel--review">
 					<div>
-						<Heading tag="h2" class="text-xl font-semibold">Ready to launch</Heading>
+						<Heading tag="h2" class="text-xl font-semibold">{$_('setup.wizard.review_title')}</Heading>
 						<P class="text-gray-600">
-							These choices will be installed together. You can still go back and change them.
+							{$_('setup.wizard.review_help')}
 						</P>
 
 						<ul class="setup-wizard__review-list">
 							<li>
-								<span>Codex</span>
-								<strong>{summaryCodexName || 'Not chosen'}</strong>
+								<span>{$_('setup.wizard.review_codex')}</span>
+								<strong>{summaryCodexName || $_('setup.wizard.review_not_chosen')}</strong>
 								{#if summaryCodexVersion}
 									<em>{summaryCodexVersion}</em>
 								{/if}
 							</li>
 							<li>
-								<span>Token</span>
-								<strong>{summaryTokenSymbol || 'Skipped'}</strong>
+								<span>{$_('setup.wizard.review_token')}</span>
+								<strong>{summaryTokenSymbol || $_('setup.wizard.review_skipped')}</strong>
 							</li>
 							<li>
 								<span>{$_('setup.wizard.review_languages')}</span>
@@ -1520,16 +1520,16 @@
 								<em>{$_('setup.wizard.review_primary')}: {localeLabel(summaryPrimaryLanguage)}</em>
 							</li>
 							<li>
-								<span>Color</span>
+								<span>{$_('setup.wizard.review_color')}</span>
 								<strong class="setup-wizard__review-color">
 									<i style={`background:${primaryColor || '#0b1120'}`}></i>
-									{hasBrandingDraft || primaryColor ? primaryColor : 'Default'}
+									{hasBrandingDraft || primaryColor ? primaryColor : $_('setup.wizard.review_default')}
 								</strong>
 							</li>
 						</ul>
 
 						{#if launchState && !launchIdle}
-						<ol class="setup-wizard__launch-steps" aria-label="Launch progress">
+						<ol class="setup-wizard__launch-steps" aria-label={$_('setup.wizard.launch_progress')}>
 							{#each LAUNCH_PHASES as phase (phase.name)}
 								{@const status = launchStepStatus(phase.name)}
 								{@const stepError = launchStepError(phase.name)}
@@ -1543,13 +1543,13 @@
 									<span class="setup-wizard__launch-step-label">{phase.label}</span>
 									<span class="setup-wizard__launch-step-status">
 										{#if status === 'running'}
-											Running…
+											{$_('setup.wizard.launch_running')}
 										{:else if status === 'completed'}
-											Done
+											{$_('setup.wizard.launch_done')}
 										{:else if status === 'failed'}
-											Failed
+											{$_('setup.wizard.launch_failed')}
 										{:else}
-											Pending
+											{$_('setup.wizard.launch_pending')}
 										{/if}
 									</span>
 									{#if status === 'failed' && stepError}
@@ -1562,13 +1562,13 @@
 					</div>
 
 					<div class="setup-wizard__preview-wrap">
-						<p class="setup-wizard__preview-label">How it will look</p>
+						<p class="setup-wizard__preview-label">{$_('setup.wizard.how_it_will_look')}</p>
 						<PublicDashboardPreview
 							logoPreview={logoPreview}
 							backgroundPreview={backgroundPreview}
 							welcomeMessage={welcomeMessage}
 							manifesto={manifesto}
-							realmName={$realmName || 'Your realm'}
+							realmName={$realmName || $_('setup.wizard.unnamed_realm')}
 							primaryColor={primaryColor}
 						/>
 					</div>

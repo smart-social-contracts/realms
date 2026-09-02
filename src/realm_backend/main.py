@@ -1311,6 +1311,25 @@ def _default_registration_profile(realm) -> str:
     return "member"
 
 
+def _join_fail(code: str, message: str) -> RealmResponse:
+    """Candid join failure: English ``error`` tagged with a stable code (issue #393)."""
+    from core.api_errors import tagged_error
+
+    return RealmResponse(
+        success=False,
+        data=RealmResponseData(error=tagged_error(code, message)),
+    )
+
+
+def _setup_gate_json(gate_err: str) -> str:
+    from core.api_errors import SETUP_NOT_OPEN, parse_tagged_error
+
+    code, message = parse_tagged_error(gate_err)
+    if not code:
+        code, message = SETUP_NOT_OPEN, gate_err
+    return json.dumps({"success": False, "error_code": code, "error": message})
+
+
 @update
 def join_realm(
     profile: str, preferred_quarter: text, invite_code_checksum_hex: text
@@ -1351,19 +1370,20 @@ def join_realm(
         # flow for all users. Races in embedded frontends have produced exactly
         # this (anonymous actor + test-mode code → anonymous admin).
         if caller == "2vxsx-fae":
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(error="Anonymous principal cannot join a realm — sign in first"),
+            from core.api_errors import ANONYMOUS_CANNOT_JOIN
+
+            return _join_fail(
+                ANONYMOUS_CANNOT_JOIN,
+                "Anonymous principal cannot join a realm — sign in first",
             )
         from ggg import Quarter, Realm, User
 
         realm = Realm.load("1")
         gate_err = setup_gate_error(caller)
         if gate_err:
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(error=gate_err),
-            )
+            from core.api_errors import SETUP_NOT_OPEN
+
+            return _join_fail(SETUP_NOT_OPEN, gate_err)
         has_invite = bool(invite_code_checksum_hex and invite_code_checksum_hex.strip())
         granted_profile = profile
         # Organization the invite code links to (per-department staff invites,
@@ -1402,22 +1422,21 @@ def join_realm(
                 consume_result = consume_registration_code(invite_code_checksum_hex, caller)
 
                 if not consume_result.get("success"):
+                    from core.api_errors import INVALID_INVITE
+
                     error_msg = consume_result.get("error", "Invalid or expired invitation code")
-                    return RealmResponse(
-                        success=False,
-                        data=RealmResponseData(error=error_msg),
-                    )
+                    return _join_fail(INVALID_INVITE, error_msg)
 
                 consume_data = consume_result.get("data", {})
                 if not isinstance(consume_data, dict):
                     consume_data = consume_result
                 invite_profile = consume_data.get("profile", "member")
                 if profile and profile != invite_profile:
-                    return RealmResponse(
-                        success=False,
-                        data=RealmResponseData(
-                            error=f"Invitation grants '{invite_profile}' profile, but '{profile}' was requested"
-                        ),
+                    from core.api_errors import INVITE_PROFILE_MISMATCH
+
+                    return _join_fail(
+                        INVITE_PROFILE_MISMATCH,
+                        f"Invitation grants '{invite_profile}' profile, but '{profile}' was requested",
                     )
                 granted_profile = invite_profile
                 invite_department = (consume_data.get("department") or "").strip()
@@ -1429,22 +1448,22 @@ def join_realm(
 
         elif profile == "admin":
             if not _self_reg_bypass:
-                return RealmResponse(
-                    success=False,
-                    data=RealmResponseData(
-                        error="Admin registration requires an invitation code."
-                    ),
+                from core.api_errors import INVITE_REQUIRED
+
+                return _join_fail(
+                    INVITE_REQUIRED,
+                    "Admin registration requires an invitation code.",
                 )
 
         else:
             # Member/developer join without code: allowed if open_registration is on or self-reg bypass
             open_reg = realm and realm.open_registration
             if not open_reg and not _self_reg_bypass:
-                return RealmResponse(
-                    success=False,
-                    data=RealmResponseData(
-                        error="Registration requires an invitation code."
-                    ),
+                from core.api_errors import INVITE_REQUIRED
+
+                return _join_fail(
+                    INVITE_REQUIRED,
+                    "Registration requires an invitation code.",
                 )
 
         # --- Coordinator-only capital guard (issue #156) ---
@@ -1467,11 +1486,11 @@ def join_realm(
             except Exception:
                 already_member = False
             if has_active_sub and not already_member:
-                return RealmResponse(
-                    success=False,
-                    data=RealmResponseData(
-                        error="This realm is coordinator-only. Please join through a quarter."
-                    ),
+                from core.api_errors import COORDINATOR_ONLY
+
+                return _join_fail(
+                    COORDINATOR_ONLY,
+                    "This realm is coordinator-only. Please join through a quarter.",
                 )
 
         # No explicit profile and no invite: codex-defined default (issue #242).
@@ -1491,10 +1510,9 @@ def join_realm(
 
                 dash = resolve_extension_id("member_dashboard")
                 if not is_dashboard_installed(list_installed(), dash):
-                    return RealmResponse(
-                        success=False,
-                        data=RealmResponseData(error=JOIN_QUARTER_NOT_READY),
-                    )
+                    from core.api_errors import QUARTER_NOT_READY
+
+                    return _join_fail(QUARTER_NOT_READY, JOIN_QUARTER_NOT_READY)
 
         # --- Register user and assign quarter ---
 
@@ -1890,9 +1908,9 @@ def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
         caller = ic.caller().to_str()
         gate_err = setup_gate_error(caller)
         if gate_err:
-            return RealmResponse(
-                success=False, data=RealmResponseData(error=gate_err)
-            )
+            from core.api_errors import SETUP_NOT_OPEN
+
+            return _join_fail(SETUP_NOT_OPEN, gate_err)
 
         # Validate the target quarter exists and is active
         realm = Realm.load("1")
@@ -4034,9 +4052,9 @@ def update_my_public_profile(nickname: str, avatar: str) -> RealmResponse:
         caller = ic.caller().to_str()
         gate_err = setup_gate_error(caller)
         if gate_err:
-            return RealmResponse(
-                success=False, data=RealmResponseData(error=gate_err)
-            )
+            from core.api_errors import SETUP_NOT_OPEN
+
+            return _join_fail(SETUP_NOT_OPEN, gate_err)
         result = user_update_public_profile(caller, nickname, avatar)
         if not result["success"]:
             return RealmResponse(
@@ -4073,9 +4091,9 @@ def update_my_private_data(private_data: str) -> RealmResponse:
         caller = ic.caller().to_str()
         gate_err = setup_gate_error(caller)
         if gate_err:
-            return RealmResponse(
-                success=False, data=RealmResponseData(error=gate_err)
-            )
+            from core.api_errors import SETUP_NOT_OPEN
+
+            return _join_fail(SETUP_NOT_OPEN, gate_err)
         result = user_update_private_data(caller, private_data)
         if not result["success"]:
             return RealmResponse(
@@ -5729,6 +5747,15 @@ def _extension_denied_response(message: str, operation: str) -> ExtensionCallRes
     )
 
 
+def _extension_coded_response(exc: BaseException) -> ExtensionCallResponse:
+    from core.extension_errors import error_payload
+
+    code = getattr(exc, "error_code", None) or "validation_error"
+    return ExtensionCallResponse(
+        success=False, response=json.dumps(error_payload(str(code), str(exc)))
+    )
+
+
 @query
 def extension_call(extension_name: text, function_name: text, args: text) -> ExtensionCallResponse:
     """Query version of extension call for read-only operations like get_entity_types."""
@@ -5757,6 +5784,8 @@ def extension_call(extension_name: text, function_name: text, args: text) -> Ext
 
     except PermissionError as e:
         return _extension_permission_response(e)
+    except ValueError as e:
+        return _extension_coded_response(e)
     except Exception as e:
         logger.error(f"Error in extension_call: {str(e)}\n{traceback.format_exc()}")
         return ExtensionCallResponse(success=False, response=str(e))
@@ -5770,7 +5799,7 @@ def extension_sync_call(extension_name: text, function_name: text, args: text) -
         if gate_err:
             return ExtensionCallResponse(
                 success=False,
-                response=json.dumps({"error": gate_err}),
+                response=_setup_gate_json(gate_err),
             )
         if not _check_access(caller, Operations.EXTENSION_SYNC_CALL):
             return _extension_denied_response(
@@ -5798,6 +5827,8 @@ def extension_sync_call(extension_name: text, function_name: text, args: text) -
 
     except PermissionError as e:
         return _extension_permission_response(e)
+    except ValueError as e:
+        return _extension_coded_response(e)
     except Exception as e:
         logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
         return ExtensionCallResponse(success=False, response=str(e))
@@ -5811,7 +5842,7 @@ def extension_async_call(extension_name: text, function_name: text, args: text) 
         if gate_err:
             return ExtensionCallResponse(
                 success=False,
-                response=json.dumps({"error": gate_err}),
+                response=_setup_gate_json(gate_err),
             )
         if not _check_access(caller, Operations.EXTENSION_ASYNC_CALL):
             return _extension_denied_response(
@@ -5855,6 +5886,8 @@ def extension_async_call(extension_name: text, function_name: text, args: text) 
 
     except PermissionError as e:
         return _extension_permission_response(e)
+    except ValueError as e:
+        return _extension_coded_response(e)
     except Exception as e:
         logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
         return ExtensionCallResponse(success=False, response=str(e))

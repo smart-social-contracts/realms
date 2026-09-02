@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { Button, P } from 'flowbite-svelte';
-	export let title = 'Something went wrong';
-	export let description =
-		"We're having trouble loading this page. Try refreshing, or wait a few seconds and try again.";
+	import { _ } from 'svelte-i18n';
+	export let title = '';
+	export let description = '';
 	export let btnHref = '/';
-	export let btnTitle = 'Go back home';
+	export let btnTitle = '';
 	/** When set, the primary button reloads the page instead of navigating. */
 	export let reloadOnClick = false;
 	export let mainClass = 'bg-gray-50 dark:bg-gray-900';
@@ -27,10 +27,10 @@
 		</div>
 		<div class={div2Class}>
 			<h1 class={h1Class}>
-				{title}
+				{title || $_('errors.server_error_title')}
 			</h1>
 			<P class="mb-5 text-base font-normal text-gray-500 dark:text-gray-400 md:text-lg">
-				{description}
+				{description || $_('errors.server_error_description')}
 			</P>
 			{#if reloadOnClick}
 				<Button on:click={() => location.reload()}>
@@ -45,7 +45,7 @@
 							clip-rule="evenodd"
 						/></svg
 					>
-					{btnTitle}
+					{btnTitle || $_('errors.refresh_page')}
 				</Button>
 			{:else}
 				<Button href={btnHref}>
@@ -60,27 +60,9 @@
 							clip-rule="evenodd"
 						/></svg
 					>
-					{btnTitle}
+					{btnTitle || $_('errors.go_back_home')}
 				</Button>
 			{/if}
 		</div>
 	</div>
 </main>
-
-<!--
-@component
-[Go to docs](https://flowbite-svelte-admin-dashboard.vercel.app/)
-## Props
-@prop export let title = 'Something went wrong';
-@prop export let description =
-		"We're having trouble loading this page. Try refreshing, or wait a few seconds and try again.";
-@prop export let btnHref = '/';
-@prop export let btnTitle = 'Go back home';
-@prop export let mainClass = 'bg-gray-50 dark:bg-gray-900';
-@prop export let mainDivClass =
-		'flex flex-col justify-center items-center px-6 mx-auto h-screen xl:px-0 dark:bg-gray-900';
-@prop export let h1Class =
-		'mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl lg:text-5xl dark:text-white';
-@prop export let imgDiv = 'block md:max-w-lg';
-@prop export let div2Class = 'text-center xl:max-w-4xl';
--->

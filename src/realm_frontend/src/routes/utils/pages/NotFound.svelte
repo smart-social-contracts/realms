@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { Button, P } from 'flowbite-svelte';
-	export let title = 'Page not found';
-	export let description =
-		'Oops! Looks like you followed a bad link. If you think this is a problem with us, please	tell us.';
-	export let btnTitle = 'Go back home';
+	import { _ } from 'svelte-i18n';
+	export let title = '';
+	export let description = '';
+	export let btnTitle = '';
 	export let btnHref = '/';
 	export let mainClass = 'bg-gray-50 dark:bg-gray-900';
 	export let mainDivClass =
@@ -18,10 +18,10 @@
 	<div class={mainDivClass}>
 		<div class={div2Class}>
 			<h1 class={h1Class}>
-				{title}
+				{title || $_('errors.not_found_title')}
 			</h1>
 			<P class="mb-5 text-base font-normal text-gray-500 dark:text-gray-400 md:text-lg">
-				{description}
+				{description || $_('errors.not_found_description')}
 			</P>
 			<Button href={btnHref}>
 				<svg
@@ -35,26 +35,8 @@
 						clip-rule="evenodd"
 					/></svg
 				>
-				{btnTitle}
+				{btnTitle || $_('errors.go_back_home')}
 			</Button>
 		</div>
 	</div>
 </main>
-
-<!--
-@component
-[Go to docs](https://flowbite-svelte-admin-dashboard.vercel.app/)
-## Props
-@prop export let title = 'Page not found';
-@prop export let description =
-		'Oops! Looks like you followed a bad link. If you think this is a problem with us, please	tell us.';
-@prop export let btnTitle = 'Go back home';
-@prop export let btnHref = '/';
-@prop export let mainClass = 'bg-gray-50 dark:bg-gray-900';
-@prop export let mainDivClass =
-		'flex flex-col items-center justify-center px-6 pt-8 mx-auto md:h-screen pt:mt-0 dark:bg-gray-900';
-@prop export let h1Class =
-		'mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl lg:text-5xl dark:text-white';
-@prop export let imgDiv = 'block md:max-w-lg';
-@prop export let div2Class = 'text-center xl:max-w-4xl';
--->

@@ -21,6 +21,10 @@ export interface NotificationItem {
 	message: string;
 	timestamp_ms: number;
 	read: boolean;
+	sender?: string;
+	sender_name?: string;
+	audience_type?: string;
+	department?: string;
 	icon?: string;
 	href?: string;
 	color?: string;

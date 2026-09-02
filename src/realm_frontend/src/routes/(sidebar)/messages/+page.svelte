@@ -1,108 +1,223 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Card, Heading, Spinner } from 'flowbite-svelte';
-	import { notifications, unreadCount, loadNotifications, markAsRead } from '$lib/stores/notifications';
+	import { goto } from '$app/navigation';
+	import { Heading, Spinner } from 'flowbite-svelte';
+	import { _ } from 'svelte-i18n';
+	import {
+		notifications,
+		unreadCount,
+		loadNotifications,
+		markAsRead,
+		markAllAsRead,
+	} from '$lib/stores/notifications';
 	import { IconMail, IconMailOpened, IconInbox } from '@tabler/icons-svelte';
+	import {
+		actionLabel,
+		formatFullDate,
+		formatNoticeMeta,
+		formatRelativeTime,
+		isActionHref,
+	} from '$lib/utils/messages';
 
-	let loading = true;
-	let activeTab: 'all' | 'unread' = 'all';
+	let loading = $state(true);
+	let activeTab = $state<'all' | 'unread'>('all');
+	let expandedId = $state<string | null>(null);
+	let markingAll = $state(false);
 
 	onMount(async () => {
 		await loadNotifications();
 		loading = false;
 	});
 
-	$: displayedMessages = activeTab === 'unread'
-		? $notifications.filter(n => !n.read)
-		: $notifications;
+	const displayedMessages = $derived(
+		activeTab === 'unread' ? $notifications.filter((n) => !n.read) : $notifications,
+	);
 
-	function formatDate(timestampMs: number): string {
-		if (!timestampMs) return '';
-		const date = new Date(timestampMs);
-		const now = new Date();
-		const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-		if (diffDays === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-		if (diffDays === 1) return 'Yesterday';
-		if (diffDays < 7) return date.toLocaleDateString([], { weekday: 'long' });
-		return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+	async function handleOpen(id: string, read: boolean) {
+		const next = expandedId === id ? null : id;
+		expandedId = next;
+		if (next && !read) {
+			await markAsRead(id, true);
+		}
 	}
 
-	async function handleMarkAsRead(id: string, read: boolean) {
-		await markAsRead(id, read);
+	async function handleToggleRead(event: MouseEvent, id: string, read: boolean) {
+		event.stopPropagation();
+		await markAsRead(id, !read);
+	}
+
+	async function handleOpenAction(event: MouseEvent, href: string) {
+		event.stopPropagation();
+		await goto(href);
+	}
+
+	async function handleMarkAll() {
+		markingAll = true;
+		try {
+			await markAllAsRead();
+		} finally {
+			markingAll = false;
+		}
 	}
 </script>
 
 <svelte:head>
-	<title>Messages</title>
+	<title>{$_('messages.page_title')}</title>
 </svelte:head>
 
 <div class="mt-4 px-4 md:px-6">
-	<div class="mb-6">
-		<Heading tag="h2" class="text-2xl font-bold text-gray-900">Messages</Heading>
-		<p class="mt-1 text-sm text-gray-500">Official correspondence with legal standing.</p>
+	<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+		<div>
+			<Heading tag="h2" class="text-2xl font-bold text-gray-900">{$_('messages.page_title')}</Heading>
+			<p class="mt-1 text-sm text-gray-500">
+				{$_('messages.subtitle')}
+			</p>
+		</div>
+		{#if $unreadCount > 0}
+			<button
+				type="button"
+				class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+				disabled={markingAll}
+				onclick={handleMarkAll}
+			>
+				{$_('messages.mark_all_read')}
+			</button>
+		{/if}
 	</div>
 
-	<!-- Tabs -->
-	<div class="flex gap-4 border-b border-gray-200 mb-4">
+	<div class="mb-4 flex gap-4 border-b border-gray-200">
 		<button
-			class="pb-2 text-sm font-medium transition-colors {activeTab === 'all' ? 'border-b-2 border-gray-900 text-gray-900' : 'text-gray-500 hover:text-gray-700'}"
-			on:click={() => activeTab = 'all'}
+			type="button"
+			class="pb-2 text-sm font-medium transition-colors {activeTab === 'all'
+				? 'border-b-2 border-gray-900 text-gray-900'
+				: 'text-gray-500 hover:text-gray-700'}"
+			onclick={() => (activeTab = 'all')}
 		>
-			All ({$notifications.length})
+			{$_('messages.tab_all', { values: { count: $notifications.length } })}
 		</button>
 		<button
-			class="pb-2 text-sm font-medium transition-colors {activeTab === 'unread' ? 'border-b-2 border-gray-900 text-gray-900' : 'text-gray-500 hover:text-gray-700'}"
-			on:click={() => activeTab = 'unread'}
+			type="button"
+			class="pb-2 text-sm font-medium transition-colors {activeTab === 'unread'
+				? 'border-b-2 border-gray-900 text-gray-900'
+				: 'text-gray-500 hover:text-gray-700'}"
+			onclick={() => (activeTab = 'unread')}
 		>
-			Unread ({$unreadCount})
+			{$_('messages.tab_unread', { values: { count: $unreadCount } })}
 		</button>
 	</div>
 
 	{#if loading}
-		<div class="flex justify-center items-center py-16">
+		<div class="flex items-center justify-center py-16">
 			<Spinner size="6" />
 		</div>
 	{:else if displayedMessages.length === 0}
 		<div class="flex flex-col items-center justify-center py-16 text-gray-400">
 			<IconInbox size={48} class="mb-4" />
 			<p class="text-lg font-medium text-gray-500">
-				{activeTab === 'unread' ? 'No unread messages' : 'No messages yet'}
+				{activeTab === 'unread'
+					? $_('messages.empty_unread_title')
+					: $_('messages.empty_all_title')}
 			</p>
-			<p class="text-sm text-gray-400 mt-1">
-				{activeTab === 'unread' ? 'You\'re all caught up.' : 'Official correspondence will appear here.'}
+			<p class="mt-1 text-sm text-gray-400">
+				{activeTab === 'unread'
+					? $_('messages.empty_unread_body')
+					: $_('messages.empty_all_body')}
 			</p>
 		</div>
 	{:else}
-		<div class="space-y-2">
+		<div class="mx-auto max-w-3xl space-y-2">
 			{#each displayedMessages as message (message.id)}
-				<button
-					class="w-full text-left p-4 rounded-lg border transition-colors {message.read ? 'border-gray-100 bg-white hover:bg-gray-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}"
-					on:click={() => handleMarkAsRead(message.id, !message.read)}
+				{@const open = expandedId === message.id}
+				<article
+					class="rounded-lg border transition-colors {message.read
+						? 'border-gray-100 bg-white'
+						: 'border-gray-200 border-l-4 border-l-gray-900 bg-gray-50'}"
 				>
-					<div class="flex items-start gap-3">
-						<div class="flex-shrink-0 mt-0.5">
-							{#if message.read}
-								<IconMailOpened size={20} class="text-gray-400" />
-							{:else}
-								<IconMail size={20} class="text-gray-700" />
-							{/if}
-						</div>
-						<div class="flex-1 min-w-0">
-							<div class="flex items-center justify-between gap-2">
-								<h4 class="text-sm truncate {message.read ? 'font-normal text-gray-600' : 'font-semibold text-gray-900'}">
-									{message.title}
-								</h4>
-								{#if message.timestamp_ms}
-									<span class="flex-shrink-0 text-xs text-gray-400">
-										{formatDate(message.timestamp_ms)}
-									</span>
+					<button
+						type="button"
+						class="w-full p-4 text-left hover:bg-gray-50"
+						aria-expanded={open}
+						onclick={() => handleOpen(message.id, message.read)}
+					>
+						<div class="flex items-start gap-3">
+							<div class="mt-0.5 flex-shrink-0">
+								{#if message.read}
+									<IconMailOpened size={20} class="text-gray-400" />
+								{:else}
+									<IconMail size={20} class="text-gray-700" />
 								{/if}
 							</div>
-							<p class="mt-1 text-sm text-gray-500 line-clamp-2">{message.message}</p>
+							<div class="min-w-0 flex-1">
+								<div class="flex items-center justify-between gap-2">
+									<h4
+										class="truncate text-sm {message.read
+											? 'font-normal text-gray-600'
+											: 'font-semibold text-gray-900'}"
+									>
+										{message.title}
+									</h4>
+									{#if message.timestamp_ms}
+										<span
+											class="flex-shrink-0 text-xs text-gray-400"
+											title={formatFullDate(message.timestamp_ms)}
+										>
+											{formatRelativeTime(message.timestamp_ms)}
+										</span>
+									{/if}
+								</div>
+								<p class="mt-0.5 text-xs text-gray-400">{formatNoticeMeta(message)}</p>
+								{#if !open}
+									<p class="mt-1 line-clamp-2 text-sm text-gray-500">{message.message}</p>
+								{/if}
+							</div>
+							<svg
+								class="h-5 w-5 flex-shrink-0 text-gray-400 transition-transform {open
+									? 'rotate-180'
+									: ''}"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M19 9l-7 7-7-7"
+								/>
+							</svg>
 						</div>
-					</div>
-				</button>
+					</button>
+
+					{#if open}
+						<div class="px-4 pb-4 pl-[3.25rem]">
+							{#if message.message}
+								<p class="whitespace-pre-wrap text-sm text-gray-700">{message.message}</p>
+							{/if}
+							{#if message.timestamp_ms}
+								<p class="mt-2 text-xs text-gray-400">{formatFullDate(message.timestamp_ms)}</p>
+							{/if}
+							<div class="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3 {isActionHref(message.href) ? 'justify-between' : 'justify-end'}">
+								{#if isActionHref(message.href)}
+									<button
+										type="button"
+										class="text-sm font-medium text-gray-900 underline-offset-2 hover:underline"
+										onclick={(e) => handleOpenAction(e, message.href || '')}
+									>
+										{actionLabel(message.href || '')}
+									</button>
+								{/if}
+								<button
+									type="button"
+									class="text-xs text-gray-500 hover:text-gray-800"
+									onclick={(e) => handleToggleRead(e, message.id, message.read)}
+								>
+									{message.read ? $_('messages.mark_unread') : $_('messages.mark_read')}
+								</button>
+							</div>
+						</div>
+					{/if}
+				</article>
 			{/each}
 		</div>
 	{/if}

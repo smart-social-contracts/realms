@@ -55,8 +55,8 @@ FILE_REGISTRY = "file_registry"
 
 
 def _dfx_cmd(*args: str) -> List[str]:
-    """Prefix dfx subcommand args with the srv1-compatible deprecated wrapper."""
-    return ["dfx", "--run-deprecated", *args]
+    """Build a ``dfx`` command list."""
+    return ["dfx", *args]
 
 
 def _dfx_subprocess_env(base_env: Optional[Dict[str, str]] = None) -> Dict[str, str]:

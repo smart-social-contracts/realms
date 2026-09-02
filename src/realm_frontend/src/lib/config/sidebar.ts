@@ -44,18 +44,29 @@ export interface SidebarConfig {
 }
 
 export interface TopUtilityItem {
-	label: string;
+	labelKey: string;
+	tooltipKey?: string;
 	icon: string;
 	href: string;
-	tooltip?: string;
 }
 
 export const topUtilityItems: TopUtilityItem[] = [
-	{ label: 'Account', icon: 'ti-user-circle', href: '/identities', tooltip: 'Manage your identity and account settings' },
-	{ label: 'Messages', icon: 'ti-mail', href: '/messages', tooltip: 'View and send messages' },
-	{ label: 'Settings', icon: 'ti-settings', href: '/settings', tooltip: 'Configure your preferences' },
+	{
+		labelKey: 'chrome.account',
+		tooltipKey: 'chrome.account_tooltip',
+		icon: 'ti-user-circle',
+		href: '/identities',
+	},
+	{
+		labelKey: 'chrome.messages',
+		tooltipKey: 'chrome.messages_tooltip',
+		icon: 'ti-mail',
+		href: '/messages',
+	},
+	{
+		labelKey: 'chrome.settings',
+		tooltipKey: 'chrome.settings_tooltip',
+		icon: 'ti-settings',
+		href: '/settings',
+	},
 ];
-
-export const SECTION_HEADER_ME = 'ME';
-export const SECTION_HEADER_REALM = 'MY REALM';
-export const SECTION_HEADER_MUNDUS = 'MY MUNDUS';

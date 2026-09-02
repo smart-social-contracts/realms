@@ -98,6 +98,24 @@ jobs:
         # source files; a stale copy silently changes what a realm enforces.
         run: |
           python3 scripts/sync_cedar_policies.py --check
+      - name: Host locale parity and sidebar labels
+        run: |
+          pytest -q tests/backend/test_sidebar_labels.py \
+                    tests/backend/test_api_errors.py \
+                    tests/backend/test_extension_i18n_packs.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: src/realm_frontend/package-lock.json
+      - name: Host frontend i18n tests
+        working-directory: src/realm_frontend
+        run: |
+          npm ci
+          npx vitest run src/lib/i18n/localeParity.test.ts \
+            src/lib/stores/sidebar.test.ts \
+            src/lib/i18n/resolveLocale.test.ts \
+            src/lib/utils/backendError.test.ts
       - name: Validate descriptors
         run: |
           for f in deployment-descriptors/*-mundus*.yml; do

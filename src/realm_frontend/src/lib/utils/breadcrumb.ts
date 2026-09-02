@@ -1,5 +1,15 @@
-import type { SidebarConfig } from '$lib/config/sidebar';
-import { topUtilityItems } from '$lib/config/sidebar';
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
+import type { SidebarConfig } from '../config/sidebar';
+import { topUtilityItems } from '../config/sidebar';
+
+function translateLabel(key: string): string {
+	try {
+		return get(_)(key);
+	} catch {
+		return key;
+	}
+}
 
 export interface BreadcrumbSegment {
 	label: string;
@@ -78,7 +88,7 @@ export function resolveBreadcrumb(
 
 	for (const item of topUtilityItems) {
 		if (pathMatches(item.href, path)) {
-			return [{ label: item.label }];
+			return [{ label: translateLabel(item.labelKey) }];
 		}
 	}
 
@@ -112,4 +122,18 @@ export function resolveBreadcrumb(
 	}
 
 	return fallbackSegments(path);
+}
+
+/** ME utility pages already have a page title — skip the redundant crumb. */
+export function shouldShowPageBreadcrumb(
+	pathname: string,
+	segments: BreadcrumbSegment[],
+): boolean {
+	if (segments.length === 0) return false;
+	const path = normalizePath(pathname);
+	if (path === '/') return false;
+	for (const item of topUtilityItems) {
+		if (pathMatches(item.href, path)) return false;
+	}
+	return true;
 }

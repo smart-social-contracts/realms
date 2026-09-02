@@ -183,6 +183,23 @@ def test_unread_count_is_per_caller(realm):
     assert result["unread_count"] == 3
 
 
+def test_list_projects_sender_name_and_audience(realm):
+    notes = seed(realm)
+    notes["to_alice"].sender = "alice"
+    listed = call("alice")("notifications", "notification.list", {})["notifications"]
+    mine = next(n for n in listed if n["title"] == "For Alice")
+    assert mine["sender"] == "alice"
+    assert mine["sender_name"] == "Alice"
+    assert mine["audience_type"] == "user"
+    assert mine["timestamp_ms"] > 0
+    dept = next(n for n in listed if n["title"] == "Justice dept")
+    assert dept["audience_type"] == "department"
+    assert dept["department"] == "justice"
+    realm_wide = next(n for n in listed if n["title"] == "Everyone")
+    assert realm_wide["audience_type"] == "realm"
+    assert realm_wide["sender_name"] == "admin"
+
+
 # ---------------------------------------------------------------------------
 # The two holes that porting closed
 # ---------------------------------------------------------------------------

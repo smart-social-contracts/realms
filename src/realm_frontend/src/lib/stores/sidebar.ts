@@ -5,11 +5,16 @@ import { resolveMemberHomeHref } from '../extension-home';
 export const sidebarConfig = writable<SidebarConfig | null>(null);
 export const sidebarLoading = writable(false);
 
-const CACHE_KEY = 'sidebar_cache';
+const CACHE_KEY_PREFIX = 'sidebar_cache';
 
-function readCache(): SidebarConfig | null {
+/** Locale-scoped localStorage key for cached sidebar config. */
+export function sidebarCacheKey(locale: string): string {
+	return `${CACHE_KEY_PREFIX}:${locale}`;
+}
+
+function readCache(locale: string): SidebarConfig | null {
 	try {
-		const raw = localStorage.getItem(CACHE_KEY);
+		const raw = localStorage.getItem(sidebarCacheKey(locale));
 		if (!raw) return null;
 		return JSON.parse(raw) as SidebarConfig;
 	} catch {
@@ -17,9 +22,9 @@ function readCache(): SidebarConfig | null {
 	}
 }
 
-function writeCache(config: SidebarConfig): void {
+function writeCache(locale: string, config: SidebarConfig): void {
 	try {
-		localStorage.setItem(CACHE_KEY, JSON.stringify(config));
+		localStorage.setItem(sidebarCacheKey(locale), JSON.stringify(config));
 	} catch {
 		// storage full or unavailable
 	}
@@ -49,7 +54,7 @@ export async function loadSidebar(
 	},
 	locale: string = 'en',
 ): Promise<void> {
-	const cached = readCache();
+	const cached = readCache(locale);
 	if (cached) {
 		sidebarConfig.set(cached);
 	}
@@ -77,7 +82,7 @@ export async function loadSidebar(
 		};
 
 		sidebarConfig.set(config);
-		writeCache(config);
+		writeCache(locale, config);
 	} catch (e) {
 		console.error('Failed to load sidebar:', e);
 		if (!get(sidebarConfig) && cached) {

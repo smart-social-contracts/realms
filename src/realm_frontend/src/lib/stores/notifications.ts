@@ -8,6 +8,10 @@ export interface NotificationItem {
     message: string;
     timestamp_ms: number;
     read: boolean;
+    sender?: string;
+    sender_name?: string;
+    audience_type?: string;
+    department?: string;
     icon?: string;
     href?: string;
     color?: string;
@@ -63,5 +67,16 @@ export async function markAsRead(notificationId: string, read: boolean = true) {
             unreadCount.set(updated.filter(n => !n.read).length);
             return updated;
         });
+    }
+}
+
+export async function markAllAsRead() {
+    let unread: NotificationItem[] = [];
+    notifications.update((items) => {
+        unread = items.filter((n) => !n.read);
+        return items;
+    });
+    for (const item of unread) {
+        await markAsRead(item.id, true);
     }
 }

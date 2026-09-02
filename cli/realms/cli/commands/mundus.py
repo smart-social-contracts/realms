@@ -40,7 +40,7 @@ _INSTALLER_IDS = {
 
 
 def _dfx_call(canister_id: str, method: str, arg: str, network: str, *, query: bool = False) -> str:
-    cmd = ["dfx", "--run-deprecated", "canister", "call", canister_id, method, arg, "--network", network, "--output", "json"]
+    cmd = ["dfx", "canister", "call", canister_id, method, arg, "--network", network, "--output", "json"]
     if query:
         cmd.append("--query")
     project_root = get_project_root()
@@ -59,7 +59,7 @@ def _dfx_call_file(canister_id: str, method: str, arg: str, network: str,
         f.write(arg)
         f.flush()
         try:
-            cmd = ["dfx", "--run-deprecated", "canister", "call", canister_id, method,
+            cmd = ["dfx", "canister", "call", canister_id, method,
                    "--argument-file", f.name, "--network", network]
             if candid_file:
                 cmd += ["--candid", candid_file]

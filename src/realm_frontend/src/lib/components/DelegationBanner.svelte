@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { actingOnBehalfOf, clearActingContext } from '$lib/stores/delegation.js';
 	import { principal } from '$lib/stores/auth';
 
@@ -17,15 +18,17 @@
 		role="status"
 	>
 		<span>
-			Acting on behalf of <strong>{shortGrantor}</strong>
-			<span class="text-blue-700">· your identity {shortYou}</span>
+			{$_('delegation.acting_on_behalf', { values: { grantor: shortGrantor } })}
+			<span class="text-blue-700">
+				· {$_('delegation.your_identity', { values: { you: shortYou } })}
+			</span>
 		</span>
 		<button
 			type="button"
 			class="rounded-md border border-blue-300 bg-white px-2 py-0.5 text-xs font-medium hover:bg-blue-100"
 			onclick={() => clearActingContext()}
 		>
-			Stop acting
+			{$_('delegation.stop_acting')}
 		</button>
 	</div>
 {/if}

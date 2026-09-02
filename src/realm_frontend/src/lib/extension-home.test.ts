@@ -57,5 +57,7 @@ describe('resolveMemberHomeHref', () => {
 		expect(page).toContain('ExtensionRoutePage');
 		const route = readFileSync(join(dir, 'components/ExtensionRoutePage.svelte'), 'utf8');
 		expect(route).toContain('{#key id}');
+		expect(route).toContain('isMemberInboxExtension');
+		expect(route).toContain('MEMBER_INBOX_HREF');
 	});
 });

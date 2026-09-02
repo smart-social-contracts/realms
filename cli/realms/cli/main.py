@@ -1847,8 +1847,10 @@ def seed(
     """Deploy Realms GOS product infra (``*.realmsgos.org``) and publish the catalog.
 
     Superset of ``realms env deploy``: marketplace + file_registry, then
-    extensions/codices into that file_registry. Does not deploy a GaaS portal
-    (``gaas new``) and never writes the GaaS file_registry.
+    extensions/codices into that file_registry. Registers product canisters on
+    the GaaS Casals conductor and runs ``casals sheet deploy`` for
+    ``casals.json`` (one shared file_registry backend, adopted by
+    name — never minted here). Does not deploy a GaaS portal (``gaas new``).
     """
     seed_command(
         env_name=env,

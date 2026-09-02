@@ -16,11 +16,16 @@
 		grantScopeData,
 		userScope
 	} from '$lib/crypto/sharing';
+	import { _ } from 'svelte-i18n';
+
+	function t(key: string, values?: Record<string, unknown>) {
+		return get(_)(key, values);
+	}
 
 	const path: string = '/identities';
-	const description: string = 'Manage your digital identities';
-	const metaTitle: string = 'My Identities';
-	const subtitle: string = 'Identity Management';
+	const description: string = '';
+	const metaTitle: string = '';
+	const subtitle: string = '';
 
 	interface IdentityProvider {
 		extensionName: string;
@@ -66,17 +71,19 @@
 	let selectedAudiences: Record<string, boolean> = {};
 	let currentlySharedWith: string[] = [];
 
-	const privateDataFields = [
-		{ key: 'first_name', label: 'First Name', type: 'text' },
-		{ key: 'last_name', label: 'Last Name', type: 'text' },
-		{ key: 'photo', label: 'Photo URL', type: 'url' },
-		{ key: 'birth_date', label: 'Date of Birth', type: 'date' },
-		{ key: 'address', label: 'Address', type: 'text' },
-		{ key: 'email', label: 'Email', type: 'email' },
-		{ key: 'phone', label: 'Phone Number', type: 'tel' }
-	];
+	const privateDataFields = $derived([
+		{ key: 'first_name', label: $_('identities.first_name'), type: 'text' },
+		{ key: 'last_name', label: $_('identities.last_name'), type: 'text' },
+		{ key: 'photo', label: $_('identities.photo_url'), type: 'url' },
+		{ key: 'birth_date', label: $_('identities.birth_date'), type: 'date' },
+		{ key: 'address', label: $_('identities.address'), type: 'text' },
+		{ key: 'email', label: $_('identities.email'), type: 'email' },
+		{ key: 'phone', label: $_('identities.phone'), type: 'tel' }
+	]);
 
-	$: displayAvatar = avatarUrl?.trim() || `https://api.dicebear.com/9.x/glass/svg?seed=${$principal}`;
+	const displayAvatar = $derived(
+		avatarUrl?.trim() || `https://api.dicebear.com/9.x/glass/svg?seed=${$principal}`,
+	);
 
 	function signedInPrincipal(): string {
 		const p = (get(principal) as string) || '';
@@ -155,7 +162,7 @@
 	async function probeEncryption(): Promise<boolean> {
 		const owner = signedInPrincipal();
 		if (!owner) {
-			encryptionError = 'Not signed in';
+			encryptionError = t('identities.not_signed_in');
 			return false;
 		}
 		try {
@@ -163,7 +170,7 @@
 			return true;
 		} catch (e) {
 			console.warn('Encryption probe failed:', e);
-			encryptionError = 'Encryption not available on this subnet';
+			encryptionError = t('identities.encryption_unavailable', { values: { detail: ' on this subnet' } });
 			return false;
 		}
 	}
@@ -190,7 +197,7 @@
 			const owner = signedInPrincipal();
 			if (!owner) {
 				encryptionAvailable = false;
-				encryptionError = 'Not signed in';
+				encryptionError = t('identities.not_signed_in');
 				return;
 			}
 			const statusResponse = await backend.get_my_user_status();
@@ -341,16 +348,16 @@
 		try {
 			const response = await backend.update_my_public_profile(nickname.trim(), avatarUrl.trim());
 			if (response?.success) {
-				publicMessage = 'Public profile updated successfully!';
+				publicMessage = t('identities.public_updated');
 				window.dispatchEvent(new CustomEvent('profilePictureUpdated', {
 					detail: { profilePictureUrl: avatarUrl.trim() }
 				}));
 			} else {
-				publicMessage = 'Failed to update public profile';
+				publicMessage = t('identities.public_update_failed');
 			}
 		} catch (err) {
 			console.error('Error updating public profile:', err);
-			publicMessage = 'Error updating public profile';
+			publicMessage = t('identities.public_update_error');
 		} finally {
 			publicSaving = false;
 		}
@@ -362,19 +369,19 @@
 		try {
 			if (encryptionAvailable !== true) {
 				if (encryptionAvailable === null) {
-					privateMessage = 'Still checking encryption. Try again in a moment.';
+					privateMessage = t('identities.encryption_checking');
 					return;
 				}
 				const response = await backend.update_my_private_data(JSON.stringify(privateData));
 				privateMessage = response?.success
-					? 'Private data saved (unencrypted).'
-					: 'Failed to update private data';
+					? t('identities.private_saved_unencrypted')
+					: t('identities.private_update_failed');
 				return;
 			}
 
 			const owner = signedInPrincipal();
 			if (!owner) {
-				privateMessage = 'Not signed in';
+				privateMessage = t('identities.not_signed_in');
 				return;
 			}
 			const scope = userScope(owner);
@@ -386,7 +393,7 @@
 
 			const response = await backend.update_my_private_data(plan.ciphertext);
 			if (!response?.success) {
-				privateMessage = 'Failed to update private data';
+				privateMessage = t('identities.private_update_failed');
 				return;
 			}
 
@@ -400,11 +407,11 @@
 
 			privateMessage =
 				recipients.length > 0
-					? `Private data encrypted, saved, and shared with ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}.`
-					: 'Private data encrypted and saved successfully!';
+					? t('identities.private_saved_shared', { values: { count: recipients.length } })
+					: t('identities.private_saved_encrypted');
 		} catch (err) {
 			console.error('Error updating private data:', err);
-			privateMessage = 'Error updating private data';
+			privateMessage = t('identities.private_update_error');
 		} finally {
 			privateSaving = false;
 		}
@@ -416,23 +423,28 @@
 		sharingMessage = '';
 		try {
 			await savePrivateData();
-			sharingMessage = 'Sharing settings updated.';
+			sharingMessage = t('identities.sharing_updated');
 		} catch {
-			sharingMessage = 'Failed to update sharing settings.';
+			sharingMessage = t('identities.sharing_update_failed');
 		} finally {
 			sharingSaving = false;
 		}
 	}
 </script>
 
-<MetaTag {path} {description} title={metaTitle} {subtitle} />
+<MetaTag
+	path={path}
+	description={description || $_('identities.meta_description')}
+	title={metaTitle || $_('identities.page_title')}
+	subtitle={subtitle || $_('identities.page_subtitle')}
+/>
 
 <div class="mt-4 space-y-6 px-4 md:px-6">
 	<!-- Public Data -->
 	<Card size="xl">
-		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Public Data</Heading>
+		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">{$_('identities.public_data')}</Heading>
 		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-			This information is visible to all community members.
+			{$_('identities.public_data_help')}
 		</p>
 		{#if !publicDataLoaded}
 			<div class="flex justify-center items-center py-8">
@@ -445,12 +457,12 @@
 				</div>
 				<div class="flex-1 space-y-4">
 					<div>
-						<Label for="nickname" class="mb-2">Nickname</Label>
-						<Input id="nickname" bind:value={nickname} placeholder="Enter your nickname" />
+						<Label for="nickname" class="mb-2">{$_('identities.nickname')}</Label>
+						<Input id="nickname" bind:value={nickname} placeholder={$_('identities.nickname_placeholder')} />
 					</div>
 					<div>
-						<Label for="avatar-url" class="mb-2">Avatar URL</Label>
-						<Input id="avatar-url" bind:value={avatarUrl} placeholder="https://example.com/your-avatar.jpg" />
+						<Label for="avatar-url" class="mb-2">{$_('identities.avatar_url')}</Label>
+						<Input id="avatar-url" bind:value={avatarUrl} placeholder={$_('identities.avatar_placeholder')} />
 					</div>
 				</div>
 			</div>
@@ -459,7 +471,7 @@
 			{/if}
 			<div class="mt-4">
 				<Button size="sm" color="alternative" on:click={savePublicProfile} disabled={publicSaving}>
-					{publicSaving ? 'Saving...' : 'Save'}
+					{publicSaving ? $_('identities.saving') : $_('buttons.save')}
 				</Button>
 			</div>
 		{/if}
@@ -467,23 +479,25 @@
 
 	<!-- Private Data -->
 	<Card size="xl">
-		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Private Data</Heading>
+		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">{$_('identities.private_data')}</Heading>
 		{#if !privateDataLoaded}
 			<div class="flex justify-center items-center py-8">
 				<Spinner size="6" />
-				<span class="ml-3 text-sm text-gray-500">Decrypting private data...</span>
+				<span class="ml-3 text-sm text-gray-500">{$_('identities.decrypting')}</span>
 			</div>
 		{:else}
 			{#if encryptionAvailable === true}
 				<div class="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
 					<p class="text-sm text-green-800 dark:text-green-200">
-						&#x1f512; Your private data is <strong>end-to-end encrypted</strong> using IC vetKeys. Only you can decrypt it.
+						&#x1f512; {$_('identities.encrypted_banner')}
 					</p>
 				</div>
 			{:else if encryptionAvailable === false}
 				<div class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
 					<p class="text-sm text-yellow-800 dark:text-yellow-200">
-						Encryption is not available{encryptionError ? `: ${encryptionError}` : ''}. Data will be stored unencrypted.
+						{$_('identities.encryption_unavailable', {
+							values: { detail: encryptionError ? `: ${encryptionError}` : '' }
+						})}
 					</p>
 				</div>
 			{/if}
@@ -512,7 +526,7 @@
 			{/if}
 			<div class="mt-4">
 				<Button size="sm" color="alternative" on:click={savePrivateData} disabled={privateSaving || encryptionAvailable === null}>
-					{privateSaving ? 'Saving...' : 'Save'}
+					{privateSaving ? $_('identities.saving') : $_('buttons.save')}
 				</Button>
 			</div>
 		{/if}
@@ -520,9 +534,9 @@
 
 	<!-- Connected Identities -->
 	<Card size="xl">
-		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Connected Identities</Heading>
+		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">{$_('identities.connected')}</Heading>
 		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-			Verify your identity through external providers for enhanced trust and access.
+			{$_('identities.connected_help')}
 		</p>
 		{#if identitiesLoading}
 			<div class="flex justify-center items-center py-8">
@@ -536,7 +550,7 @@
 							src={imagesPath(provider.logo)}
 							title={provider.name}
 							description={provider.description}
-							status="Verified"
+							status="verified"
 						/>
 					{:else}
 						<a href="/extensions/{provider.extensionName}" class="block">
@@ -552,7 +566,7 @@
 								<P class="mb-3 text-sm text-gray-500 dark:text-gray-400 text-center">
 									{provider.description}
 								</P>
-								<Button size="sm" color="blue" class="px-4 py-2">Start Verification</Button>
+								<Button size="sm" color="blue" class="px-4 py-2">{$_('identities.start_verification')}</Button>
 							</div>
 						</a>
 					{/if}
@@ -564,7 +578,7 @@
 					<FingerprintOutline class="w-6 h-6 text-gray-400 dark:text-gray-500" />
 				</div>
 				<p class="text-gray-500 dark:text-gray-400">
-					No identity verification extensions are currently installed.
+					{$_('identities.no_providers')}
 				</p>
 			</div>
 		{/if}
@@ -572,11 +586,9 @@
 
 	<!-- Data Sharing -->
 	<Card size="xl">
-		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Data Sharing</Heading>
+		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">{$_('identities.data_sharing')}</Heading>
 		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-			Choose who may read your private data — realm administrators and/or specific
-			departments. Sharing is consent-based: your data stays encrypted, and access is
-			granted by wrapping your encryption key for each recipient. You can revoke at any time.
+			{$_('identities.data_sharing_help')}
 		</p>
 		{#if !sharingLoaded}
 			<div class="flex justify-center items-center py-6">
@@ -589,13 +601,13 @@
 		{:else if encryptionAvailable === false}
 			<div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
 				<p class="text-sm text-yellow-800 dark:text-yellow-200">
-					Sharing requires encryption, which is not available on this subnet.
+					{$_('identities.sharing_requires_encryption')}
 				</p>
 			</div>
 		{:else if audiences.length === 0}
 			<div class="p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
 				<p class="text-sm text-gray-600 dark:text-gray-300">
-					There are no administrators or departments available to share with yet.
+					{$_('identities.no_share_audiences')}
 				</p>
 			</div>
 		{:else}
@@ -606,11 +618,11 @@
 							<p class="text-sm font-medium text-gray-900 dark:text-white">
 								{audience.label}
 								{#if audience.type === 'department'}
-									<span class="ml-1 text-xs font-normal text-gray-400">(department)</span>
+									<span class="ml-1 text-xs font-normal text-gray-400">{$_('identities.department')}</span>
 								{/if}
 							</p>
 							<p class="text-xs text-gray-500 dark:text-gray-400">
-								{audience.principals.length} member{audience.principals.length === 1 ? '' : 's'} would gain read access.
+								{$_('identities.members_gain_access', { values: { count: audience.principals.length } })}
 							</p>
 						</div>
 						<Toggle bind:checked={selectedAudiences[audience.id]} disabled={sharingSaving || privateSaving} />
@@ -620,7 +632,7 @@
 
 			<div class="mt-4 flex items-center gap-3">
 				<Button size="sm" color="blue" on:click={saveSharingSettings} disabled={sharingSaving || privateSaving}>
-					{sharingSaving ? 'Updating…' : 'Save sharing settings'}
+					{sharingSaving ? $_('identities.updating') : $_('identities.save_sharing')}
 				</Button>
 				{#if sharingMessage}
 					<span class="text-sm {sharingMessage.includes('updated') ? 'text-green-600' : 'text-red-600'}">{sharingMessage}</span>
@@ -630,7 +642,7 @@
 			{#if currentlySharedWith.length > 0}
 				<div class="mt-3">
 					<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
-						Currently shared with ({currentlySharedWith.length})
+						{$_('identities.currently_shared', { values: { count: currentlySharedWith.length } })}
 					</p>
 					<ul class="space-y-1 max-h-32 overflow-y-auto">
 						{#each currentlySharedWith as p}

@@ -2,12 +2,12 @@
 	import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
 	import { page } from '$app/stores';
 	import { sidebarConfig } from '$lib/stores/sidebar';
-	import { resolveBreadcrumb } from '$lib/utils/breadcrumb';
+	import { resolveBreadcrumb, shouldShowPageBreadcrumb } from '$lib/utils/breadcrumb';
 	import { parseExtensionIdFromPath } from '$lib/utils/extension-manifest';
 	import ExtensionInfoIcon from '$lib/components/ExtensionInfoIcon.svelte';
 
 	$: segments = resolveBreadcrumb($page.url.pathname, $sidebarConfig);
-	$: showBreadcrumb = segments.length > 0 && $page.url.pathname !== '/';
+	$: showBreadcrumb = shouldShowPageBreadcrumb($page.url.pathname, segments);
 	$: extensionId = parseExtensionIdFromPath($page.url.pathname);
 </script>
 

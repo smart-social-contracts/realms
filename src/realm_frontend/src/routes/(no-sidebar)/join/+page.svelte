@@ -31,6 +31,11 @@
   } from '$lib/test-identities.js';
   import { parseTestIdentitySearch, applyTestIdentitySearch } from '$lib/test-identity-query.ts';
   import { _ } from 'svelte-i18n';
+  import { isAssignableJoinError, localizeBackendError } from '$lib/utils/backendError';
+
+  function t(key, values) {
+    return get(_)(key, values);
+  }
   
   // Step management: 'auth' | 'already_joined' | 'terms' | 'profile' | 'success'
   let currentStep = 'auth';
@@ -129,10 +134,10 @@
   // Order: Sign In → Notice → Profile → Welcome. System assigns the quarter;
   // there is no free pick_quarter step on the open-registration path.
   $: steps = [
-    { id: 'auth', label: 'Sign In' },
-    ...(showJoinNotice ? [{ id: 'terms', label: 'Notice' }] : []),
-    { id: 'profile', label: 'Invitation' },
-    { id: 'success', label: 'Welcome' },
+    { id: 'auth', labelKey: 'join.step_sign_in' },
+    ...(showJoinNotice ? [{ id: 'terms', labelKey: 'join.step_notice' }] : []),
+    { id: 'profile', labelKey: 'join.step_invitation' },
+    { id: 'success', labelKey: 'join.step_welcome' },
   ];
   $: currentStepIndex = steps.findIndex((s) => s.id === currentStep);
 
@@ -184,7 +189,7 @@
     if (!hit) return '';
     const info = quarterDirectory.find((q) => q.canister_id === hit.canisterId);
     if (info) return formatQuarterLabel(info);
-    return hit.canisterId || 'Capital';
+    return hit.canisterId || t('join.capital');
   }
 
   /** Federated membership probe before any new registration (issue #156). */
@@ -229,7 +234,7 @@
       await goto(resolve('/extensions/member_dashboard'));
     } catch (e) {
       console.error('Failed to activate membership', e);
-      error = e.message || 'Failed to activate membership';
+      error = e.message || t('join.activate_failed');
     } finally {
       loading = false;
     }
@@ -378,8 +383,8 @@
 
   function quarterOptionSuffix(quarter) {
     if (quarter.joinable !== false) return '';
-    if (!quarter.is_capital && quarter.status === 'setup') return ' (setting up)';
-    return ' (coordinator-only)';
+    if (!quarter.is_capital && quarter.status === 'setup') return t('join.quarter_setting_up');
+    return t('join.quarter_coordinator_only');
   }
 
   /** Pick least-populated joinable quarter, excluding skipped ids (issue #156). */
@@ -419,21 +424,6 @@
     } catch (e) {
       console.warn('Failed to re-resolve join target after join error', e);
     }
-  }
-
-  function isAssignableJoinError(message) {
-    const m = (message || '').toLowerCase();
-    return (
-      m.includes('coordinator-only') ||
-      m.includes('coordinator only') ||
-      m.includes('join through a quarter') ||
-      m.includes('quarter is full') ||
-      m.includes('is full') ||
-      m.includes('at capacity') ||
-      m.includes('no capacity') ||
-      m.includes('still setting up') ||
-      m.includes('still installing')
-    );
   }
 
   // Point the page at a specific quarter (or the capital) for validate + join.
@@ -488,7 +478,7 @@
         await handleLogin();
       }
       if (!$isAuthenticated) {
-        forgotError = 'Please sign in to locate your quarter.';
+        forgotError = t('join.sign_in_to_find');
         return;
       }
 
@@ -499,10 +489,10 @@
         await goto(resolve('/'));
         return;
       }
-      forgotError = 'We could not find your membership on any quarter. You may need to join.';
+      forgotError = t('join.membership_not_found');
     } catch (e) {
       console.warn('Find my quarter failed', e);
-      forgotError = 'We could not find your membership on any quarter. You may need to join.';
+      forgotError = t('join.membership_not_found');
     } finally {
       forgotLoading = false;
     }
@@ -554,11 +544,11 @@
       if (userPrincipal && identity) {
         await completeAuthAfterLogin(userPrincipal, identity);
       } else {
-        error = 'Login was cancelled or failed. Please try again.';
+        error = t('join.login_cancelled');
       }
     } catch (e) {
       console.error('Login error:', e);
-      error = 'Failed to authenticate. Please try again.';
+      error = t('join.auth_failed');
     } finally {
       loading = false;
     }
@@ -609,12 +599,12 @@
         inviteValid = true;
         inviteProfile = parsed.data.profile || 'member';
       } else {
-        inviteError = parsed.error || 'Invalid invitation code';
+        inviteError = localizeBackendError(parsed.error || t('errors.invalid_invite'), (key) => t(key));
         inviteValid = false;
       }
     } catch (e) {
       console.error('Invite validation error:', e);
-      inviteError = 'Could not validate invitation code';
+      inviteError = t('join.could_not_validate_invite');
       inviteValid = false;
     } finally {
       inviteChecking = false;
@@ -623,7 +613,7 @@
 
   function handleTermsAccept() {
     if (!agreement) {
-      error = 'Please confirm you understand this notice';
+      error = t('join.confirm_notice');
       return;
     }
     error = '';
@@ -640,7 +630,7 @@
     error = '';
 
     if (inviteRequired) {
-      error = 'Registration requires an invitation code';
+      error = t('errors.invite_required');
       return;
     }
 
@@ -676,8 +666,8 @@
         await loadUserProfiles();
         currentStep = 'success';
       } else {
-        const joinError = response.data?.error || 'Unknown error occurred';
-        error = joinError;
+        const joinError = response.data?.error || t('errors.generic');
+        error = localizeBackendError(joinError, (key) => t(key));
         // Coordinator-only / full / bootstrapping: re-resolve assignment, no free picker.
         if (isAssignableJoinError(joinError)) {
           if (targetQuarterId && !skippedJoinQuarters.includes(targetQuarterId)) {
@@ -688,7 +678,7 @@
       }
     } catch (e) {
       console.error('Error joining realm:', e);
-      error = e.message || 'Failed to join the realm';
+      error = localizeBackendError(e.message || t('join.failed_join'), (key) => t(key));
       if (isAssignableJoinError(error)) {
         if (targetQuarterId && !skippedJoinQuarters.includes(targetQuarterId)) {
           skippedJoinQuarters = [...skippedJoinQuarters, targetQuarterId];
@@ -708,7 +698,7 @@
     <div class="absolute inset-0 z-0">
       <img 
         src={welcomeImageUrl} 
-        alt="{realmName} background"
+        alt={t('join.background_alt', { values: { name: realmName } })}
         class="w-full h-full object-cover"
       />
     </div>
@@ -719,7 +709,7 @@
       <div class="bg-black/60 backdrop-blur-sm rounded-2xl p-6 max-w-md mx-6">
         <!-- Welcome Message -->
         <h1 class="text-4xl font-bold mb-4 leading-tight">
-          Welcome to {realmName}
+          {$_('join.welcome_to', { values: { name: realmName } })}
         </h1>
         
         {#if $realmWelcomeMessage}
@@ -743,7 +733,7 @@
     <div class="md:hidden absolute inset-0 z-0">
       <img 
         src={welcomeImageUrl} 
-        alt="{realmName} background"
+        alt={t('join.background_alt', { values: { name: realmName } })}
         class="w-full h-full object-cover"
       />
     </div>
@@ -781,7 +771,7 @@
                 "text-[11px] sm:text-xs leading-none whitespace-nowrap transition-colors",
                 isCurrent ? "text-gray-900 font-medium" : "text-gray-500",
                 clickable && "group-hover:text-gray-900"
-              )}>{step.label}</span>
+              )}>{$_(step.labelKey)}</span>
             </button>
           {/each}
         </div>
@@ -797,7 +787,7 @@
       {#if inviteChecking}
         <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm flex items-center gap-2">
           <Spinner size="4" color="blue" />
-          <span>Validating invitation code...</span>
+          <span>{$_('join.validating_invite')}</span>
         </div>
       {/if}
 
@@ -810,12 +800,12 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Sign in to continue</h2>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">{$_('join.sign_in_title')}</h2>
             <p class="text-gray-500">
               {#if $testModeIIBypass}
-                Choose how to sign in to {realmName}
+                {$_('join.sign_in_test', { values: { name: realmName } })}
               {:else}
-                Authenticate with Internet Identity to join {realmName}
+                {$_('join.sign_in_ii', { values: { name: realmName } })}
               {/if}
             </p>
           </div>
@@ -823,7 +813,7 @@
           {#if $testModeIIBypass}
             <div class="space-y-3">
               <p class="text-sm text-gray-600 text-center mb-2">
-                Pick a test identity (Internet Identity is bypassed on the test network).
+                {$_('join.test_identity_hint')}
               </p>
               {#each testIdentities as persona (persona.index)}
                 <button
@@ -840,13 +830,13 @@
                   <div class="flex items-center justify-between gap-3">
                     <span class="font-semibold text-gray-900">{persona.label}</span>
                     {#if selectedTestIdentityIndex === persona.index}
-                      <span class="text-xs font-medium text-gray-700 bg-gray-200 px-2 py-0.5 rounded-full">Selected</span>
+                      <span class="text-xs font-medium text-gray-700 bg-gray-200 px-2 py-0.5 rounded-full">{$_('join.selected')}</span>
                     {/if}
                   </div>
                   <p class="text-xs font-mono text-gray-500 mt-1 break-all">{persona.principal}</p>
                   {#if persona.registeredFounder && persona.registeredFounder !== persona.principal}
                     <p class="text-xs text-amber-700 mt-1">
-                      Registered founder: {shortPrincipal(persona.registeredFounder)}
+                      {$_('join.registered_founder', { values: { principal: shortPrincipal(persona.registeredFounder) } })}
                     </p>
                   {/if}
                   <p class="text-xs text-gray-400 mt-1">{persona.description}</p>
@@ -862,7 +852,7 @@
                 )}
               >
                 <label class="block text-sm font-semibold text-gray-900 mb-2" for="join-custom-identity-number">
-                  Other identity (enter number)
+                  {$_('join.other_identity')}
                 </label>
                 <div class="flex gap-2">
                   <input
@@ -887,7 +877,7 @@
                       if (customIdentityIndex != null) persistSelectedTestIdentity(customIdentityIndex);
                     }}
                   >
-                    Select
+                    {$_('join.select')}
                   </button>
                 </div>
                 {#if customPersona}
@@ -895,7 +885,7 @@
                   <p class="text-xs text-gray-400 mt-1">{customPersona.description}</p>
                 {:else}
                   <p class="text-xs text-gray-400 mt-2">
-                    Identity numbers 3–{maxCustomIdentityNumber.toLocaleString()}.
+                    {$_('join.identity_numbers', { values: { max: maxCustomIdentityNumber.toLocaleString() } })}
                   </p>
                 {/if}
               </div>
@@ -907,12 +897,12 @@
               >
                 {#if loading}
                   <Spinner size="5" color="white" />
-                  <span>Connecting...</span>
+                  <span>{$_('join.connecting')}</span>
                 {:else}
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  <span>Continue as {selectedIdentityLabel}</span>
+                  <span>{$_('join.continue_as', { values: { label: selectedIdentityLabel } })}</span>
                 {/if}
               </button>
             </div>
@@ -924,30 +914,30 @@
             >
               {#if loading}
                 <Spinner size="5" color="white" />
-                <span>Connecting...</span>
+                <span>{$_('join.connecting')}</span>
               {:else}
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
                 </svg>
-                <span>Sign in with Internet Identity</span>
+                <span>{$_('join.sign_in_ii_button')}</span>
               {/if}
             </button>
 
             <p class="mt-6 text-center text-sm text-gray-500">
-              Don't have an Internet Identity?
+              {$_('join.no_ii')}
               <button
                 type="button"
                 on:click={openInternetIdentity}
                 class="text-gray-700 hover:text-gray-900 hover:underline font-medium"
               >
-                Create one →
+                {$_('join.create_ii')}
               </button>
             </p>
           {/if}
 
           <!-- Returning member who forgot their quarter -->
           <div class="mt-6 pt-5 border-t border-gray-100 text-center">
-            <p class="text-sm text-gray-500 mb-2">Already a member but don't know your quarter?</p>
+            <p class="text-sm text-gray-500 mb-2">{$_('join.already_member_quarter')}</p>
             <button
               type="button"
               on:click={findMyQuarter}
@@ -956,9 +946,9 @@
             >
               {#if forgotLoading}
                 <Spinner size="4" color="gray" />
-                <span>Searching quarters…</span>
+                <span>{$_('join.searching_quarters')}</span>
               {:else}
-                <span>Find my quarter →</span>
+                <span>{$_('join.find_quarter')}</span>
               {/if}
             </button>
             {#if forgotError}
@@ -976,15 +966,15 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Welcome back!</h2>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">{$_('join.welcome_back')}</h2>
             <p class="text-gray-500">
-              You're already a member of {realmName}
+              {$_('join.already_member_of', { values: { name: realmName } })}
             </p>
           </div>
 
           {#if membershipHits.length > 1}
             <p class="text-sm text-gray-500 mb-4 text-center">
-              You belong to multiple quarters. Choose which membership to use for this session.
+              {$_('join.multiple_quarters')}
             </p>
             <div class="space-y-3 mb-6">
               {#each membershipHits as hit (hit.canisterId)}
@@ -1013,9 +1003,9 @@
             >
               {#if loading}
                 <Spinner size="5" color="white" />
-                <span>Continuing...</span>
+                <span>{$_('join.continuing')}</span>
               {:else}
-                <span>Continue</span>
+                <span>{$_('setup.wizard.continue')}</span>
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -1024,14 +1014,14 @@
           {:else}
             {#if membershipHits.length === 1}
               <p class="text-sm text-gray-500 mb-6 text-center">
-                Your quarter: {membershipQuarterLabel(membershipHits[0])}
+                {$_('join.your_quarter', { values: { label: membershipQuarterLabel(membershipHits[0]) } })}
               </p>
             {/if}
             <a
               href={resolve('/extensions/member_dashboard')}
               class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3"
             >
-              <span>Go to Dashboard</span>
+              <span>{$_('join.go_dashboard')}</span>
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
@@ -1044,7 +1034,7 @@
         <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           {#if showQuarterBanner}
             <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-              <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
+              <div class="text-xs uppercase tracking-wide text-gray-400">{$_('join.joining_quarter')}</div>
               {#if showTestModeQuarterPicker}
                 <select
                   id="test-mode-quarter"
@@ -1059,7 +1049,7 @@
                   {/each}
                 </select>
                 <p class="mt-2 text-xs text-gray-400">
-                  Test mode: choose any quarter to register on.
+                  {$_('join.test_mode_quarter')}
                 </p>
               {:else}
                 <div class="font-semibold text-gray-900 truncate">
@@ -1081,7 +1071,7 @@
                 on:click={goBack}
                 class="flex-1 py-4 px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
               >
-                Back
+                {$_('setup.wizard.back')}
               </button>
             {/if}
             <button
@@ -1089,7 +1079,7 @@
               disabled={!agreement}
               class="flex-1 py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Continue
+              {$_('setup.wizard.continue')}
             </button>
           </div>
         </div>
@@ -1101,31 +1091,31 @@
             <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>Registration requires an invitation code.</span>
+            <span>{$_('errors.invite_required')}</span>
           </div>
         {/if}
         <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <div class="flex items-center justify-between mb-2">
-            <h2 class="text-2xl font-bold text-gray-900">Join {realmName}</h2>
+            <h2 class="text-2xl font-bold text-gray-900">{$_('join.join_title', { values: { name: realmName } })}</h2>
 {#if inviteValid}
-              <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Invited as {inviteProfile}</span>
+              <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">{$_('join.invited_as', { values: { profile: inviteProfile } })}</span>
             {:else if $testMode}
-              <span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">Test Mode</span>
+              <span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">{$_('join.test_mode')}</span>
             {/if}
           </div>
           <p class="text-gray-500 mb-6">
             {#if inviteValid}
-              Your invitation determines your access.
+              {$_('join.invite_determines_access')}
             {:else if $realmOpenRegistration}
-              Registration is open — join now, or enter an invitation code if you received one.
+              {$_('join.open_registration')}
             {:else}
-              Enter your invitation code to continue.
+              {$_('join.enter_invite_code')}
             {/if}
           </p>
 
           {#if showQuarterBanner}
             <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-              <div class="text-xs uppercase tracking-wide text-gray-400">Joining quarter</div>
+              <div class="text-xs uppercase tracking-wide text-gray-400">{$_('join.joining_quarter')}</div>
               {#if showTestModeQuarterPicker}
                 <select
                   id="test-mode-quarter"
@@ -1140,7 +1130,7 @@
                   {/each}
                 </select>
                 <p class="mt-2 text-xs text-gray-400">
-                  Test mode: choose any quarter to register on.
+                  {$_('join.test_mode_quarter')}
                 </p>
               {:else}
                 <div class="font-semibold text-gray-900 truncate">
@@ -1163,10 +1153,10 @@
               <div class="flex-1">
                 {#if inviteValid}
                   <div class="font-semibold text-gray-900 capitalize">{inviteProfile}</div>
-                  <div class="text-sm text-gray-500">Access granted by your invitation</div>
+                  <div class="text-sm text-gray-500">{$_('join.access_by_invite')}</div>
                 {:else}
-                  <div class="font-semibold text-gray-900">Member</div>
-                  <div class="text-sm text-gray-500">Standard access — an invitation code can grant a different profile</div>
+                  <div class="font-semibold text-gray-900">{$_('join.member_profile')}</div>
+                  <div class="text-sm text-gray-500">{$_('join.standard_access')}</div>
                 {/if}
               </div>
             </div>
@@ -1177,11 +1167,11 @@
           <div class="mb-6 p-3 md:p-4 border border-gray-200 rounded-xl">
             <label for="invite-code" class="block text-sm font-medium text-gray-700 mb-2">
               {#if inviteValid}
-                Invitation code
+                {$_('join.invitation_code')}
               {:else if $realmOpenRegistration || $testMode}
-                Have an invitation code?
+                {$_('join.have_invite')}
               {:else}
-                Invitation code <span class="text-red-500">*</span>
+                {$_('join.invitation_code')} <span class="text-red-500">*</span>
               {/if}
             </label>
             <div class="flex gap-2">
@@ -1190,7 +1180,7 @@
                 type="text"
                 bind:value={inviteCode}
                 on:keydown={(e) => { if (e.key === 'Enter' && inviteCode && !inviteChecking) validateInvite(); }}
-                placeholder="Paste your invite code"
+                placeholder={$_('join.paste_invite')}
                 disabled={inviteValid}
                 class={cn(
                   "min-w-0 flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-gray-900 focus:border-gray-900",
@@ -1202,7 +1192,7 @@
                   on:click={() => { inviteCode = ''; inviteValid = false; inviteProfile = ''; inviteError = ''; }}
                   class="shrink-0 px-3 md:px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  Clear
+                  {$_('join.clear')}
                 </button>
               {:else}
                 <button
@@ -1213,7 +1203,7 @@
                   {#if inviteChecking}
                     <Spinner size="4" color="white" />
                   {:else}
-                    Validate
+                    {$_('join.validate')}
                   {/if}
                 </button>
               {/if}
@@ -1223,7 +1213,7 @@
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
-                Valid — grants <strong class="ml-1">{inviteProfile}</strong> access
+                {$_('join.valid_grants', { values: { profile: inviteProfile } })}
               </p>
             {/if}
             {#if inviteError && !inviteChecking && !inviteValid}
@@ -1235,7 +1225,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>
-                  Test mode: enter <strong>"member"</strong>, <strong>"admin"</strong>, or <strong>"dev"</strong> to register with that profile.
+                  {$_('join.test_mode_codes')}
                 </span>
               </p>
             {/if}
@@ -1247,7 +1237,7 @@
                 on:click={goBack}
                 class="flex-1 py-3 md:py-4 px-4 md:px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
               >
-                Back
+                {$_('setup.wizard.back')}
               </button>
             {/if}
             <button
@@ -1257,9 +1247,9 @@
             >
               {#if loading}
                 <Spinner size="5" color="white" />
-                <span>Joining...</span>
+                <span>{$_('join.joining')}</span>
               {:else}
-                <span>Join Realm</span>
+                <span>{$_('join.join_realm')}</span>
               {/if}
             </button>
           </div>
@@ -1274,16 +1264,16 @@
             </svg>
           </div>
           
-          <h2 class="text-2xl font-bold text-gray-900 mb-2">Welcome to {realmName}!</h2>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">{$_('join.welcome_success', { values: { name: realmName } })}</h2>
           <p class="text-gray-500 mb-8">
-            You've successfully joined the realm. Start exploring your new community.
+            {$_('join.join_success_body')}
           </p>
           
           <a
             href={resolve('/extensions/member_dashboard')}
             class="inline-flex items-center justify-center w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all gap-2"
           >
-            <span>Go to Member Dashboard</span>
+            <span>{$_('join.go_member_dashboard')}</span>
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
             </svg>

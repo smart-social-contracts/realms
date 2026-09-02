@@ -145,6 +145,10 @@ def _is_read_by(n, caller: str) -> bool:
 
 
 def _timestamp_ms(n) -> int:
+    for attr in ("_timestamp_created", "_timestamp_updated"):
+        value = getattr(n, attr, None)
+        if isinstance(value, (int, float)) and value > 0:
+            return int(value)
     for attr in ("timestamp_created", "timestamp_updated"):
         value = getattr(n, attr, None)
         if value and str(value) != "None":
@@ -152,6 +156,24 @@ def _timestamp_ms(n) -> int:
             if stamp:
                 return stamp
     return 0
+
+
+def _sender_display(n) -> str:
+    """Public nickname when the sender is a known member; else the raw principal."""
+    sender = getattr(n, "sender", "") or ""
+    if not sender:
+        return ""
+    try:
+        from ggg import User
+
+        user = User[sender]
+        if user:
+            nick = (getattr(user, "nickname", "") or "").strip()
+            if nick:
+                return nick
+    except Exception:
+        pass
+    return sender
 
 
 def project(n, caller: str = "") -> dict:
@@ -165,6 +187,7 @@ def project(n, caller: str = "") -> dict:
         "title": getattr(n, "title", "") or "",
         "message": message,
         "sender": getattr(n, "sender", "") or "",
+        "sender_name": _sender_display(n),
         "recipient": getattr(n, "recipient", "") or "",
         "visibility": getattr(n, "visibility", "private") or "private",
         "audience_type": _audience(n),
@@ -564,9 +587,13 @@ def v_request_email_verification(caller="", email="", **kwargs) -> dict:
 
     address = str(email or "").strip().lower()
     if not address:
-        raise ValueError("email is required")
+        from core.extension_errors import CodedError
+
+        raise CodedError("email_required", "email is required")
     if not _valid_email(address):
-        raise ValueError("Invalid email address")
+        from core.extension_errors import CodedError
+
+        raise CodedError("email_invalid", "Invalid email address")
 
     user = _caller_user(caller)
     data = _private_data(user)
@@ -606,26 +633,34 @@ def v_verify_email_code(caller="", code="", **kwargs) -> dict:
     user = _caller_user(caller)
     data = _private_data(user)
 
+    from core.extension_errors import CodedError
+
     expected = str(data.get("email_verify_code") or "")
     if not expected:
-        raise ValueError("No verification in progress; request a code first")
+        raise CodedError(
+            "email_no_verification",
+            "No verification in progress; request a code first",
+        )
 
     attempts = int(data.get("email_verify_attempts", 0))
     if attempts >= VERIFY_MAX_ATTEMPTS:
         _clear_verify_state(data)
         user.private_data = json.dumps(data)
-        raise ValueError("Too many attempts; request a new code")
+        raise CodedError("email_too_many_attempts", "Too many attempts; request a new code")
 
     expires = int(data.get("email_verify_expires", 0))
     if expires and _now_seconds() > expires:
         _clear_verify_state(data)
         user.private_data = json.dumps(data)
-        raise ValueError("Verification code expired; request a new one")
+        raise CodedError(
+            "email_code_expired",
+            "Verification code expired; request a new one",
+        )
 
     if str(code or "").strip() != expected:
         data["email_verify_attempts"] = attempts + 1
         user.private_data = json.dumps(data)
-        raise ValueError("Incorrect verification code")
+        raise CodedError("email_code_incorrect", "Incorrect verification code")
 
     data["email_verified"] = True
     _clear_verify_state(data)

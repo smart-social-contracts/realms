@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "setup": "npm i && dfx --run-deprecated canister create marketplace_backend && dfx --run-deprecated generate marketplace_backend && dfx --run-deprecated deploy",
+    "setup": "npm i && dfx canister create marketplace_backend && dfx generate marketplace_backend && dfx deploy",
     "start": "vite --port 3002",
-    "prebuild": "dfx --run-deprecated generate marketplace_backend",
+    "prebuild": "dfx generate marketplace_backend",
     "build": "vite build",
     "postbuild": "node scripts/write-version-file.js",
     "test": "node --experimental-strip-types --test src/lib/*.test.ts && node --test ../../scripts/build-info.test.js",

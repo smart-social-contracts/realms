@@ -2,11 +2,13 @@
 	import { Avatar, Button, Card, Heading, Badge } from 'flowbite-svelte';
 	import { PenOutline, TrashBinOutline, CheckCircleSolid } from 'flowbite-svelte-icons';
 	import { styles, cn } from '$lib/theme/utilities';
+	import { _ } from 'svelte-i18n';
 
 	export let src: string;
 	export let title: string;
 	export let description: string;
-	export let status: string = 'Verified'; // Default status is Verified
+	/** `verified` | `pending` | other label shown as-is */
+	export let status: string = 'verified';
 	
 	let isEnabled = true; // Track enable/disable state
 </script>
@@ -24,13 +26,13 @@
 		<div class="flex-1 flex flex-col">
 			<div class="flex flex-wrap justify-between items-start gap-2 mb-2">
 				<Heading tag="h3" class="text-xl font-semibold text-gray-900 dark:text-white">{title}</Heading>
-				{#if status === 'Verified'}
+				{#if status === 'verified'}
 					<Badge color="green" class="flex items-center gap-1 px-2.5 py-1">
 						<CheckCircleSolid class="w-3 h-3" />
-						Verified
+						{$_('identities.verified')}
 					</Badge>
-				{:else if status === 'Pending'}
-					<Badge color="yellow" class="px-2.5 py-1">Pending</Badge>
+				{:else if status === 'pending'}
+					<Badge color="yellow" class="px-2.5 py-1">{$_('identities.pending')}</Badge>
 				{:else}
 					<Badge color="dark" class="px-2.5 py-1">{status}</Badge>
 				{/if}

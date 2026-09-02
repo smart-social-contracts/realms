@@ -99,6 +99,12 @@ describe('Sidebar.svelte membership gate', () => {
 		expect(sidebar).toContain('`${path}${search}|${membership}`');
 	});
 
+	it('reloads sidebar config when the UI locale changes', () => {
+		expect(sidebar).toContain("import { locale, _ } from 'svelte-i18n'");
+		expect(sidebar).toContain('const currentLocale = $locale || \'en\'');
+		expect(sidebar).toContain('loadSidebar(actor, currentLocale)');
+	});
+
 	it('keeps the host brain FAB wiring (not chrome cleanup)', () => {
 		expect(layout).toContain("event.action.type === 'assistant.open'");
 		expect(layout).toContain('portalAssistantOpen');

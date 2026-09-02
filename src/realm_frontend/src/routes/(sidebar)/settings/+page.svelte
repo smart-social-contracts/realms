@@ -5,6 +5,8 @@
 	import { SITE_NAME } from '$lib/globals';
 	import MetaTag from '../../utils/MetaTag.svelte';
 	import { _ } from 'svelte-i18n';
+	import { get } from 'svelte/store';
+	import { localizeBackendError } from '$lib/utils/backendError';
 	import { onMount } from 'svelte';
 	// @ts-ignore
 	import { quarterBackend, createQuarterActor, asJoinSafeActor } from '$lib/canisters.js';
@@ -86,8 +88,8 @@
 	function labelForCanister(canisterId: string): string {
 		const q = quarterMeta(canisterId);
 		if (q) return formatQuarterLabel(q as any);
-		if (capitalId && canisterId === capitalId) return 'Quarter 0 (Capital)';
-		return canisterId || 'Unknown quarter';
+		if (capitalId && canisterId === capitalId) return $_('settings.quarter_capital');
+		return canisterId || $_('settings.quarter_unknown');
 	}
 
 	function isSessionActive(hit: MembershipHit): boolean {
@@ -151,28 +153,33 @@
 	}
 
 	function parseExtensionResponse(result: any) {
+		const tr = (key: string) => get(_)(key);
 		if (!result) {
-			throw new Error('No response from server.');
+			throw new Error(tr('errors.request_failed'));
 		}
 		if (result.success === false) {
 			const responseStr = result.response ?? '';
 			try {
 				const inner =
 					typeof responseStr === 'string' ? JSON.parse(responseStr) : responseStr;
-				throw new Error(inner?.error || inner?.message || 'Request failed.');
+				throw new Error(localizeBackendError(inner, tr, 'errors.request_failed'));
 			} catch (e: any) {
-				if (e instanceof Error && e.message !== 'Request failed.') {
+				if (e instanceof Error && e.message !== tr('errors.request_failed')) {
 					throw e;
 				}
 				throw new Error(
-					typeof responseStr === 'string' && responseStr ? responseStr : 'Request failed.'
+					localizeBackendError(
+						typeof responseStr === 'string' && responseStr ? responseStr : '',
+						tr,
+						'errors.request_failed',
+					),
 				);
 			}
 		}
 		const responseStr = result.response ?? result;
 		const data = typeof responseStr === 'string' ? JSON.parse(responseStr) : responseStr;
 		if (data?.success === false) {
-			throw new Error(data.error || data.message || 'Request failed.');
+			throw new Error(localizeBackendError(data, tr, 'errors.request_failed'));
 		}
 		return data?.data ?? data;
 	}
@@ -181,7 +188,7 @@
 		sendingCode = true;
 		try {
 			if (!emailIsValid) {
-				throw new Error('Please enter a valid email address.');
+				throw new Error(get(_)('errors.email_invalid'));
 			}
 			const result = await quarterBackend.extension_sync_call(
 				'notifications',
@@ -192,11 +199,11 @@
 			verificationPending = true;
 			emailVerified = false;
 			void showBridgeNotice({
-				title: 'Verification code sent',
-				body: 'Check your inbox for a 6-digit code.',
+				title: $_('settings.email_code_sent_title'),
+				body: $_('settings.email_code_sent_body'),
 			});
 		} catch (e: any) {
-			void showBridgeAlert({ body: e.message || 'Failed to send verification code.' });
+			void showBridgeAlert({ body: e.message || get(_)('errors.email_send_failed') });
 		} finally {
 			sendingCode = false;
 		}
@@ -207,7 +214,7 @@
 		try {
 			const code = verifyCode.trim();
 			if (!code) {
-				throw new Error('Please enter the 6-digit code.');
+				throw new Error(get(_)('errors.email_code_required'));
 			}
 			const result = await quarterBackend.extension_sync_call(
 				'notifications',
@@ -219,8 +226,8 @@
 			verificationPending = false;
 			verifyCode = '';
 			void showBridgeNotice({
-				title: 'Email verified',
-				body: 'Email address verified.',
+				title: $_('settings.email_verified_title'),
+				body: $_('settings.email_verified_body'),
 			});
 			try {
 				await loadUserStatus();
@@ -228,7 +235,7 @@
 				console.warn('User status refresh after verify failed:', e);
 			}
 		} catch (e: any) {
-			void showBridgeAlert({ body: e.message || 'Failed to verify code.' });
+			void showBridgeAlert({ body: e.message || get(_)('errors.email_verify_failed') });
 		} finally {
 			verifyingCode = false;
 		}
@@ -282,8 +289,8 @@
 			if (response && response.success) {
 				privateData = updated;
 				void showBridgeNotice({
-					title: 'Saved',
-					body: 'Notification preference saved.',
+					title: $_('settings.notification_saved_title'),
+					body: $_('settings.notification_saved_body'),
 				});
 			} else {
 				throw new Error(
@@ -311,8 +318,8 @@
 		try {
 			await activateMembership(hit, capitalId, { cache: true });
 			void showBridgeNotice({
-				title: 'Quarter switched',
-				body: `Now using ${labelForCanister(hit.canisterId)} for this session.`,
+				title: $_('settings.quarter_switched_title'),
+				body: $_('settings.quarter_switched_body', { values: { label: labelForCanister(hit.canisterId) } }),
 			});
 			try {
 				await loadUserStatus();
@@ -338,8 +345,8 @@
 				const err = response?.data?.error || 'Failed to register in this quarter.';
 				if (isInviteRequiredError(err)) {
 					void showBridgeAlert({
-						title: 'Invitation required',
-						body: 'This quarter requires an invitation code. Use an invite link to register there, then return here to activate it.',
+						title: $_('settings.quarter_invite_required_title'),
+						body: $_('settings.quarter_invite_required_body'),
 					});
 				} else {
 					void showBridgeAlert({ body: err });
@@ -359,8 +366,10 @@
 
 			await activateMembership(hit, result.capitalId || capitalId, { cache: true });
 			void showBridgeNotice({
-				title: 'Registered',
-				body: `Registered in ${labelForCanister(canisterId)} and set it as the active quarter.`,
+				title: $_('settings.quarter_registered_title'),
+				body: $_('settings.quarter_registered_body', {
+					values: { label: labelForCanister(canisterId) }
+				}),
 			});
 			try {
 				await loadUserStatus();
@@ -371,8 +380,8 @@
 			const msg = e.message || 'Failed to register in this quarter.';
 			if (isInviteRequiredError(msg)) {
 				void showBridgeAlert({
-					title: 'Invitation required',
-					body: 'This quarter requires an invitation code. Use an invite link to register there, then return here to activate it.',
+					title: $_('settings.quarter_invite_required_title'),
+					body: $_('settings.quarter_invite_required_body'),
 				});
 			} else {
 				void showBridgeAlert({ body: msg });
@@ -417,7 +426,7 @@
 
 			<!-- User Info -->
 			{#if loadingUserStatus}
-				<div class="mt-4 text-gray-500">Loading user status...</div>
+				<div class="mt-4 text-gray-500">{$_('settings.loading_status')}</div>
 			{:else if userStatusError}
 				<div class="mt-4 text-red-500">{userStatusError}</div>
 			{:else}
@@ -430,7 +439,7 @@
 						/>
 						<div>
 							<div class="text-lg font-semibold text-gray-900 dark:text-white">
-								{nickname || 'No nickname set'}
+								{nickname || $_('settings.no_nickname')}
 							</div>
 							<div class="flex flex-wrap gap-1.5 mt-1">
 								{#each profiles as profile (profile)}
@@ -439,18 +448,18 @@
 									</span>
 								{/each}
 								{#if profiles.length === 0}
-									<span class="text-sm text-gray-500 dark:text-gray-400">No profiles</span>
+									<span class="text-sm text-gray-500 dark:text-gray-400">{$_('settings.no_profiles')}</span>
 								{/if}
 							</div>
 						</div>
 					</div>
 					<div class="pt-3 border-t border-gray-200 dark:border-gray-700">
-						<span class="text-xs font-medium text-gray-500 dark:text-gray-400">Principal</span>
+						<span class="text-xs font-medium text-gray-500 dark:text-gray-400">{$_('settings.principal')}</span>
 						<div class="font-mono text-sm text-gray-700 dark:text-gray-300 break-all mt-0.5">{principal}</div>
 					</div>
 					{#if sessionQuarterId}
 						<div class="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
-							<span class="text-xs font-medium text-gray-500 dark:text-gray-400">Active quarter (this session)</span>
+							<span class="text-xs font-medium text-gray-500 dark:text-gray-400">{$_('settings.active_quarter')}</span>
 							<div class="text-sm text-gray-700 dark:text-gray-300 mt-0.5">
 								{labelForCanister(sessionQuarterId)}
 							</div>
@@ -496,17 +505,17 @@
 		<!-- Email notifications (issue #266) -->
 		<div class="col-span-full mt-6">
 			<Heading tag="h2" class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-				Email notifications
+				{$_('settings.email_title')}
 			</Heading>
 			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
 				<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-					Add a personal email address to receive realm notifications. We will send a 6-digit code to verify it. You can turn email delivery off at any time.
+					{$_('settings.email_description')}
 				</p>
 
 				<div class="space-y-4">
 					<div>
 						<label for="user-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-							Email address
+							{$_('settings.email_address')}
 						</label>
 						<div class="flex flex-wrap items-center gap-2">
 							<input
@@ -517,7 +526,7 @@
 								class="flex-1 min-w-[12rem] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 							/>
 							{#if emailVerified}
-								<span class="text-sm font-medium text-green-600 dark:text-green-400">Verified</span>
+								<span class="text-sm font-medium text-green-600 dark:text-green-400">{$_('settings.email_verified')}</span>
 							{/if}
 						</div>
 					</div>
@@ -529,14 +538,14 @@
 							disabled={sendingCode || !emailIsValid}
 							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 						>
-							{sendingCode ? 'Sending…' : 'Send verification code'}
+							{sendingCode ? $_('settings.email_sending') : $_('settings.email_send_code')}
 						</button>
 					{/if}
 
 					{#if verificationPending && !emailVerified}
 						<div>
 							<label for="user-email-verify-code" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-								Verification code
+								{$_('settings.email_code')}
 							</label>
 							<div class="flex flex-wrap items-center gap-2">
 								<input
@@ -555,7 +564,7 @@
 									disabled={verifyingCode || !verifyCode.trim()}
 									class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 								>
-									{verifyingCode ? 'Verifying…' : 'Verify'}
+									{verifyingCode ? $_('settings.email_verifying') : $_('settings.email_verify')}
 								</button>
 							</div>
 						</div>
@@ -572,8 +581,8 @@
 							<div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-300 dark:bg-gray-600 dark:peer-focus:ring-blue-800 after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
 						</label>
 						<div>
-							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">Enable email notifications</span>
-							<p class="text-xs text-gray-500 dark:text-gray-400">When off, you will not receive emails even if the realm has email enabled.</p>
+							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$_('settings.email_enable')}</span>
+							<p class="text-xs text-gray-500 dark:text-gray-400">{$_('settings.email_enable_help')}</p>
 						</div>
 					</div>
 
@@ -583,7 +592,7 @@
 						disabled={savingEmail}
 						class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 					>
-						{savingEmail ? 'Saving…' : 'Save notification preference'}
+						{savingEmail ? $_('settings.email_saving') : $_('settings.email_save_preference')}
 					</button>
 				</div>
 			</div>
@@ -599,18 +608,18 @@
 			<!-- 1. Activate / switch session among existing memberships -->
 			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700 mb-4">
 				<h3 class="text-sm font-semibold text-gray-900 dark:text-white">
-					Active quarter (this session)
+					{$_('settings.active_quarter')}
 				</h3>
 				<p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-					Switch among quarters you already belong to. This updates session routing and your local home cache — it does not create a new membership.
+					{$_('settings.quarter_switch_help')}
 				</p>
 
 				{#if loadingMembership}
-					<div class="mt-3 text-sm text-gray-500">Checking memberships…</div>
+					<div class="mt-3 text-sm text-gray-500">{$_('settings.quarter_checking')}</div>
 				{:else if membershipError}
 					<div class="mt-3 text-sm text-red-600 dark:text-red-400">{membershipError}</div>
 				{:else if membershipHits.length === 0}
-					<div class="mt-3 text-sm text-gray-500">No quarter memberships found for this principal.</div>
+					<div class="mt-3 text-sm text-gray-500">{$_('settings.quarter_no_memberships')}</div>
 				{:else}
 					<ul class="mt-3 space-y-2">
 						{#each membershipHits as hit (hit.canisterId)}
@@ -629,7 +638,7 @@
 									{/if}
 								</div>
 								{#if isSessionActive(hit)}
-									<span class="text-xs font-medium text-green-700 dark:text-green-400">In use</span>
+									<span class="text-xs font-medium text-green-700 dark:text-green-400">{$_('settings.quarter_in_use')}</span>
 								{:else}
 									<button
 										type="button"
@@ -637,7 +646,7 @@
 										disabled={!!activatingCanisterId}
 										class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
 									>
-										{activatingCanisterId === hit.canisterId ? 'Switching…' : 'Use this quarter'}
+										{activatingCanisterId === hit.canisterId ? $_('settings.quarter_switching') : $_('settings.quarter_use_this')}
 									</button>
 								{/if}
 							</li>
@@ -650,17 +659,17 @@
 			<!-- 2. Deliberate register in another quarter -->
 			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
 				<h3 class="text-sm font-semibold text-gray-900 dark:text-white">
-					Register in another quarter
+					{$_('settings.quarter_register_title')}
 				</h3>
 				<p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-					Create a membership on a quarter you are not yet part of, then make it active. This is intentional multi-registration — not the open join picker.
+					{$_('settings.quarter_register_help')}
 				</p>
 
 				{#if loadingMembership}
-					<div class="mt-3 text-sm text-gray-500">Loading available quarters…</div>
+					<div class="mt-3 text-sm text-gray-500">{$_('settings.quarter_loading_available')}</div>
 				{:else if registerTargets.length === 0}
 					<div class="mt-3 text-sm text-gray-500">
-						You are already a member of every active quarter, or none are available to join.
+						{$_('settings.quarter_all_joined')}
 					</div>
 				{:else}
 					<ul class="mt-3 space-y-2">
@@ -674,7 +683,7 @@
 										{quarter.canister_id}
 									</div>
 									<div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-										{quarter.population} users
+										{$_('settings.quarter_users', { values: { count: quarter.population } })}
 									</div>
 								</div>
 								<button
@@ -683,7 +692,7 @@
 									disabled={!!registeringCanisterId || loadingUserStatus || !profiles.length}
 									class="px-3 py-1.5 text-sm font-medium text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
 								>
-									{registeringCanisterId === quarter.canister_id ? 'Registering…' : 'Register here'}
+									{registeringCanisterId === quarter.canister_id ? $_('settings.quarter_registering') : $_('settings.quarter_register_here')}
 								</button>
 							</li>
 						{/each}
@@ -698,7 +707,7 @@
 				{$_('settings.quarter_title', { default: 'Quarter' })}
 			</Heading>
 			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-				<span class="font-semibold">Current quarter:</span>
+				<span class="font-semibold">{$_('settings.quarter_current')}</span>
 				<span class="ml-1">{labelForCanister($realmInfo.quarters[0]?.canister_id || sessionQuarterId)}</span>
 			</div>
 		</div>

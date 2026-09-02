@@ -298,6 +298,24 @@ ls extensions/
 - Show subcommand help: `realms realm --help`, `realms mundus --help`, etc.
 - Check project status: `realms status`
 
+### `realms seed`
+
+Deploy the Realms GOS **product** stack (`*.realmsgos.org`: marketplace + file_registry UI) and publish the extension/codex catalog into the fleet `file_registry` backend.
+
+After `realms env deploy` (still used in this slice for DNS-safe dfx deploy), seed registers existing product canister IDs on the **GaaS Casals conductor** and runs:
+
+```bash
+casals sheet deploy casals.json
+```
+
+via a local Casals checkout (`CASALS_SRC`, sibling `../Casals`, or `/srv/dev/Casals`). The conductor is resolved from `environments/<env>.json` (`casals_backend`), sibling `gos-as-a-service/environments/<env>.json`, or `CASALS_BACKEND`.
+
+**One shared `file_registry` backend** — seed never mints a second registry. The product sheet includes the backend (and an orchestration baton) so Casals can adopt the existing canister by name.
+
+```bash
+realms seed --env test --identity deployer --yes
+```
+
 ## GUI alternative: the Package Manager extension
 
 Most extension and codex management actions exposed by this CLI
