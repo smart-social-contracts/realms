@@ -25,7 +25,7 @@ A full platform rebuild is **`gaas new` then `realms seed`**. Seed **destroys Ca
 | Sheet deploy | `gaas new` deploys `gos-as-a-service/casals.json`. `realms seed` deploys the **union** with `realms/casals.json` (must not send Product-only). |
 | Token/NFT catalog | Authorize [ic-tokens v0.1.0](https://github.com/smart-social-contracts/ic-tokens/releases/tag/v0.1.0) backends plus certified-assets for the frontends. No new GitHub release required. |
 
-**Not implemented yet:** `realms seed` does not call `casals new`, does not destroy token/nft, and Product-only `sheet deploy` would stop GaaS infra. Steps below are the **target** pipeline.
+**Not implemented yet:** `realms seed` does not yet call `casals new` (always-destroy conductor). Union sheet deploy, Product-owned fleet `file-registry`, and token/nft on the product stack **are** in the CLI. Do not live-destroy test until that remaining step is wired and confirmed.
 
 ---
 

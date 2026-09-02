@@ -173,18 +173,20 @@ class TestCreateCanisterSubnet:
 
 
 class TestDestroyProductStack:
-    def test_destroys_three_keeps_marketplace_frontend(self, tmp_path):
+    def test_destroys_non_dns_product_keeps_marketplace_frontend(self, tmp_path):
         ids = {
             "file_registry": {"demo": "aaaaa-aaaaa-aaaaa-aaaaa-aaa"},
             "file_registry_frontend": {"demo": "bbbbb-bbbbb-bbbbb-bbbbb-bbb"},
             "marketplace_backend": {"demo": "ccccc-ccccc-ccccc-ccccc-ccc"},
             "marketplace_frontend": {"demo": "ddddd-ddddd-ddddd-ddddd-ddd"},
+            "token_backend": {"demo": "eeeee-eeeee-eeeee-eeeee-eee"},
+            "nft_backend": {"demo": "fffff-fffff-fffff-fffff-fff"},
         }
         (tmp_path / "canister_ids.json").write_text(json.dumps(ids), encoding="utf-8")
 
         with patch(
             "realms.cli.commands.env._dfx_canister_id",
-            side_effect=lambda name, network: ids[name]["demo"],
+            side_effect=lambda name, network: (ids.get(name) or {}).get("demo"),
         ), patch(
             "realms.cli.commands.env._is_canister_dead", return_value=False
         ), patch(
@@ -202,12 +204,15 @@ class TestDestroyProductStack:
             "aaaaa-aaaaa-aaaaa-aaaaa-aaa",
             "bbbbb-bbbbb-bbbbb-bbbbb-bbb",
             "ccccc-ccccc-ccccc-ccccc-ccc",
+            "eeeee-eeeee-eeeee-eeeee-eee",
+            "fffff-fffff-fffff-fffff-fff",
         }
         assert "ddddd-ddddd-ddddd-ddddd-ddd" not in deleted
         leftover = _read_canister_ids(tmp_path)
         assert leftover["marketplace_frontend"]["demo"] == "ddddd-ddddd-ddddd-ddddd-ddd"
         assert "file_registry" not in leftover
         assert "marketplace_backend" not in leftover
+        assert "token_backend" not in leftover
         assert result["kept"] == ["ddddd-ddddd-ddddd-ddddd-ddd"]
 
     def test_refuses_to_delete_when_id_matches_dns_frontend(self, tmp_path):

@@ -1837,20 +1837,20 @@ def seed(
         False,
         "--destroy-except-marketplace-frontend",
         help=(
-            "Stop, recover cycles, and delete file_registry, "
-            "file_registry_frontend, and marketplace_backend. Keeps "
-            "marketplace_frontend (*.realmsgos.org DNS). Then recreates the "
-            "three and upgrades the frontend. Does not touch GaaS file_registry."
+            "Stop, recover cycles, and delete product canisters except "
+            "marketplace_frontend (*.realmsgos.org DNS). Then recreate "
+            "file_registry, marketplace_backend, token, and nft. Does not "
+            "touch GaaS portal canisters."
         ),
     ),
 ) -> None:
     """Deploy Realms GOS product infra (``*.realmsgos.org``) and publish the catalog.
 
-    Superset of ``realms env deploy``: marketplace + file_registry, then
-    extensions/codices into that file_registry. Registers product canisters on
-    the GaaS Casals conductor and runs ``casals sheet deploy`` for
-    ``casals.json`` (one shared file_registry backend, adopted by
-    name — never minted here). Does not deploy a GaaS portal (``gaas new``).
+    Superset of ``realms env deploy``: marketplace, fleet file_registry, token,
+    and nft, then extensions/codices into that file_registry. Registers GaaS
+    plus product canisters on the Casals conductor and deploys the union of
+    ``gos-as-a-service/casals.json`` and ``casals.json``. Does not deploy a GaaS
+    portal (``gaas new``).
     """
     seed_command(
         env_name=env,

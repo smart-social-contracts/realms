@@ -1,15 +1,15 @@
 {
-  "$comment": "Realms product sheet for `realms seed` → `casals sheet deploy` on the GaaS Casals conductor. One fleet file_registry backend per network: put it on this sheet and adopt by name (register_canister then deploy_sheet) — never mint a second registry. marketplace_frontend is DNS adopt-only (*.realmsgos.org). No per-stand batons: those belong on realm stands (installer) and infra-baton (GaaS sheet). Catalog bytes, npm builds, and DNS stay in realms seed / env deploy. Demo realm stands (Agora, Dominion, Syntropia) live in casals-config/sheets/realms.json, not here.",
+  "$comment": "Realms product sheet. realms seed deploys the UNION of this file and gos-as-a-service/casals.json — never Product-only (Pass 2 would stop GaaS canisters). Fleet file-registry lives only here (not on GaaS Infra). marketplace-frontend is DNS keep-ID (*.realmsgos.org): reinstall on the same principal is OK; do not delete_canister. Everything else: destroy and re-create. No per-stand batons (those belong on realm stands and GaaS infra-baton). Token/NFT backends are ic-tokens v0.1.0; frontends are empty certified-assets canisters. Demo realm stands live in casals-config/sheets/realms.json, not here.",
   "name": "realms-product",
-  "description": "Realms *.realmsgos.org product surface: marketplace and fleet file_registry.",
+  "description": "Realms *.realmsgos.org product surface: marketplace, fleet file_registry, token, nft.",
   "sections": [
     {
       "name": "Product",
-      "description": "Marketplace and file-registry canisters. DNS frontends and the shared file_registry backend are adopted by name.",
+      "description": "Marketplace, fleet file-registry, and token/NFT canisters. DNS frontend is reinstall keep-ID.",
       "stands": [
         {
           "name": "marketplace",
-          "description": "Marketplace backend and landing/marketplace frontend.",
+          "description": "Marketplace backend and landing/marketplace frontend (DNS keep-ID).",
           "canisters": [
             {
               "name": "marketplace-backend",
@@ -29,7 +29,7 @@
         },
         {
           "name": "file-registry",
-          "description": "Fleet file_registry backend (adopt by name) and browse/admin UI.",
+          "description": "Fleet file_registry backend and browse/admin UI (Product-owned; not Casals' own file-registry).",
           "canisters": [
             {
               "name": "file-registry",
@@ -41,6 +41,46 @@
             {
               "name": "file-registry-frontend",
               "wasm_key": "file-registry-assets",
+              "kind": "frontend",
+              "wasm_type": "assets",
+              "teardown_priority": 20
+            }
+          ]
+        },
+        {
+          "name": "token",
+          "description": "ICRC token backend (ic-tokens v0.1.0) and empty certified-assets frontend.",
+          "canisters": [
+            {
+              "name": "token-backend",
+              "wasm_key": "token-backend",
+              "kind": "backend",
+              "wasm_type": "motoko",
+              "teardown_priority": 30
+            },
+            {
+              "name": "token-frontend",
+              "wasm_key": "token-assets",
+              "kind": "frontend",
+              "wasm_type": "assets",
+              "teardown_priority": 20
+            }
+          ]
+        },
+        {
+          "name": "nft",
+          "description": "NFT backend (ic-tokens v0.1.0) and empty certified-assets frontend.",
+          "canisters": [
+            {
+              "name": "nft-backend",
+              "wasm_key": "nft-backend",
+              "kind": "backend",
+              "wasm_type": "motoko",
+              "teardown_priority": 30
+            },
+            {
+              "name": "nft-frontend",
+              "wasm_key": "nft-assets",
               "kind": "frontend",
               "wasm_type": "assets",
               "teardown_priority": 20

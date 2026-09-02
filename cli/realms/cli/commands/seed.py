@@ -1,13 +1,13 @@
 """``realms seed`` — Realms GOS product infrastructure per network.
 
-Deploys the ``*.realmsgos.org`` stack (marketplace + file_registry) and
-publishes the extension/codex catalog. GaaS (``gaas new``) does not own these
-canisters.
+Deploys the ``*.realmsgos.org`` stack (marketplace, fleet file_registry,
+token, nft) and publishes the extension/codex catalog. GaaS (``gaas new``)
+does not own these canisters.
 
-After the product stack is deployed, registers existing canister IDs on the
-GaaS Casals conductor and runs ``casals sheet deploy`` for repo-root
-``casals.json``. The fleet ``file_registry`` backend is on that sheet and
-adopted by name — seed never mints a second registry.
+After the product stack is deployed, registers GaaS + product canister IDs
+on the Casals conductor and runs ``casals sheet deploy`` of the **union** of
+``gos-as-a-service/casals.json`` and repo-root ``casals.json``. Product-only
+deploy is forbidden (Pass 2 would stop installer/registry).
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def seed_command(
         Panel.fit(
             f"🌱 realms seed\n"
             f"Environment: [bold]{env_name}[/bold]  Network: [bold]{network}[/bold]\n"
-            f"Owns marketplace + file_registry + catalog — not the GaaS portal.",
+            f"Owns marketplace + file_registry + token/nft + catalog — not the GaaS portal.",
             style="bold blue",
         )
     )
@@ -99,15 +99,15 @@ def seed_command(
             )
             if deployed:
                 console.print(
-                    f"[green]✓ Product sheet deployed on GaaS Casals[/green] "
+                    f"[green]✓ Union sheet deployed on GaaS Casals[/green] "
                     f"[dim]({detail})[/dim]"
                 )
             else:
                 console.print(
-                    f"[dim]Product Casals sheet skipped: {detail}[/dim]"
+                    f"[dim]Casals union sheet skipped: {detail}[/dim]"
                 )
         except RuntimeError as exc:
-            console.print(f"[yellow]⚠️  Product Casals sheet failed: {exc}[/yellow]")
+            console.print(f"[yellow]⚠️  Casals union sheet failed: {exc}[/yellow]")
     else:
         console.print("[dim]skip product stack (--skip-product)[/dim]")
 

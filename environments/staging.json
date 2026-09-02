@@ -10,6 +10,10 @@
     "file_registry",
     "file_registry_frontend",
     "marketplace_backend",
-    "marketplace_frontend"
+    "marketplace_frontend",
+    "token_backend",
+    "token_frontend",
+    "nft_backend",
+    "nft_frontend"
   ]
 }

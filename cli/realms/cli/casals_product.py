@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import typer
 
@@ -23,6 +24,17 @@ _PRODUCT_REGISTRATIONS: tuple[tuple[str, str, str, str], ...] = (
     ("marketplace", "marketplace-frontend", "marketplace_frontend", "frontend"),
     ("file-registry", "file-registry", "file_registry", "backend"),
     ("file-registry", "file-registry-frontend", "file_registry_frontend", "frontend"),
+    ("token", "token-backend", "token_backend", "backend"),
+    ("token", "token-frontend", "token_frontend", "frontend"),
+    ("nft", "nft-backend", "nft_backend", "backend"),
+    ("nft", "nft-frontend", "nft_frontend", "frontend"),
+)
+
+# GaaS IDs from gos-as-a-service/environments/<env>.json (stand, name, descriptor key, kind)
+_GAAS_REGISTRATIONS: tuple[tuple[str, str, str, str], ...] = (
+    ("installer", "realm-installer", "realm_installer", "backend"),
+    ("realm-registry", "realm-registry-backend", "realm_registry_backend", "backend"),
+    ("realm-registry", "realm-registry-frontend", "realm_registry_frontend", "frontend"),
 )
 
 
@@ -98,6 +110,118 @@ def resolve_conductor_id(
 def product_sheet_path(project_root: Optional[Path] = None) -> Path:
     root = project_root or get_project_root()
     return root / "casals.json"
+
+
+def gaas_sheet_path(project_root: Optional[Path] = None) -> Path:
+    """Locate gos-as-a-service/casals.json (GAAS_SRC / sibling checkout)."""
+    root = (project_root or get_project_root()).resolve()
+    env = (os.environ.get("GAAS_SRC") or os.environ.get("GOS_SRC") or "").strip()
+    if env:
+        candidate = Path(env) / "casals.json"
+        if candidate.is_file():
+            return candidate
+    return root.parent / "gos-as-a-service" / "casals.json"
+
+
+def merge_sheets(gaas: dict, product: dict) -> dict:
+    """Union GaaS + product sheets by section / stand / canister name.
+
+    ``deploy_sheet`` Pass 2 retires every orchestra canister not listed. A
+    Product-only sheet on a conductor that still has GaaS canisters would
+    stop installer / registry / multisig.
+    """
+    merged: dict[str, Any] = copy.deepcopy(
+        {k: v for k, v in gaas.items() if k != "$comment"}
+    )
+    merged["name"] = "gaas-realms-union"
+    merged["description"] = (
+        "Union of gos-as-a-service/casals.json and realms/casals.json"
+    )
+    sections: list[dict] = list(merged.get("sections") or [])
+    by_name = {(sec.get("name") or ""): sec for sec in sections}
+
+    for sec in product.get("sections") or []:
+        sname = (sec.get("name") or "").strip()
+        if not sname:
+            continue
+        if sname not in by_name:
+            cloned = copy.deepcopy(sec)
+            sections.append(cloned)
+            by_name[sname] = cloned
+            continue
+        existing = by_name[sname]
+        stands = list(existing.get("stands") or [])
+        stand_by_name = {(st.get("name") or ""): st for st in stands}
+        for stand in sec.get("stands") or []:
+            dname = (stand.get("name") or "").strip()
+            if not dname:
+                continue
+            if dname not in stand_by_name:
+                cloned_stand = copy.deepcopy(stand)
+                stands.append(cloned_stand)
+                stand_by_name[dname] = cloned_stand
+                continue
+            dest = stand_by_name[dname]
+            canisters = list(dest.get("canisters") or [])
+            can_by_name = {(c.get("name") or ""): c for c in canisters}
+            for canister in stand.get("canisters") or []:
+                cname = (canister.get("name") or "").strip()
+                if not cname:
+                    continue
+                if cname not in can_by_name:
+                    canisters.append(copy.deepcopy(canister))
+                    can_by_name[cname] = canisters[-1]
+            dest["canisters"] = canisters
+        existing["stands"] = stands
+    merged["sections"] = sections
+    return merged
+
+
+def load_union_sheet(project_root: Optional[Path] = None) -> dict:
+    root = project_root or get_project_root()
+    gaas_path = gaas_sheet_path(root)
+    product_path = product_sheet_path(root)
+    if not gaas_path.is_file():
+        raise RuntimeError(
+            f"GaaS sheet missing at {gaas_path} "
+            "(clone ../gos-as-a-service or set GAAS_SRC)"
+        )
+    if not product_path.is_file():
+        raise RuntimeError(f"product sheet missing at {product_path}")
+    try:
+        gaas = json.loads(gaas_path.read_text(encoding="utf-8"))
+        product = json.loads(product_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"invalid Casals sheet JSON: {exc}") from exc
+    return merge_sheets(gaas, product)
+
+
+def load_gos_canisters(
+    env_name: str, project_root: Optional[Path] = None
+) -> Dict[str, str]:
+    root = (project_root or get_project_root()).resolve()
+    env = (os.environ.get("GAAS_SRC") or os.environ.get("GOS_SRC") or "").strip()
+    candidates = []
+    if env:
+        candidates.append(Path(env) / "environments" / f"{env_name}.json")
+    candidates.append(
+        root.parent / "gos-as-a-service" / "environments" / f"{env_name}.json"
+    )
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        canisters = data.get("canisters") or {}
+        if isinstance(canisters, dict):
+            return {
+                str(k): str(v).strip()
+                for k, v in canisters.items()
+                if str(v).strip()
+            }
+    return {}
 
 
 def _run_casals_cli(
@@ -291,17 +415,15 @@ def _already_exists(exc: Exception) -> bool:
     return "already exists" in str(exc).lower()
 
 
-def ensure_product_stands(
+def ensure_sheet_stands(
+    sheet: dict,
     *,
     conductor: str,
     network: str,
     identity: Optional[str],
     casals_src: Path,
-    project_root: Optional[Path] = None,
 ) -> None:
-    """Create Product section and stands from casals.json (idempotent)."""
-    root = project_root or get_project_root()
-    sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))
+    """Create sections and stands from a sheet dict (idempotent)."""
     for sec in sheet.get("sections") or []:
         sname = (sec.get("name") or "").strip()
         if not sname:
@@ -337,6 +459,60 @@ def ensure_product_stands(
                     raise
 
 
+def ensure_product_stands(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    casals_src: Path,
+    project_root: Optional[Path] = None,
+) -> None:
+    """Create Product section and stands from realms/casals.json (idempotent)."""
+    root = project_root or get_project_root()
+    sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))
+    ensure_sheet_stands(
+        sheet,
+        conductor=conductor,
+        network=network,
+        identity=identity,
+        casals_src=casals_src,
+    )
+
+
+def _register_named(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    casals_src: Path,
+    registered: Dict[str, str],
+    stand: str,
+    name: str,
+    cid: str,
+    kind: str,
+) -> None:
+    existing = registered.get(name, "")
+    if existing:
+        if existing == cid:
+            return
+        raise RuntimeError(
+            f"{name} already registered as {existing}, expected {cid}"
+        )
+    wasm_type = "assets" if kind == "frontend" else None
+    run_casals_register(
+        stand,
+        name,
+        cid,
+        kind,
+        network=network,
+        identity=identity,
+        casals_src=casals_src,
+        canister=conductor,
+        wasm_type=wasm_type,
+    )
+    registered[name] = cid
+
+
 def register_product_canisters(
     *,
     conductor: str,
@@ -362,24 +538,61 @@ def register_product_canisters(
                 f"missing {ids_key} canister id for network {network!r} "
                 f"(needed to register {name})"
             )
-        existing = registered.get(name, "")
-        if existing:
-            if existing == cid:
-                continue
-            raise RuntimeError(
-                f"{name} already registered as {existing}, expected {cid}"
-            )
-        wasm_type = "assets" if kind == "frontend" else None
-        run_casals_register(
-            stand,
-            name,
-            cid,
-            kind,
+        _register_named(
+            conductor=conductor,
             network=network,
             identity=identity,
             casals_src=casals_src,
-            canister=conductor,
-            wasm_type=wasm_type,
+            registered=registered,
+            stand=stand,
+            name=name,
+            cid=cid,
+            kind=kind,
+        )
+
+
+def register_gaas_canisters(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    casals_src: Path,
+    env_name: str,
+    project_root: Optional[Path] = None,
+) -> None:
+    """Register existing GaaS canisters so union sheet deploy reinstalls them."""
+    root = project_root or get_project_root()
+    gos = load_gos_canisters(env_name, root)
+    tree = run_casals_tree(
+        network=network,
+        identity=identity,
+        casals_src=casals_src,
+        canister=conductor,
+    )
+    registered = canister_ids_from_tree(tree)
+
+    missing: list[str] = []
+    for stand, name, ids_key, kind in _GAAS_REGISTRATIONS:
+        cid = (gos.get(ids_key) or "").strip()
+        if not cid:
+            missing.append(ids_key)
+            continue
+        _register_named(
+            conductor=conductor,
+            network=network,
+            identity=identity,
+            casals_src=casals_src,
+            registered=registered,
+            stand=stand,
+            name=name,
+            cid=cid,
+            kind=kind,
+        )
+    if missing:
+        raise RuntimeError(
+            "missing GaaS canister ids for union sheet register: "
+            + ", ".join(missing)
+            + f" (gos-as-a-service/environments/{env_name}.json)"
         )
 
 
@@ -390,7 +603,7 @@ def deploy_product_sheet_on_casals(
     identity: Optional[str],
     project_root: Optional[Path] = None,
 ) -> Tuple[bool, str]:
-    """Register product canisters and deploy repo-root casals.json."""
+    """Register GaaS + product canisters and deploy the union sheet."""
     root = project_root or get_project_root()
     conductor = resolve_conductor_id(env_name, root)
     if not conductor:
@@ -400,15 +613,24 @@ def deploy_product_sheet_on_casals(
     if not casals_src:
         return False, "no Casals checkout (set CASALS_SRC or clone ../Casals)"
 
-    sheet = product_sheet_path(root)
-    if not sheet.is_file():
-        return False, f"product sheet missing at {sheet}"
+    try:
+        union = load_union_sheet(root)
+    except RuntimeError as exc:
+        return False, str(exc)
 
-    ensure_product_stands(
+    ensure_sheet_stands(
+        union,
         conductor=conductor,
         network=network,
         identity=identity,
         casals_src=casals_src,
+    )
+    register_gaas_canisters(
+        conductor=conductor,
+        network=network,
+        identity=identity,
+        casals_src=casals_src,
+        env_name=env_name,
         project_root=root,
     )
     register_product_canisters(
@@ -419,10 +641,11 @@ def deploy_product_sheet_on_casals(
         project_root=root,
     )
     run_casals_sheet_deploy(
-        sheet,
+        union,
         network=network,
         identity=identity,
         casals_src=casals_src,
         canister=conductor,
     )
-    return True, f"conductor {conductor}"
+    return True, f"conductor {conductor} (union sheet)"
+

@@ -2,7 +2,8 @@
 
 Deploys the complete product surface for one IC environment (demo / staging /
 test): ``file_registry``, ``file_registry_frontend``, ``marketplace_backend``,
-and ``marketplace_frontend`` (landing + marketplace), wired together and
+``marketplace_frontend`` (landing + marketplace), ``token_backend`` /
+``token_frontend``, and ``nft_backend`` / ``nft_frontend``, wired together and
 prepared for a custom ``*.realmsgos.org`` domain.
 
 Subcommands::
@@ -46,19 +47,32 @@ from ..utils import (
 
 FILE_REGISTRY_FRONTEND = "file_registry_frontend"
 
+TOKEN_BACKEND = "token_backend"
+TOKEN_FRONTEND = "token_frontend"
+NFT_BACKEND = "nft_backend"
+NFT_FRONTEND = "nft_frontend"
+
 PRODUCT_STACK = (
     FILE_REGISTRY,
     FILE_REGISTRY_FRONTEND,
     MARKETPLACE_BACKEND,
     MARKETPLACE_FRONTEND,
+    TOKEN_BACKEND,
+    TOKEN_FRONTEND,
+    NFT_BACKEND,
+    NFT_FRONTEND,
 )
 
 # DNS-mapped ``*.realmsgos.org`` frontend. Destroy recovers cycles from the
-# other three product canisters and leaves this id in place.
+# other product canisters and leaves this id in place.
 PRODUCT_STACK_DESTROY = (
     FILE_REGISTRY,
     FILE_REGISTRY_FRONTEND,
     MARKETPLACE_BACKEND,
+    TOKEN_BACKEND,
+    TOKEN_FRONTEND,
+    NFT_BACKEND,
+    NFT_FRONTEND,
 )
 DNS_PRODUCT_FRONTEND = MARKETPLACE_FRONTEND
 
@@ -810,6 +824,10 @@ def env_deploy_command(
     )
 
     mf_id = _dfx_canister_id(MARKETPLACE_FRONTEND, network) or resolved[MARKETPLACE_FRONTEND]
+
+    console.print(Panel.fit("🪙 Deploying token + nft (ic-tokens v0.1.0)", style="bold blue"))
+    for canister_name in (TOKEN_BACKEND, TOKEN_FRONTEND, NFT_BACKEND, NFT_FRONTEND):
+        _dfx_deploy(canister_name, network, mode, identity, env=dfx_env, logger=logger)
 
     console.print("\n[green]✅ Environment stack deployed successfully![/green]")
     display_canister_urls_json(project_root, network, f"{env_name} product stack")
