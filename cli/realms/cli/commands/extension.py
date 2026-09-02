@@ -729,7 +729,7 @@ _ICP_NETWORK_ALIASES = {"test": "ic", "staging": "ic", "demo": "ic"}
 _ICP_IDENTITY_ALIASES = {"deployer": "my_dev_identity_1"}
 
 
-def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=120):
+def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=120, raise_on_error=True):
     """Run a canister call (via icp when available, else dfx) and return parsed output.
 
     For large candid arguments (≥ 100 KiB) the argument is written to a
@@ -777,7 +777,10 @@ def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         if result.returncode != 0:
-            console.print(f"[red]Error: {result.stderr.strip()}[/red]")
+            err = (result.stderr or result.stdout or "").strip()
+            if not raise_on_error:
+                return err
+            console.print(f"[red]Error: {err}[/red]")
             raise typer.Exit(1)
         return _parse_candid_string(result.stdout)
     except subprocess.TimeoutExpired:
@@ -1385,11 +1388,43 @@ def _upload_one_file(
             network,
             identity,
             timeout=600,
+            raise_on_error=False,
         )
         try:
             res = json.loads(raw)
         except json.JSONDecodeError:
             res = {"raw": raw}
+        missing_step = (
+            "no update method" in str(raw).lower()
+            or "ic0536" in str(raw).lower()
+        )
+        if missing_step:
+            oneshot = json.dumps({
+                "namespace": namespace,
+                "path": registry_path,
+                "sha256": local_sha,
+            })
+            oneshot_arg = '("' + oneshot.replace("\\", "\\\\").replace('"', '\\"') + '")'
+            console.print(
+                f"  [dim]{registry} has no finalize_chunked_file_step; "
+                "using finalize_chunked_file[/dim]"
+            )
+            raw = _dfx_call(
+                registry,
+                "finalize_chunked_file",
+                oneshot_arg,
+                network,
+                identity,
+                timeout=600,
+            )
+            try:
+                res = json.loads(raw)
+            except json.JSONDecodeError:
+                res = {"raw": raw}
+            if isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True):
+                label = "chunked" if total_chunks > 1 else "stored"
+                console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes, {label})")
+                return "uploaded"
         if not (isinstance(res, dict) and res.get("ok") is True):
             console.print(f"  [red]✗[/red] finalize failed for {registry_path}: {res}")
             return "failed"

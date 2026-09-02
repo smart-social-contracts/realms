@@ -72,10 +72,10 @@ def seed_command(
     network = env_config.get("network", env_name)
     rebuild = not skip_product
     phase = (from_phase or "destroy").replace("-", "_")
-    if phase not in ("destroy", "catalog", "env_deploy"):
+    if phase not in ("destroy", "catalog", "env_deploy", "authorize"):
         console.print(
             f"[red]❌ unknown --from-phase {from_phase!r} "
-            "(destroy, catalog, env_deploy)[/red]"
+            "(destroy, catalog, env_deploy, authorize)[/red]"
         )
         raise typer.Exit(1)
 
@@ -138,14 +138,15 @@ def seed_command(
                 console.print(f"[red]❌ casals seed catalog failed: {exc}[/red]")
                 raise typer.Exit(1) from exc
 
-        env_deploy_command(
-            env_name=env_name,
-            mode="auto",
-            identity=identity,
-            yes=yes,
-            skip_frontend_build=skip_frontend_build,
-            with_domain=with_domain,
-        )
+        if phase != "authorize":
+            env_deploy_command(
+                env_name=env_name,
+                mode="auto",
+                identity=identity,
+                yes=yes,
+                skip_frontend_build=skip_frontend_build,
+                with_domain=with_domain,
+            )
 
         try:
             authorize_product_wasms(

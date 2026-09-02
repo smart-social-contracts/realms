@@ -1849,7 +1849,8 @@ def seed(
         "--from",
         help=(
             "Resume after a failed rebuild: catalog (retry Casals catalog "
-            "seed then product deploy) or env_deploy (skip destroy + casals new)."
+            "seed then product deploy), env_deploy (skip destroy + casals new), "
+            "or authorize (skip product deploy too)."
         ),
     ),
 ) -> None:

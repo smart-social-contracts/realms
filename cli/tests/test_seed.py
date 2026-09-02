@@ -252,3 +252,42 @@ def test_seed_from_phase_catalog_skips_destroy(
     mock_env_deploy.assert_called_once()
     mock_authorize.assert_called_once()
     mock_publish.assert_called_once()
+
+
+@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.authorize_product_wasms")
+@patch("realms.cli.commands.seed.rebuild_casals_conductor")
+@patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
+@patch("realms.cli.commands.seed.run_casals_seed_catalog")
+@patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
+@patch("realms.cli.commands.seed.files_publish_branding_command")
+@patch("realms.cli.commands.seed.files_publish_command")
+@patch("realms.cli.commands.seed.env_deploy_command")
+@patch(
+    "realms.cli.commands.seed.load_env_config",
+    return_value={"name": "test", "network": "test"},
+)
+def test_seed_from_phase_authorize_skips_env_deploy(
+    _load,
+    mock_env_deploy,
+    mock_publish,
+    mock_branding,
+    _registry,
+    mock_catalog,
+    mock_destroy,
+    mock_rebuild,
+    mock_authorize,
+    _sheet,
+):
+    seed_command(
+        env_name="test",
+        identity="deployer",
+        yes=True,
+        from_phase="authorize",
+    )
+    mock_destroy.assert_not_called()
+    mock_rebuild.assert_not_called()
+    mock_catalog.assert_not_called()
+    mock_env_deploy.assert_not_called()
+    mock_authorize.assert_called_once()
+    mock_publish.assert_called_once()
