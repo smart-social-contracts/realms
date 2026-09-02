@@ -232,17 +232,16 @@ def _run_casals_cli(
     canister: str,
 ) -> dict:
     env = casals_env(network)
+    # Global flags (--identity, --canister) must precede the subcommand.
     argv: list[str] = [
         sys.executable,
         str(casals_src / "scripts" / "casals.py"),
         "-e",
         env,
-        "--canister",
-        canister,
-        *command,
     ]
     if identity:
         argv.extend(["--identity", identity])
+    argv.extend(["--canister", canister, *command])
 
     result = subprocess.run(
         argv,
@@ -769,17 +768,16 @@ def run_casals_new_fresh(
 ) -> dict:
     """Mint a new Casals conductor. Never pass existing IDs (never upgrade/adopt)."""
     env = casals_env(network)
+    # Global flags (--identity) must precede the subcommand.
     argv: list[str] = [
         sys.executable,
         str(casals_src / "scripts" / "casals.py"),
         "-e",
         env,
-        "new",
-        "-y",
-        "--no-seed",
     ]
     if identity:
         argv.extend(["--identity", identity])
+    argv.extend(["new", "-y", "--no-seed"])
 
     result = subprocess.run(
         argv,

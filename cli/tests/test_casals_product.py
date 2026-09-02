@@ -434,6 +434,7 @@ def test_run_casals_new_fresh_argv_no_ids_file(mock_run, tmp_path: Path):
     assert "-y" in argv
     assert "--no-seed" in argv
     assert "--identity" in argv
+    assert argv.index("--identity") < argv.index("new")
     assert not any(str(arg).endswith(".ids.json") for arg in argv)
     assert mock_run.call_args.kwargs["cwd"] == casals
 
