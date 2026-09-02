@@ -55,5 +55,7 @@ describe('resolveMemberHomeHref', () => {
 			'utf8',
 		);
 		expect(page).toContain('ExtensionRoutePage');
+		const route = readFileSync(join(dir, 'components/ExtensionRoutePage.svelte'), 'utf8');
+		expect(route).toContain('{#key id}');
 	});
 });

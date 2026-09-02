@@ -26,6 +26,51 @@ function meaningfulSearch(params: URLSearchParams): string {
   return copy.toString();
 }
 
+function normalizeEmbeddedPath(pathname: string): string {
+  const path = (pathname || '/').split('?')[0].replace(/\/$/, '');
+  return path || '/';
+}
+
+/** Join / setup carry host-only query (`?ti=`); do not overwrite them on enter. */
+function isHostOnlyQueryPath(pathname: string): boolean {
+  const path = normalizeEmbeddedPath(pathname);
+  return path === '/join' || path === '/setup' || path.startsWith('/join/') || path.startsWith('/setup/');
+}
+
+/**
+ * After a full iframe reload (afterNavigate type `enter`), the portal address
+ * bar can still show the previous route (e.g. /identities, member_dashboard)
+ * while the iframe is already on /messages or another extension. Push when the
+ * host told us its embedded path and it differs — skipping the matched case
+ * preserves host-only query params like `?ti=` on first paint.
+ */
+export function shouldPortalEnterPush(
+  iframePathname: string,
+  hostEmbeddedPath: string | null | undefined,
+): boolean {
+  const iframe = normalizeEmbeddedPath(iframePathname);
+  if (hostEmbeddedPath) {
+    return iframe !== normalizeEmbeddedPath(hostEmbeddedPath);
+  }
+  // Old portal hosts omit `config.realm.path`. Mirror the iframe route after a
+  // full reload so the bar does not stay on Account while Messages is on
+  // screen (same for extension routes). Leave /join and /setup alone — that is
+  // where pushing used to drop `?ti=`.
+  return !isHostOnlyQueryPath(iframe);
+}
+
+/** Strip iframe-only query params before mirroring a path onto the portal bar. */
+export function portalSharePathFromUrl(url: {
+  pathname: string;
+  search?: string;
+  hash?: string;
+}): string {
+  const params = new URLSearchParams(url.search || '');
+  for (const key of IFRAME_ONLY_PARAMS) params.delete(key);
+  const qs = params.toString();
+  return `${url.pathname}${qs ? `?${qs}` : ''}${url.hash || ''}`;
+}
+
 /**
  * Build the in-iframe URL for a portal `nav:sync`, keeping iframe-only query
  * params (`portal=1`, `slug=…`) that the host path does not carry.

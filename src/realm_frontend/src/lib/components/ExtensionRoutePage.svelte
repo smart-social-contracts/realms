@@ -20,5 +20,7 @@
 </script>
 
 {#if id}
-	<ExtensionRuntimeHost extensionId={id} />
+	{#key id}
+		<ExtensionRuntimeHost extensionId={id} />
+	{/key}
 {/if}

@@ -34,11 +34,12 @@ describe('join II-bypass click + ?ti= wiring', () => {
 		expect(auth).toContain('resolvedIndex');
 	});
 
-	it('home redirect and portal enter do not strip ti', () => {
+	it('home redirect and portal enter keep ti unless the iframe path drifted from the host', () => {
 		const home = readSrc('../routes/(sidebar)/+page.svelte');
 		expect(home).toContain('hrefWithPreservedTestIdentityParams');
 		const layout = readSrc('../routes/+layout.svelte');
 		expect(layout).toContain("navigation.type === 'enter'");
-		expect(layout).toContain('return;');
+		expect(layout).toContain('shouldPortalEnterPush');
+		expect(layout).toContain('syncPortalIfHostStale');
 	});
 });

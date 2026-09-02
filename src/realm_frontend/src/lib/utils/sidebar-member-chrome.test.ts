@@ -87,10 +87,16 @@ describe('Sidebar.svelte membership gate', () => {
 	it('does not treat $isAuthenticated as membership for ME', () => {
 		expect(sidebar).toContain('shouldShowMeSection');
 		expect(sidebar).toContain('visibleSidebarCategories');
+		expect(sidebar).toContain('isRealmMember');
 		expect(sidebar).toContain('userProfiles');
 		expect(sidebar).toContain('{#if showMeSection}');
 		expect(sidebar).not.toContain('hasJoined()');
 		expect(sidebar.match(/\{#if showMeSection\}/g)?.length).toBe(2);
+	});
+
+	it('re-expands folds after membership profiles arrive so Import & Export can highlight', () => {
+		expect(sidebar).toContain("isRealmMember($userProfiles) ? 'member' : 'guest'");
+		expect(sidebar).toContain('`${path}${search}|${membership}`');
 	});
 
 	it('keeps the host brain FAB wiring (not chrome cleanup)', () => {

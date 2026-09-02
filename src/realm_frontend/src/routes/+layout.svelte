@@ -8,8 +8,8 @@
 	import '../app.pcss';
 	import { initializeTheme } from '$lib/theme/init';
 	import { restoreAuthSession, resetAuthSessionRestore, getPortalRedirectUrl } from '$lib/auth';
-	import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge.ts';
-	import { resolvePortalNavSyncHref } from '$lib/portal-redirect-path.ts';
+	import { isEmbeddedInPortal, portalNavPush, getPortalHostEmbeddedPath } from '$lib/portal-bridge.ts';
+	import { portalSharePathFromUrl, resolvePortalNavSyncHref, shouldPortalEnterPush } from '$lib/portal-redirect-path.ts';
 	import { dismissAppSplash } from '$lib/app-splash';
 	import SetupStageGate from '$lib/components/SetupStageGate.svelte';
 	import BridgeModalHost from '$lib/components/BridgeModalHost.svelte';
@@ -31,6 +31,16 @@
 		});
 	}
 
+	function pushPortalShare(url, { replace }) {
+		portalNavPush(portalSharePathFromUrl(url), { replace });
+	}
+
+	function syncPortalIfHostStale(url) {
+		if (!browser || !isEmbeddedInPortal() || !url) return;
+		if (!shouldPortalEnterPush(url.pathname, getPortalHostEmbeddedPath())) return;
+		pushPortalShare(url, { replace: true });
+	}
+
 	// Mirror every in-realm navigation onto the portal address bar so shared
 	// links and hard-refresh keep the current extension/path
 	// (`/r/<slug>/extensions/justice_litigation`, …).
@@ -39,21 +49,15 @@
 		const url = navigation.to?.url;
 		if (!url) return;
 		// Initial enter: the host already has the user-facing URL (including
-		// `?ti=` / `skip_ii` / `test_mode`). Pushing the iframe path here used
-		// to replace `/join?ti=1` with `/join` when the embed src omitted them.
-		if (navigation.type === 'enter') return;
-		// Drop iframe-only query params (portal=1, slug=…) — those belong on
-		// the iframe src, not the shareable portal URL. Keep other search
-		// params (e.g. invite codes, ti) and the hash.
-		const params = new URLSearchParams(url.search);
-		params.delete('portal');
-		params.delete('slug');
-		const qs = params.toString();
-		const path = `${url.pathname}${qs ? `?${qs}` : ''}${url.hash}`;
-		// Real link clicks push a history entry; programmatic goto / initial
-		// enter replace so auth redirects don't trap the back button on /join.
-		const replace = navigation.type !== 'link';
-		portalNavPush(path, { replace });
+		// `?ti=` / `skip_ii` / `test_mode`). Pushing when paths already match
+		// used to replace `/join?ti=1` with `/join` when the embed src omitted
+		// them. A *full iframe reload* (sidebar click before hydration) leaves
+		// the host bar stale — e.g. /identities while Messages is on screen.
+		if (navigation.type === 'enter') {
+			syncPortalIfHostStale(url);
+			return;
+		}
+		pushPortalShare(url, { replace: navigation.type !== 'link' });
 	});
 
 	onMount(async () => {
@@ -95,14 +99,19 @@
 				if (!next) return;
 				void goto(next, { replaceState: true, noScroll: true });
 			};
+			const onPortalConfig = () => {
+				syncPortalIfHostStale(window.location);
+			};
 			window.addEventListener('portal:auth', onPortalAuth);
 			window.addEventListener('portal:nav-sync', onPortalNavSync);
+			window.addEventListener('portal:config', onPortalConfig);
 			void restoreAuthSession();
 			const prevDispose = bridgeDispose;
 			bridgeDispose = () => {
 				prevDispose?.();
 				window.removeEventListener('portal:auth', onPortalAuth);
 				window.removeEventListener('portal:nav-sync', onPortalNavSync);
+				window.removeEventListener('portal:config', onPortalConfig);
 			};
 		}
 

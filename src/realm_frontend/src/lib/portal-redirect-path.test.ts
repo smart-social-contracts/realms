@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   normalizePortalRedirectPath,
+  portalSharePathFromUrl,
   resolvePortalNavSyncHref,
+  shouldPortalEnterPush,
 } from './portal-redirect-path';
 
 describe('normalizePortalRedirectPath', () => {
@@ -78,5 +80,63 @@ describe('resolvePortalNavSyncHref', () => {
         '/extensions/public_dashboard',
       ),
     ).toBe('/extensions/public_dashboard?portal=1&slug=x&ti=1&skip_ii=true&test_mode=true');
+  });
+});
+
+describe('shouldPortalEnterPush', () => {
+  it('does not push /join when the host has not reported a path (keeps ?ti=)', () => {
+    expect(shouldPortalEnterPush('/join', null)).toBe(false);
+    expect(shouldPortalEnterPush('/join', undefined)).toBe(false);
+    expect(shouldPortalEnterPush('/setup', '')).toBe(false);
+  });
+
+  it('pushes extension and ME chrome routes when the host has not reported a path (old portal)', () => {
+    expect(shouldPortalEnterPush('/extensions/import_export', null)).toBe(true);
+    expect(shouldPortalEnterPush('/extensions/member_dashboard', undefined)).toBe(true);
+    expect(shouldPortalEnterPush('/messages', null)).toBe(true);
+    expect(shouldPortalEnterPush('/identities', undefined)).toBe(true);
+    expect(shouldPortalEnterPush('/settings', '')).toBe(true);
+  });
+
+  it('does not push when iframe and host already agree (keeps ?ti= on first paint)', () => {
+    expect(
+      shouldPortalEnterPush('/extensions/member_dashboard', '/extensions/member_dashboard'),
+    ).toBe(false);
+    expect(shouldPortalEnterPush('/extensions/member_dashboard/', '/extensions/member_dashboard')).toBe(
+      false,
+    );
+  });
+
+  it('pushes when a full iframe reload landed on a different extension than the host bar', () => {
+    expect(
+      shouldPortalEnterPush('/extensions/import_export', '/extensions/member_dashboard'),
+    ).toBe(true);
+  });
+
+  it('pushes when Messages is on screen but the host bar is still Account', () => {
+    expect(shouldPortalEnterPush('/messages', '/identities')).toBe(true);
+    expect(shouldPortalEnterPush('/identities', '/messages')).toBe(true);
+  });
+});
+
+describe('portalSharePathFromUrl', () => {
+  it('drops iframe-only portal/slug params and keeps the extension path', () => {
+    expect(
+      portalSharePathFromUrl({
+        pathname: '/extensions/import_export',
+        search: '?portal=1&slug=initargdemo',
+        hash: '',
+      }),
+    ).toBe('/extensions/import_export');
+  });
+
+  it('keeps test-identity query params', () => {
+    expect(
+      portalSharePathFromUrl({
+        pathname: '/extensions/import_export',
+        search: '?portal=1&slug=x&ti=1',
+        hash: '',
+      }),
+    ).toBe('/extensions/import_export?ti=1');
   });
 });

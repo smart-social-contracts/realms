@@ -6,7 +6,15 @@ import { DelegationIdentity, DelegationChain, Ed25519KeyIdentity } from '@dfinit
 const BRIDGE_VERSION = '1';
 const PORTAL_SESSION_KEY = 'realms:portal-embed';
 let port: MessagePort | null = null;
-let portalConfig: { slug?: string; backendCanisterId?: string; frontendCanisterId?: string; env?: string } | null = null;
+let portalConfig: {
+  slug?: string;
+  backendCanisterId?: string;
+  frontendCanisterId?: string;
+  env?: string;
+  path?: string;
+} | null = null;
+/** Last embedded path the portal host reported (`/extensions/…`, `/join`, …). */
+let portalHostEmbeddedPath: string | null = null;
 let pendingDelegationRequest = false;
 let pendingNavPush: { path: string; replace: boolean } | null = null;
 let pendingFocusPush: { source: string; uri: string; label?: string } | null | undefined = undefined;
@@ -63,6 +71,11 @@ function onPortMessage(event: MessageEvent) {
   switch (msg.type) {
     case 'config:realm':
       portalConfig = msg.payload || null;
+      portalHostEmbeddedPath =
+        typeof portalConfig?.path === 'string' && portalConfig.path
+          ? portalConfig.path
+          : null;
+      window.dispatchEvent(new CustomEvent('portal:config', { detail: portalConfig }));
       break;
     case 'auth:delegation':
       applyDelegation(msg.payload).catch((e) => {
@@ -92,6 +105,9 @@ function onPortMessage(event: MessageEvent) {
       break;
     case 'nav:sync': {
       const path = msg.payload?.path || '/';
+      if (typeof path === 'string' && path) {
+        portalHostEmbeddedPath = path;
+      }
       window.dispatchEvent(new CustomEvent('portal:nav-sync', { detail: { path } }));
       break;
     }
@@ -175,6 +191,10 @@ export function getPortalDelegationIdentity() {
 
 export function getPortalConfig() {
   return portalConfig;
+}
+
+export function getPortalHostEmbeddedPath(): string | null {
+  return portalHostEmbeddedPath;
 }
 
 export function isEmbeddedInPortal() {

@@ -11,7 +11,7 @@
 	import { sidebarConfig, sidebarLoading, loadSidebar } from '$lib/stores/sidebar';
 	import { profilesLoading, userProfiles } from '$lib/stores/profiles';
 	import { isAuthenticated } from '$lib/stores/auth';
-	import { shouldShowMeSection, visibleSidebarCategories } from '$lib/utils/sidebar-member-chrome';
+	import { shouldShowMeSection, visibleSidebarCategories, isRealmMember } from '$lib/utils/sidebar-member-chrome';
 	import { unreadCount } from '$lib/stores/notifications';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
 	import { isNavItemActive } from '$lib/utils/breadcrumb';
@@ -233,12 +233,13 @@
 	$: if ($sidebarConfig && $isAuthenticated && $page.url.pathname && !userHasToggledFolds) {
 		const path = $page.url.pathname;
 		const search = $page.url.search;
+		const membership = isRealmMember($userProfiles) ? 'member' : 'guest';
 		const hasItems =
 			($sidebarConfig.welcomeItems?.length || 0) +
 				($sidebarConfig.categories?.length || 0) +
 				($sidebarConfig.mundusItems?.length || 0) >
 			0;
-		const key = `${path}${search}`;
+		const key = `${path}${search}|${membership}`;
 		if (hasItems && lastFoldExpandKey !== key) {
 			expandForActivePage($sidebarConfig, path, search);
 			lastFoldExpandKey = key;
