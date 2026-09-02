@@ -49,6 +49,7 @@ def test_seed_always_destroys_casals_then_product_and_catalog(
 ):
     seed_command(env_name="demo", identity="deployer", yes=True)
     mock_destroy.assert_called_once()
+    assert mock_destroy.call_args.kwargs["env_name"] == "demo"
     mock_rebuild.assert_called_once()
     assert mock_rebuild.call_args.kwargs["env_name"] == "demo"
     mock_authorize.assert_called_once()

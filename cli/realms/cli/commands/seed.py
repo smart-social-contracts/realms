@@ -90,6 +90,7 @@ def seed_command(
             project_root=project_root,
             identity=identity,
             yes=yes,
+            env_name=env_name,
         )
         try:
             rebuild_casals_conductor(

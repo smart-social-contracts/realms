@@ -25,7 +25,7 @@ A full platform rebuild is **`gaas new` then `realms seed`**. Seed **destroys Ca
 | Sheet deploy | `gaas new` deploys `gos-as-a-service/casals.json`. `realms seed` deploys the **union** with `realms/casals.json` (must not send Product-only). |
 | Token/NFT catalog | Authorize [ic-tokens v0.1.0](https://github.com/smart-social-contracts/ic-tokens/releases/tag/v0.1.0) backends plus certified-assets for the frontends. No new GitHub release required. |
 
-**Always destructive:** `realms seed --env test --yes` destroys the Casals stack, runs `casals new -y --no-seed`, seeds the Casals catalog, recreates product canisters (DNS keep-ID for `marketplace-frontend`), authorizes union-sheet WASMs (installer, registry, marketplace, fleet file-registry, token, nft) into **Casals'** file-registry, then deploys the union sheet. `--skip-product` is catalog-only and does not destroy. `gaas new` still needs `--destroy-except-realm-registry-frontend` for the GaaS orchestra wipe.
+**Always destructive:** `realms seed --env test --yes` destroys the Casals stack, runs `casals new -y --no-seed`, seeds the Casals catalog, recreates product canisters (DNS keep-ID for `marketplace-frontend`), authorizes union-sheet WASMs (installer, registry, marketplace, fleet file-registry, token, nft) into **Casals'** file-registry, then deploys the union sheet. Product destroy also deletes fleet IDs written by `gaas new` (file-registry, marketplace backend) so those canisters are not orphaned. `--skip-product` is catalog-only and does not destroy. `gaas new` still needs `--destroy-except-realm-registry-frontend` for the GaaS orchestra wipe.
 
 ---
 
@@ -98,7 +98,7 @@ A full platform rebuild is **`gaas new` then `realms seed`**. Seed **destroys Ca
 
 ### Steps
 
-1. **Destroy except `marketplace-frontend`** — sweep cycles, delete the Casals stack, fleet file-registry (backend + frontend), marketplace backend, token backend/frontend, nft backend/frontend. Leave the DNS frontend ID.
+1. **Destroy except `marketplace-frontend`** — sweep cycles, delete the Casals stack, fleet file-registry (backend + frontend), marketplace backend, token backend/frontend, nft backend/frontend. Also deletes those product IDs from the GaaS descriptor when they differ from `canister_ids.json` (so a sequential `gaas new` then `realms seed` does not leave the just-created fleet canisters behind). Leave the DNS frontend ID.
 2. **`casals new`** — always mint a new conductor (never adopt). Invoked as `casals new -y --no-seed` so Casals’ default sheet is not deployed before the union sheet. Then `scripts/seed.py` (catalog only, no `--deploy`) authorizes orchestration templates.
 3. **Create** new principals for fleet file-registry, file-registry frontend, marketplace backend, token backend/frontend, nft backend/frontend. **Adopt** `marketplace-frontend`.
 4. **dfx install (reinstall)** those product canisters. Token/NFT backends from ic-tokens v0.1.0; frontends are certified-assets.

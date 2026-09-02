@@ -30,6 +30,8 @@ def _make_casals_checkout(tmp_path: Path) -> Path:
 
 def test_resolve_conductor_from_gos_descriptor(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("CASALS_BACKEND", raising=False)
+    monkeypatch.delenv("GAAS_SRC", raising=False)
+    monkeypatch.delenv("GOS_SRC", raising=False)
     realms = tmp_path / "realms"
     realms.mkdir()
     (realms / "environments").mkdir()
@@ -49,6 +51,8 @@ def test_resolve_conductor_from_gos_descriptor(tmp_path: Path, monkeypatch):
 
 def test_resolve_conductor_from_env_var(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("CASALS_BACKEND", raising=False)
+    monkeypatch.delenv("GAAS_SRC", raising=False)
+    monkeypatch.delenv("GOS_SRC", raising=False)
     realms = tmp_path / "realms"
     realms.mkdir()
     (realms / "environments").mkdir()
@@ -142,6 +146,8 @@ def test_seed_skips_sheet_deploy_when_skip_product(
 
 def test_deploy_product_sheet_missing_conductor(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("CASALS_BACKEND", raising=False)
+    monkeypatch.delenv("GAAS_SRC", raising=False)
+    monkeypatch.delenv("GOS_SRC", raising=False)
     realms = tmp_path / "realms"
     realms.mkdir()
     (realms / "environments").mkdir()

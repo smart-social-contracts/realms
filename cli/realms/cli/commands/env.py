@@ -250,31 +250,57 @@ def destroy_product_stack_except_frontend(
     identity: Optional[str] = None,
     yes: bool = False,
     logger=None,
+    env_name: Optional[str] = None,
 ) -> Dict[str, List[str]]:
     """Drain-destroy product canisters except the ``*.realmsgos.org`` frontend.
 
     Recovers cycles into the caller's cycles-ledger account, then removes the
     destroyed ids from ``canister_ids.json`` so the next deploy mints replacements.
-    Does not touch GaaS (``gaas new``) canisters.
+    Does not touch installer / realm-registry. After ``gaas new``, also deletes
+    fleet product IDs recorded in the GaaS descriptor (file_registry, marketplace
+    backend, …) so seed does not orphan the stack ``gaas new`` just created.
     """
-    keep_id = _product_canister_id(DNS_PRODUCT_FRONTEND, network, project_root) or ""
-    if keep_id and _is_canister_dead(keep_id, network):
-        console.print(
-            f"[red]⚠️  {DNS_PRODUCT_FRONTEND} {keep_id} is not live on {network}. "
-            "It will be recreated with a NEW id and the *.realmsgos.org DNS "
-            "mapping will break until re-registered.[/red]"
-        )
-    targets: List[tuple[str, str]] = []
-    for name in PRODUCT_STACK_DESTROY:
-        cid = (_product_canister_id(name, network, project_root) or "").strip()
-        if not cid:
-            continue
-        if keep_id and cid == keep_id:
+    gos: Dict[str, str] = {}
+    if env_name:
+        from ..casals_product import load_gos_canisters
+
+        gos = load_gos_canisters(env_name, project_root)
+
+    keep_ids: List[str] = []
+    for cid in (
+        (_product_canister_id(DNS_PRODUCT_FRONTEND, network, project_root) or "").strip(),
+        (gos.get(DNS_PRODUCT_FRONTEND) or "").strip(),
+    ):
+        if cid and cid not in keep_ids:
+            keep_ids.append(cid)
+    keep_id = keep_ids[0] if keep_ids else ""
+    for cid in keep_ids:
+        if _is_canister_dead(cid, network):
             console.print(
-                f"[yellow]Refusing to destroy DNS frontend {name} ({cid})[/yellow]"
+                f"[red]⚠️  {DNS_PRODUCT_FRONTEND} {cid} is not live on {network}. "
+                "It will be recreated with a NEW id and the *.realmsgos.org DNS "
+                "mapping will break until re-registered.[/red]"
             )
-            continue
-        targets.append((name, cid))
+    targets: List[tuple[str, str]] = []
+    seen: set[str] = set(keep_ids)
+    for name in PRODUCT_STACK_DESTROY:
+        cids: List[str] = []
+        primary = (_product_canister_id(name, network, project_root) or "").strip()
+        if primary:
+            cids.append(primary)
+        extra = (gos.get(name) or "").strip()
+        if extra and extra not in cids:
+            cids.append(extra)
+        for cid in cids:
+            if cid in keep_ids:
+                console.print(
+                    f"[yellow]Refusing to destroy DNS frontend {name} ({cid})[/yellow]"
+                )
+                continue
+            if cid in seen:
+                continue
+            seen.add(cid)
+            targets.append((name, cid))
 
     if not targets:
         console.print("[dim]No product canisters to destroy (except marketplace_frontend).[/dim]")

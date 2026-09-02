@@ -237,3 +237,44 @@ class TestDestroyProductStack:
         mock_delete.assert_not_called()
         leftover = _read_canister_ids(tmp_path)
         assert leftover["marketplace_frontend"]["demo"] == same
+
+    def test_also_destroys_gaas_descriptor_product_ids(self, tmp_path):
+        ids = {
+            "file_registry": {"test": "old-file-registry"},
+            "marketplace_frontend": {"test": "keep-frontend"},
+        }
+        (tmp_path / "canister_ids.json").write_text(json.dumps(ids), encoding="utf-8")
+        gos = {
+            "file_registry": "gaas-file-registry",
+            "marketplace_backend": "gaas-marketplace-backend",
+            "marketplace_frontend": "keep-frontend",
+        }
+        with patch(
+            "realms.cli.commands.env._dfx_canister_id",
+            side_effect=lambda name, network: (ids.get(name) or {}).get("test"),
+        ), patch(
+            "realms.cli.commands.env._is_canister_dead", return_value=False
+        ), patch(
+            "realms.cli.commands.env._delete_canister_recover_cycles"
+        ) as mock_delete, patch(
+            "realms.cli.casals_product.load_gos_canisters",
+            return_value=gos,
+        ):
+            result = destroy_product_stack_except_frontend(
+                network="test",
+                project_root=tmp_path,
+                identity="deployer",
+                yes=True,
+                env_name="test",
+            )
+        deleted = {call.args[0] for call in mock_delete.call_args_list}
+        assert deleted == {
+            "old-file-registry",
+            "gaas-file-registry",
+            "gaas-marketplace-backend",
+        }
+        assert "keep-frontend" not in deleted
+        leftover = _read_canister_ids(tmp_path)
+        assert leftover["marketplace_frontend"]["test"] == "keep-frontend"
+        assert "file_registry" not in leftover
+        assert result["kept"] == ["keep-frontend"]
