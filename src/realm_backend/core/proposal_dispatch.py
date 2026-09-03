@@ -299,6 +299,8 @@ def _json_ok(raw: Any) -> Tuple[bool, str, str]:
             return False, str(raw)[:300], "install_failed"
     if not isinstance(parsed, dict):
         return False, str(parsed)[:300], "install_failed"
+    if parsed.get("status") == "in_progress":
+        return False, "codex install still in progress", "install_in_progress"
     if parsed.get("success") is False or parsed.get("error"):
         return (
             False,

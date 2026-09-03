@@ -170,10 +170,29 @@ export async function pollUntilCodexInstalled(
 	intervalMs = CODEX_INSTALL_POLL_MS
 ): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
+	const actor = await getActor();
 	while (Date.now() < deadline) {
 		const state = await fetchSetupState();
-		if (state.codex?.package === packageName && state.codex?.version === version) {
+		if (state.codex?.package === packageName && (!version || state.codex?.version === version)) {
 			return;
+		}
+		const { settled, result: raw, error: callError } = await raceWithGrace(
+			actor.setup_install_codex(JSON.stringify({ package: packageName, version })),
+			Math.min(intervalMs, RAW_INSTALL_CALL_GRACE_MS)
+		);
+		if (settled) {
+			if (callError !== undefined && !isAmbiguousInstallError(callError)) {
+				throw callError;
+			}
+			if (raw !== undefined) {
+				const parsed = parseJson<SetupActionResult>(raw);
+				if (!parsed.success) {
+					throw new Error(parsed.error || 'Codex install failed');
+				}
+				if (parsed.setup_codex?.package === packageName) {
+					return;
+				}
+			}
 		}
 		await sleep(intervalMs);
 	}

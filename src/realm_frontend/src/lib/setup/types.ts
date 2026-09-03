@@ -95,6 +95,8 @@ export interface SetupActionResult {
 	success: boolean;
 	error?: string;
 	resolved_version?: string;
+	status?: string;
+	setup_codex?: { package?: string; version?: string } | null;
 	token?: { token_canister_id?: string; symbol?: string } | null;
 }
 

@@ -475,6 +475,12 @@ def _launch_phase_install_codex(realm, draft: dict) -> Async[dict]:
     if not result.get("success"):
         return result
 
+    if result.get("status") == "in_progress":
+        return result
+
+    if result.get("status") != "complete":
+        return {"success": False, "error": "Unexpected install response"}
+
     resolved_version = (result.get("version") or version or "").strip()
     codex_record: Dict[str, Any] = {"package": package, "version": resolved_version}
     if isinstance(extra_params, dict) and extra_params:
@@ -970,7 +976,18 @@ def setup_install_codex(args_json: str) -> Async[str]:
         already.update(list_cdx())
     except Exception:
         pass
-    if package in already:
+    job_state = {}
+    try:
+        raw_job = getattr(realm, "codex_install_state", "") or ""
+        if raw_job:
+            parsed_job = json.loads(raw_job)
+            if isinstance(parsed_job, dict):
+                job_state = parsed_job
+    except (json.JSONDecodeError, TypeError):
+        job_state = {}
+    job_in_progress = (job_state.get("ext_id") or "").strip() == package
+
+    if package in already and not job_in_progress:
         resolved_version = (version or "installed").strip()
         extra_params = params.get("params")
         codex_record: Dict[str, Any] = {
@@ -1013,6 +1030,13 @@ def setup_install_codex(args_json: str) -> Async[str]:
     if not result.get("success"):
         return json.dumps(result)
 
+    if result.get("status") == "in_progress":
+        return json.dumps(result)
+
+    resolved_version = (result.get("version") or version or "").strip()
+    if result.get("status") != "complete":
+        return json.dumps(result)
+
     from api.file_registry import run_codex_init as _run_init
     from _cdk import ic as _ic
 
@@ -1021,7 +1045,6 @@ def setup_install_codex(args_json: str) -> Async[str]:
 
     _ic.set_timer(1, _run_init_later)
 
-    resolved_version = (result.get("version") or version or "").strip()
     codex_record: Dict[str, Any] = {
         "package": package,
         "version": resolved_version,

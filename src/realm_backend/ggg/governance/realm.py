@@ -16,7 +16,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 9
+    __version__ = 10
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -45,6 +45,8 @@ class Realm(Entity, TimestampedMixin):
             from core.demo_notice import seed_host_flag_defaults
 
             seed_host_flag_defaults(obj)
+        if from_version < 10:
+            obj.setdefault("codex_install_state", "")
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.SETUP)
@@ -86,6 +88,8 @@ class Realm(Entity, TimestampedMixin):
     # ballot cannot clobber or be clobbered by bootstrap_state, and re-seeding
     # the sync task does not reset the first-boot plan.
     sync_state = String(max_length=8192, default="")
+    # Codex install job cursor (multi-message IC0522-safe install).
+    codex_install_state = String(max_length=8192, default="")
     # Canister id of the realm_installer broker used to provision new quarters
     # via Casals. Empty => auto-scale records intent but cannot self-provision.
     installer_canister_id = String(max_length=64, default="")

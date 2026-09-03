@@ -688,6 +688,15 @@ def advance_bootstrap():
     try:
         try:
             result = yield from _install_item(state, item)
+            if isinstance(result, dict) and result.get("status") == "in_progress":
+                return {
+                    "success": True,
+                    "status": "in_progress",
+                    "phase": result.get("phase"),
+                    "item": item.get("id"),
+                    "done": result.get("done"),
+                    "total": result.get("total"),
+                }
             ok = not (isinstance(result, dict) and result.get("success") is False)
         except Exception as e:
             logger.error(f"advance_bootstrap install of {item.get('id')} failed: {e}")

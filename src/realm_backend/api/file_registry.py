@@ -815,6 +815,32 @@ def install_extension_from_registry(
 
     registry = FileRegistryService(Principal.from_str(registry_canister_id))
 
+    # Route codex packages through the multi-message install job (IC0522).
+    try:
+        manifest_res: CallResult = yield registry.get_extension_manifest(
+            json.dumps({"ext_id": ext_id, "version": version or None})
+        )
+        peek = json.loads(_unwrap_call_result(manifest_res))
+        if isinstance(peek, dict) and peek.get("kind") == "codex" and not peek.get("error"):
+            from core.codex_install_job import continue_codex_install
+
+            return (
+                yield from continue_codex_install(
+                    registry_canister_id,
+                    ext_id,
+                    version,
+                    frontend_canister_id,
+                    install_dependencies,
+                    owner,
+                    run_init,
+                    "ext",
+                )
+            )
+    except Exception as peek_err:
+        logger.info(
+            f"Extension '{ext_id}': manifest peek for codex routing failed ({peek_err})"
+        )
+
     raw_files, resolved_version, err = yield from _pull_extension_backend_files(
         registry, "ext", ext_id, version or ""
     )
@@ -1083,168 +1109,25 @@ def install_codex_from_registry(
     frontend_canister_id: str = None,
     install_dependencies: bool = True,
 ) -> Async[str]:
-    """Install a codex, preferring the unified extension pipeline (issue #244).
-
-    Resolution order:
-      1. ``ext/<id>/<ver>`` — the codex published as a ``kind: codex``
-         extension package; installed via install_extension_from_registry
-         (dependency resolution, singleton check, init hook).
-      2. ``codex/<id>/<ver>`` — legacy codex namespace (deprecated; kept as
-         a read fallback for one release).
-
-    Args:
-        registry_canister_id: Canister ID of the file registry
-        codex_id: Codex identifier (e.g. "syntropia")
-        version: Specific version or None for latest
-        run_init: Whether to run init after install (legacy path only —
-            the unified path always runs the init hook)
-        frontend_canister_id: Frontend asset canister for same-origin UI bundles
-            (overrides the realm's configured frontend_canister_id)
-
-    Returns (via yield):
-        JSON string with result
-    """
+    """Install a codex via the realm-owned multi-message install job."""
     logger.info(
         f"Installing codex '{codex_id}' (version={version or 'latest'}) "
-        f"from registry {registry_canister_id} — trying unified ext/ namespace first"
+        f"from registry {registry_canister_id}"
     )
+    from core.codex_install_job import continue_codex_install
 
-    frontend_id = (
-        (frontend_canister_id or "").strip()
-        or _get_realm_frontend_canister_id()
-        or None
-    )
-    unified_raw = yield from install_extension_from_registry(
-        registry_canister_id,
-        codex_id,
-        version,
-        frontend_canister_id=frontend_id,
-        install_dependencies=install_dependencies,
-        run_init=run_init,
-    )
-    try:
-        unified = json.loads(unified_raw)
-    except (json.JSONDecodeError, TypeError):
-        unified = {"success": False}
-    if unified.get("success"):
-        return unified_raw
-    unified_error = str(unified.get("error") or "")
-    missing = (
-        "No published version" in unified_error
-        or "not found" in unified_error.lower()
-        or "no versions found" in unified_error.lower()
-    )
-    if not missing:
-        # The package exists under ext/ but failed for a real reason
-        # (singleton conflict, unsupported API version, load failure) —
-        # surface that instead of silently installing a stale legacy copy.
-        return unified_raw
-
-    logger.info(
-        f"Codex '{codex_id}' not found under ext/ ({unified_error}); "
-        f"falling back to legacy codex/ namespace"
-    )
-
-    registry = FileRegistryService(Principal.from_str(registry_canister_id))
-
-    files, resolved_version, err = yield from _pull_extension_backend_files(
-        registry, "codex", codex_id, version or ""
-    )
-    if err:
-        err_obj = json.loads(err)
-        return json.dumps({"success": False, "error": err_obj.get("error", err)})
-
-    if not files:
-        return json.dumps(
-            {"success": False, "error": f"No files found for codex '{codex_id}'"}
+    return (
+        yield from continue_codex_install(
+            registry_canister_id,
+            codex_id,
+            version,
+            frontend_canister_id,
+            install_dependencies,
+            None,
+            run_init,
+            "auto",
         )
-
-    logger.info(f"Got {len(files)} files from registry (version {resolved_version})")
-
-    # Use codex_id as the package name (last component for nested ids like "syntropia/membership")
-    package_name = codex_id.split("/")[-1] if "/" in codex_id else codex_id
-
-    # Singleton (issue #244): exactly one codex per realm, legacy path included.
-    from core import codex_hooks
-
-    conflict = codex_hooks.singleton_violation(package_name)
-    if conflict:
-        return json.dumps({"success": False, "error": conflict})
-
-    # Dependency resolution (issues #241, #242): install missing dependency
-    # extensions *before* the package init runs, so init can rely on them
-    # (and the realm is never left with a half-working codex).
-    try:
-        codex_manifest = json.loads(files.get("manifest.json", "{}"))
-        if not isinstance(codex_manifest, dict):
-            codex_manifest = {}
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.error(
-            f"Codex '{codex_id}': unreadable manifest.json, skipping dependency check: {e}"
-        )
-        codex_manifest = {}
-
-    override_error = _entity_method_override_error(codex_id, codex_manifest)
-    if override_error:
-        return json.dumps({"success": False, "error": override_error})
-
-    from core.runtime_codex import legacy_init_py_error
-
-    init_py_error = legacy_init_py_error(codex_id, files)
-    if init_py_error:
-        return json.dumps({"success": False, "error": init_py_error})
-
-    dependencies = []
-    installed_deps = []
-    failed_deps = []
-    if install_dependencies:
-        dependencies = _resolve_codex_dependencies(codex_manifest, codex_id)
-        installed_deps, failed_deps = yield from _install_codex_dependencies(
-            registry_canister_id, codex_id, dependencies, frontend_id
-        )
-        if failed_deps:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": _format_failed_deps(codex_id, failed_deps),
-                    "dependency_warnings": failed_deps,
-                }
-            )
-
-    # Install via runtime_codex. Legacy init.py is refused above; the unified
-    # path runs ``codex_hooks.run_init`` instead. ``run_init`` is kept in the
-    # signature for callers but is a no-op here (issue #265).
-    from core.runtime_codex import install_codex_package
-
-    ok = install_codex_package(package_name, files)
-    if not ok:
-        return json.dumps(
-            {
-                "success": False,
-                "error": f"Failed to install codex package '{package_name}'",
-            }
-        )
-
-    # Legacy catalog pull keeps backend/modules/*.py unflattened. Seed
-    # those stems the same way the unified ext/ path does after flatten.
-    seeded_modules = _seed_codex_module_entities(
-        package_name, files, codex_manifest
     )
-
-    result = {
-        "success": True,
-        "codex_id": codex_id,
-        "package_name": package_name,
-        "version": resolved_version,
-        "files_count": len(files),
-        "source": "registry",
-        "dependencies": dependencies,
-        "dependencies_installed": installed_deps,
-        "codex_modules": seeded_modules,
-    }
-    if failed_deps:
-        result["dependency_warnings"] = failed_deps
-    return json.dumps(result)
 
 
 def run_codex_init(codex_id: str) -> str:
