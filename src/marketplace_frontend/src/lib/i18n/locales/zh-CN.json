@@ -456,6 +456,54 @@
         "button": "阅读文档"
       }
     },
+    "explainer": {
+      "greeting": "我是 Ashoka。告诉我你是谁、需要什么——我会据此解释 Realms GOS。",
+      "askGoal": "你想先搞懂什么？",
+      "placeholder": "询问 Realms…",
+      "send": "发送",
+      "aria": "Ashoka，Realms GOS 助手",
+      "noResponse": "Ashoka 没有回复。请稍后再试。",
+      "error": "Ashoka 暂时不可用。请稍后再试。",
+      "waking": "正在唤醒 Ashoka…",
+      "suggestions": {
+        "gos": "什么是 Realms GOS？",
+        "ssc": "什么是 Smart Social Contracts？",
+        "who": "这适合谁？",
+        "try": "如何试用演示？"
+      },
+      "writtenOverview": "文字概览",
+      "sscExtra": "智能社会契约就是这一转变：社区把共同生活的规则写成可执行的约定，公开运行，并一起演进——而不是把每项公共服务都交给不透明的官僚体系。",
+      "unknown": "我只根据 Realms 实际是什么来回答。可以问身份、运作方式、智能社会契约、演示，或它为谁而建。",
+      "roles": {
+        "resident": "居民或公民",
+        "official": "公职人员",
+        "developer": "开发者",
+        "organization": "NGO 或组织",
+        "curious": "只是好奇"
+      },
+      "topics": {
+        "what": "Realms 是什么",
+        "ssc": "智能社会契约",
+        "principles": "四项原则",
+        "how": "如何运作",
+        "identity": "隐私身份",
+        "participate": "参与",
+        "create": "创建 Realm",
+        "governments": "面向政府",
+        "orgs": "NGO 与合作社",
+        "migration": "迁移现有机构",
+        "ic": "Internet Computer",
+        "extensions": "扩展",
+        "mundus": "Mundus",
+        "ai": "AI 治理者",
+        "demo": "试用演示",
+        "contact": "联系团队",
+        "docs": "文档",
+        "transparency": "透明",
+        "services": "公共服务",
+        "cost": "降低行政成本"
+      }
+    },
     "product_name": "Realms GOS"
   }
 }

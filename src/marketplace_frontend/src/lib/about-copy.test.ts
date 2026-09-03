@@ -39,6 +39,11 @@ describe("marketplace about copy", () => {
       assert.ok(loc.about.forInstitutions.governments.title);
       assert.ok(Array.isArray(loc.about.forInstitutions.governments.benefits));
       assert.ok(loc.about.getStarted.demo.button);
+      assert.ok(loc.about.explainer.greeting.includes("Ashoka"));
+      assert.ok(loc.about.explainer.suggestions.gos);
+      assert.ok(loc.about.explainer.suggestions.ssc);
+      assert.ok(loc.about.explainer.suggestions.who);
+      assert.ok(loc.about.explainer.suggestions.try);
     });
   }
 

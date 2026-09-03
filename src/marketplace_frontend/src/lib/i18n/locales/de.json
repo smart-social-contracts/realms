@@ -456,6 +456,54 @@
         "button": "Dokumentation Lesen"
       }
     },
+    "explainer": {
+      "greeting": "Ich bin Ashoka. Sag mir, wer du bist und was du brauchst — ich erkläre Realms GOS von dort aus.",
+      "askGoal": "Was möchtest du zuerst verstehen?",
+      "placeholder": "Frage zu Realms stellen…",
+      "send": "Senden",
+      "aria": "Ashoka, Realms-GOS-Assistent",
+      "noResponse": "Ashoka hat nicht geantwortet. Versuche es gleich noch einmal.",
+      "error": "Ashoka ist gerade nicht erreichbar. Versuche es gleich noch einmal.",
+      "waking": "Ashoka wird geweckt…",
+      "suggestions": {
+        "gos": "Was ist Realms GOS?",
+        "ssc": "Was sind Smart Social Contracts?",
+        "who": "Für wen ist das?",
+        "try": "Wie teste ich die Demo?"
+      },
+      "writtenOverview": "Schriftliche Übersicht",
+      "sscExtra": "Smart Social Contracts sind dieser Wandel: Gemeinschaften kodieren die Regeln, nach denen sie leben, führen sie offen aus und ändern sie gemeinsam — statt jeden öffentlichen Dienst durch undurchsichtige Bürokratie zu schicken.",
+      "unknown": "Ich bleibe bei dem, was Realms tatsächlich ist. Frag nach Identität, Funktionsweise, Smart Social Contracts, der Demo oder für wen es gedacht ist.",
+      "roles": {
+        "resident": "Einwohnerin oder Bürger",
+        "official": "Amtsperson",
+        "developer": "Entwickler",
+        "organization": "NGO oder Organisation",
+        "curious": "Nur neugierig"
+      },
+      "topics": {
+        "what": "Was Realms ist",
+        "ssc": "Smart Social Contracts",
+        "principles": "Die vier Prinzipien",
+        "how": "Wie es funktioniert",
+        "identity": "Private Identität",
+        "participate": "Mitwirken",
+        "create": "Ein Realm starten",
+        "governments": "Für Regierungen",
+        "orgs": "NGOs und Genossenschaften",
+        "migration": "Eine Institution migrieren",
+        "ic": "Internet Computer",
+        "extensions": "Erweiterungen",
+        "mundus": "Mundus",
+        "ai": "KI-Governors",
+        "demo": "Demo ausprobieren",
+        "contact": "Mit dem Team sprechen",
+        "docs": "Dokumentation",
+        "transparency": "Transparenz",
+        "services": "Öffentliche Dienste",
+        "cost": "Niedrigere Verwaltungskosten"
+      }
+    },
     "product_name": "Realms GOS"
   }
 }

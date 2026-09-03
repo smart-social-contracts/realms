@@ -1,6 +1,7 @@
 <script lang="ts">
 import { _, json } from "svelte-i18n";
 import CapitolBackdrop from "$lib/components/CapitolBackdrop.svelte";
+import AboutExplainer from "$lib/components/AboutExplainer.svelte";
 
 const DEMO_URL = "https://demo.gos.earth";
 const INVITE_URL = "https://tally.so/r/GxQ8QL";
@@ -32,6 +33,10 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
   : []) as string[];
 </script>
 
+<svelte:head>
+  <title>About · Realms GOS</title>
+</svelte:head>
+
 <article class="about">
   <header class="about-hero">
     <div class="about-hero-bg" aria-hidden="true">
@@ -39,100 +44,107 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
       <div class="about-hero-wash"></div>
     </div>
     <div class="about-hero-inner">
-      <h1>{$_('about.hero.title')}</h1>
-      <p class="alpha">{$_('about.hero.alphaBadge')}</p>
-      <h2 id="mission-title">{$_('about.mission.title')}</h2>
-      <p class="prose">{@html $_('about.mission.description')}</p>
-      <p class="more">
-        <a href={$_('about.mission.learnMoreUrl')} target="_blank" rel="noreferrer">{$_('about.mission.learnMore')}</a>
-      </p>
-      <a class="cta" href={DEMO_URL} target="_blank" rel="noreferrer">{$_('about.hero.tryDemo')}</a>
+      <h1>{$_("about.hero.title")}</h1>
+      <p class="alpha">{$_("about.hero.alphaBadge")}</p>
+      <AboutExplainer demoUrl={DEMO_URL} docsUrl={DOCS_URL} contactHref={CONTACT_MAIL} />
     </div>
   </header>
 
   <div class="about-body">
-    <section class="block" aria-labelledby="principles-title">
-      <h2 id="principles-title">{$_('about.principles.title')}</h2>
-      <p class="lede">{$_('about.principles.intro')}</p>
-      <div class="principles">
-        {#each PRINCIPLES as p}
-          <div class="principle">
-            <div class="num">{p.n}</div>
-            <h3>{$_(p.title)}</h3>
-            <p>{$_(p.desc)}</p>
-          </div>
-        {/each}
-      </div>
-    </section>
+    <details class="overview">
+      <summary>{$_("about.explainer.writtenOverview")}</summary>
 
-    <section class="block" id="features" aria-labelledby="features-title">
-      <h2 id="features-title">{$_('about.features.title')}</h2>
-      <p class="lede">{$_('about.features.subtitle')}</p>
-      <dl class="defs">
-        {#each FEATURES as f}
-          <div>
-            <dt>{$_(f.title)}</dt>
-            <dd>{$_(f.desc)}</dd>
-          </div>
-        {/each}
-      </dl>
-    </section>
+      <section class="block" aria-labelledby="mission-title">
+        <h2 id="mission-title">{$_("about.mission.title")}</h2>
+        <p class="prose">{@html $_("about.mission.description")}</p>
+        <p class="more">
+          <a href={$_("about.mission.learnMoreUrl")} target="_blank" rel="noreferrer">{$_("about.mission.learnMore")}</a>
+        </p>
+      </section>
 
-    <section class="audience" aria-label="Who Realms is for">
-      <div class="audience-col" id="forpeople" role="region" aria-labelledby="people-title">
-        <h2 id="people-title">{$_('about.forPeople.title')}</h2>
-        <p class="lede">{$_('about.forPeople.subtitle')}</p>
-        <h3>{$_('about.forPeople.identity.title')}</h3>
-        <p>{$_('about.forPeople.identity.description')}</p>
-        <ul class="plain">
-          {#each identityFeatures as item}
-            <li>{item}</li>
+      <section class="block" aria-labelledby="principles-title">
+        <h2 id="principles-title">{$_("about.principles.title")}</h2>
+        <p class="lede">{$_("about.principles.intro")}</p>
+        <div class="principles">
+          {#each PRINCIPLES as p}
+            <div class="principle">
+              <div class="num">{p.n}</div>
+              <h3>{$_(p.title)}</h3>
+              <p>{$_(p.desc)}</p>
+            </div>
           {/each}
-        </ul>
-        <h3>{$_('about.forPeople.participate.title')}</h3>
-        <p>{$_('about.forPeople.participate.description')}</p>
-        <h3>{$_('about.forPeople.create.title')}</h3>
-        <p>{$_('about.forPeople.create.description')}</p>
-      </div>
-      <div class="audience-col" id="forinstitutions" role="region" aria-labelledby="institutions-title">
-        <h2 id="institutions-title">{$_('about.forInstitutions.title')}</h2>
-        <p class="lede">{$_('about.forInstitutions.subtitle')}</p>
-        <h3>{$_('about.forInstitutions.governments.title')}</h3>
-        <p>{$_('about.forInstitutions.governments.description')}</p>
-        <p class="kicker">{$_('about.forInstitutions.benefits_heading')}</p>
-        <ul class="plain">
-          {#each govBenefits as item}
-            <li>{item}</li>
-          {/each}
-        </ul>
-        <h3>{$_('about.forInstitutions.organizations.title')}</h3>
-        <p>{$_('about.forInstitutions.organizations.description')}</p>
-        <h3>{$_('about.forInstitutions.migration.title')}</h3>
-        <p>{$_('about.forInstitutions.migration.description')}</p>
-      </div>
-    </section>
+        </div>
+      </section>
 
-    <section class="block start" id="getstarted" aria-labelledby="started-title">
-      <h2 id="started-title">{$_('about.getStarted.title')}</h2>
-      <p class="lede">{$_('about.getStarted.subtitle')}</p>
-      <div class="start-row">
-        <a href={DEMO_URL} target="_blank" rel="noreferrer">
-          <strong>{$_('about.getStarted.demo.title')}</strong>
-          <span>{$_('about.getStarted.demo.description')}</span>
-        </a>
-        <a href={CONTACT_MAIL}>
-          <strong>{$_('about.getStarted.contact.title')}</strong>
-          <span>{$_('about.getStarted.contact.description')}</span>
-        </a>
-        <a href={DOCS_URL} target="_blank" rel="noreferrer">
-          <strong>{$_('about.getStarted.developers.title')}</strong>
-          <span>{$_('about.getStarted.developers.description')}</span>
-        </a>
-      </div>
-      <p class="invite">
-        <a href={INVITE_URL} target="_blank" rel="noreferrer">{$_('about.hero.requestInvite')}</a>
-      </p>
-    </section>
+      <section class="block" id="features" aria-labelledby="features-title">
+        <h2 id="features-title">{$_("about.features.title")}</h2>
+        <p class="lede">{$_("about.features.subtitle")}</p>
+        <dl class="defs">
+          {#each FEATURES as f}
+            <div>
+              <dt>{$_(f.title)}</dt>
+              <dd>{$_(f.desc)}</dd>
+            </div>
+          {/each}
+        </dl>
+      </section>
+
+      <section class="audience" aria-label="Who Realms is for">
+        <div class="audience-col" id="forpeople" role="region" aria-labelledby="people-title">
+          <h2 id="people-title">{$_("about.forPeople.title")}</h2>
+          <p class="lede">{$_("about.forPeople.subtitle")}</p>
+          <h3>{$_("about.forPeople.identity.title")}</h3>
+          <p>{$_("about.forPeople.identity.description")}</p>
+          <ul class="plain">
+            {#each identityFeatures as item}
+              <li>{item}</li>
+            {/each}
+          </ul>
+          <h3>{$_("about.forPeople.participate.title")}</h3>
+          <p>{$_("about.forPeople.participate.description")}</p>
+          <h3>{$_("about.forPeople.create.title")}</h3>
+          <p>{$_("about.forPeople.create.description")}</p>
+        </div>
+        <div class="audience-col" id="forinstitutions" role="region" aria-labelledby="institutions-title">
+          <h2 id="institutions-title">{$_("about.forInstitutions.title")}</h2>
+          <p class="lede">{$_("about.forInstitutions.subtitle")}</p>
+          <h3>{$_("about.forInstitutions.governments.title")}</h3>
+          <p>{$_("about.forInstitutions.governments.description")}</p>
+          <p class="kicker">{$_("about.forInstitutions.benefits_heading")}</p>
+          <ul class="plain">
+            {#each govBenefits as item}
+              <li>{item}</li>
+            {/each}
+          </ul>
+          <h3>{$_("about.forInstitutions.organizations.title")}</h3>
+          <p>{$_("about.forInstitutions.organizations.description")}</p>
+          <h3>{$_("about.forInstitutions.migration.title")}</h3>
+          <p>{$_("about.forInstitutions.migration.description")}</p>
+        </div>
+      </section>
+
+      <section class="block start" id="getstarted" aria-labelledby="started-title">
+        <h2 id="started-title">{$_("about.getStarted.title")}</h2>
+        <p class="lede">{$_("about.getStarted.subtitle")}</p>
+        <div class="start-row">
+          <a href={DEMO_URL} target="_blank" rel="noreferrer">
+            <strong>{$_("about.getStarted.demo.title")}</strong>
+            <span>{$_("about.getStarted.demo.description")}</span>
+          </a>
+          <a href={CONTACT_MAIL}>
+            <strong>{$_("about.getStarted.contact.title")}</strong>
+            <span>{$_("about.getStarted.contact.description")}</span>
+          </a>
+          <a href={DOCS_URL} target="_blank" rel="noreferrer">
+            <strong>{$_("about.getStarted.developers.title")}</strong>
+            <span>{$_("about.getStarted.developers.description")}</span>
+          </a>
+        </div>
+        <p class="invite">
+          <a href={INVITE_URL} target="_blank" rel="noreferrer">{$_("about.hero.requestInvite")}</a>
+        </p>
+      </section>
+    </details>
   </div>
 </article>
 
@@ -141,8 +153,11 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
   .about-hero {
     position: relative;
     overflow: hidden;
-    min-height: 28rem;
-    padding: 5.5rem 1.5rem 3.25rem;
+    height: calc(100dvh - 60px);
+    min-height: 32rem;
+    display: flex;
+    flex-direction: column;
+    padding: 4.5rem 1.5rem 1.25rem;
   }
   .about-hero-bg {
     position: absolute;
@@ -159,7 +174,12 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
     position: relative;
     z-index: 1;
     max-width: 42rem;
+    width: 100%;
     margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
   }
   .about-hero h1 {
     margin: 0 0 0.55rem;
@@ -170,14 +190,30 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
     text-wrap: balance;
   }
   .alpha {
-    margin: 0 0 1.75rem;
+    margin: 0 0 1.5rem;
     font-size: 0.8rem;
     font-weight: 500;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-faint);
   }
-  .about-hero h2,
+  .about-hero :global(.explainer) { flex: 1; min-height: 22rem; }
+
+  .about-body {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 0.5rem 1.5rem 2rem;
+  }
+  .overview {
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 0 0;
+  }
+  .overview summary {
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+  }
   .block h2,
   .audience-col h2 {
     margin: 0 0 0.65rem;
@@ -200,30 +236,11 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
     color: var(--text);
     text-underline-offset: 0.18em;
   }
-  .cta {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.6rem 1.15rem;
-    border-radius: 0.5rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-    text-decoration: none;
-    background: var(--primary);
-    border: 1px solid var(--primary);
-    color: #fff;
-  }
-  .cta:hover { background: var(--primary-hover); }
-
-  .about-body {
-    max-width: 52rem;
-    margin: 0 auto;
-    padding: 0.5rem 1.5rem 2rem;
-  }
   .block {
     padding: 2.75rem 0 0;
     border-top: 1px solid var(--border);
   }
+  .overview .block:first-of-type { border-top: none; padding-top: 1.5rem; }
   .lede { margin: 0 0 1.75rem; max-width: 42rem; }
   .principles {
     display: grid;
@@ -317,7 +334,7 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
   }
 
   @media (max-width: 760px) {
-    .about-hero { padding: 4.75rem 1.25rem 2.5rem; min-height: 0; }
+    .about-hero { padding: 4rem 1.25rem 1rem; height: calc(100dvh - 52px); }
     .principles, .defs, .audience, .start-row { grid-template-columns: 1fr; }
     .audience { gap: 2.25rem; }
   }
