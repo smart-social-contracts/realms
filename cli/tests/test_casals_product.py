@@ -10,10 +10,11 @@ import pytest
 
 from realms.cli.casals_product import (
     deploy_product_sheet_on_casals,
-    merge_sheets,
+    parse_cycles_balance,
     product_sheet_path,
     resolve_conductor_id,
     resolve_casals_src,
+    top_up_canister_cycles,
 )
 
 
@@ -28,7 +29,33 @@ def _make_casals_checkout(tmp_path: Path) -> Path:
     return casals
 
 
-def test_resolve_conductor_from_gos_descriptor(tmp_path: Path, monkeypatch):
+def test_resolve_conductor_from_realms_canister_ids(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("CASALS_BACKEND", raising=False)
+    monkeypatch.delenv("GAAS_SRC", raising=False)
+    monkeypatch.delenv("GOS_SRC", raising=False)
+    realms = tmp_path / "realms"
+    realms.mkdir()
+    (realms / "environments").mkdir()
+    (realms / "environments" / "test.json").write_text(
+        json.dumps({"name": "test", "network": "test"}),
+        encoding="utf-8",
+    )
+    (realms / "canister_ids.json").write_text(
+        json.dumps({"casals_backend": {"test": "aaaaa-aa"}}),
+        encoding="utf-8",
+    )
+    gos = tmp_path / "gos-as-a-service"
+    (gos / "environments").mkdir(parents=True)
+    (gos / "environments" / "test.json").write_text(
+        json.dumps({"canisters": {"casals_backend": "3adcv-rqaaa-aaaad-qmdcq-cai"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GAAS_SRC", str(gos))
+
+    assert resolve_conductor_id("test", realms) == "aaaaa-aa"
+
+
+def test_resolve_conductor_ignores_gaas_descriptor(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("CASALS_BACKEND", raising=False)
     monkeypatch.delenv("GAAS_SRC", raising=False)
     monkeypatch.delenv("GOS_SRC", raising=False)
@@ -45,8 +72,9 @@ def test_resolve_conductor_from_gos_descriptor(tmp_path: Path, monkeypatch):
         json.dumps({"canisters": {"casals_backend": "3adcv-rqaaa-aaaad-qmdcq-cai"}}),
         encoding="utf-8",
     )
+    monkeypatch.setenv("GAAS_SRC", str(gos))
 
-    assert resolve_conductor_id("test", realms) == "3adcv-rqaaa-aaaad-qmdcq-cai"
+    assert resolve_conductor_id("test", realms) is None
 
 
 def test_resolve_conductor_from_env_var(tmp_path: Path, monkeypatch):
@@ -74,6 +102,8 @@ def test_resolve_casals_src_sibling(tmp_path: Path, monkeypatch):
     assert resolve_casals_src(realms) == casals.resolve()
 
 
+@patch("realms.cli.commands.seed.configure_gaas_installer_product_pointers")
+@patch("realms.cli.commands.seed.publish_casals_frontend_to_marketplace")
 @patch("realms.cli.commands.seed.deploy_product_sheet_on_casals")
 @patch("realms.cli.commands.seed.authorize_product_wasms")
 @patch("realms.cli.commands.seed.rebuild_casals_conductor")
@@ -96,6 +126,8 @@ def test_seed_invokes_product_sheet_deploy(
     mock_rebuild,
     mock_authorize,
     mock_sheet_deploy,
+    mock_casals_ptr,
+    _installer,
 ):
     from realms.cli.commands.seed import seed_command
 
@@ -108,6 +140,7 @@ def test_seed_invokes_product_sheet_deploy(
     mock_authorize.assert_called_once()
     mock_env_deploy.assert_called_once()
     mock_sheet_deploy.assert_called_once()
+    mock_casals_ptr.assert_called_once()
     assert mock_sheet_deploy.call_args.kwargs["env_name"] == "test"
     assert mock_sheet_deploy.call_args.kwargs["network"] == "test"
     assert mock_sheet_deploy.call_args.kwargs["identity"] == "deployer"
@@ -163,12 +196,11 @@ def test_deploy_product_sheet_missing_conductor(tmp_path: Path, monkeypatch):
         project_root=realms,
     )
     assert ok is False
-    assert "no Casals conductor" in detail
+    assert "no Realms GOS Casals conductor" in detail
 
 
 @patch("realms.cli.casals_product.run_casals_sheet_deploy")
 @patch("realms.cli.casals_product.register_product_canisters")
-@patch("realms.cli.casals_product.register_gaas_canisters")
 @patch("realms.cli.casals_product.ensure_sheet_stands")
 @patch(
     "realms.cli.casals_product.resolve_casals_src",
@@ -178,20 +210,16 @@ def test_deploy_product_sheet_missing_conductor(tmp_path: Path, monkeypatch):
     "realms.cli.casals_product.resolve_conductor_id",
     return_value="qthgp-3yaaa-aaaae-agveq-cai",
 )
-def test_deploy_uses_union_sheet_dict_not_product_path(
+def test_deploy_uses_product_sheet_not_gaas_union(
     _conductor,
     _src,
     mock_stands,
-    mock_gaas,
     mock_product,
     mock_deploy,
     tmp_path: Path,
-    monkeypatch,
 ):
     realms = tmp_path / "realms"
-    gos = tmp_path / "gos-as-a-service"
     (realms / "environments").mkdir(parents=True)
-    (gos / "environments").mkdir(parents=True)
     (realms / "casals.json").write_text(
         json.dumps(
             {
@@ -211,26 +239,6 @@ def test_deploy_uses_union_sheet_dict_not_product_path(
         ),
         encoding="utf-8",
     )
-    (gos / "casals.json").write_text(
-        json.dumps(
-            {
-                "name": "gaas",
-                "sections": [
-                    {
-                        "name": "Infra",
-                        "stands": [
-                            {
-                                "name": "installer",
-                                "canisters": [{"name": "realm-installer"}],
-                            }
-                        ],
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("GAAS_SRC", str(gos))
 
     ok, detail = deploy_product_sheet_on_casals(
         env_name="test",
@@ -239,7 +247,7 @@ def test_deploy_uses_union_sheet_dict_not_product_path(
         project_root=realms,
     )
     assert ok is True
-    assert "union sheet" in detail
+    assert "product sheet" in detail
     mock_deploy.assert_called_once()
     sheet_arg = mock_deploy.call_args.args[0]
     assert isinstance(sheet_arg, dict)
@@ -249,9 +257,8 @@ def test_deploy_uses_union_sheet_dict_not_product_path(
         for stand in sec.get("stands") or []
         for c in stand.get("canisters") or []
     ]
-    assert "realm-installer" in names
     assert "marketplace-frontend" in names
-    mock_gaas.assert_called_once()
+    assert "realm-installer" not in names
     mock_product.assert_called_once()
     mock_stands.assert_called_once()
 
@@ -282,90 +289,23 @@ def test_product_sheet_includes_file_registry_token_nft_without_batons():
     assert stands["file-registry"]["canisters"][0]["wasm_key"] == "file-registry-backend"
     comment = sheet.get("$comment") or ""
     assert "adopt" not in comment.lower()
-    assert "union" in comment.lower()
+    assert "never as a union" in comment.lower()
 
 
-def test_merge_sheets_is_union_not_product_only():
-    gaas = {
-        "name": "gaas",
-        "sections": [
-            {
-                "name": "Infra",
-                "stands": [
-                    {
-                        "name": "installer",
-                        "canisters": [
-                            {"name": "realm-installer", "kind": "backend"},
-                        ],
-                    }
-                ],
-            },
-            {"name": "Deployments", "stands": []},
-        ],
-    }
-    product = {
-        "name": "realms-product",
-        "sections": [
-            {
-                "name": "Product",
-                "stands": [
-                    {
-                        "name": "marketplace",
-                        "canisters": [
-                            {"name": "marketplace-backend", "kind": "backend"},
-                            {"name": "marketplace-frontend", "kind": "frontend"},
-                        ],
-                    }
-                ],
-            }
-        ],
-    }
-    union = merge_sheets(gaas, product)
-    section_names = [s["name"] for s in union["sections"]]
-    assert section_names == ["Infra", "Deployments", "Product"]
-    infra = next(s for s in union["sections"] if s["name"] == "Infra")
-    assert infra["stands"][0]["canisters"][0]["name"] == "realm-installer"
-    product_sec = next(s for s in union["sections"] if s["name"] == "Product")
-    assert product_sec["stands"][0]["name"] == "marketplace"
-    names = [
-        c["name"]
-        for s in union["sections"]
-        for st in s.get("stands") or []
-        for c in st.get("canisters") or []
-    ]
-    assert "realm-installer" in names
-    assert "marketplace-frontend" in names
-    assert union["name"] == "gaas-realms-union"
-
-
-def test_union_sheet_from_repo_includes_gaas_and_product():
-    from realms.cli.casals_product import gaas_sheet_path, load_union_sheet
-
+def test_product_sheet_from_repo_has_no_gaas_stands():
     root = Path(__file__).resolve().parents[2]
-    if not gaas_sheet_path(root).is_file():
-        pytest.skip("gos-as-a-service/casals.json not next to realms")
-    union = load_union_sheet(root)
+    sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))
     stand_names = [
         stand["name"]
-        for sec in union["sections"]
+        for sec in sheet["sections"]
         for stand in sec.get("stands") or []
     ]
-    assert "installer" in stand_names
-    assert "realm-registry" in stand_names
+    assert "installer" not in stand_names
+    assert "realm-registry" not in stand_names
     assert "marketplace" in stand_names
     assert "file-registry" in stand_names
     assert "token" in stand_names
     assert "nft" in stand_names
-    canisters = [
-        c["name"]
-        for sec in union["sections"]
-        for stand in sec.get("stands") or []
-        for c in stand.get("canisters") or []
-    ]
-    assert "realm-registry-frontend" in canisters
-    assert "marketplace-frontend" in canisters
-    assert "token-backend" in canisters
-    assert stand_names.count("file-registry") == 1
 
 
 def test_casals_env_maps_ic_networks():
@@ -379,41 +319,131 @@ def test_casals_env_maps_ic_networks():
     assert casals_env("ic") == "ic"
 
 
-def test_persist_casals_ids_to_gos_maps_file_registry(tmp_path: Path, monkeypatch):
-    from realms.cli.casals_product import persist_casals_ids_to_gos
+def test_persist_casals_url_to_env(tmp_path: Path):
+    from realms.cli.casals_product import persist_casals_url_to_env
+
+    env_dir = tmp_path / "environments"
+    env_dir.mkdir()
+    path = env_dir / "test.json"
+    path.write_text(
+        json.dumps({"name": "test", "casals_url": "https://old.icp0.io"}),
+        encoding="utf-8",
+    )
+    persist_casals_url_to_env(
+        "test",
+        {"casals_frontend": "nfs6d-saaaa-aaaae-qkjya-cai"},
+        tmp_path,
+    )
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["casals_url"] == "https://nfs6d-saaaa-aaaae-qkjya-cai.icp0.io"
+
+
+@patch("realms.cli.casals_product.typer.confirm", return_value=True)
+@patch("realms.cli.commands.env._delete_canister_recover_cycles")
+@patch("realms.cli.commands.env._is_canister_dead", return_value=True)
+def test_destroy_casals_stack_skips_gaas_ids(
+    _dead, mock_delete, _confirm, tmp_path: Path, monkeypatch
+):
+    from realms.cli.casals_product import destroy_casals_stack
+    from realms.cli.commands.env import _set_canister_id
 
     gos = tmp_path / "gos-as-a-service"
     (gos / "environments").mkdir(parents=True)
-    desc = gos / "environments" / "test.json"
-    desc.write_text(
-        json.dumps({"canisters": {"realm_installer": "fltjm-tyaaa-aaaap-qunhq-cai"}}),
+    (gos / "environments" / "test.json").write_text(
+        json.dumps({"canisters": {"casals_backend": "gaas-casals-aa"}}),
         encoding="utf-8",
     )
+    monkeypatch.setenv("GAAS_SRC", str(gos))
     realms = tmp_path / "realms"
     realms.mkdir()
-    monkeypatch.setenv("GAAS_SRC", str(gos))
+    _set_canister_id(realms, "casals_backend", "test", "gaas-casals-aa")
+    _set_canister_id(realms, "casals_frontend", "test", "product-casals-fe")
 
-    persist_casals_ids_to_gos(
-        "test",
-        {
-            "casals_backend": "aaaaa-aa",
-            "casals_frontend": "bbbbb-aa",
-            "ic_file_registry": "ccccc-aa",
-            "ic_file_registry_frontend": "ddddd-aa",
-        },
-        realms,
+    result = destroy_casals_stack(
+        env_name="test",
+        network="test",
+        identity="deployer",
+        project_root=realms,
+        yes=True,
     )
-    saved = json.loads(desc.read_text(encoding="utf-8"))
-    assert saved["canisters"]["casals_backend"] == "aaaaa-aa"
-    assert saved["canisters"]["casals_frontend"] == "bbbbb-aa"
-    assert saved["canisters"]["casals_file_registry"] == "ccccc-aa"
-    assert "ic_file_registry" not in saved["canisters"]
-    assert "ic_file_registry_frontend" not in saved["canisters"]
-    assert saved["canisters"]["realm_installer"] == "fltjm-tyaaa-aaaap-qunhq-cai"
+    assert "product-casals-fe" in result["destroyed"]
+    assert "gaas-casals-aa" not in result["destroyed"]
+    mock_delete.assert_not_called()
 
 
 @patch("realms.cli.casals_product.subprocess.run")
-def test_run_casals_new_fresh_argv_no_ids_file(mock_run, tmp_path: Path):
+def test_publish_casals_frontend_to_marketplace(mock_run, tmp_path: Path):
+    from realms.cli.casals_product import publish_casals_frontend_to_marketplace
+    from realms.cli.commands.env import _set_canister_id
+
+    realms = tmp_path / "realms"
+    realms.mkdir()
+    _set_canister_id(realms, "marketplace_backend", "test", "mxyd5-3qaaa-aaaao-ba2xq-cai")
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = '{"Ok": "nfs6d-saaaa-aaaae-qkjya-cai"}'
+    mock_run.return_value.stderr = ""
+
+    publish_casals_frontend_to_marketplace(
+        env_name="test",
+        canisters={"casals_frontend": "nfs6d-saaaa-aaaae-qkjya-cai"},
+        network="test",
+        identity="deployer",
+        project_root=realms,
+    )
+    argv = mock_run.call_args[0][0]
+    assert "set_casals_frontend_canister_id" in argv
+    assert "mxyd5-3qaaa-aaaao-ba2xq-cai" in argv
+    assert "nfs6d-saaaa-aaaae-qkjya-cai" in " ".join(argv)
+
+
+@patch("realms.cli.casals_product.subprocess.run")
+def test_configure_gaas_installer_product_pointers(mock_run, tmp_path: Path, monkeypatch):
+    from realms.cli.casals_product import configure_gaas_installer_product_pointers
+    from realms.cli.commands.env import _set_canister_id
+
+    gos = tmp_path / "gos-as-a-service"
+    (gos / "environments").mkdir(parents=True)
+    (gos / "environments" / "test.json").write_text(
+        json.dumps(
+            {
+                "name": "test",
+                "domain": "test.gos.earth",
+                "canisters": {
+                    "realm_installer": "fltjm-tyaaa-aaaap-qunhq-cai",
+                    "realm_registry_backend": "yhw3g-fyaaa-aaaas-qgorq-cai",
+                    "casals_backend": "qthgp-3yaaa-aaaae-agveq-cai",
+                },
+                "cycles": {"threshold_tc": 2.0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GAAS_SRC", str(gos))
+    realms = tmp_path / "realms"
+    realms.mkdir()
+    _set_canister_id(realms, "file_registry", "test", "uq2mu-kaaaa-aaaah-avqcq-cai")
+    _set_canister_id(realms, "marketplace_backend", "test", "2wldc-niaaa-aaaad-qlxga-cai")
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "{}"
+    mock_run.return_value.stderr = ""
+
+    configure_gaas_installer_product_pointers(
+        env_name="test",
+        network="test",
+        identity="deployer",
+        project_root=realms,
+    )
+    argv = mock_run.call_args[0][0]
+    assert argv[argv.index("call") + 1] == "fltjm-tyaaa-aaaap-qunhq-cai"
+    assert "configure" in argv
+    joined = " ".join(argv)
+    assert "uq2mu-kaaaa-aaaah-avqcq-cai" in joined
+    assert "2wldc-niaaa-aaaad-qlxga-cai" in joined
+    assert "qthgp-3yaaa-aaaae-agveq-cai" in joined
+
+
+@patch("realms.cli.casals_product.subprocess.run")
+def test_run_casals_new_fresh_argv(mock_run, tmp_path: Path):
     from realms.cli.casals_product import run_casals_new_fresh
 
     casals = _make_casals_checkout(tmp_path)
@@ -477,49 +507,31 @@ def test_run_casals_seed_catalog_argv(mock_run, tmp_path: Path):
 
 @patch("realms.cli.casals_product._download_url")
 @patch("realms.cli.casals_product._certified_assets_wasm")
-@patch("realms.cli.casals_product._ensure_gos_release_artifacts")
 @patch("realms.cli.commands.files.files_publish_release_command")
-def test_authorize_product_wasms_covers_union_families(
+def test_authorize_product_wasms_covers_product_families(
     mock_publish,
-    _ensure,
     mock_assets,
     _dl,
     tmp_path: Path,
-    monkeypatch,
 ):
     from realms.cli.casals_product import authorize_product_wasms
+    from realms.cli.commands.env import _set_canister_id
 
     realms = tmp_path / "realms"
-    gos = tmp_path / "gos-as-a-service"
     (realms / "environments").mkdir(parents=True)
-    (gos / "environments").mkdir(parents=True)
-    (gos / "environments" / "test.json").write_text(
-        json.dumps(
-            {
-                "canisters": {
-                    "casals_backend": "aaaaa-aa",
-                    "casals_file_registry": "bbbbb-aa",
-                }
-            }
-        ),
+    (realms / "environments" / "test.json").write_text(
+        json.dumps({"name": "test", "network": "test"}),
         encoding="utf-8",
     )
-    monkeypatch.setenv("GAAS_SRC", str(gos))
+    _set_canister_id(realms, "casals_backend", "test", "aaaaa-aa")
+    _set_canister_id(realms, "casals_file_registry", "test", "bbbbb-aa")
 
     wasm_dir = realms / ".external-wasms"
     wasm_dir.mkdir()
-    for name in (
-        "file_registry.wasm.gz",
-        "realm_installer.wasm.gz",
-        "realm_registry_backend.wasm.gz",
-    ):
-        (wasm_dir / name).write_bytes(b"wasm")
+    (wasm_dir / "file_registry.wasm.gz").write_bytes(b"wasm")
     basilisk = realms / ".basilisk" / "marketplace_backend"
     basilisk.mkdir(parents=True)
     (basilisk / "marketplace_backend.wasm").write_bytes(b"wasm")
-    (realms / ".external-assets" / "realm_registry_frontend" / "dist").mkdir(
-        parents=True
-    )
     mock_assets.return_value = tmp_path / "assetstorage.wasm.gz"
     mock_assets.return_value.write_bytes(b"assets")
 
@@ -536,8 +548,6 @@ def test_authorize_product_wasms_covers_union_families(
     )
     families = [c.kwargs["family"] for c in mock_publish.call_args_list]
     assert families == [
-        "installer",
-        "registry",
         "marketplace",
         "file-registry",
         "token",
@@ -547,8 +557,26 @@ def test_authorize_product_wasms_covers_union_families(
     assert all(c.kwargs["casals"] == "aaaaa-aa" for c in mock_publish.call_args_list)
     token_job = next(c for c in mock_publish.call_args_list if c.kwargs["family"] == "token")
     assert token_job.kwargs["frontend_dist"]
-    installer_job = next(
-        c for c in mock_publish.call_args_list if c.kwargs["family"] == "installer"
-    )
-    assert installer_job.kwargs["frontend_dist"] is None
-    assert installer_job.kwargs["version"] == "0.3.2"
+
+
+def test_parse_cycles_balance():
+    assert parse_cycles_balance("9_534_357_159_658 cycles") == 9_534_357_159_658
+    assert parse_cycles_balance("Balance: 1.53 TC") == 1_530_000_000_000
+
+
+@patch("realms.cli.casals_product.subprocess.run")
+@patch("realms.cli.casals_product.cycles_ledger_balance", return_value=1_530_000_000_000)
+def test_top_up_clamps_to_wallet_minus_reserve(mock_balance, mock_run):
+    mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+    top_up_canister_cycles("yn4fq-nqaaa-aaaaj-a6woq-cai", identity="deployer", amount=2_000_000_000_000)
+    args = mock_run.call_args[0][0]
+    assert "top-up" in args
+    sent = int(args[args.index("top-up") + 2])
+    assert sent == 1_330_000_000_000
+
+
+@patch("realms.cli.casals_product.subprocess.run")
+@patch("realms.cli.casals_product.cycles_ledger_balance", return_value=100_000_000_000)
+def test_top_up_skips_when_under_reserve(_balance, mock_run):
+    top_up_canister_cycles("yn4fq-nqaaa-aaaaj-a6woq-cai", identity="deployer", amount=2_000_000_000_000)
+    mock_run.assert_not_called()

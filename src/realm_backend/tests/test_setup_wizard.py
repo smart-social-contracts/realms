@@ -343,8 +343,8 @@ def test_enter_setup_fills_empty_infra_ids_for_test():
     )
 
     assert result == {"ok": True}
-    assert realm.file_registry_canister_id == "uq2mu-kaaaa-aaaah-avqcq-cai"
-    assert realm.marketplace_canister_id == "2wldc-niaaa-aaaad-qlxga-cai"
+    assert realm.file_registry_canister_id == "bbwyi-raaaa-aaaas-amxfa-cai"
+    assert realm.marketplace_canister_id == "btqpr-5qaaa-aaaas-amxga-cai"
 
 
 def test_enter_setup_rejects_unknown_environment():

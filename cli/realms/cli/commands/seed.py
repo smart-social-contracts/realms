@@ -1,15 +1,15 @@
 """``realms seed`` — Realms GOS product infrastructure per network.
 
-Always destroys and re-creates the Casals conductor (``casals new``), then
-deploys the ``*.realmsgos.org`` stack (marketplace, fleet file_registry,
-token, nft) and publishes the extension/codex catalog. GaaS (``gaas new``)
-does not own these canisters. ``--skip-product`` is catalog-only and does not
-destroy anything.
+Always destroys and re-creates the **Realms GOS** Casals conductor
+(``casals new``), then deploys the ``*.realmsgos.org`` stack (marketplace,
+fleet file_registry, token, nft) and publishes the extension/codex catalog.
+Does not touch GaaS Casals (``gaas new``). ``--skip-product`` is catalog-only
+and does not destroy anything.
 
-After the product stack is deployed, registers GaaS + product canister IDs
-on the new conductor and runs ``casals sheet deploy`` of the **union** of
-``gos-as-a-service/casals.json`` and repo-root ``casals.json``. Product-only
-deploy is forbidden (Pass 2 would stop installer/registry).
+After the product stack is deployed, registers product canister IDs on the
+new conductor and runs ``casals sheet deploy`` of repo-root ``casals.json``
+only (never a union with GaaS, never onto GaaS Casals). Then writes the
+product Casals frontend principal onto the marketplace backend.
 """
 
 from __future__ import annotations
@@ -21,10 +21,11 @@ from rich.panel import Panel
 
 from ..casals_product import (
     authorize_product_wasms,
+    configure_gaas_installer_product_pointers,
     deploy_product_sheet_on_casals,
+    finish_casals_rebuild,
+    publish_casals_frontend_to_marketplace,
     rebuild_casals_conductor,
-    resolve_casals_src,
-    run_casals_seed_catalog,
 )
 from .env import (
     env_deploy_command,
@@ -62,8 +63,8 @@ def seed_command(
 ) -> None:
     """Deploy Realms product infra and publish the package catalog.
 
-    Destroys Casals and product canisters (except marketplace_frontend) unless
-    ``skip_product`` is set. ``from_phase`` resumes after a failed rebuild:
+    Destroys Realms GOS Casals and product canisters (except marketplace_frontend)
+    unless ``skip_product`` is set. ``from_phase`` resumes after a failed rebuild:
     ``catalog`` retries Casals catalog seed then product deploy; ``env_deploy``
     skips destroy and Casals recreate.
     """
@@ -83,8 +84,8 @@ def seed_command(
         Panel.fit(
             f"🌱 realms seed\n"
             f"Environment: [bold]{env_name}[/bold]  Network: [bold]{network}[/bold]\n"
-            f"Destroys Casals + product (keeps marketplace_frontend DNS).\n"
-            f"Owns marketplace + file_registry + token/nft + catalog — not the GaaS portal.",
+            f"Destroys Realms GOS Casals + product (keeps marketplace_frontend DNS).\n"
+            f"Does not touch GaaS Casals / installer / registry.",
             style="bold blue",
         )
     )
@@ -123,19 +124,16 @@ def seed_command(
                 console.print(f"[red]❌ casals new failed: {exc}[/red]")
                 raise typer.Exit(1) from exc
         elif phase == "catalog":
-            casals_src = resolve_casals_src(project_root)
-            if not casals_src:
-                console.print("[red]❌ no Casals checkout (set CASALS_SRC)[/red]")
-                raise typer.Exit(1)
             try:
-                run_casals_seed_catalog(
+                finish_casals_rebuild(
+                    env_name=env_name,
                     network=network,
                     identity=identity,
-                    casals_src=casals_src,
+                    project_root=project_root,
                 )
                 console.print("[green]✓ Casals catalog seeded[/green]")
             except RuntimeError as exc:
-                console.print(f"[red]❌ casals seed catalog failed: {exc}[/red]")
+                console.print(f"[red]❌ casals finish/catalog failed: {exc}[/red]")
                 raise typer.Exit(1) from exc
 
         if phase != "authorize":
@@ -169,15 +167,36 @@ def seed_command(
             )
             if deployed:
                 console.print(
-                    f"[green]✓ Union sheet deployed on GaaS Casals[/green] "
+                    f"[green]✓ Product sheet deployed on Realms GOS Casals[/green] "
                     f"[dim]({detail})[/dim]"
                 )
             else:
                 console.print(
-                    f"[dim]Casals union sheet skipped: {detail}[/dim]"
+                    f"[dim]Casals product sheet skipped: {detail}[/dim]"
                 )
         except RuntimeError as exc:
-            console.print(f"[yellow]⚠️  Casals union sheet failed: {exc}[/yellow]")
+            console.print(f"[yellow]⚠️  Casals product sheet failed: {exc}[/yellow]")
+
+        try:
+            publish_casals_frontend_to_marketplace(
+                env_name=env_name,
+                canisters={},
+                network=network,
+                identity=identity,
+                project_root=project_root,
+            )
+        except RuntimeError as exc:
+            console.print(f"[yellow]⚠️  {exc}[/yellow]")
+
+        try:
+            configure_gaas_installer_product_pointers(
+                env_name=env_name,
+                network=network,
+                identity=identity,
+                project_root=project_root,
+            )
+        except RuntimeError as exc:
+            console.print(f"[yellow]⚠️  {exc}[/yellow]")
     else:
         console.print("[dim]skip product stack (--skip-product)[/dim]")
 

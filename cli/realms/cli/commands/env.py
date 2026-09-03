@@ -317,9 +317,7 @@ def destroy_product_stack_except_frontend(
 
     Recovers cycles into the caller's cycles-ledger account, then removes the
     destroyed ids from ``canister_ids.json`` so the next deploy mints replacements.
-    Does not touch installer / realm-registry. After ``gaas new``, also deletes
-    fleet product IDs recorded in the GaaS descriptor (file_registry, marketplace
-    backend, …) so seed does not orphan the stack ``gaas new`` just created.
+    Does not touch GaaS Casals, installer, or realm-registry.
     """
     gos: Dict[str, str] = {}
     if env_name:
@@ -660,6 +658,7 @@ def _build_marketplace_frontend(
     _ensure_marketplace_declarations(project_root, dfx_env=dfx_env, logger=logger)
 
     build_env = os.environ.copy()
+    build_env.pop("VITE_CASALS_URL", None)
     build_env["DFX_NETWORK"] = network
     build_env["CANISTER_ID_MARKETPLACE_BACKEND"] = marketplace_backend_id
     build_env["CANISTER_ID_FILE_REGISTRY"] = file_registry_id
@@ -669,7 +668,17 @@ def _build_marketplace_frontend(
     build_env["VITE_CANISTER_ID_FILE_REGISTRY"] = file_registry_id
     build_env["VITE_ENV_NAME"] = env_config.get("name", "")
     build_env["VITE_PORTAL_URL"] = env_config.get("portal_url", "")
-    build_env["VITE_CASALS_URL"] = env_config.get("casals_url", "")
+    registry_backend = ""
+    try:
+        from ..casals_product import load_gos_canisters
+
+        gos = load_gos_canisters(str(env_config.get("name") or ""), project_root)
+        registry_backend = (gos.get("realm_registry_backend") or "").strip()
+        if registry_backend:
+            build_env["VITE_CANISTER_ID_REALM_REGISTRY_BACKEND"] = registry_backend
+            build_env["CANISTER_ID_REALM_REGISTRY_BACKEND"] = registry_backend
+    except Exception:
+        registry_backend = ""
     build_env["VITE_REALMS_VERSION"] = env_config.get("realms_version", "main")
     billing_url = env_config.get("billing_service_url") or env_config.get("services", {}).get(
         "billing_url", ""
@@ -694,12 +703,16 @@ def _build_marketplace_frontend(
             "VITE_CANISTER_ID_FILE_REGISTRY": file_registry_id,
             "VITE_ENV_NAME": env_config.get("name", ""),
             "VITE_PORTAL_URL": env_config.get("portal_url", ""),
-            "VITE_CASALS_URL": env_config.get("casals_url", ""),
             "VITE_REALMS_VERSION": env_config.get("realms_version", "main"),
         }
     )
+    if registry_backend:
+        env_vars["VITE_CANISTER_ID_REALM_REGISTRY_BACKEND"] = registry_backend
     if billing_url:
         env_vars["VITE_BILLING_SERVICE_URL"] = billing_url
+    # Never bake a Casals frontend URL. The SPA queries marketplace backend at runtime.
+    env_vars.pop("VITE_CASALS_URL", None)
+    env_vars.pop("CANISTER_ID_CASALS_FRONTEND", None)
     if env_file.parent.is_dir():
         env_file.write_text("\n".join(f"{k}={v}" for k, v in env_vars.items()) + "\n")
         if logger:
@@ -724,6 +737,7 @@ def _wire_marketplace_backend(
     network: str,
     file_registry_id: str,
     billing_service_principal: str,
+    casals_frontend_id: str = "",
 ) -> None:
     if file_registry_id:
         console.print("[dim]→ set_file_registry_canister_id[/dim]")
@@ -731,6 +745,18 @@ def _wire_marketplace_backend(
             MARKETPLACE_BACKEND,
             "set_file_registry_canister_id",
             f'("{file_registry_id}")',
+            network,
+            update=True,
+            quiet=True,
+        )
+        if result.returncode != 0 and result.stderr:
+            console.print(f"[yellow]   warning: {result.stderr.strip()[:200]}[/yellow]")
+    if casals_frontend_id:
+        console.print("[dim]→ set_casals_frontend_canister_id[/dim]")
+        result = _dfx_call(
+            MARKETPLACE_BACKEND,
+            "set_casals_frontend_canister_id",
+            f'("{casals_frontend_id}")',
             network,
             update=True,
             quiet=True,
@@ -888,7 +914,15 @@ def env_deploy_command(
         env=dfx_env,
         logger=logger,
     )
-    _wire_marketplace_backend(network, fr_id, billing_principal)
+    _wire_marketplace_backend(
+        network,
+        fr_id,
+        billing_principal,
+        casals_frontend_id=(
+            (_read_canister_ids(project_root).get("casals_frontend") or {}).get(network)
+            or ""
+        ).strip(),
+    )
 
     mb_id = _dfx_canister_id(MARKETPLACE_BACKEND, network) or resolved[MARKETPLACE_BACKEND]
 

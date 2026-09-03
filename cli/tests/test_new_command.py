@@ -13,6 +13,9 @@ from realms.cli.commands.new import (
     BRANDING_MAX_BYTES,
     DEPLOYMENT_COST_CREDITS,
     StageError,
+    _format_installer_job_failure,
+    _local_manifest_dependencies,
+    _parse_jsonish,
     _identity_kind_is_web,
     assert_credits_sufficient,
     build_portal_manifest,
@@ -88,6 +91,21 @@ class TestSpecFlagMerge:
     def test_slug_defaults_from_name(self):
         merged = merge_spec_and_flags({"name": "Hello World"}, spec_dir=None)
         assert merged["slug"] == "hello-world"
+
+    def test_codex_package_object_and_top_level_copy(self):
+        merged = merge_spec_and_flags(
+            {
+                "name": "Acme Realm",
+                "manifesto": "A new realm",
+                "welcome_message": "Hello",
+                "codex": {"package": {"name": "syntropia", "version": "latest"}},
+            },
+            spec_dir=None,
+        )
+        assert merged["codex"]["package"] == "syntropia"
+        assert merged["codex"]["version"] == "latest"
+        assert merged["branding"]["manifesto"] == "A new realm"
+        assert merged["branding"]["welcome_message"] == "Hello"
 
     def test_paths_relative_to_spec_file(self, tmp_path: Path):
         logo = tmp_path / "logo.png"
@@ -235,6 +253,46 @@ class TestPortalManifest:
         assert manifest["federation"]["portal_url"] == "https://registry.realmsgos.org/r/acme"
         assert manifest["deploy_version"] == "main"
         assert "test_flags" not in manifest
+
+    def test_includes_codex_for_installer(self):
+        manifest = build_portal_manifest(
+            name="Acme",
+            slug="acme",
+            network="test",
+            version="main",
+            founder="aaaaa-aa",
+            subnet={"choice": "automatic"},
+            codex_package="agora",
+            codex_version="1.0.0",
+        )
+        assert manifest["realm"]["codex"] == {
+            "package": {"name": "agora", "version": "1.0.0"}
+        }
+
+    def test_codex_defaults_version_to_latest(self):
+        manifest = build_portal_manifest(
+            name="Acme",
+            slug="acme",
+            network="test",
+            version="main",
+            founder="aaaaa-aa",
+            subnet={"choice": "automatic"},
+            codex_package="syntropia",
+        )
+        assert manifest["realm"]["codex"]["package"]["version"] == "latest"
+
+
+class TestInstallerFailure:
+    def test_access_denied_includes_controller_hint(self):
+        msg = _format_installer_job_failure(
+            {"error": "set_canister_config_json: AccessDenied"},
+            installer_id="jmgc7-2aaaa-aaaai-ax5qa-cai",
+        )
+        assert "AccessDenied" in msg
+        assert "extra_controller_principals" in msg
+        assert "NETWORK_INFRA" in msg
+        assert "jmgc7-2aaaa-aaaai-ax5qa-cai" in msg
+        assert "CLI bootstrap" in msg
 
 
 class TestCreditsFail:
@@ -530,8 +588,8 @@ class TestDeployMode:
     @patch("realms.cli.commands.new.register_co_admin_principal")
     @patch("realms.cli.commands.new.run_setup_stage")
     @patch("realms.cli.commands.new.setup_already_complete", return_value=True)
-    @patch("realms.cli.commands.new.wait_for_enter_setup")
-    @patch("realms.cli.commands.new.call_enter_setup")
+    @patch("realms.cli.commands.new.apply_bootstrap_canister_config")
+    @patch("realms.cli.commands.new.ensure_founder_enter_setup")
     @patch(
         "realms.cli.commands.new.deploy_standalone_realm",
         return_value=("aaaaa-aaaaa-aaaaa-aaaaa-aaa", "bbbbb-bbbbb-bbbbb-bbbbb-bbb"),
@@ -571,5 +629,102 @@ class TestDeployMode:
         out = capsys.readouterr().out
         assert "standalone" in out
         assert "bbbbb-bbbbb-bbbbb-bbbbb-bbb" in out
+
+
+class TestGaasFlow:
+    def _gaas_config(self, tmp_path: Path) -> str:
+        path = tmp_path / "test-gaas.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "name": "test",
+                    "domain": "test.gos.earth",
+                    "canisters": {
+                        "realm_registry_backend": "mq5y2-riaaa-aaaai-ax5pq-cai",
+                        "realm_installer": "jmgc7-2aaaa-aaaai-ax5qa-cai",
+                    },
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return str(path)
+
+    @patch("realms.cli.commands.new.join_geister_members", return_value=[])
+    @patch("realms.cli.commands.new.import_data_overlay")
+    @patch("realms.cli.commands.new.apply_runtime_config")
+    @patch("realms.cli.commands.new.register_co_admin_principal")
+    @patch("realms.cli.commands.new.run_setup_stage")
+    @patch("realms.cli.commands.new.setup_already_complete", return_value=False)
+    @patch("realms.cli.commands.new.apply_bootstrap_canister_config")
+    @patch("realms.cli.commands.new.ensure_founder_enter_setup")
+    @patch(
+        "realms.cli.commands.new.poll_installer_until_ready",
+        return_value={
+            "status": "completed",
+            "backend_canister_id": "aaaaa-aaaaa-aaaaa-aaaaa-aaa",
+            "frontend_canister_id": "bbbbb-bbbbb-bbbbb-bbbbb-bbb",
+        },
+    )
+    @patch("realms.cli.commands.new.request_deployment", return_value="job-123")
+    @patch("realms.cli.commands.new.query_credit_balance", return_value=10)
+    @patch(
+        "realms.cli.commands.new.resolve_identity_principal",
+        return_value="aaaaa-aaaaa-aaaaa-aaaaa-aaa",
+    )
+    @patch("realms.cli.commands.new.assert_identity_is_ii_linked")
+    def test_gaas_skips_cli_bootstrap_after_installer(
+        self,
+        _linked,
+        _principal,
+        _credits,
+        mock_request,
+        mock_poll,
+        mock_enter,
+        mock_config,
+        _setup_complete,
+        mock_setup,
+        _co_admin,
+        _runtime,
+        _data,
+        _members,
+        tmp_path: Path,
+        capsys,
+    ):
+        new_command(
+            spec_file=None,
+            identity="alice",
+            network="test",
+            name="Acme Realm",
+            slug="acme",
+            codex="agora",
+            yes=True,
+            gaas_config=self._gaas_config(tmp_path),
+        )
+        mock_request.assert_called_once()
+        manifest = mock_request.call_args[0][0]
+        assert manifest["realm"]["codex"]["package"]["name"] == "agora"
+        mock_poll.assert_called_once()
+        mock_enter.assert_not_called()
+        mock_config.assert_not_called()
+        mock_setup.assert_not_called()
+        out = capsys.readouterr().out
+        assert "test.gos.earth/r/acme" in out
+        assert "job-123" in out
+
+
+def test_local_manifest_dependencies_lists_syntropia_extensions():
+    deps = _local_manifest_dependencies("syntropia")
+    assert "access_manager" in deps
+    assert "zone_selector" in deps
+    assert deps[-1] == "syntropia"
+
+
+def test_parse_jsonish_unwraps_dfx_text_json_string():
+    raw = json.dumps(json.dumps({"success": True, "status": "setup", "creator": None}))
+    parsed = _parse_jsonish(raw)
+    assert parsed["success"] is True
+    assert parsed["status"] == "setup"
 
 

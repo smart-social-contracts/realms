@@ -338,6 +338,7 @@ service : {
   "resync_extension_frontends" : (text) -> (text);
   "install_extension_from_registry" : (text) -> (text);
   "install_codex_from_registry" : (text) -> (text);
+  "run_codex_init" : (text) -> (text);
   "install_branding_from_registry" : (text) -> (text);
   "register_realm_from_registry" : (text) -> (text);
   "enter_setup" : (principal, text, text) -> (text);

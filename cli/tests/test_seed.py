@@ -24,7 +24,9 @@ def test_seed_help():
     assert "destroy" in plain.lower() or "casals" in plain.lower()
 
 
-@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.configure_gaas_installer_product_pointers")
+@patch("realms.cli.commands.seed.publish_casals_frontend_to_marketplace")
+@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "product"))
 @patch("realms.cli.commands.seed.authorize_product_wasms")
 @patch("realms.cli.commands.seed.rebuild_casals_conductor")
 @patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
@@ -46,6 +48,8 @@ def test_seed_always_destroys_casals_then_product_and_catalog(
     mock_rebuild,
     mock_authorize,
     _sheet,
+    _ptr,
+    _installer,
 ):
     seed_command(env_name="demo", identity="deployer", yes=True)
     mock_destroy.assert_called_once()
@@ -89,7 +93,9 @@ def test_seed_skip_product_catalog_only(
     mock_branding.assert_called_once()
 
 
-@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.configure_gaas_installer_product_pointers")
+@patch("realms.cli.commands.seed.publish_casals_frontend_to_marketplace")
+@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "product"))
 @patch("realms.cli.commands.seed.authorize_product_wasms")
 @patch("realms.cli.commands.seed.rebuild_casals_conductor")
 @patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
@@ -109,6 +115,8 @@ def test_seed_skip_catalog(
     mock_rebuild,
     mock_authorize,
     _sheet,
+    _ptr,
+    _installer,
 ):
     seed_command(env_name="staging", skip_catalog=True, yes=True)
     mock_destroy.assert_called_once()
@@ -146,7 +154,9 @@ def test_live_file_registry_id_prefers_canister_ids(tmp_path):
     assert _live_file_registry_id("demo", tmp_path) == "krch6-ryaaa-aaaas-amw3q-cai"
 
 
-@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.configure_gaas_installer_product_pointers")
+@patch("realms.cli.commands.seed.publish_casals_frontend_to_marketplace")
+@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "product"))
 @patch("realms.cli.commands.seed.authorize_product_wasms")
 @patch("realms.cli.commands.seed.rebuild_casals_conductor")
 @patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
@@ -170,6 +180,8 @@ def test_seed_destroy_except_frontend_then_product_and_catalog(
     mock_rebuild,
     mock_authorize,
     _sheet,
+    _ptr,
+    _installer,
     tmp_path,
 ):
     mock_root.return_value = tmp_path
@@ -211,12 +223,13 @@ def test_seed_destroy_rejects_skip_product(_load, mock_env_deploy, mock_destroy)
     mock_env_deploy.assert_not_called()
 
 
-@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.configure_gaas_installer_product_pointers")
+@patch("realms.cli.commands.seed.publish_casals_frontend_to_marketplace")
+@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "product"))
 @patch("realms.cli.commands.seed.authorize_product_wasms")
 @patch("realms.cli.commands.seed.rebuild_casals_conductor")
 @patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
-@patch("realms.cli.commands.seed.run_casals_seed_catalog")
-@patch("realms.cli.commands.seed.resolve_casals_src")
+@patch("realms.cli.commands.seed.finish_casals_rebuild")
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
 @patch("realms.cli.commands.seed.files_publish_command")
@@ -231,15 +244,14 @@ def test_seed_from_phase_catalog_skips_destroy(
     mock_publish,
     mock_branding,
     _registry,
-    mock_src,
-    mock_catalog,
+    mock_finish,
     mock_destroy,
     mock_rebuild,
     mock_authorize,
     _sheet,
-    tmp_path,
+    _ptr,
+    _installer,
 ):
-    mock_src.return_value = tmp_path
     seed_command(
         env_name="test",
         identity="deployer",
@@ -248,17 +260,18 @@ def test_seed_from_phase_catalog_skips_destroy(
     )
     mock_destroy.assert_not_called()
     mock_rebuild.assert_not_called()
-    mock_catalog.assert_called_once()
+    mock_finish.assert_called_once()
     mock_env_deploy.assert_called_once()
     mock_authorize.assert_called_once()
     mock_publish.assert_called_once()
 
 
-@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "union"))
+@patch("realms.cli.commands.seed.configure_gaas_installer_product_pointers")
+@patch("realms.cli.commands.seed.publish_casals_frontend_to_marketplace")
+@patch("realms.cli.commands.seed.deploy_product_sheet_on_casals", return_value=(True, "product"))
 @patch("realms.cli.commands.seed.authorize_product_wasms")
 @patch("realms.cli.commands.seed.rebuild_casals_conductor")
 @patch("realms.cli.commands.seed.destroy_product_stack_except_frontend")
-@patch("realms.cli.commands.seed.run_casals_seed_catalog")
 @patch("realms.cli.commands.seed._live_file_registry_id", return_value="krch6-ryaaa-aaaas-amw3q-cai")
 @patch("realms.cli.commands.seed.files_publish_branding_command")
 @patch("realms.cli.commands.seed.files_publish_command")
@@ -273,11 +286,12 @@ def test_seed_from_phase_authorize_skips_env_deploy(
     mock_publish,
     mock_branding,
     _registry,
-    mock_catalog,
     mock_destroy,
     mock_rebuild,
     mock_authorize,
     _sheet,
+    _ptr,
+    _installer,
 ):
     seed_command(
         env_name="test",
@@ -287,7 +301,6 @@ def test_seed_from_phase_authorize_skips_env_deploy(
     )
     mock_destroy.assert_not_called()
     mock_rebuild.assert_not_called()
-    mock_catalog.assert_not_called()
     mock_env_deploy.assert_not_called()
     mock_authorize.assert_called_once()
     mock_publish.assert_called_once()

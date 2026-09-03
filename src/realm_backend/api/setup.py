@@ -957,6 +957,37 @@ def setup_install_codex(args_json: str) -> Async[str]:
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
 
+    already: set[str] = set()
+    try:
+        from core.runtime_extensions import list_installed as list_ext
+
+        already.update(list_ext())
+    except Exception:
+        pass
+    try:
+        from core.runtime_codex import list_installed as list_cdx
+
+        already.update(list_cdx())
+    except Exception:
+        pass
+    if package in already:
+        resolved_version = (version or "installed").strip()
+        extra_params = params.get("params")
+        codex_record: Dict[str, Any] = {
+            "package": package,
+            "version": resolved_version,
+        }
+        if isinstance(extra_params, dict) and extra_params:
+            codex_record["params"] = extra_params
+        update_setup_config(realm, {"codex": codex_record})
+        return json.dumps(
+            {
+                "success": True,
+                "skipped": True,
+                "setup_codex": codex_record,
+            }
+        )
+
     registry_id = (getattr(realm, "file_registry_canister_id", "") or "").strip()
     if not registry_id:
         return json.dumps(
@@ -970,8 +1001,9 @@ def setup_install_codex(args_json: str) -> Async[str]:
         registry_id,
         package,
         version,
-        True,
+        False,
         frontend_canister_id=frontend_id,
+        install_dependencies=False,
     )
     try:
         result = json.loads(result_raw) if isinstance(result_raw, str) else result_raw
@@ -980,6 +1012,14 @@ def setup_install_codex(args_json: str) -> Async[str]:
 
     if not result.get("success"):
         return json.dumps(result)
+
+    from api.file_registry import run_codex_init as _run_init
+    from _cdk import ic as _ic
+
+    def _run_init_later():
+        _run_init(package)
+
+    _ic.set_timer(1, _run_init_later)
 
     resolved_version = (result.get("version") or version or "").strip()
     codex_record: Dict[str, Any] = {

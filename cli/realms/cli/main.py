@@ -1856,12 +1856,12 @@ def seed(
 ) -> None:
     """Deploy Realms GOS product infra (``*.realmsgos.org``) and publish the catalog.
 
-    Always destroys and re-creates Casals, then marketplace, fleet
+    Always destroys and re-creates **Realms GOS** Casals, then marketplace, fleet
     file_registry, token, and nft (keeps marketplace_frontend for DNS).
     Then publishes extensions/codices into that file_registry. Registers
-    GaaS plus product canisters on the new conductor and deploys the union of
-    ``gos-as-a-service/casals.json`` and ``casals.json``. Does not deploy a GaaS
-    portal (``gaas new``). ``--skip-product`` is catalog-only and does not destroy.
+    product canisters on that conductor and deploys ``casals.json``. Does not
+    touch GaaS Casals or the GaaS portal (``gaas new``). ``--skip-product`` is
+    catalog-only and does not destroy.
     """
     seed_command(
         env_name=env,

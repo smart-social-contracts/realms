@@ -8,7 +8,7 @@ from unittest.mock import patch
 from realms.cli.commands.extension import publish_codex_command
 
 
-def test_unified_codex_publish_uses_codex_namespace_prefix():
+def test_unified_codex_publish_uses_ext_namespace_prefix():
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "backend"))
         with open(os.path.join(tmp, "manifest.json"), "w") as fh:
@@ -33,4 +33,4 @@ def test_unified_codex_publish_uses_codex_namespace_prefix():
             )
 
         mock_publish.assert_called_once()
-        assert mock_publish.call_args.kwargs["namespace_prefix"] == "codex"
+        assert mock_publish.call_args.kwargs["namespace_prefix"] == "ext"

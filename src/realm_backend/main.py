@@ -8083,6 +8083,8 @@ def install_extension_from_registry(args: text) -> Async[text]:
             version,
             frontend_canister_id=frontend_id,
             owner=params.get("owner"),
+            install_dependencies=params.get("install_dependencies", True),
+            run_init=params.get("run_init", True),
         )
 
         # After a canister reinstall, init_() runs before extensions are
@@ -8120,7 +8122,10 @@ def install_codex_from_registry(args: text) -> Async[text]:
         "registry_canister_id": str,
         "codex_id": str,           (e.g. "syntropia")
         "version": str|null,       (null = latest)
-        "run_init": bool,          (optional, default true; legacy path only)
+        "run_init": bool,          (optional, default true; set false when
+                                    the installer will call run_codex_init)
+        "install_dependencies": bool (optional, default true; set false when
+                                    deps were already installed as steps)
         "frontend_canister_id": str|null  (overrides Realm entity value)
     }
     """
@@ -8130,6 +8135,7 @@ def install_codex_from_registry(args: text) -> Async[text]:
         codex_id = params.get("codex_id")
         version = params.get("version")
         run_init = params.get("run_init", True)
+        install_dependencies = params.get("install_dependencies", True)
         frontend_id = params.get("frontend_canister_id") or _get_frontend_canister_id()
 
         if not registry_id:
@@ -8140,11 +8146,30 @@ def install_codex_from_registry(args: text) -> Async[text]:
         from api.file_registry import install_codex_from_registry as _install
 
         result = yield from _install(
-            registry_id, codex_id, version, run_init, frontend_canister_id=frontend_id or None
+            registry_id,
+            codex_id,
+            version,
+            run_init,
+            frontend_canister_id=frontend_id or None,
+            install_dependencies=install_dependencies,
         )
         return result
     except Exception as e:
         logger.error(f"install_codex_from_registry error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_INSTALL)
+def run_codex_init(args: text) -> text:
+    """Run an already-installed codex init hook (split from package install)."""
+    try:
+        params = json.loads(args) if args else {}
+        from api.file_registry import run_codex_init as _run
+
+        return _run((params.get("codex_id") or "").strip())
+    except Exception as e:
+        logger.error(f"run_codex_init error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

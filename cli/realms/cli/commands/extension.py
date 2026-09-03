@@ -1724,12 +1724,16 @@ def publish_codex_command(
     if manifest.get("kind") == "codex" and os.path.isdir(
         os.path.join(source_dir, "backend")
     ):
+        # Setup wizard / install_codex_from_registry resolve ``ext/<id>`` first.
+        # Default CLI prefix is ``codex`` (legacy); unified packages must land
+        # under ``ext/`` or ``setup_install_codex`` reports no versions.
+        prefix = "ext" if namespace_prefix == "codex" else namespace_prefix
         return publish_extension_command(
             registry=registry,
             source_dir=source_dir,
             extension_id=codex_id or manifest.get("id"),
             version=version,
-            namespace_prefix=namespace_prefix,
+            namespace_prefix=prefix,
             skip_publish=skip_publish,
             network=network,
             identity=identity,

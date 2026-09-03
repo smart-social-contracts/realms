@@ -2,12 +2,18 @@
   "casals_backend": {
     "demo": "jo3cj-faaaa-aaaac-bffea-cai",
     "staging": "jj2e5-iyaaa-aaaac-bffeq-cai",
-    "test": "nlqtl-jqaaa-aaaae-qkjza-cai"
+    "test": "yk5de-aiaaa-aaaaj-a6woa-cai"
+  },
+  "casals_file_registry": {
+    "test": "yn4fq-nqaaa-aaaaj-a6woq-cai"
+  },
+  "casals_file_registry_frontend": {
+    "test": "ye7om-3yaaa-aaaaj-a6wpa-cai"
   },
   "casals_frontend": {
     "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
     "staging": "mcqbx-hyaaa-aaaaj-qsarq-cai",
-    "test": "nfs6d-saaaa-aaaae-qkjya-cai"
+    "test": "yd6iy-waaaa-aaaaj-a6wpq-cai"
   },
   "ckbtc_indexer": {
     "demo": "n5wcd-faaaa-aaaar-qaaea-cai"
@@ -18,18 +24,18 @@
   "file_registry": {
     "demo": "krch6-ryaaa-aaaas-amw3q-cai",
     "staging": "hacwc-baaaa-aaaac-bfxmq-cai",
-    "test": "a66l7-syaaa-aaaas-amxbq-cai"
+    "test": "bbwyi-raaaa-aaaas-amxfa-cai"
   },
   "file_registry_frontend": {
     "demo": "l4mdq-6qaaa-aaaas-amw4a-cai",
     "ic": "rbex3-xyaaa-aaaah-qumma-cai",
     "staging": "hoa3k-2qaaa-aaaac-bfxnq-cai",
-    "test": "alz2s-tqaaa-aaaas-amxca-cai"
+    "test": "bgx64-4yaaa-aaaas-amxfq-cai"
   },
   "marketplace_backend": {
     "demo": "l3nfe-tiaaa-aaaas-amw4q-cai",
     "staging": "h3hkh-3yaaa-aaaac-bfxoa-cai",
-    "test": "amy4g-6iaaa-aaaas-amxcq-cai"
+    "test": "btqpr-5qaaa-aaaas-amxga-cai"
   },
   "marketplace_frontend": {
     "demo": "lsooy-faaaa-aaaas-amw5a-cai",
@@ -39,37 +45,32 @@
   "nft_backend": {
     "demo": "6hrip-iiaaa-aaaaf-qdoha-cai",
     "staging": "ca5ww-5iaaa-aaaac-bfxra-cai",
-    "test": "bpuva-kqaaa-aaaas-amxea-cai"
+    "test": "b2ten-lyaaa-aaaas-amxhq-cai"
   },
   "nft_frontend": {
     "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai",
     "staging": "ch4qc-qqaaa-aaaac-bfxrq-cai",
-    "test": "bivtu-hiaaa-aaaas-amxeq-cai"
+    "test": "dhokf-yqaaa-aaaas-amxia-cai"
   },
   "platform_dashboard_frontend": {
     "demo": "rxtxq-kyaaa-aaaac-qgora-cai",
-    "staging": "cs3bp-ryaaa-aaaac-bfxsa-cai",
-    "test": "em2mz-rqaaa-aaaag-ayt7q-cai"
+    "staging": "cs3bp-ryaaa-aaaac-bfxsa-cai"
   },
   "realm_backend": {
     "demo": "h5vpp-qyaaa-aaaac-qai3a-cai",
-    "staging": "egxaj-cqaaa-aaaac-bfp7q-cai",
-    "test": "ku6cv-2iaaa-aaaab-agrpa-cai"
+    "staging": "egxaj-cqaaa-aaaac-bfp7q-cai"
   },
   "realm_frontend": {
     "demo": "gzya5-jyaaa-aaaac-qai5a-cai",
-    "staging": "qf5wy-vqaaa-aaaac-bftma-cai",
-    "test": "pqwsi-vyaaa-aaaau-agrbq-cai"
+    "staging": "qf5wy-vqaaa-aaaac-bftma-cai"
   },
   "realm_installer": {
     "demo": "2s4td-daaaa-aaaao-bazmq-cai",
-    "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
-    "test": "5bg7t-naaaa-aaaau-ag6oa-cai"
+    "staging": "lusjm-wqaaa-aaaau-ago7q-cai"
   },
   "realm_registry_backend": {
     "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
-    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
-    "test": "5ubo6-miaaa-aaaau-ag6nq-cai"
+    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai"
   },
   "realm_registry_frontend": {
     "demo": "2zaor-5yaaa-aaaac-qbxaa-cai",
@@ -79,12 +80,12 @@
   "token_backend": {
     "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
     "staging": "cj65k-laaaa-aaaac-bfxqq-cai",
-    "test": "af3x2-iaaaa-aaaas-amxda-cai"
+    "test": "burjf-qiaaa-aaaas-amxgq-cai"
   },
   "token_frontend": {
     "demo": "xglmt-7aaaa-aaaah-qq3yq-cai",
     "staging": "hjb56-xiaaa-aaaac-bfxna-cai",
-    "test": "ac2ro-fyaaa-aaaas-amxdq-cai"
+    "test": "b5scz-gaaaa-aaaas-amxha-cai"
   },
   "website": {
     "ic": "6kdvx-3yaaa-aaaah-qqo5a-cai"

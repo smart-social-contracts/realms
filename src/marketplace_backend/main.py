@@ -272,6 +272,7 @@ from api.approval import (
 from api.config import (
     add_reviewer as add_reviewer_impl,
     get_billing_service_principal,
+    get_casals_frontend_canister_id,
     get_config,
     get_file_registry_canister_id,
     get_license_pricing,
@@ -279,6 +280,7 @@ from api.config import (
     init_config_from_args,
     remove_reviewer as remove_reviewer_impl,
     set_billing_service_principal as set_billing_service_principal_impl,
+    set_casals_frontend_canister_id as set_casals_frontend_canister_id_impl,
     set_file_registry_canister_id as set_file_registry_canister_id_impl,
     set_license_pricing as set_license_pricing_impl,
 )
@@ -826,6 +828,23 @@ def set_file_registry_canister_id(canister_id: text) -> GenericResult:
     try:
         r = set_file_registry_canister_id_impl(canister_id)
         return {"Ok": r["file_registry_canister_id"]} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@query
+def get_casals_frontend_canister_id_q() -> text:
+    try:
+        return get_casals_frontend_canister_id()
+    except Exception:
+        return ""
+
+
+@update
+def set_casals_frontend_canister_id(canister_id: text) -> GenericResult:
+    try:
+        r = set_casals_frontend_canister_id_impl(canister_id)
+        return {"Ok": r["casals_frontend_canister_id"]} if r["success"] else {"Err": r["error"]}
     except Exception as e:
         return {"Err": str(e)}
 

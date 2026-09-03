@@ -165,6 +165,20 @@ export const idlFactory = ({ IDL }) => {
     'item_id' : IDL.Text,
     'developer' : IDL.Text,
   });
+  const Header = IDL.Tuple(IDL.Text, IDL.Text);
+  const HttpRequest = IDL.Record({
+    'url' : IDL.Text,
+    'method' : IDL.Text,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(Header),
+  });
+  const HttpResponseIncoming = IDL.Record({
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(Header),
+    'upgrade' : IDL.Opt(IDL.Bool),
+    'streaming_strategy' : IDL.Opt(IDL.Text),
+    'status_code' : IDL.Nat16,
+  });
   const AssistantListResult = IDL.Record({
     'per_page' : IDL.Nat64,
     'listings' : IDL.Vec(AssistantListing),
@@ -224,20 +238,6 @@ export const idlFactory = ({ IDL }) => {
     'likes_count' : IDL.Nat64,
   });
   const StatusResult = IDL.Variant({ 'Ok' : StatusRecord, 'Err' : IDL.Text });
-  const Header = IDL.Tuple(IDL.Text, IDL.Text);
-  const HttpRequest = IDL.Record({
-    'url' : IDL.Text,
-    'method' : IDL.Text,
-    'body' : IDL.Vec(IDL.Nat8),
-    'headers' : IDL.Vec(Header),
-  });
-  const HttpResponseIncoming = IDL.Record({
-    'body' : IDL.Vec(IDL.Nat8),
-    'headers' : IDL.Vec(Header),
-    'upgrade' : IDL.Opt(IDL.Bool),
-    'streaming_strategy' : IDL.Opt(IDL.Text),
-    'status_code' : IDL.Nat16,
-  });
   return IDL.Service({
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
     'add_reviewer' : IDL.Func([IDL.Text], [GenericResult], []),
@@ -258,6 +258,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_billing_service_principal_q' : IDL.Func([], [IDL.Text], ['query']),
+    'get_casals_frontend_canister_id_q' : IDL.Func([], [IDL.Text], ['query']),
     'get_codex_details' : IDL.Func([IDL.Text], [CodexResult], ['query']),
     'get_extension_details' : IDL.Func(
         [IDL.Text],
@@ -278,8 +279,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'greet' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
-    'http_request' : IDL.Func([HttpRequest], [HttpResponseIncoming], ['query']),
-    'http_request_update' : IDL.Func([HttpRequest], [HttpResponseIncoming], []),
     'has_liked' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text],
         [IDL.Bool],
@@ -300,6 +299,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool],
         ['query'],
       ),
+    'http_request' : IDL.Func([HttpRequest], [HttpResponseIncoming], ['query']),
+    'http_request_update' : IDL.Func([HttpRequest], [HttpResponseIncoming], []),
     'like_item' : IDL.Func([IDL.Text, IDL.Text], [GenericResult], []),
     'list_marketplace_assistants' : IDL.Func(
         [IDL.Nat64, IDL.Nat64, IDL.Bool],
@@ -349,6 +350,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'set_billing_service_principal' : IDL.Func([IDL.Text], [GenericResult], []),
+    'set_casals_frontend_canister_id' : IDL.Func(
+        [IDL.Text],
+        [GenericResult],
+        [],
+      ),
     'set_file_registry_canister_id' : IDL.Func([IDL.Text], [GenericResult], []),
     'set_license_pricing' : IDL.Func(
         [IDL.Nat64, IDL.Nat64],

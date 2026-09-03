@@ -200,6 +200,8 @@ service : (opt MarketplaceInitArg) -> {
   "get_marketplace_config" : () -> (ConfigResult) query;
   "get_file_registry_canister_id_q" : () -> (text) query;
   "set_file_registry_canister_id" : (text) -> (GenericResult);
+  "get_casals_frontend_canister_id_q" : () -> (text) query;
+  "set_casals_frontend_canister_id" : (text) -> (GenericResult);
   "list_reviewers" : () -> (vec text) query;
   "add_reviewer" : (text) -> (GenericResult);
   "remove_reviewer" : (text) -> (GenericResult);

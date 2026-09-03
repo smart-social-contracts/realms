@@ -1,7 +1,8 @@
 """``realms new`` — live realm create.
 
 ``--deploy-mode=gaas`` (default) mirrors the ``*.gos.earth`` wizard: registry
-``request_deployment``, installer job, then in-realm setup as the founder.
+``request_deployment``, then poll the installer job until it completes on-chain.
+No CLI ``enter_setup``, ``set_canister_config_json``, or setup-wizard installs.
 
 ``--deploy-mode=standalone`` mints ``realm_backend`` + ``realm_frontend`` from a
 Realms GitHub release. No credits, no installer, not listed on any GaaS portal.
@@ -243,6 +244,8 @@ def build_portal_manifest(
     version: str,
     founder: str,
     subnet: Dict[str, str],
+    codex_package: str = "",
+    codex_version: Optional[str] = None,
     open_registration: bool = False,
     manifesto: str = "",
     welcome_message: str = "",
@@ -264,6 +267,12 @@ def build_portal_manifest(
         "open_registration": bool(open_registration),
         "extensions": [],
     }
+    package = (codex_package or "").strip()
+    if package:
+        pkg: Dict[str, Any] = {"name": package}
+        version_text = (codex_version or "").strip()
+        pkg["version"] = version_text or "latest"
+        realm_block["codex"] = {"package": pkg}
     manifest: Dict[str, Any] = {
         "name": name,
         "network": network,
@@ -289,6 +298,31 @@ def build_portal_manifest(
             str(k): bool(v) for k, v in test_flags.items()
         }
     return manifest
+
+
+def _normalize_codex_package(
+    *,
+    cli_codex: Optional[str],
+    spec_package: Any,
+    cli_version: Optional[str],
+    spec_version: Any,
+) -> Tuple[str, Optional[str]]:
+    """Return ``(package_name, version)``. Spec may use ``{name, version}``."""
+    version = cli_version if cli_version is not None else spec_version
+    if cli_codex is not None:
+        package: Any = cli_codex
+    else:
+        package = spec_package
+    if isinstance(package, dict):
+        name = str(package.get("name") or package.get("package") or "").strip()
+        if version is None:
+            version = package.get("version")
+        package = name
+    else:
+        package = str(package or "").strip()
+    if version is not None:
+        version = str(version).strip() or None
+    return package, version
 
 
 def _deep_get(data: Dict[str, Any], *keys: str, default: Any = None) -> Any:
@@ -370,11 +404,12 @@ def merge_spec_and_flags(
 
     subnet = parse_subnet(spec.get("subnet"), subnet_flag)
 
-    package = (codex if codex is not None else codex_spec.get("package") or "") or ""
-    package = str(package).strip()
-    cv = codex_version if codex_version is not None else codex_spec.get("version")
-    if cv is not None:
-        cv = str(cv).strip() or None
+    package, cv = _normalize_codex_package(
+        cli_codex=codex,
+        spec_package=codex_spec.get("package"),
+        cli_version=codex_version,
+        spec_version=codex_spec.get("version"),
+    )
 
     logo_path = resolve_spec_path(
         logo if logo is not None else branding_spec.get("logo"), spec_dir
@@ -388,12 +423,16 @@ def merge_spec_and_flags(
     ) or ""
     primary_color = str(primary_color).strip()
     merged_manifesto = (
-        manifesto if manifesto is not None else branding_spec.get("manifesto") or ""
+        manifesto
+        if manifesto is not None
+        else branding_spec.get("manifesto") or spec.get("manifesto") or ""
     ) or ""
     merged_welcome = (
         welcome
         if welcome is not None
-        else branding_spec.get("welcome_message") or ""
+        else branding_spec.get("welcome_message")
+        or spec.get("welcome_message")
+        or ""
     ) or ""
 
     token: Optional[Dict[str, str]] = None
@@ -856,6 +895,12 @@ def _parse_jsonish(stdout: str) -> Any:
             # Fall back to response_bytes hex decode if needed
             if "response_bytes" in envelope:
                 return envelope
+        # dfx --output json for a Candid ``text`` is a JSON string of JSON.
+        if isinstance(envelope, str):
+            try:
+                return json.loads(envelope)
+            except json.JSONDecodeError:
+                return envelope
         return envelope
     except json.JSONDecodeError:
         pass
@@ -1010,6 +1055,28 @@ def _job_fields(info: Any) -> Dict[str, Any]:
     return info
 
 
+INSTALLER_ACCESS_DENIED_HINT = (
+    "The live installer must be an IC controller of the new realm canisters "
+    "(Casals extra_controller_principals / provision controllers). Do not "
+    "publish a new realm-backend WASM just to add the installer id to "
+    "NETWORK_INFRA. CLI bootstrap (enter_setup / set_canister_config_json) "
+    "is not used on the GaaS path."
+)
+
+
+def _format_installer_job_failure(
+    info: Dict[str, Any], *, installer_id: str = ""
+) -> str:
+    err = str(info.get("error") or info.get("status") or "installer job failed").strip()
+    low = err.lower()
+    if "accessdenied" in low or "access denied" in low:
+        hint = INSTALLER_ACCESS_DENIED_HINT
+        if installer_id:
+            hint = f"{hint} Installer: {installer_id}."
+        return f"{err}\n{hint}"
+    return err
+
+
 def poll_installer_until_ready(
     installer_id: str,
     job_id: str,
@@ -1018,7 +1085,7 @@ def poll_installer_until_ready(
     *,
     timeout_s: int = POLL_TIMEOUT_S,
 ) -> Dict[str, Any]:
-    """Poll until backend+frontend exist (enter_setup is checked separately)."""
+    """Poll until the installer job reaches ``completed`` (or a terminal failure)."""
     start = time.time()
     last_status = ""
     while time.time() - start < timeout_s:
@@ -1038,20 +1105,57 @@ def poll_installer_until_ready(
             continue
         info = _job_fields(raw)
         if info.get("success") is False and info.get("error"):
-            _fail("poll", str(info.get("error")))
+            _fail("poll", _format_installer_job_failure(info, installer_id=installer_id))
         status = str(info.get("status") or "unknown")
-        backend = str(info.get("backend_canister_id") or "").strip()
-        frontend = str(info.get("frontend_canister_id") or "").strip()
         if status != last_status:
             console.print(f"  installer: {status}")
             last_status = status
         if status in ("failed", "failed_verification", "cancelled"):
-            _fail("poll", info.get("error") or status)
-        if backend and frontend:
+            _fail(
+                "poll",
+                _format_installer_job_failure(info, installer_id=installer_id),
+            )
+        if status == "completed":
+            if info.get("error"):
+                _fail(
+                    "poll",
+                    _format_installer_job_failure(info, installer_id=installer_id),
+                )
+            backend = str(info.get("backend_canister_id") or "").strip()
+            frontend = str(info.get("frontend_canister_id") or "").strip()
+            if not (backend and frontend):
+                _fail(
+                    "poll",
+                    "installer reported completed but backend/frontend ids are missing",
+                )
             return info
         time.sleep(POLL_INTERVAL_S)
-    _fail("poll", f"Timed out after {timeout_s}s waiting for canisters (job {job_id})")
+    _fail("poll", f"Timed out after {timeout_s}s waiting for installer job {job_id}")
     raise AssertionError("unreachable")
+
+
+def _as_setup_state(raw: Any) -> Dict[str, Any]:
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def get_setup_state(
+    backend_id: str, network: str, identity: str
+) -> Dict[str, Any]:
+    raw = _canister_call(
+        backend_id,
+        "get_setup_state",
+        "()",
+        network,
+        identity,
+        query=True,
+        timeout=60,
+    )
+    return _as_setup_state(raw)
 
 
 def wait_for_enter_setup(
@@ -1059,33 +1163,138 @@ def wait_for_enter_setup(
     network: str,
     identity: str,
     *,
-    timeout_s: int = 600,
+    timeout_s: int = 90,
 ) -> Dict[str, Any]:
+    """Poll until the installer recorded a founder. Default ``setup`` is not enough."""
     start = time.time()
     last_err = ""
+    last: Dict[str, Any] = {}
     while time.time() - start < timeout_s:
         try:
-            state = _canister_call(
-                backend_id,
-                "get_setup_state",
-                "()",
-                network,
-                identity,
-                query=True,
-                timeout=60,
-            )
-            if isinstance(state, dict) and state.get("success"):
-                if state.get("creator") or state.get("status") == "setup":
-                    return state
+            state = get_setup_state(backend_id, network, identity)
+            last = state
+            if state.get("success") and state.get("creator"):
+                return state
         except Exception as exc:
             last_err = str(exc)
         time.sleep(POLL_INTERVAL_S)
-    _fail(
-        "poll",
-        f"Timed out waiting for enter_setup on {backend_id}"
-        + (f": {last_err}" if last_err else ""),
+    if last_err and not last:
+        console.print(f"  enter_setup poll: {last_err}")
+    return last
+
+
+def ensure_founder_enter_setup(
+    backend_id: str,
+    founder: str,
+    registry_id: str,
+    environment: str,
+    network: str,
+    identity: str,
+    *,
+    timeout_s: int = 90,
+) -> Dict[str, Any]:
+    """Wait for installer enter_setup; if the founder is still missing, call it."""
+    state = wait_for_enter_setup(
+        backend_id, network, identity, timeout_s=timeout_s
     )
-    raise AssertionError("unreachable")
+    if state.get("creator"):
+        return state
+    console.print("  installer did not record founder — calling enter_setup")
+    call_enter_setup(
+        backend_id, founder, registry_id, environment, network, identity
+    )
+    state = get_setup_state(backend_id, network, identity)
+    if not state.get("creator"):
+        _fail(
+            "setup",
+            f"enter_setup did not record founder on {backend_id}",
+        )
+    return state
+
+
+def _canister_id_from_inventory(name: str, network: str) -> str:
+    try:
+        from .env import _read_canister_ids
+
+        cid = (_read_canister_ids(get_project_root()).get(name) or {}).get(network)
+        return str(cid or "").strip()
+    except Exception:
+        return ""
+
+
+def apply_bootstrap_canister_config(
+    backend_id: str,
+    frontend_id: str,
+    network: str,
+    identity: str,
+    *,
+    founder: str = "",
+    gaas: Optional["GaasConfig"] = None,
+) -> None:
+    """Write live file_registry / frontend IDs. Installer often cannot (no realm.admin)."""
+    file_registry = _canister_id_from_inventory(
+        "file_registry", network
+    ) or _file_registry_id_or_empty(network)
+    marketplace = _canister_id_from_inventory("marketplace_backend", network)
+    payload: Dict[str, Any] = {}
+    if frontend_id:
+        payload["frontend_canister_id"] = frontend_id
+    if file_registry:
+        payload["file_registry_canister_id"] = file_registry
+    if marketplace:
+        payload["marketplace_canister_id"] = marketplace
+    if gaas is not None:
+        if gaas.registry_id:
+            payload["realm_registry_canister_id"] = gaas.registry_id
+        if gaas.can_test_mode is not None:
+            payload["can_test_mode"] = bool(gaas.can_test_mode)
+        if gaas.test_flags:
+            payload["test_flags"] = dict(gaas.test_flags)
+        if gaas.portal_host:
+            payload["portal_origin"] = gaas.portal_host
+    if founder:
+        payload["creator_principal"] = founder
+    if not payload.get("file_registry_canister_id"):
+        _fail(
+            "setup",
+            "file_registry_canister_id not configured (missing from "
+            "canister_ids.json / installer bootstrap)",
+        )
+    console.print(
+        f"  set_canister_config_json file_registry={payload['file_registry_canister_id']}"
+    )
+    _setup_json_call(
+        backend_id,
+        "set_canister_config_json",
+        payload,
+        network,
+        identity,
+        timeout=180,
+        stage="setup",
+    )
+    if gaas is not None and gaas.can_test_mode:
+        _disable_marketplace_approval_gate(backend_id, network, identity)
+
+
+def _disable_marketplace_approval_gate(
+    backend_id: str, network: str, identity: str
+) -> None:
+    """GOS file_registry has no ``get_namespace_approval_icc``; setup cannot install."""
+    console.print("  require_marketplace_approval=false (registry has no approval API)")
+    raw = _setup_json_call(
+        backend_id,
+        "update_realm_config",
+        {"require_marketplace_approval": False},
+        network,
+        identity,
+        timeout=180,
+        stage="setup",
+    )
+    if raw.get("success") is False:
+        _fail(
+            "setup",
+            raw.get("error") or "update_realm_config require_marketplace_approval failed",
+        )
 
 
 def _setup_json_call(
@@ -1204,6 +1413,121 @@ def register_co_admin_principal(
     console.print(f"  co-admin {principal} (admin profile + root org)")
 
 
+def _local_manifest_dependencies(package: str) -> List[str]:
+    """Post-order dependency ids from local extension/codex manifests (package last omitted)."""
+    root = get_project_root()
+    search = [
+        root / "codices" / "codices",
+        root / "extensions" / "extensions",
+    ]
+    ordered: List[str] = []
+    seen: set[str] = set()
+
+    def walk(name: str) -> None:
+        key = (name or "").strip()
+        if not key or key in seen:
+            return
+        seen.add(key)
+        manifest: Dict[str, Any] = {}
+        for folder in search:
+            path = folder / key / "manifest.json"
+            if path.is_file():
+                try:
+                    loaded = json.loads(path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    loaded = {}
+                if isinstance(loaded, dict):
+                    manifest = loaded
+                break
+        for dep in manifest.get("dependencies") or []:
+            if isinstance(dep, str):
+                walk(dep)
+            elif isinstance(dep, dict):
+                walk(str(dep.get("id") or dep.get("name") or ""))
+        ordered.append(key)
+
+    walk(package)
+    return ordered
+
+
+def _list_runtime_extension_ids(
+    backend_id: str, network: str, identity: str
+) -> set[str]:
+    try:
+        raw = _canister_call(
+            backend_id,
+            "list_runtime_extensions",
+            "()",
+            network,
+            identity,
+            query=True,
+            timeout=60,
+        )
+    except Exception:
+        return set()
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return set()
+    if not isinstance(raw, dict):
+        return set()
+    ids = raw.get("runtime_extensions") or raw.get("extensions") or []
+    return {str(x).strip() for x in ids if str(x).strip()}
+
+
+def _already_installed(err: str) -> bool:
+    low = (err or "").lower()
+    return "already" in low and ("install" in low or "exist" in low)
+
+
+def preinstall_codex_dependencies(
+    backend_id: str,
+    package: str,
+    network: str,
+    identity: str,
+) -> None:
+    """Install extension deps one-by-one so setup_install_codex stays under the ingress window."""
+    deps = _local_manifest_dependencies(package)
+    if not deps:
+        return
+    installed = _list_runtime_extension_ids(backend_id, network, identity)
+    pending = [name for name in deps if name not in installed]
+    skipped = len(deps) - len(pending)
+    if skipped:
+        console.print(f"  already installed: {skipped} of {len(deps)}")
+    if not pending:
+        return
+    registry_id = _canister_id_from_inventory(
+        "file_registry", network
+    ) or _file_registry_id_or_empty(network)
+    if not registry_id:
+        _fail("setup", "cannot preinstall codex dependencies: no file_registry id")
+    console.print(f"  preinstall {len(pending)} remaining packages for {package}")
+    for ext_id in pending:
+        payload = {
+            "registry_canister_id": registry_id,
+            "ext_id": ext_id,
+            "version": "latest",
+        }
+        console.print(f"  install_extension_from_registry {ext_id}")
+        try:
+            _setup_json_call(
+                backend_id,
+                "install_extension_from_registry",
+                payload,
+                network,
+                identity,
+                timeout=300,
+                stage="setup",
+            )
+        except StageError as exc:
+            if _already_installed(exc.message):
+                console.print(f"  {ext_id} already installed")
+                continue
+            raise
+
+
 def run_setup_stage(
     merged: Dict[str, Any],
     backend_id: str,
@@ -1235,10 +1559,13 @@ def run_setup_stage(
     console.print("  setup_save_draft (codex / identity)")
     _setup_json_call(backend_id, "setup_save_draft", draft, network, identity)
 
-    install_args: Dict[str, Any] = {"package": merged["codex"]["package"]}
-    if merged["codex"].get("version"):
-        install_args["version"] = merged["codex"]["version"]
-    console.print(f"  setup_install_codex {install_args['package']}")
+    package = str(merged["codex"]["package"])
+    version = merged["codex"].get("version")
+    preinstall_codex_dependencies(backend_id, package, network, identity)
+    install_args: Dict[str, Any] = {"package": package}
+    if version:
+        install_args["version"] = version
+    console.print(f"  setup_install_codex {package}")
     _setup_json_call(
         backend_id, "setup_install_codex", install_args, network, identity, timeout=600
     )
@@ -2028,15 +2355,22 @@ def new_command(
                 slug=merged["slug"],
             )
             portal = f"https://{frontend_id}.icp0.io/"
-            call_enter_setup(
+            ensure_founder_enter_setup(
                 backend_id,
                 founder,
                 _file_registry_id_or_empty(network),
                 network,
                 network,
                 identity,
+                timeout_s=15,
             )
-            wait_for_enter_setup(backend_id, network, identity)
+            apply_bootstrap_canister_config(
+                backend_id,
+                frontend_id,
+                network,
+                identity,
+                founder=founder,
+            )
             console.print(f"  portal {portal}")
             stage = "setup"
             if setup_already_complete(backend_id, network, identity):
@@ -2112,27 +2446,11 @@ def new_command(
         if job_id:
             stage = "poll"
             console.print(f"[bold]resume[/bold] job {job_id}")
-            try:
-                raw = _canister_call(
-                    installer_id,
-                    "get_deployment_job_status",
-                    f'("{job_id}")',
-                    network,
-                    identity,
-                    query=True,
-                    timeout=60,
-                )
-                info = _job_fields(raw)
-                backend_id = str(info.get("backend_canister_id") or "").strip()
-                frontend_id = str(info.get("frontend_canister_id") or "").strip()
-            except Exception as exc:
-                _fail("poll", f"Could not load job {job_id}: {exc}")
-            if not (backend_id and frontend_id):
-                info = poll_installer_until_ready(
-                    installer_id, job_id, network, identity
-                )
-                backend_id = str(info.get("backend_canister_id") or "").strip()
-                frontend_id = str(info.get("frontend_canister_id") or "").strip()
+            info = poll_installer_until_ready(
+                installer_id, job_id, network, identity
+            )
+            backend_id = str(info.get("backend_canister_id") or "").strip()
+            frontend_id = str(info.get("frontend_canister_id") or "").strip()
         else:
             stage = "deploy"
             manifest = build_portal_manifest(
@@ -2142,6 +2460,8 @@ def new_command(
                 version=merged["version"],
                 founder=founder,
                 subnet=merged["subnet"],
+                codex_package=merged["codex"]["package"],
+                codex_version=merged["codex"].get("version"),
                 open_registration=bool(merged.get("open_registration")),
                 manifesto=merged["branding"].get("manifesto") or "",
                 welcome_message=merged["branding"].get("welcome_message") or "",
@@ -2151,6 +2471,13 @@ def new_command(
             )
             if "artifacts" in manifest or "expected_hashes" in manifest:
                 _fail("deploy", "internal error: GitHub artifact URLs must not appear in the portal manifest")
+            infra = manifest.setdefault("infra", {})
+            live_fr = _canister_id_from_inventory("file_registry", network)
+            live_mp = _canister_id_from_inventory("marketplace_backend", network)
+            if live_fr:
+                infra["file_registry_canister_id"] = live_fr
+            if live_mp:
+                infra["marketplace_canister_id"] = live_mp
             job_id = request_deployment(manifest, registry_id, network, identity)
             console.print(f"  job_id {job_id}")
             stage = "poll"
@@ -2158,14 +2485,7 @@ def new_command(
             backend_id = str(info.get("backend_canister_id") or "").strip()
             frontend_id = str(info.get("frontend_canister_id") or "").strip()
 
-        wait_for_enter_setup(backend_id, network, identity)
         console.print(f"  portal {portal}")
-
-        stage = "setup"
-        if setup_already_complete(backend_id, network, identity):
-            console.print("  setup already complete — skipping")
-        else:
-            run_setup_stage(merged, backend_id, network, identity)
 
         stage = "co-admin"
         register_co_admin_principal(merged, backend_id, network, identity)

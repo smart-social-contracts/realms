@@ -222,6 +222,8 @@ class MarketplaceConfigEntity(Entity):
 
     Holds:
       * ``file_registry_canister_id`` — where listings store their files.
+      * ``casals_frontend_canister_id`` — Realms GOS Casals frontend
+        (footer conductor link; not baked into marketplace WASM).
       * ``billing_service_principal`` — principal allowed to call
         ``record_license_payment`` (the off-chain Stripe relay).
       * ``license_price_usd_cents`` and ``license_duration_seconds`` —
@@ -229,7 +231,7 @@ class MarketplaceConfigEntity(Entity):
         same pricing when creating a checkout session.
     """
     __alias__ = "id"
-    __version__ = 2
+    __version__ = 3
 
     @classmethod
     def migrate(cls, obj, from_version, to_version):
@@ -237,10 +239,13 @@ class MarketplaceConfigEntity(Entity):
             # Config written before reviewers existed: no one is appointed, so
             # only controllers can review until someone is.
             obj.setdefault("reviewers", "")
+        if from_version < 3:
+            obj.setdefault("casals_frontend_canister_id", "")
         return obj
 
     id                          = String(max_length=16)  # always "config"
     file_registry_canister_id   = String(max_length=64)
+    casals_frontend_canister_id = String(max_length=64)
     billing_service_principal   = String(max_length=128)
     license_price_usd_cents     = Integer()
     license_duration_seconds    = Integer()

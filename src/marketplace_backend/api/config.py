@@ -40,6 +40,7 @@ def _ensure_config() -> MarketplaceConfigEntity:
         cfg = MarketplaceConfigEntity(
             id=CONFIG_ID,
             file_registry_canister_id="",
+            casals_frontend_canister_id="",
             billing_service_principal="",
             license_price_usd_cents=DEFAULT_LICENSE_PRICE_USD_CENTS,
             license_duration_seconds=DEFAULT_LICENSE_DURATION_SECONDS,
@@ -53,6 +54,7 @@ def get_config() -> Dict:
         "success": True,
         "config": {
             "file_registry_canister_id": cfg.file_registry_canister_id or "",
+            "casals_frontend_canister_id": cfg.casals_frontend_canister_id or "",
             "billing_service_principal": cfg.billing_service_principal or "",
             "license_price_usd_cents": int(cfg.license_price_usd_cents or DEFAULT_LICENSE_PRICE_USD_CENTS),
             "license_duration_seconds": int(cfg.license_duration_seconds or DEFAULT_LICENSE_DURATION_SECONDS),
@@ -113,6 +115,26 @@ def remove_reviewer(principal: str) -> Dict:
 def get_file_registry_canister_id() -> str:
     cfg = _ensure_config()
     return cfg.file_registry_canister_id or ""
+
+
+def get_casals_frontend_canister_id() -> str:
+    cfg = _ensure_config()
+    return cfg.casals_frontend_canister_id or ""
+
+
+def set_casals_frontend_canister_id(canister_id: str) -> Dict:
+    err = _require_controller()
+    if not err["success"]:
+        return err
+    cfg = _ensure_config()
+    cfg.casals_frontend_canister_id = canister_id.strip()
+    logger.info(
+        f"set_casals_frontend_canister_id -> {cfg.casals_frontend_canister_id!r}"
+    )
+    return {
+        "success": True,
+        "casals_frontend_canister_id": cfg.casals_frontend_canister_id,
+    }
 
 
 def set_file_registry_canister_id(canister_id: str) -> Dict:

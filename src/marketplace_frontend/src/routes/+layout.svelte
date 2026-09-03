@@ -8,9 +8,9 @@ import "../index.scss";
 import { bootstrapAuth, isAuthenticated, login, logout, principalStore } from "$lib/auth";
 import { invalidateActor, marketplace } from "$lib/canisters";
 import { shortPrincipal } from "$lib/format";
-import { resolveCasalsUrl } from "$lib/config";
+import { resolveCasalsUrlLive } from "$lib/config";
 
-$: casalsUrl = browser ? resolveCasalsUrl() : "";
+let casalsUrl = "";
 $: isHome = $page.url.pathname === "/";
 $: isFlush = isHome || $page.url.pathname === "/about";
 let booted = false;
@@ -35,6 +35,11 @@ onMount(async () => {
   booted = true;
   refreshController();
   onWindowScroll();
+  try {
+    casalsUrl = await resolveCasalsUrlLive();
+  } catch {
+    casalsUrl = "";
+  }
 });
 $: if (browser && $locale) document.documentElement.lang = $locale;
 async function refreshController() {

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import copy
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import typer
 
@@ -28,13 +28,6 @@ _PRODUCT_REGISTRATIONS: tuple[tuple[str, str, str, str], ...] = (
     ("token", "token-frontend", "token_frontend", "frontend"),
     ("nft", "nft-backend", "nft_backend", "backend"),
     ("nft", "nft-frontend", "nft_frontend", "frontend"),
-)
-
-# GaaS IDs from gos-as-a-service/environments/<env>.json (stand, name, descriptor key, kind)
-_GAAS_REGISTRATIONS: tuple[tuple[str, str, str, str], ...] = (
-    ("installer", "realm-installer", "realm_installer", "backend"),
-    ("realm-registry", "realm-registry-backend", "realm_registry_backend", "backend"),
-    ("realm-registry", "realm-registry-frontend", "realm_registry_frontend", "frontend"),
 )
 
 
@@ -78,7 +71,11 @@ def resolve_conductor_id(
     env_name: str,
     project_root: Optional[Path] = None,
 ) -> Optional[str]:
-    """Resolve the GaaS Casals conductor backend for an environment."""
+    """Resolve the **Realms GOS** Casals conductor backend for an environment.
+
+    Never falls back to the GaaS descriptor — that conductor is a different
+    instance and must not receive the product sheet.
+    """
     root = project_root or get_project_root()
 
     try:
@@ -97,8 +94,9 @@ def resolve_conductor_id(
         if cid:
             return cid
 
-    gos = load_gos_canisters(env_name, root)
-    cid = (gos.get("casals_backend") or "").strip()
+    network = (env_cfg.get("network") or env_name or "").strip()
+    realms_ids = _read_canister_ids(root)
+    cid = ((realms_ids.get("casals_backend") or {}).get(network) or "").strip()
     if cid:
         return cid
 
@@ -111,88 +109,15 @@ def product_sheet_path(project_root: Optional[Path] = None) -> Path:
     return root / "casals.json"
 
 
-def gaas_sheet_path(project_root: Optional[Path] = None) -> Path:
-    """Locate gos-as-a-service/casals.json (GAAS_SRC / sibling checkout)."""
-    root = (project_root or get_project_root()).resolve()
-    env = (os.environ.get("GAAS_SRC") or os.environ.get("GOS_SRC") or "").strip()
-    if env:
-        candidate = Path(env) / "casals.json"
-        if candidate.is_file():
-            return candidate
-    return root.parent / "gos-as-a-service" / "casals.json"
-
-
-def merge_sheets(gaas: dict, product: dict) -> dict:
-    """Union GaaS + product sheets by section / stand / canister name.
-
-    ``deploy_sheet`` Pass 2 retires every orchestra canister not listed. A
-    Product-only sheet on a conductor that still has GaaS canisters would
-    stop installer / registry / multisig.
-    """
-    merged: dict[str, Any] = copy.deepcopy(
-        {k: v for k, v in gaas.items() if k != "$comment"}
-    )
-    merged["name"] = "gaas-realms-union"
-    merged["description"] = (
-        "Union of gos-as-a-service/casals.json and realms/casals.json"
-    )
-    sections: list[dict] = list(merged.get("sections") or [])
-    by_name = {(sec.get("name") or ""): sec for sec in sections}
-
-    for sec in product.get("sections") or []:
-        sname = (sec.get("name") or "").strip()
-        if not sname:
-            continue
-        if sname not in by_name:
-            cloned = copy.deepcopy(sec)
-            sections.append(cloned)
-            by_name[sname] = cloned
-            continue
-        existing = by_name[sname]
-        stands = list(existing.get("stands") or [])
-        stand_by_name = {(st.get("name") or ""): st for st in stands}
-        for stand in sec.get("stands") or []:
-            dname = (stand.get("name") or "").strip()
-            if not dname:
-                continue
-            if dname not in stand_by_name:
-                cloned_stand = copy.deepcopy(stand)
-                stands.append(cloned_stand)
-                stand_by_name[dname] = cloned_stand
-                continue
-            dest = stand_by_name[dname]
-            canisters = list(dest.get("canisters") or [])
-            can_by_name = {(c.get("name") or ""): c for c in canisters}
-            for canister in stand.get("canisters") or []:
-                cname = (canister.get("name") or "").strip()
-                if not cname:
-                    continue
-                if cname not in can_by_name:
-                    canisters.append(copy.deepcopy(canister))
-                    can_by_name[cname] = canisters[-1]
-            dest["canisters"] = canisters
-        existing["stands"] = stands
-    merged["sections"] = sections
-    return merged
-
-
-def load_union_sheet(project_root: Optional[Path] = None) -> dict:
-    root = project_root or get_project_root()
-    gaas_path = gaas_sheet_path(root)
-    product_path = product_sheet_path(root)
-    if not gaas_path.is_file():
-        raise RuntimeError(
-            f"GaaS sheet missing at {gaas_path} "
-            "(clone ../gos-as-a-service or set GAAS_SRC)"
-        )
-    if not product_path.is_file():
-        raise RuntimeError(f"product sheet missing at {product_path}")
+def load_product_sheet(project_root: Optional[Path] = None) -> dict:
+    """Load ``realms/casals.json`` (product orchestra only)."""
+    path = product_sheet_path(project_root)
+    if not path.is_file():
+        raise RuntimeError(f"product sheet missing at {path}")
     try:
-        gaas = json.loads(gaas_path.read_text(encoding="utf-8"))
-        product = json.loads(product_path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"invalid Casals sheet JSON: {exc}") from exc
-    return merge_sheets(gaas, product)
 
 
 def load_gos_canisters(
@@ -549,64 +474,12 @@ def register_product_canisters(
         )
 
 
-def register_gaas_canisters(
-    *,
-    conductor: str,
-    network: str,
-    identity: Optional[str],
-    casals_src: Path,
-    env_name: str,
-    project_root: Optional[Path] = None,
-) -> None:
-    """Register existing GaaS canisters so union sheet deploy reinstalls them."""
-    root = project_root or get_project_root()
-    gos = load_gos_canisters(env_name, root)
-    tree = run_casals_tree(
-        network=network,
-        identity=identity,
-        casals_src=casals_src,
-        canister=conductor,
-    )
-    registered = canister_ids_from_tree(tree)
-
-    missing: list[str] = []
-    for stand, name, ids_key, kind in _GAAS_REGISTRATIONS:
-        cid = (gos.get(ids_key) or "").strip()
-        if not cid:
-            missing.append(ids_key)
-            continue
-        _register_named(
-            conductor=conductor,
-            network=network,
-            identity=identity,
-            casals_src=casals_src,
-            registered=registered,
-            stand=stand,
-            name=name,
-            cid=cid,
-            kind=kind,
-        )
-    if missing:
-        raise RuntimeError(
-            "missing GaaS canister ids for union sheet register: "
-            + ", ".join(missing)
-            + f" (gos-as-a-service/environments/{env_name}.json)"
-        )
-
-
 _CASALS_STACK_GOS_KEYS: tuple[str, ...] = (
     "casals_backend",
     "casals_frontend",
     "casals_file_registry",
     "casals_file_registry_frontend",
 )
-
-_CASALS_NEW_TO_GOS: dict[str, str] = {
-    "casals_backend": "casals_backend",
-    "casals_frontend": "casals_frontend",
-    "ic_file_registry": "casals_file_registry",
-    "ic_file_registry_frontend": "casals_file_registry_frontend",
-}
 
 _IC_TOKENS_VERSION = "0.1.0"
 _IC_TOKENS_BASE = (
@@ -622,8 +495,11 @@ _CERTIFIED_ASSETS_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
 # seed then OOGs. Top up before seed.py uploads.
 _CASALS_FILE_REGISTRY_TOPUP = 2_000_000_000_000
 _CASALS_CONDUCTOR_TOPUP = 8_000_000_000_000
-# Keep in sync with scripts/fetch_gos_artifacts.py GOS_RELEASE (no leading v).
-_GOS_CATALOG_VERSION = "0.3.2"
+_WALLET_RESERVE_CYCLES = 200_000_000_000
+_CYCLES_BALANCE_RE = re.compile(
+    r"([\d_]+(?:\.\d+)?)\s*(TC|t|cycles)",
+    re.IGNORECASE,
+)
 
 
 def gos_descriptor_path(
@@ -638,45 +514,279 @@ def gos_descriptor_path(
     return root.parent / "gos-as-a-service" / "environments" / f"{env_name}.json"
 
 
-def persist_casals_ids_to_gos(
-    env_name: str,
-    canisters: dict,
-    project_root: Optional[Path] = None,
-) -> Path:
-    """Write ``casals new`` principals into the GaaS environment descriptor."""
-    path = gos_descriptor_path(env_name, project_root)
-    if not path.is_file():
-        raise RuntimeError(f"GaaS descriptor missing at {path}")
-    data = json.loads(path.read_text(encoding="utf-8"))
-    dest = data.setdefault("canisters", {})
-    if not isinstance(dest, dict):
-        raise RuntimeError(f"{path} canisters must be an object")
-    for casals_key, cid in (canisters or {}).items():
-        gos_key = _CASALS_NEW_TO_GOS.get(casals_key)
-        if not gos_key or not isinstance(cid, str) or not cid.strip():
-            continue
-        dest[gos_key] = cid.strip()
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    return path
-
-
 def persist_casals_ids_to_realms(
     network: str,
     canisters: dict,
     project_root: Optional[Path] = None,
 ) -> None:
-    """Write new conductor IDs into realms ``canister_ids.json`` for this network."""
+    """Write new **Realms GOS** conductor IDs into ``canister_ids.json``."""
     from .commands.env import _set_canister_id
 
     root = project_root or get_project_root()
     mapping = {
         "casals_backend": "casals_backend",
         "casals_frontend": "casals_frontend",
+        "ic_file_registry": "casals_file_registry",
+        "ic_file_registry_frontend": "casals_file_registry_frontend",
     }
     for casals_key, realms_key in mapping.items():
         cid = (canisters.get(casals_key) or "").strip()
         if cid:
             _set_canister_id(root, realms_key, network, cid)
+
+
+def persist_casals_url_to_env(
+    env_name: str,
+    canisters: dict,
+    project_root: Optional[Path] = None,
+) -> None:
+    """Point ``environments/<env>.json`` ``casals_url`` at Realms GOS Casals frontend."""
+    frontend = (canisters.get("casals_frontend") or "").strip()
+    if not frontend:
+        return
+    root = project_root or get_project_root()
+    path = root / "environments" / f"{env_name}.json"
+    if not path.is_file():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    if not isinstance(data, dict):
+        return
+    data["casals_url"] = f"https://{frontend}.icp0.io"
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def configure_gaas_installer_product_pointers(
+    *,
+    env_name: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+) -> None:
+    """Point the GaaS installer at the fleet file-registry and marketplace.
+
+    Does not write those ids into the GaaS descriptor. ``casals_canister_id``
+    stays the GaaS conductor.
+    """
+    root = project_root or get_project_root()
+    path = gos_descriptor_path(env_name, root)
+    if not path.is_file():
+        console.print(
+            f"[yellow]⚠️  no GaaS descriptor at {path}; skip installer product pointers[/yellow]"
+        )
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise RuntimeError(f"invalid GaaS descriptor {path}: {exc}") from exc
+    cans = data.get("canisters") if isinstance(data, dict) else None
+    if not isinstance(cans, dict):
+        raise RuntimeError(f"{path} canisters must be an object")
+    installer = (cans.get("realm_installer") or "").strip()
+    if not installer:
+        console.print("[yellow]⚠️  no realm_installer in GaaS descriptor; skip[/yellow]")
+        return
+    file_registry = _product_canister_id(network, "file_registry", root)
+    marketplace = _product_canister_id(network, "marketplace_backend", root)
+    if not file_registry or not marketplace:
+        console.print(
+            "[yellow]⚠️  missing fleet file_registry or marketplace_backend; "
+            "skip installer product pointers[/yellow]"
+        )
+        return
+    domain = str((data.get("domain") or "")).strip()
+    portal = domain if domain.startswith("http") else (f"https://{domain}" if domain else "")
+    threshold_tc = 2.0
+    cycles = data.get("cycles") if isinstance(data.get("cycles"), dict) else {}
+    try:
+        threshold_tc = float(cycles.get("threshold_tc") or 2.0)
+    except (TypeError, ValueError):
+        pass
+    payload = {
+        "registry_backend_id": (cans.get("realm_registry_backend") or "").strip(),
+        "file_registry_id": file_registry,
+        "marketplace_id": marketplace,
+        "casals_canister_id": (cans.get("casals_backend") or "").strip(),
+        "casals_section": "Deployments",
+        "portal_url": portal,
+        "provision_via_casals": True,
+        "create_stand_baton": True,
+        "baton_wasm_key": "orchestration-baton@1.3.0",
+        "cycle_threshold_cycles": int(threshold_tc * 1_000_000_000_000),
+    }
+    arg = _candid_text_arg(json.dumps(payload))
+    cmd = [
+        "icp",
+        "canister",
+        "call",
+        installer,
+        "configure",
+        arg,
+        "-n",
+        "https://icp0.io",
+        "--root-key",
+        "mainnet",
+    ]
+    if identity:
+        cmd.extend(["--identity", identity])
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_dfx_subprocess_env(),
+    )
+    if result.returncode != 0:
+        dfx_cmd = [
+            "dfx",
+            "canister",
+            "call",
+            installer,
+            "configure",
+            arg,
+        ]
+        if identity:
+            dfx_cmd.extend(["--identity", identity])
+        if network:
+            dfx_cmd.extend(["--network", network])
+        result = subprocess.run(
+            dfx_cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_dfx_subprocess_env(),
+        )
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"installer configure (product pointers) failed: {err}")
+    console.print(
+        f"[green]✓ installer file_registry + marketplace[/green] "
+        f"[dim]({installer})[/dim]"
+    )
+
+
+def _candid_text_arg(payload: str) -> str:
+    escaped = payload.replace("\\", "\\\\").replace('"', '\\"')
+    return f'("{escaped}")'
+
+
+def _dfx_subprocess_env() -> dict:
+    env = os.environ.copy()
+    env["TERM"] = "xterm-256color"
+    env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+    env.pop("NO_COLOR", None)
+    env.pop("FORCE_COLOR", None)
+    return env
+
+
+def _gaas_casals_ids(env_name: str, project_root: Optional[Path] = None) -> set[str]:
+    """Principals of the GaaS Casals stack — seed must never delete these."""
+    gos = load_gos_canisters(env_name, project_root)
+    ids: set[str] = set()
+    for key in _CASALS_STACK_GOS_KEYS:
+        cid = (gos.get(key) or "").strip()
+        if cid:
+            ids.add(cid)
+    path = gos_descriptor_path(env_name, project_root)
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            mid = ((data.get("multisig") or {}).get("backend_id") or "").strip()
+            if mid:
+                ids.add(mid)
+        except (json.JSONDecodeError, OSError, AttributeError):
+            pass
+    return ids
+
+
+_PRODUCT_CASALS_REALMS_KEYS: tuple[str, ...] = (
+    "casals_backend",
+    "casals_frontend",
+    "casals_file_registry",
+    "casals_file_registry_frontend",
+)
+
+
+def publish_casals_frontend_to_marketplace(
+    *,
+    env_name: str,
+    canisters: dict,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+) -> None:
+    """Write the Realms GOS Casals frontend principal onto marketplace backend.
+
+    Sheet deploy may reinstall the backend (wiping config), so call this
+    **after** ``casals sheet deploy``. Do not write this id to the GaaS registry.
+    """
+    frontend = (canisters.get("casals_frontend") or "").strip()
+    if not frontend:
+        ids = _read_canister_ids(project_root or get_project_root())
+        frontend = ((ids.get("casals_frontend") or {}).get(network) or "").strip()
+    if not frontend:
+        return
+    root = project_root or get_project_root()
+    marketplace = _product_canister_id(network, "marketplace_backend", root)
+    if not marketplace:
+        console.print(
+            "[yellow]⚠️  no marketplace_backend id; skip Casals frontend publish[/yellow]"
+        )
+        return
+
+    arg = _candid_text_arg(frontend)
+    cmd = [
+        "icp",
+        "canister",
+        "call",
+        marketplace,
+        "set_casals_frontend_canister_id",
+        arg,
+        "-n",
+        "https://icp0.io",
+        "--root-key",
+        "mainnet",
+    ]
+    if identity:
+        cmd.extend(["--identity", identity])
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_dfx_subprocess_env(),
+    )
+    if result.returncode != 0:
+        dfx_cmd = [
+            "dfx",
+            "canister",
+            "call",
+            marketplace,
+            "set_casals_frontend_canister_id",
+            arg,
+        ]
+        if identity:
+            dfx_cmd.extend(["--identity", identity])
+        if network:
+            dfx_cmd.extend(["--network", network])
+        result = subprocess.run(
+            dfx_cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_dfx_subprocess_env(),
+        )
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(
+            f"marketplace set_casals_frontend_canister_id failed: {err}"
+        )
+    console.print(
+        f"[green]✓ marketplace casals_frontend[/green] {frontend} "
+        f"[dim]({marketplace})[/dim]"
+    )
 
 
 def destroy_casals_stack(
@@ -687,57 +797,56 @@ def destroy_casals_stack(
     project_root: Optional[Path] = None,
     yes: bool = False,
 ) -> Dict[str, list]:
-    """Sweep cycles and delete the Casals conductor stack (not GaaS portal IDs)."""
+    """Sweep cycles and delete the **Realms GOS** Casals stack only."""
     from .commands.env import (
+        _clear_canister_id,
         _delete_canister_recover_cycles,
         _is_canister_dead,
         _read_canister_ids,
     )
 
     root = project_root or get_project_root()
-    gos = load_gos_canisters(env_name, root)
+    protected = _gaas_casals_ids(env_name, root)
+    realms_ids = _read_canister_ids(root)
     targets: list[tuple[str, str]] = []
     seen: set[str] = set()
+    skipped_gaas: list[str] = []
 
     def _add(name: str, cid: str) -> None:
         cid = (cid or "").strip()
         if not cid or cid in seen:
             return
+        if cid in protected:
+            skipped_gaas.append(f"{name} ({cid})")
+            return
         seen.add(cid)
         targets.append((name, cid))
 
-    for key in _CASALS_STACK_GOS_KEYS:
-        _add(key, gos.get(key) or "")
-
-    realms_ids = _read_canister_ids(root)
-    for key in ("casals_backend", "casals_frontend"):
+    for key in _PRODUCT_CASALS_REALMS_KEYS:
         _add(key, (realms_ids.get(key) or {}).get(network) or "")
 
-    path = gos_descriptor_path(env_name, root)
-    if path.is_file():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            mid = ((data.get("multisig") or {}).get("backend_id") or "").strip()
-            _add("casals-multisig", mid)
-        except (json.JSONDecodeError, OSError, AttributeError):
-            pass
+    if skipped_gaas:
+        console.print(
+            "[yellow]Leaving GaaS Casals IDs untouched:[/yellow] "
+            + ", ".join(skipped_gaas)
+        )
 
     if not targets:
-        console.print("[dim]No Casals stack IDs to destroy.[/dim]")
+        console.print("[dim]No Realms GOS Casals stack IDs to destroy.[/dim]")
         return {"destroyed": []}
 
     from rich.panel import Panel
 
     console.print(
         Panel.fit(
-            "Destroy Casals stack (recover cycles)\n"
-            f"Keep GaaS installer + realm-registry (including DNS frontend).\n"
+            "Destroy Realms GOS Casals stack (recover cycles)\n"
+            "GaaS Casals, installer, and registry are not deleted.\n"
             "Delete: " + ", ".join(f"{n} ({c})" for n, c in targets),
             style="yellow",
         )
     )
     if not yes and not typer.confirm(
-        "Stop, recover cycles, and destroy the Casals conductor?",
+        "Stop, recover cycles, and destroy the Realms GOS Casals conductor?",
         default=False,
     ):
         console.print("[yellow]Aborted.[/yellow]")
@@ -751,18 +860,9 @@ def destroy_casals_stack(
             console.print(f"[dim]Destroying {name} {cid} (recover cycles)…[/dim]")
             _delete_canister_recover_cycles(cid, network, identity)
         destroyed.append(cid)
+        if name in _PRODUCT_CASALS_REALMS_KEYS:
+            _clear_canister_id(root, name, network)
         console.print(f"  recovered+deleted {name} {cid}")
-
-    if path.is_file():
-        data = json.loads(path.read_text(encoding="utf-8"))
-        cans = data.get("canisters")
-        if isinstance(cans, dict):
-            for key in _CASALS_STACK_GOS_KEYS:
-                cans.pop(key, None)
-        multi = data.get("multisig")
-        if isinstance(multi, dict):
-            multi["backend_id"] = None
-        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return {"destroyed": destroyed}
 
 
@@ -841,13 +941,59 @@ def run_casals_seed_catalog(
         )
 
 
+def parse_cycles_balance(text: str) -> Optional[int]:
+    match = _CYCLES_BALANCE_RE.search(text or "")
+    if not match:
+        return None
+    raw, unit = match.group(1), match.group(2).lower()
+    value = float(raw.replace("_", ""))
+    if unit == "tc" or unit == "t":
+        return int(value * 1_000_000_000_000)
+    return int(value)
+
+
+def cycles_ledger_balance(*, identity: Optional[str] = None) -> Optional[int]:
+    cmd = ["dfx", "cycles", "balance", "--network", "ic"]
+    if identity:
+        cmd.extend(["--identity", identity])
+    env = os.environ.copy()
+    env["TERM"] = "xterm-256color"
+    env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+    env.pop("NO_COLOR", None)
+    env.pop("FORCE_COLOR", None)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+    if result.returncode != 0:
+        return None
+    return parse_cycles_balance(result.stdout or result.stderr or "")
+
+
 def top_up_canister_cycles(
     canister_id: str,
     *,
     identity: Optional[str],
     amount: int,
 ) -> None:
-    """Deposit cycles from the identity's ledger into ``canister_id``."""
+    """Deposit cycles from the identity's ledger into ``canister_id``.
+
+    Clamps to the wallet balance minus a reserve so a 2T/8T target cannot
+    abort ``realms seed`` after ``casals new`` already minted the stack.
+    """
+    available = cycles_ledger_balance(identity=identity)
+    if available is not None:
+        sendable = max(0, available - _WALLET_RESERVE_CYCLES)
+        if sendable <= 0:
+            console.print(
+                f"[yellow]skip top-up {canister_id}: wallet "
+                f"{available / 1_000_000_000_000:.3f} TC at/under reserve[/yellow]"
+            )
+            return
+        if sendable < amount:
+            console.print(
+                f"[yellow]clamping top-up {canister_id} to "
+                f"{sendable / 1_000_000_000_000:.3f} TC "
+                f"(wanted {amount / 1_000_000_000_000:.1f} TC)[/yellow]"
+            )
+            amount = sendable
     cmd = [
         "dfx",
         "cycles",
@@ -944,7 +1090,7 @@ def rebuild_casals_conductor(
     project_root: Optional[Path] = None,
     yes: bool = False,
 ) -> Tuple[str, dict]:
-    """Destroy the Casals stack, ``casals new``, persist IDs. Returns (conductor, parsed)."""
+    """Destroy the **Realms GOS** Casals stack, ``casals new``, persist IDs. Returns (conductor, parsed)."""
     root = project_root or get_project_root()
     casals_src = resolve_casals_src(root)
     if not casals_src:
@@ -963,12 +1109,57 @@ def rebuild_casals_conductor(
         casals_src=casals_src,
     )
     canisters = parsed.get("canisters") or {}
-    persist_casals_ids_to_gos(env_name, canisters, root)
     persist_casals_ids_to_realms(network, canisters, root)
+    persist_casals_url_to_env(env_name, canisters, root)
     conductor = (canisters.get("casals_backend") or "").strip()
     if not conductor:
         raise RuntimeError("casals new did not return casals_backend")
     file_registry = (canisters.get("ic_file_registry") or "").strip()
+    finish_casals_rebuild(
+        env_name=env_name,
+        network=network,
+        identity=identity,
+        project_root=root,
+        conductor=conductor,
+        file_registry=file_registry,
+    )
+    console.print(
+        f"[green]✓ casals new[/green] conductor {conductor} "
+        f"[dim](mode={parsed.get('mode')}, catalog seeded)[/dim]"
+    )
+    return conductor, parsed
+
+
+def _inventory_canister_id(root: Path, name: str, network: str) -> str:
+    entry = _read_canister_ids(root).get(name) or {}
+    if not isinstance(entry, dict):
+        return ""
+    return (entry.get(network) or entry.get("ic") or "").strip()
+
+
+def finish_casals_rebuild(
+    *,
+    env_name: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+    conductor: Optional[str] = None,
+    file_registry: Optional[str] = None,
+) -> None:
+    """Top up + GOS file-registry WASM + catalog after ``casals new``.
+
+    Safe to re-run when ``casals new`` succeeded but a later 2T/8T top-up
+    hit InsufficientFunds.
+    """
+    root = project_root or get_project_root()
+    casals_src = resolve_casals_src(root)
+    if not casals_src:
+        raise RuntimeError("no Casals checkout (set CASALS_SRC or clone ../Casals)")
+    conductor = (conductor or _inventory_canister_id(root, "casals_backend", network)).strip()
+    file_registry = (
+        file_registry
+        or _inventory_canister_id(root, "casals_file_registry", network)
+    ).strip()
     if file_registry:
         top_up_canister_cycles(
             file_registry,
@@ -989,11 +1180,6 @@ def rebuild_casals_conductor(
         identity=identity,
         casals_src=casals_src,
     )
-    console.print(
-        f"[green]✓ casals new[/green] conductor {conductor} "
-        f"[dim](mode={parsed.get('mode')}, catalog seeded)[/dim]"
-    )
-    return conductor, parsed
 
 
 def _download_url(url: str, dest: Path) -> Path:
@@ -1011,27 +1197,6 @@ def _certified_assets_wasm() -> Path:
     return _CERTIFIED_ASSETS_CACHE
 
 
-def _ensure_gos_release_artifacts(root: Path) -> None:
-    installer = root / ".external-wasms" / "realm_installer.wasm.gz"
-    registry = root / ".external-wasms" / "realm_registry_backend.wasm.gz"
-    registry_dist = root / ".external-assets" / "realm_registry_frontend" / "dist"
-    if installer.is_file() and registry.is_file() and registry_dist.is_dir():
-        return
-    script = root / "scripts" / "fetch_gos_artifacts.py"
-    if not script.is_file():
-        raise RuntimeError(f"missing {script} (needed to authorize installer/registry WASMs)")
-    result = subprocess.run(
-        [sys.executable, str(script), "--what", "all"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        stderr = result.stderr.strip() or result.stdout.strip()
-        raise RuntimeError(f"fetch_gos_artifacts.py failed: {stderr}")
-
-
 def authorize_product_wasms(
     *,
     env_name: str,
@@ -1040,17 +1205,22 @@ def authorize_product_wasms(
     project_root: Optional[Path] = None,
     conductor: Optional[str] = None,
 ) -> None:
-    """Upload union-sheet WASMs into Casals' file-registry and authorize them."""
+    """Upload product-sheet WASMs into Realms GOS Casals' file-registry and authorize them."""
     from .commands.files import files_publish_release_command
 
     root = project_root or get_project_root()
     conductor = conductor or resolve_conductor_id(env_name, root)
     if not conductor:
-        raise RuntimeError("no Casals conductor id for product WASM authorize")
-    gos = load_gos_canisters(env_name, root)
-    casals_fr = (gos.get("casals_file_registry") or "").strip()
+        raise RuntimeError("no Realms GOS Casals conductor id for product WASM authorize")
+    realms_ids = _read_canister_ids(root)
+    casals_fr = (
+        (realms_ids.get("casals_file_registry") or {}).get(network) or ""
+    ).strip()
     if not casals_fr:
-        raise RuntimeError("casals_file_registry id required to authorize product WASMs")
+        raise RuntimeError(
+            "casals_file_registry id required to authorize product WASMs "
+            "(realms canister_ids.json after casals new)"
+        )
 
     assets = _certified_assets_wasm()
     cache = Path("/tmp/realms-seed-wasms")
@@ -1061,8 +1231,6 @@ def authorize_product_wasms(
     if not keep.is_file():
         keep.write_text("", encoding="utf-8")
 
-    _ensure_gos_release_artifacts(root)
-
     marketplace_wasm = (
         root / ".basilisk" / "marketplace_backend" / "marketplace_backend.wasm"
     )
@@ -1071,9 +1239,6 @@ def authorize_product_wasms(
     file_registry_dist = (
         root / ".external-assets" / "file_registry_frontend" / "dist"
     )
-    installer_wasm = root / ".external-wasms" / "realm_installer.wasm.gz"
-    registry_wasm = root / ".external-wasms" / "realm_registry_backend.wasm.gz"
-    registry_dist = root / ".external-assets" / "realm_registry_frontend" / "dist"
     token_wasm = cache / "token_backend.wasm"
     nft_wasm = cache / "nft_backend.wasm"
     if not token_wasm.is_file():
@@ -1085,8 +1250,6 @@ def authorize_product_wasms(
     for path, label in (
         (marketplace_wasm, "marketplace backend WASM (.basilisk/marketplace_backend)"),
         (file_registry_wasm, "fleet file_registry WASM (.external-wasms)"),
-        (installer_wasm, "realm_installer WASM (.external-wasms)"),
-        (registry_wasm, "realm_registry_backend WASM (.external-wasms)"),
     ):
         if not path.is_file():
             missing.append(label)
@@ -1094,18 +1257,6 @@ def authorize_product_wasms(
         raise RuntimeError("missing artifacts to authorize: " + "; ".join(missing))
 
     jobs: list[dict] = [
-        {
-            "family": "installer",
-            "version": _GOS_CATALOG_VERSION,
-            "backend_wasm": str(installer_wasm),
-            "frontend_dist": None,
-        },
-        {
-            "family": "registry",
-            "version": _GOS_CATALOG_VERSION,
-            "backend_wasm": str(registry_wasm),
-            "frontend_dist": str(registry_dist) if registry_dist.is_dir() else None,
-        },
         {
             "family": "marketplace",
             "version": "main",
@@ -1158,35 +1309,27 @@ def deploy_product_sheet_on_casals(
     identity: Optional[str],
     project_root: Optional[Path] = None,
 ) -> Tuple[bool, str]:
-    """Register GaaS + product canisters and deploy the union sheet."""
+    """Register product canisters and deploy ``realms/casals.json`` on Realms GOS Casals."""
     root = project_root or get_project_root()
     conductor = resolve_conductor_id(env_name, root)
     if not conductor:
-        return False, "no Casals conductor id (set CASALS_BACKEND or gos-as-a-service descriptor)"
+        return False, "no Realms GOS Casals conductor id (canister_ids.json casals_backend or CASALS_BACKEND)"
 
     casals_src = resolve_casals_src(root)
     if not casals_src:
         return False, "no Casals checkout (set CASALS_SRC or clone ../Casals)"
 
     try:
-        union = load_union_sheet(root)
+        sheet = load_product_sheet(root)
     except RuntimeError as exc:
         return False, str(exc)
 
     ensure_sheet_stands(
-        union,
+        sheet,
         conductor=conductor,
         network=network,
         identity=identity,
         casals_src=casals_src,
-    )
-    register_gaas_canisters(
-        conductor=conductor,
-        network=network,
-        identity=identity,
-        casals_src=casals_src,
-        env_name=env_name,
-        project_root=root,
     )
     register_product_canisters(
         conductor=conductor,
@@ -1196,11 +1339,11 @@ def deploy_product_sheet_on_casals(
         project_root=root,
     )
     run_casals_sheet_deploy(
-        union,
+        sheet,
         network=network,
         identity=identity,
         casals_src=casals_src,
         canister=conductor,
     )
-    return True, f"conductor {conductor} (union sheet)"
+    return True, f"conductor {conductor} (product sheet)"
 

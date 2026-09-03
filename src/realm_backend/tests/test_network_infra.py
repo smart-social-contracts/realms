@@ -13,6 +13,8 @@ _DEMO_LEGACY_INSTALLER = "2s4td-daaaa-aaaao-bazmq-cai"
 _DEMO_LEGACY_REGISTRY = "rhw4p-gqaaa-aaaac-qbw7q-cai"
 _TEST_INSTALLER = "fltjm-tyaaa-aaaap-qunhq-cai"
 _TEST_REGISTRY = "yhw3g-fyaaa-aaaas-qgorq-cai"
+_TEST_GAAS_INSTALLER = "jmgc7-2aaaa-aaaai-ax5qa-cai"
+_TEST_GAAS_REGISTRY = "mq5y2-riaaa-aaaai-ax5pq-cai"
 
 
 def test_known_bootstrap_principals_includes_live_demo_installer():
@@ -33,6 +35,8 @@ def test_known_bootstrap_principals_keeps_legacy_demo_and_test():
     assert _DEMO_LEGACY_REGISTRY in principals
     assert _TEST_INSTALLER in principals
     assert _TEST_REGISTRY in principals
+    assert _TEST_GAAS_INSTALLER in principals
+    assert _TEST_GAAS_REGISTRY in principals
 
 
 def test_known_bootstrap_principals_rejects_unlisted():

@@ -459,7 +459,16 @@ def _check_marketplace_approval(
         payload = _unwrap_call_result(raw)
         approval = json.loads(payload)
     except Exception as e:
-        # Most likely an older file registry with no approval support at all.
+        err = str(e)
+        # GOS-vendored file_registry has no approval API (IC0536). Founding
+        # setup cannot install realm_settings to flip the trust policy first.
+        if _is_founding_setup() and (
+            "IC0536" in err or "has no update method" in err or "has no query method" in err
+        ):
+            logger.warning(
+                f"file_registry has no approval API during setup; installing '{namespace}'"
+            )
+            return ""
         return (
             f"cannot verify marketplace approval for '{namespace}': the file "
             f"registry did not answer ({e}). {hint}"
@@ -767,6 +776,7 @@ def install_extension_from_registry(
     frontend_canister_id: str = None,
     install_dependencies: bool = True,
     owner: str = None,
+    run_init: bool = True,
 ) -> Async[str]:
     """Pull extension backend files from the file registry and install them.
     Frontend bundles are copied to the realm's frontend asset canister before
@@ -1033,9 +1043,12 @@ def install_extension_from_registry(
         from core.codex_overlay import commit_current, ensure_codex_revert_grants
 
         commit_current(ext_id, files, seeded_modules)
-        # Post-install realm setup — the codex enforces its realm settings
-        # server-side here, so no wizard bug can contradict the codex.
-        init_error = codex_hooks.run_init(ext_id)
+        # Agora (and other heavy codices) seed orgs/courts in init. Doing that
+        # in the same 40B-instruction message as the package pull + overlay
+        # copy hits IC0522. Callers that already installed deps as separate
+        # steps pass run_init=False and follow up with run_codex_init.
+        if run_init:
+            init_error = codex_hooks.run_init(ext_id)
         try:
             ensure_codex_revert_grants()
         except Exception:
@@ -1054,6 +1067,7 @@ def install_extension_from_registry(
         result["kind"] = "codex"
         result["dependencies_installed"] = installed_deps
         result["codex_modules"] = seeded_modules
+        result["init_ran"] = bool(run_init)
         if failed_deps:
             result["dependency_warnings"] = failed_deps
         if init_error:
@@ -1106,6 +1120,7 @@ def install_codex_from_registry(
         version,
         frontend_canister_id=frontend_id,
         install_dependencies=install_dependencies,
+        run_init=run_init,
     )
     try:
         unified = json.loads(unified_raw)
@@ -1114,10 +1129,12 @@ def install_codex_from_registry(
     if unified.get("success"):
         return unified_raw
     unified_error = str(unified.get("error") or "")
-    if (
-        "No published version" not in unified_error
-        and "not found" not in unified_error.lower()
-    ):
+    missing = (
+        "No published version" in unified_error
+        or "not found" in unified_error.lower()
+        or "no versions found" in unified_error.lower()
+    )
+    if not missing:
         # The package exists under ext/ but failed for a real reason
         # (singleton conflict, unsupported API version, load failure) —
         # surface that instead of silently installing a stale legacy copy.
@@ -1177,6 +1194,7 @@ def install_codex_from_registry(
     if init_py_error:
         return json.dumps({"success": False, "error": init_py_error})
 
+    dependencies = []
     installed_deps = []
     failed_deps = []
     if install_dependencies:
@@ -1227,6 +1245,23 @@ def install_codex_from_registry(
     if failed_deps:
         result["dependency_warnings"] = failed_deps
     return json.dumps(result)
+
+
+def run_codex_init(codex_id: str) -> str:
+    """Run a already-installed codex ``init`` hook in its own update.
+
+    Split out of ``install_*_from_registry`` so Agora-sized packages stay
+    under the 40B instruction limit (IC0522).
+    """
+    cid = (codex_id or "").strip()
+    if not cid:
+        return json.dumps({"success": False, "error": "codex_id is required"})
+    from core import codex_hooks
+
+    err = codex_hooks.run_init(cid)
+    if err:
+        return json.dumps({"success": False, "error": err, "codex_id": cid})
+    return json.dumps({"success": True, "codex_id": cid, "init_ran": True})
 
 
 _CONTENT_TYPES = {

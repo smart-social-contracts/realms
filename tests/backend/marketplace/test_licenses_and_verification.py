@@ -40,6 +40,17 @@ def test_only_controller_can_set_config(as_caller):
     assert cfg_api.get_file_registry_canister_id() == "fr-test"
 
 
+def test_only_controller_can_set_casals_frontend(as_caller):
+    as_caller("anon-1", controller=False)
+    r = cfg_api.set_casals_frontend_canister_id("nfs6d-saaaa-aaaae-qkjya-cai")
+    assert r["success"] is False
+
+    as_caller("admin", controller=True)
+    r2 = cfg_api.set_casals_frontend_canister_id("nfs6d-saaaa-aaaae-qkjya-cai")
+    assert r2["success"] is True
+    assert cfg_api.get_casals_frontend_canister_id() == "nfs6d-saaaa-aaaae-qkjya-cai"
+
+
 def test_init_config_from_args_idempotent(as_caller):
     cfg_api.init_config_from_args("fr-1", "billing-1")
     assert cfg_api.get_file_registry_canister_id() == "fr-1"

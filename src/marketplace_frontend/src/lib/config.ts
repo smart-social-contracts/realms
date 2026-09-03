@@ -22,20 +22,33 @@ function pick(...keys: string[]): string {
   return '';
 }
 
-/** Realms GOS Casals UI per product hostname. Used when VITE_CASALS_URL was not baked. */
-const CASALS_BY_HOST: Record<string, string> = {
-  'test.realmsgos.org': 'https://qtht4-saaaa-aaaap-quwna-cai.icp0.io',
-  'demo.realmsgos.org': 'https://usukh-2yaaa-aaaae-agztq-cai.icp0.io',
-  'staging.realmsgos.org': 'https://h6mrr-iiaaa-aaaae-ag2uq-cai.icp0.io',
-};
-
-export function resolveCasalsUrl(): string {
-  const baked = pick('VITE_CASALS_URL');
-  if (baked) return baked;
-  if (typeof window !== 'undefined') {
-    return CASALS_BY_HOST[window.location.hostname] || '';
+/**
+ * Query the marketplace backend for the Realms GOS Casals frontend principal.
+ * Written by ``realms seed`` after ``casals new`` — not baked into this SPA.
+ * Empty string if unset or fetch fails.
+ */
+export async function resolveCasalsUrlLive(): Promise<string> {
+  const marketplace = pick(
+    'VITE_CANISTER_ID_MARKETPLACE_BACKEND',
+    'CANISTER_ID_MARKETPLACE_BACKEND'
+  );
+  if (!marketplace || typeof window === 'undefined') return '';
+  try {
+    const { Actor, HttpAgent } = await import('@dfinity/agent');
+    const agent = new HttpAgent({ host: 'https://icp-api.io' });
+    const actor = Actor.createActor(
+      ({ IDL }) =>
+        IDL.Service({
+          get_casals_frontend_canister_id_q: IDL.Func([], [IDL.Text], ['query']),
+        }),
+      { agent, canisterId: marketplace }
+    ) as { get_casals_frontend_canister_id_q: () => Promise<string> };
+    const id = String(await actor.get_casals_frontend_canister_id_q() || '').trim();
+    return id ? `https://${id}.icp0.io` : '';
+  } catch (err) {
+    console.warn('live Casals URL fetch failed:', err);
+    return '';
   }
-  return '';
 }
 
 export const CONFIG = {
@@ -65,8 +78,6 @@ export const CONFIG = {
   env_name: pick('VITE_ENV_NAME'),
   portal_url: pick('VITE_PORTAL_URL'),
   realms_version: pick('VITE_REALMS_VERSION'),
-  // Realms GOS Casals frontend (not the GaaS platform orchestra).
-  casals_url: resolveCasalsUrl(),
 };
 
 // --- TEST_MODE umbrella and sub-flags ---

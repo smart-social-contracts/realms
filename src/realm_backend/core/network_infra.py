@@ -1,9 +1,16 @@
 NETWORK_INFRA = {
     "test": {
-        "file_registry": "uq2mu-kaaaa-aaaah-avqcq-cai",
-        "marketplace": "2wldc-niaaa-aaaad-qlxga-cai",
-        "installer": "fltjm-tyaaa-aaaap-qunhq-cai",
-        "registry": "yhw3g-fyaaa-aaaas-qgorq-cai",
+        "file_registry": "bbwyi-raaaa-aaaas-amxfa-cai",
+        "marketplace": "btqpr-5qaaa-aaaas-amxga-cai",
+        # Historical GOS IDs plus the 2026-09-03 gaas new stack.
+        "installer": (
+            "fltjm-tyaaa-aaaap-qunhq-cai",
+            "jmgc7-2aaaa-aaaai-ax5qa-cai",
+        ),
+        "registry": (
+            "yhw3g-fyaaa-aaaas-qgorq-cai",
+            "mq5y2-riaaa-aaaai-ax5pq-cai",
+        ),
     },
     "demo": {
         "file_registry": "krch6-ryaaa-aaaas-amw3q-cai",
@@ -50,7 +57,7 @@ def known_bootstrap_principals() -> frozenset:
     """GOS installer + registry principals that may first-boot a realm.
 
     Casals is not a lasting controller. After canister create, the installer
-    (fltjm on test, moqmm on live demo) calls enter_setup /
+    (fltjm / jmgc7 on test, moqmm / tzip5 on demo, …) calls enter_setup /
     set_canister_config_json. Those callers must be recognizable without an
     IC-controller check.
     """
