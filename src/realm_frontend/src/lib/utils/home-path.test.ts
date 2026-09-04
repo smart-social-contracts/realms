@@ -19,7 +19,7 @@ describe('resolveHomePath', () => {
 				welcomeItems: [{ extensionId: 'first_realm', href: '/extensions/first_realm' }],
 			}),
 		).toBe('/extensions/first_realm');
-		expect(resolveHomePath(null)).toBe('/');
+		expect(resolveHomePath(null)).toBe('/extensions/public_dashboard');
 	});
 
 	it('is what the sidebar layout uses for navigate.home', () => {

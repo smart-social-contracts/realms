@@ -22,7 +22,7 @@
 		const search = typeof window !== 'undefined' ? window.location.search : '';
 		if (get(isAuthenticated) && hasJoined()) {
 			const config = get(sidebarConfig);
-			goto(hrefWithPreservedTestIdentityParams(search, config?.defaultPath || '/'));
+			goto(hrefWithPreservedTestIdentityParams(search, config?.defaultPath || '/extensions/public_dashboard'));
 		} else {
 			// Anonymous / not-yet-joined visitors see the public dashboard
 			// (same on portal embeds and standalone). Join remains available

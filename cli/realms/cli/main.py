@@ -381,6 +381,17 @@ def new(
     resume: Optional[str] = typer.Option(
         None, "--resume", help="Continue from an existing installer job_id"
     ),
+    from_stage: Optional[str] = typer.Option(
+        None,
+        "--from-stage",
+        help=(
+            "Resume from this stage (skip earlier ones). validate always runs. "
+            "GaaS: validate, credits, confirm, deploy, poll, setup, co-admin, "
+            "config, data, members. Standalone: validate, confirm, deploy, "
+            "setup, co-admin, config, data, members. Accepts a name or "
+            "1-based index (like gaas new --from-phase)."
+        ),
+    ),
     co_admin: Optional[str] = typer.Option(
         None,
         "--co-admin",
@@ -423,7 +434,9 @@ def new(
     """Create a live realm.
 
     --deploy-mode=gaas (default) mirrors the *.gos.earth wizard: charges 5
-    registry credits, enqueues request_deployment, then runs in-realm setup.
+    registry credits, enqueues request_deployment, then completes founder
+    setup (codex / token / branding / launch). --from-stage resumes after a
+    named stage (same idea as gaas new --from-phase).
 
     --deploy-mode=standalone deploys two canisters from the Realms GitHub
     release (or --version latest). No credits, no installer, not listed on
@@ -439,6 +452,8 @@ def new(
         --identity deployer --co-admin <ii-principal> --codex agora --name Acme --yes
       realms new --deploy-mode standalone --network demo --identity deployer \\
         --codex agora --name Acme --yes
+      realms new spec.json --gaas-config environments/test.json \\
+        --identity deployer --slug acme --from-stage setup --token-symbol ckEURC --yes
     """
     start_run_log(
         network or (gaas_config.stem if gaas_config else "new"),
@@ -471,6 +486,7 @@ def new(
             open_registration=True if open_registration else None,
             yes=yes,
             resume=resume,
+            from_stage=from_stage,
             co_admin=co_admin,
             gaas_config=str(gaas_config) if gaas_config else None,
             deploy_mode=deploy_mode,

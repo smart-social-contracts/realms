@@ -34,9 +34,17 @@ describe('resolveMemberHomeHref', () => {
 		).toBe('/extensions/first_realm');
 	});
 
-	it('falls back to realm home when no MY REALM row exists', () => {
-		expect(resolveMemberHomeHref({ manifests: [], welcomeItems: [] })).toBe('/');
-		expect(resolveMemberHomeHref(null)).toBe('/');
+	it('falls back to the public dashboard when no MY REALM row exists', () => {
+		expect(
+			resolveMemberHomeHref({
+				manifests: [{ id: 'public_dashboard', sidebar_label: { en: 'My Realm' } }],
+				welcomeItems: [],
+			}),
+		).toBe('/extensions/public_dashboard');
+		expect(resolveMemberHomeHref({ manifests: [], welcomeItems: [] })).toBe(
+			'/extensions/public_dashboard',
+		);
+		expect(resolveMemberHomeHref(null)).toBe('/extensions/public_dashboard');
 	});
 
 	it('never hardcodes a dashboard extension id', () => {

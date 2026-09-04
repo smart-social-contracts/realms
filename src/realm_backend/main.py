@@ -7254,6 +7254,11 @@ def get_sidebar_manifests() -> text:
         # Codex overrides (issue #242): a base system extension is hidden when
         # its codex-specific replacement is installed.
         active_overrides = _active_extension_overrides(manifests)
+        has_member_home = any(
+            isinstance(m, dict) and _sidebar_manifest_is_member_home(eid, m)
+            for eid, m in manifests.items()
+            if eid not in active_overrides
+        )
 
         out = []
         for ext_id, m in manifests.items():
@@ -7264,6 +7269,9 @@ def get_sidebar_manifests() -> text:
             label_obj = m.get("sidebar_label")
             if isinstance(label_obj, str):
                 label_obj = {"en": label_obj}
+            is_default = m.get("is_default") is True
+            if ext_id == "public_dashboard" and not has_member_home:
+                is_default = True
             out.append({
                 "id": ext_id,
                 "name": m.get("name") or ext_id,
@@ -7273,7 +7281,7 @@ def get_sidebar_manifests() -> text:
                 "profiles": m.get("profiles") or [],
                 "show_in_sidebar": m.get("show_in_sidebar", True) is not False,
                 "sidebar_label": label_obj,
-                "is_default": m.get("is_default") is True,
+                "is_default": is_default,
                 "kind": "runtime" if ext_id in runtime_ids else "bundled",
             })
 
@@ -7297,6 +7305,15 @@ def get_sidebar_manifests() -> text:
         })
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
+
+
+def _sidebar_manifest_is_member_home(ext_id: str, manifest: dict) -> bool:
+    """True when this row is the MY REALM / My Dashboard home target."""
+    if manifest.get("is_default") is True:
+        return True
+    label = manifest.get("sidebar_label")
+    values = list(label.values()) if isinstance(label, dict) else [label]
+    return any(str(v or "").strip().lower() == "my dashboard" for v in values)
 
 
 def _active_extension_overrides(manifests: dict) -> dict:

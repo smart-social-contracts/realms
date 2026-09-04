@@ -1,8 +1,10 @@
 """``realms new`` — live realm create.
 
 ``--deploy-mode=gaas`` (default) mirrors the ``*.gos.earth`` wizard: registry
-``request_deployment``, then poll the installer job until it completes on-chain.
-No CLI ``enter_setup``, ``set_canister_config_json``, or setup-wizard installs.
+``request_deployment``, poll the installer until it completes on-chain, then
+finish founder setup (codex / token / branding / launch). Use ``--from-stage``
+to resume after a named stage (same idea as ``gaas new --from-phase``).
+No CLI ``enter_setup`` / ``set_canister_config_json``.
 
 ``--deploy-mode=standalone`` mints ``realm_backend`` + ``realm_frontend`` from a
 Realms GitHub release. No credits, no installer, not listed on any GaaS portal.
@@ -84,10 +86,45 @@ GEISTER_INSTALL_HINT = (
     "https://github.com/smart-social-contracts/geister"
 )
 GEISTER_AGENT_PREFIX = "swarm_agent"
+# Host chrome every wizard realm needs after launch. Codex manifests do not
+# list these (sheet realms get them from Casals arrangements).
+WIZARD_CHROME_EXTENSIONS: Tuple[str, ...] = (
+    "public_dashboard",
+    "member_dashboard",
+    "welcome",
+)
+# Shared-catalog symbols the wizard can attach without a new ledger canister.
+CATALOG_TOKEN_SYMBOLS = frozenset({"ckEURC", "ckBTC", "ckUSDC", "REALMS"})
 
 POLL_INTERVAL_S = 10
 POLL_TIMEOUT_S = 3600
 LAUNCH_POLL_TIMEOUT_S = 1800
+CODEX_INSTALL_TIMEOUT_S = 40 * 60
+
+# Ordered pipeline stages. ``--from-stage`` accepts the id or a 1-based index.
+GAAS_STAGES: Tuple[Tuple[str, str], ...] = (
+    ("validate", "Validate spec and identity"),
+    ("credits", "Check registry credits"),
+    ("confirm", "Confirm before deploy"),
+    ("deploy", "Enqueue installer job"),
+    ("poll", "Wait for the installer"),
+    ("setup", "Complete founder wizard (codex / token / branding / launch)"),
+    ("co-admin", "Register co-admin principal"),
+    ("config", "Apply runtime config"),
+    ("data", "Import data overlay"),
+    ("members", "Join geister members"),
+)
+STANDALONE_STAGES: Tuple[Tuple[str, str], ...] = (
+    ("validate", "Validate spec and identity"),
+    ("confirm", "Confirm before deploy"),
+    ("deploy", "Mint standalone canisters"),
+    ("setup", "Complete founder wizard (codex / token / branding / launch)"),
+    ("co-admin", "Register co-admin principal"),
+    ("config", "Apply runtime config"),
+    ("data", "Import data overlay"),
+    ("members", "Join geister members"),
+)
+POST_DEPLOY_STAGES = frozenset({"setup", "co-admin", "config", "data", "members"})
 
 _IMAGE_MIME = {
     ".png": "image/png",
@@ -106,6 +143,62 @@ class StageError(Exception):
         super().__init__(message)
         self.stage = stage
         self.message = message
+
+
+def stages_for_mode(mode: str) -> Tuple[Tuple[str, str], ...]:
+    return STANDALONE_STAGES if mode == "standalone" else GAAS_STAGES
+
+
+def format_stage_catalog(stages: Sequence[Tuple[str, str]]) -> str:
+    lines = ["valid --from-stage values:"]
+    for index, (stage_id, title) in enumerate(stages, start=1):
+        lines.append(f"  {index:>2}  {stage_id}  {title}")
+    return "\n".join(lines)
+
+
+def parse_from_stage(
+    from_stage: Optional[str],
+    stages: Sequence[Tuple[str, str]],
+) -> int:
+    """Return a 0-based start index. ``from_stage`` is a 1-based index or stage id."""
+    if from_stage is None:
+        return 0
+    raw = str(from_stage).strip()
+    if not raw:
+        return 0
+    ids = [stage_id for stage_id, _title in stages]
+    if raw.isdigit():
+        number = int(raw)
+        if number < 1 or number > len(stages):
+            raise StageError(
+                "validate",
+                f"--from-stage {raw} is out of range 1..{len(stages)}\n"
+                + format_stage_catalog(stages),
+            )
+        return number - 1
+    key = raw.replace("_", "-")
+    normalized = [stage_id.replace("_", "-") for stage_id in ids]
+    if key in normalized:
+        return normalized.index(key)
+    raise StageError(
+        "validate",
+        f"unknown --from-stage {raw!r}\n" + format_stage_catalog(stages),
+    )
+
+
+def stage_ids_to_run(
+    stages: Sequence[Tuple[str, str]],
+    from_stage: Optional[str],
+    *,
+    always: Sequence[str] = ("validate",),
+) -> set[str]:
+    """Stages to execute. ``validate`` always stays, like ``gaas new --from-phase``."""
+    start = parse_from_stage(from_stage, stages)
+    run_ids = {stage_id for stage_id, _title in stages[start:]}
+    for keep in always:
+        if any(stage_id == keep for stage_id, _title in stages):
+            run_ids.add(keep)
+    return run_ids
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +358,7 @@ def build_portal_manifest(
         "manifesto": manifesto or f"Welcome to {name}.",
         "welcome_message": welcome_message or f"Welcome to {name}!",
         "open_registration": bool(open_registration),
-        "extensions": [],
+        "extensions": list(WIZARD_CHROME_EXTENSIONS),
     }
     package = (codex_package or "").strip()
     if package:
@@ -594,10 +687,14 @@ def validate_merged_spec(
         errors.append(ic_err)
     token = merged.get("token")
     if isinstance(token, dict) and token.get("symbol") and not token.get("canister"):
-        errors.append(
-            "--token-canister is required when --token-symbol is set "
-            "(v1 cannot provision a new token canister)"
-        )
+        symbol = str(token.get("symbol") or "").strip()
+        if symbol not in CATALOG_TOKEN_SYMBOLS:
+            errors.append(
+                f"unknown catalog token {symbol!r}: pass --token-canister for "
+                "an existing ledger, or use a wizard catalog symbol "
+                "(ckEURC, ckBTC, ckUSDC, REALMS). v1 cannot provision a new "
+                "token canister"
+            )
     if errors:
         raise StageError("validate", "\n".join(errors))
 
@@ -1022,6 +1119,69 @@ def _canister_call(
                 os.unlink(arg_file)
             except OSError:
                 pass
+
+
+def _unwrap_ok_json(raw: Any) -> Dict[str, Any]:
+    """Unwrap a Candid ``Result`` / GenericResult JSON envelope to a dict."""
+    data = raw
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            return {}
+    if not isinstance(data, dict):
+        return {}
+    if "Err" in data and "Ok" not in data:
+        raise StageError("setup", f"registry error: {data['Err']}")
+    if "Ok" in data:
+        inner = data["Ok"]
+        if isinstance(inner, str):
+            try:
+                inner = json.loads(inner)
+            except json.JSONDecodeError:
+                return {"value": inner}
+        if isinstance(inner, dict):
+            return inner
+        return {}
+    return data
+
+
+def resolve_registered_slug(
+    registry_id: str,
+    slug: str,
+    network: str,
+    identity: str,
+) -> Dict[str, str]:
+    """Look up backend/frontend IDs. ``resolve_slug`` is an UPDATE — do not query."""
+    raw = _canister_call(
+        registry_id,
+        "resolve_slug",
+        f'("{slug}")',
+        network,
+        identity,
+        query=False,
+        timeout=120,
+    )
+    payload = _unwrap_ok_json(raw)
+    if payload.get("success") is False:
+        raise StageError(
+            "setup",
+            payload.get("error") or f"Unknown slug {slug!r}",
+        )
+    backend = str(
+        payload.get("backend_canister_id") or payload.get("realm_id") or ""
+    ).strip()
+    frontend = str(payload.get("frontend_canister_id") or "").strip()
+    if not backend:
+        raise StageError(
+            "setup",
+            f"resolve_slug({slug}) returned no backend_canister_id",
+        )
+    return {
+        "backend_canister_id": backend,
+        "frontend_canister_id": frontend,
+        "portal_url": str(payload.get("portal_url") or ""),
+    }
 
 
 def query_credit_balance(registry_id: str, principal: str, network: str, identity: str) -> int:
@@ -1489,6 +1649,9 @@ def preinstall_codex_dependencies(
 ) -> None:
     """Install extension deps one-by-one so setup_install_codex stays under the ingress window."""
     deps = _local_manifest_dependencies(package)
+    for chrome in WIZARD_CHROME_EXTENSIONS:
+        if chrome not in deps:
+            deps.append(chrome)
     if not deps:
         return
     installed = _list_runtime_extension_ids(backend_id, network, identity)
@@ -1528,6 +1691,94 @@ def preinstall_codex_dependencies(
             raise
 
 
+def _token_draft(token: Any) -> Optional[Dict[str, str]]:
+    """Normalize spec.token for setup_save_draft. Catalog symbols need no ledger."""
+    if not isinstance(token, dict):
+        return None
+    out: Dict[str, str] = {}
+    canister = str(token.get("canister") or token.get("token_canister_id") or "").strip()
+    symbol = str(token.get("symbol") or "").strip()
+    if canister:
+        out["token_canister_id"] = canister
+    if symbol:
+        out["symbol"] = symbol
+    return out or None
+
+
+def _setup_state_has_token(backend_id: str, network: str, identity: str) -> bool:
+    try:
+        state = _canister_call(
+            backend_id,
+            "get_setup_state",
+            "()",
+            network,
+            identity,
+            query=True,
+            timeout=60,
+        )
+        if isinstance(state, str):
+            state = json.loads(state)
+        if not isinstance(state, dict):
+            return False
+        token = state.get("token")
+        if isinstance(token, dict) and (
+            token.get("token_canister_id")
+            or token.get("symbol")
+            or token.get("ledger")
+        ):
+            return True
+    except Exception:
+        return False
+    return False
+
+
+def call_setup_install_codex(
+    backend_id: str,
+    package: str,
+    version: Optional[str],
+    network: str,
+    identity: str,
+) -> Dict[str, Any]:
+    """Drive the resumable Codex job until ``complete`` / already installed."""
+    install_args: Dict[str, Any] = {"package": package}
+    if version:
+        install_args["version"] = version
+    console.print(f"  setup_install_codex {package}")
+    start = time.time()
+    last = ""
+    while time.time() - start < CODEX_INSTALL_TIMEOUT_S:
+        raw = _setup_json_call(
+            backend_id,
+            "setup_install_codex",
+            install_args,
+            network,
+            identity,
+            timeout=600,
+        )
+        status = str(raw.get("status") or "")
+        phase = str(raw.get("phase") or raw.get("step") or "")
+        label = f"{status} {phase}".strip() or (
+            "skipped" if raw.get("skipped") else "ok"
+        )
+        if label != last:
+            console.print(f"  setup_install_codex: {label}")
+            last = label
+        if raw.get("skipped") or raw.get("setup_codex"):
+            return raw
+        if status in ("", "complete", "completed"):
+            return raw
+        if status == "in_progress":
+            time.sleep(POLL_INTERVAL_S)
+            continue
+        return raw
+    _fail(
+        "setup",
+        f"Timed out waiting for setup_install_codex ({package}) after "
+        f"{CODEX_INSTALL_TIMEOUT_S}s",
+    )
+    return {}
+
+
 def run_setup_stage(
     merged: Dict[str, Any],
     backend_id: str,
@@ -1535,7 +1786,7 @@ def run_setup_stage(
     identity: str,
 ) -> None:
     branding = merged.get("branding") or {}
-    token = merged.get("token")
+    token_draft = _token_draft(merged.get("token"))
     draft: Dict[str, Any] = {
         "codex": {
             "package": merged["codex"]["package"],
@@ -1550,11 +1801,8 @@ def run_setup_stage(
         identity_block["welcome_message"] = branding["welcome_message"]
     if identity_block:
         draft["identity"] = identity_block
-    if isinstance(token, dict) and token.get("canister"):
-        draft["token"] = {
-            "token_canister_id": token["canister"],
-            "symbol": token.get("symbol") or "",
-        }
+    if token_draft:
+        draft["token"] = token_draft
 
     console.print("  setup_save_draft (codex / identity)")
     _setup_json_call(backend_id, "setup_save_draft", draft, network, identity)
@@ -1562,21 +1810,23 @@ def run_setup_stage(
     package = str(merged["codex"]["package"])
     version = merged["codex"].get("version")
     preinstall_codex_dependencies(backend_id, package, network, identity)
-    install_args: Dict[str, Any] = {"package": package}
-    if version:
-        install_args["version"] = version
-    console.print(f"  setup_install_codex {package}")
-    _setup_json_call(
-        backend_id, "setup_install_codex", install_args, network, identity, timeout=600
-    )
+    call_setup_install_codex(backend_id, package, version, network, identity)
 
-    if isinstance(token, dict) and token.get("canister"):
-        console.print(f"  setup_configure_token {token['canister']}")
-        token_args: Dict[str, Any] = {"token_canister_id": token["canister"]}
-        if token.get("symbol"):
-            token_args["symbol"] = token["symbol"]
+    if token_draft and token_draft.get("token_canister_id"):
+        console.print(f"  setup_configure_token {token_draft['token_canister_id']}")
+        token_args: Dict[str, Any] = {
+            "token_canister_id": token_draft["token_canister_id"]
+        }
+        if token_draft.get("symbol"):
+            token_args["symbol"] = token_draft["symbol"]
         _setup_json_call(
             backend_id, "setup_configure_token", token_args, network, identity, timeout=300
+        )
+    elif not token_draft and not _setup_state_has_token(backend_id, network, identity):
+        _fail(
+            "setup",
+            "setup_launch needs a treasury token. Pass --token-symbol ckEURC "
+            "(or spec.token.symbol / spec.token.canister).",
         )
 
     branding_args: Dict[str, Any] = {}
@@ -2263,6 +2513,7 @@ def new_command(
     co_admin: Optional[str] = None,
     gaas_config: Optional[str] = None,
     deploy_mode: Optional[str] = None,
+    from_stage: Optional[str] = None,
 ) -> None:
     """Run the live wizard-path create pipeline. Never hits IC from unit tests."""
     stage = "validate"
@@ -2332,9 +2583,18 @@ def new_command(
         founder = resolve_identity_principal(identity)
         merged["founder"] = founder
 
+        stages = stages_for_mode(mode)
+        run_ids = stage_ids_to_run(stages, from_stage)
+        start_index = parse_from_stage(from_stage, stages)
+        if start_index > 0:
+            skipped = [sid for sid, _title in stages[:start_index] if sid not in run_ids]
+            console.print(
+                f"  from-stage {stages[start_index][0]} "
+                f"(skipping {', '.join(skipped) or 'none'})"
+            )
+
         if mode == "standalone":
-            stage = "confirm"
-            if not yes:
+            if "confirm" in run_ids and not yes:
                 console.print(
                     f"Create standalone realm?\n"
                     f"  name:     {merged['name']}\n"
@@ -2347,44 +2607,61 @@ def new_command(
                 if not typer.confirm("Proceed?"):
                     console.print("[yellow]Aborted.[/yellow]")
                     raise typer.Exit(0)
-            stage = "deploy"
-            backend_id, frontend_id = deploy_standalone_realm(
-                version=merged["version"],
-                network=network,
-                identity=identity,
-                slug=merged["slug"],
-            )
-            portal = f"https://{frontend_id}.icp0.io/"
-            ensure_founder_enter_setup(
-                backend_id,
-                founder,
-                _file_registry_id_or_empty(network),
-                network,
-                network,
-                identity,
-                timeout_s=15,
-            )
-            apply_bootstrap_canister_config(
-                backend_id,
-                frontend_id,
-                network,
-                identity,
-                founder=founder,
-            )
-            console.print(f"  portal {portal}")
-            stage = "setup"
-            if setup_already_complete(backend_id, network, identity):
-                console.print("  setup already complete — skipping")
-            else:
-                run_setup_stage(merged, backend_id, network, identity)
-            stage = "co-admin"
-            register_co_admin_principal(merged, backend_id, network, identity)
-            stage = "config"
-            apply_runtime_config(merged, backend_id, network, identity)
-            stage = "data"
-            import_data_overlay(merged, backend_id, network, identity)
-            stage = "members"
-            member_rows = join_geister_members(merged, backend_id, network, identity)
+            backend_id = ""
+            frontend_id = ""
+            portal = ""
+            if "deploy" in run_ids:
+                stage = "deploy"
+                backend_id, frontend_id = deploy_standalone_realm(
+                    version=merged["version"],
+                    network=network,
+                    identity=identity,
+                    slug=merged["slug"],
+                )
+                portal = f"https://{frontend_id}.icp0.io/"
+                ensure_founder_enter_setup(
+                    backend_id,
+                    founder,
+                    _file_registry_id_or_empty(network),
+                    network,
+                    network,
+                    identity,
+                    timeout_s=15,
+                )
+                apply_bootstrap_canister_config(
+                    backend_id,
+                    frontend_id,
+                    network,
+                    identity,
+                    founder=founder,
+                )
+                console.print(f"  portal {portal}")
+            elif run_ids & POST_DEPLOY_STAGES:
+                raise StageError(
+                    "validate",
+                    "standalone --from-stage cannot skip deploy (no registry "
+                    "slug). Use --deploy-mode=gaas --from-stage "
+                    f"{stages[start_index][0]} --slug <slug>",
+                )
+            if "setup" in run_ids:
+                stage = "setup"
+                if setup_already_complete(backend_id, network, identity):
+                    console.print("  setup already complete — skipping")
+                else:
+                    run_setup_stage(merged, backend_id, network, identity)
+            if "co-admin" in run_ids:
+                stage = "co-admin"
+                register_co_admin_principal(merged, backend_id, network, identity)
+            if "config" in run_ids:
+                stage = "config"
+                apply_runtime_config(merged, backend_id, network, identity)
+            if "data" in run_ids:
+                stage = "data"
+                import_data_overlay(merged, backend_id, network, identity)
+            member_rows: List[Dict[str, str]] = []
+            if "members" in run_ids:
+                stage = "members"
+                member_rows = join_geister_members(merged, backend_id, network, identity)
             result = {
                 "deploy_mode": "standalone",
                 "slug": merged["slug"],
@@ -2405,19 +2682,20 @@ def new_command(
         console.print(f"  registry {registry_id}")
         console.print(f"  installer {installer_id}")
 
-        stage = "credits"
-        console.print(f"[bold]credits[/bold] founder {founder} on {network}")
-        try:
-            balance = query_credit_balance(registry_id, founder, network, identity)
-        except StageError:
-            raise
-        except Exception as exc:
-            _fail("credits", f"get_credits failed: {exc}")
-        assert_credits_sufficient(balance, founder, network)
-        console.print(f"  balance {balance} (need {DEPLOYMENT_COST_CREDITS})")
+        if "credits" in run_ids:
+            stage = "credits"
+            console.print(f"[bold]credits[/bold] founder {founder} on {network}")
+            try:
+                balance = query_credit_balance(registry_id, founder, network, identity)
+            except StageError:
+                raise
+            except Exception as exc:
+                _fail("credits", f"get_credits failed: {exc}")
+            assert_credits_sufficient(balance, founder, network)
+            console.print(f"  balance {balance} (need {DEPLOYMENT_COST_CREDITS})")
 
-        stage = "confirm"
-        if not yes:
+        if "confirm" in run_ids and not yes:
+            stage = "confirm"
             subnet_label = merged["subnet"].get("choice")
             if merged["subnet"].get("id"):
                 subnet_label = f"{subnet_label} ({merged['subnet']['id']})"
@@ -2443,15 +2721,7 @@ def new_command(
             merged["slug"], network, portal_host=gaas.portal_host or None
         )
 
-        if job_id:
-            stage = "poll"
-            console.print(f"[bold]resume[/bold] job {job_id}")
-            info = poll_installer_until_ready(
-                installer_id, job_id, network, identity
-            )
-            backend_id = str(info.get("backend_canister_id") or "").strip()
-            frontend_id = str(info.get("frontend_canister_id") or "").strip()
-        else:
+        if "deploy" in run_ids and not job_id:
             stage = "deploy"
             manifest = build_portal_manifest(
                 name=merged["name"],
@@ -2480,24 +2750,58 @@ def new_command(
                 infra["marketplace_canister_id"] = live_mp
             job_id = request_deployment(manifest, registry_id, network, identity)
             console.print(f"  job_id {job_id}")
+
+        if "poll" in run_ids:
+            if not job_id:
+                raise StageError(
+                    "poll",
+                    "--from-stage poll needs --resume <job_id>. "
+                    "To continue an already-installed realm, use --from-stage setup.",
+                )
             stage = "poll"
-            info = poll_installer_until_ready(installer_id, job_id, network, identity)
+            if (resume or "").strip():
+                console.print(f"[bold]resume[/bold] job {job_id}")
+            info = poll_installer_until_ready(
+                installer_id, job_id, network, identity
+            )
             backend_id = str(info.get("backend_canister_id") or "").strip()
             frontend_id = str(info.get("frontend_canister_id") or "").strip()
+        elif run_ids & POST_DEPLOY_STAGES:
+            stage = "setup"
+            resolved = resolve_registered_slug(
+                registry_id, merged["slug"], network, identity
+            )
+            backend_id = resolved["backend_canister_id"]
+            frontend_id = resolved["frontend_canister_id"]
+            if resolved.get("portal_url"):
+                portal = resolved["portal_url"]
+            console.print(f"  resolved {merged['slug']} → {backend_id}")
 
         console.print(f"  portal {portal}")
 
-        stage = "co-admin"
-        register_co_admin_principal(merged, backend_id, network, identity)
+        if "setup" in run_ids:
+            stage = "setup"
+            if setup_already_complete(backend_id, network, identity):
+                console.print("  setup already complete — skipping")
+            else:
+                run_setup_stage(merged, backend_id, network, identity)
 
-        stage = "config"
-        apply_runtime_config(merged, backend_id, network, identity)
+        if "co-admin" in run_ids:
+            stage = "co-admin"
+            register_co_admin_principal(merged, backend_id, network, identity)
 
-        stage = "data"
-        import_data_overlay(merged, backend_id, network, identity)
+        if "config" in run_ids:
+            stage = "config"
+            apply_runtime_config(merged, backend_id, network, identity)
 
-        stage = "members"
-        member_rows = join_geister_members(merged, backend_id, network, identity)
+        if "data" in run_ids:
+            stage = "data"
+            import_data_overlay(merged, backend_id, network, identity)
+
+        member_rows = []
+        if "members" in run_ids:
+            stage = "members"
+            member_rows = join_geister_members(merged, backend_id, network, identity)
 
         result = {
             "job_id": job_id,

@@ -67,5 +67,7 @@ export function resolveMemberHomeHref(input: SidebarHomeInput | null | undefined
 	const firstId = firstRealm ? navItemExtensionId(firstRealm) : '';
 	if (firstId) return extensionHref(firstId);
 	if (firstRealm?.href?.startsWith('/')) return firstRealm.href;
-	return '/';
+	const publicHome = manifests.find((row) => row?.id === 'public_dashboard');
+	if (publicHome?.id) return extensionHref(publicHome.id);
+	return '/extensions/public_dashboard';
 }

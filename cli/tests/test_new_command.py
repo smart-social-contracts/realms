@@ -12,24 +12,32 @@ from typer.testing import CliRunner
 from realms.cli.commands.new import (
     BRANDING_MAX_BYTES,
     DEPLOYMENT_COST_CREDITS,
+    GAAS_STAGES,
+    WIZARD_CHROME_EXTENSIONS,
+    STANDALONE_STAGES,
     StageError,
     _format_installer_job_failure,
     _local_manifest_dependencies,
     _parse_jsonish,
+    _token_draft,
+    _unwrap_ok_json,
     _identity_kind_is_web,
     assert_credits_sufficient,
     build_portal_manifest,
     check_ic_members_policy,
     classify_identity,
+    format_stage_catalog,
     identity_refuse_message,
     load_gaas_config,
     merge_spec_and_flags,
     new_command,
     normalize_deploy_mode,
+    parse_from_stage,
     parse_subnet,
     portal_url_for_slug,
     resolve_gos_queue,
     slugify,
+    stage_ids_to_run,
     standalone_artifact_urls,
     validate_branding_size,
     validate_merged_spec,
@@ -268,6 +276,7 @@ class TestPortalManifest:
         assert manifest["realm"]["codex"] == {
             "package": {"name": "agora", "version": "1.0.0"}
         }
+        assert list(manifest["realm"]["extensions"]) == list(WIZARD_CHROME_EXTENSIONS)
 
     def test_codex_defaults_version_to_latest(self):
         manifest = build_portal_manifest(
@@ -708,10 +717,152 @@ class TestGaasFlow:
         mock_poll.assert_called_once()
         mock_enter.assert_not_called()
         mock_config.assert_not_called()
-        mock_setup.assert_not_called()
+        mock_setup.assert_called_once()
         out = capsys.readouterr().out
         assert "test.gos.earth/r/acme" in out
         assert "job-123" in out
+
+    @patch("realms.cli.commands.new.join_geister_members", return_value=[])
+    @patch("realms.cli.commands.new.import_data_overlay")
+    @patch("realms.cli.commands.new.apply_runtime_config")
+    @patch("realms.cli.commands.new.register_co_admin_principal")
+    @patch("realms.cli.commands.new.run_setup_stage")
+    @patch("realms.cli.commands.new.setup_already_complete", return_value=False)
+    @patch(
+        "realms.cli.commands.new.resolve_registered_slug",
+        return_value={
+            "backend_canister_id": "aaaaa-aaaaa-aaaaa-aaaaa-aaa",
+            "frontend_canister_id": "bbbbb-bbbbb-bbbbb-bbbbb-bbb",
+            "portal_url": "https://test.gos.earth/r/acme",
+        },
+    )
+    @patch("realms.cli.commands.new.poll_installer_until_ready")
+    @patch("realms.cli.commands.new.request_deployment")
+    @patch("realms.cli.commands.new.query_credit_balance")
+    @patch(
+        "realms.cli.commands.new.resolve_identity_principal",
+        return_value="aaaaa-aaaaa-aaaaa-aaaaa-aaa",
+    )
+    @patch("realms.cli.commands.new.assert_identity_is_ii_linked")
+    def test_gaas_from_stage_setup_resolves_slug(
+        self,
+        _linked,
+        _principal,
+        mock_credits,
+        mock_request,
+        mock_poll,
+        mock_resolve,
+        _setup_complete,
+        mock_setup,
+        _co_admin,
+        _runtime,
+        _data,
+        _members,
+        tmp_path: Path,
+        capsys,
+    ):
+        new_command(
+            spec_file=None,
+            identity="alice",
+            network="test",
+            name="Acme Realm",
+            slug="acme",
+            codex="agora",
+            yes=True,
+            gaas_config=self._gaas_config(tmp_path),
+            from_stage="setup",
+        )
+        mock_credits.assert_not_called()
+        mock_request.assert_not_called()
+        mock_poll.assert_not_called()
+        mock_resolve.assert_called_once()
+        mock_setup.assert_called_once()
+        out = capsys.readouterr().out
+        assert "from-stage setup" in out
+        assert "test.gos.earth/r/acme" in out
+
+
+class TestFromStage:
+    def test_parse_index_and_id(self):
+        assert parse_from_stage(None, GAAS_STAGES) == 0
+        assert parse_from_stage("setup", GAAS_STAGES) == 5
+        assert parse_from_stage("co-admin", GAAS_STAGES) == 6
+        assert parse_from_stage("co_admin", GAAS_STAGES) == 6
+        assert parse_from_stage("6", GAAS_STAGES) == 5
+
+    def test_rejects_unknown(self):
+        with pytest.raises(StageError) as exc:
+            parse_from_stage("not-a-stage", GAAS_STAGES)
+        assert "unknown --from-stage" in exc.value.message
+        assert "setup" in exc.value.message
+
+    def test_stage_ids_keep_validate(self):
+        ids = stage_ids_to_run(GAAS_STAGES, "setup")
+        assert "validate" in ids
+        assert "setup" in ids
+        assert "credits" not in ids
+        assert "deploy" not in ids
+        assert "poll" not in ids
+        assert "members" in ids
+
+    def test_standalone_catalog_has_no_poll(self):
+        catalog = format_stage_catalog(STANDALONE_STAGES)
+        assert "poll" not in catalog
+        assert "deploy" in catalog
+
+    def test_catalog_symbol_does_not_need_canister(self):
+        merged = _merged(token={"symbol": "ckEURC", "canister": ""})
+        validate_merged_spec(merged, network="test", identity="alice")
+
+    def test_unknown_symbol_still_needs_canister(self):
+        merged = _merged(token={"symbol": "MYTOKEN", "canister": ""})
+        with pytest.raises(StageError) as exc:
+            validate_merged_spec(merged, network="test", identity="alice")
+        assert "unknown catalog token" in exc.value.message
+
+    def test_token_draft_accepts_catalog_symbol(self):
+        assert _token_draft({"symbol": "ckEURC"}) == {"symbol": "ckEURC"}
+        assert _token_draft({"canister": "aaaaa-aa", "symbol": "ckEURC"}) == {
+            "token_canister_id": "aaaaa-aa",
+            "symbol": "ckEURC",
+        }
+        assert _token_draft({}) is None
+
+    def test_unwrap_ok_json(self):
+        inner = {"success": True, "backend_canister_id": "abc"}
+        assert _unwrap_ok_json({"Ok": json.dumps(inner)}) == inner
+        assert _unwrap_ok_json(inner) == inner
+
+    @patch("realms.cli.commands.new.time.sleep")
+    @patch("realms.cli.commands.new._setup_json_call")
+    def test_setup_install_codex_retries_in_progress(self, mock_call, _sleep):
+        from realms.cli.commands.new import call_setup_install_codex
+
+        mock_call.side_effect = [
+            {"success": True, "status": "in_progress", "phase": "pull_backend"},
+            {"success": True, "status": "complete", "version": "0.9.6"},
+        ]
+        raw = call_setup_install_codex("be", "agora", None, "test", "alice")
+        assert raw["status"] == "complete"
+        assert mock_call.call_count == 2
+
+
+def test_new_help_lists_from_stage():
+    result = runner.invoke(app, ["new", "--help"])
+    assert result.exit_code == 0
+    text = result.output.replace("\x1b[0m", "").replace("\x1b[1m", "")
+    assert "from-stage" in text
+
+
+def test_wizard_chrome_is_host_not_codex():
+    assert WIZARD_CHROME_EXTENSIONS == (
+        "public_dashboard",
+        "member_dashboard",
+        "welcome",
+    )
+    agora_deps = _local_manifest_dependencies("agora")
+    for chrome in WIZARD_CHROME_EXTENSIONS:
+        assert chrome not in agora_deps
 
 
 def test_local_manifest_dependencies_lists_syntropia_extensions():
