@@ -91,20 +91,21 @@ Confirm `mxyd5-…` is live before wipe. If it is already dead, DNS is already b
 
 ---
 
-## 3. Before `realms seed` — Realms inventory must list product ids to delete
+## 3. Before `realms seed` — Realms inventory for adopt or rebuild
 
-Seed destroy only matches ids in **Realms** `canister_ids.json` (and GaaS-descriptor names that happen to collide — do not rely on that). Test currently has almost no product keys there.
+Default `realms seed` **adopts** ids from **Realms** `canister_ids.json` (register + sheet reconcile). It does not `delete_canister` unless you pass **`--rebuild`**.
 
-Copy **live** product principals into `realms/canister_ids.json` under `"test"` (hints in `gos-as-a-service/canister_ids.json` test keys — verify status):
+For **`--rebuild`**, the same inventory lists what will be destroyed (except `marketplace_frontend` DNS). Test product principals (verify with `dfx canister status`):
 
 | Name | Role |
 |---|---|
-| `marketplace_frontend` | **Keep.** DNS. Seed must not delete this id. |
-| `marketplace_backend` | Destroy + recreate |
-| `file_registry` | Destroy + recreate (fleet, not Casals’ own) |
-| `file_registry_frontend` | Destroy + recreate |
-| `token_backend` / `token_frontend` | Destroy + recreate |
-| `nft_backend` / `nft_frontend` | Destroy + recreate |
+| `marketplace_frontend` | **Keep on rebuild.** DNS. Default seed adopts; rebuild must not delete this id. |
+| `marketplace_backend` | Adopt (default) / destroy + recreate (`--rebuild`) |
+| `file_registry` | Adopt (default) / destroy + recreate (`--rebuild`; fleet, not Casals’ own) |
+| `file_registry_frontend` | Adopt (default) / destroy + recreate (`--rebuild`) |
+| `token_backend` / `token_frontend` | Adopt (default) / destroy + recreate (`--rebuild`) |
+| `nft_backend` / `nft_frontend` | Adopt (default) / destroy + recreate (`--rebuild`) |
+| `casals_backend` (+ other `casals_*`) | Adopt (default) / destroy + recreate (`--rebuild`) |
 
 Do **not** put GaaS `casals_*` into Realms `casals_*`. If Realms still has a test Casals id that is actually the **GaaS** conductor, seed will try to delete it unless that id is also in the GaaS descriptor (seed treats those as protected). After `gaas new`, GaaS Casals is a **new** principal; an old id in Realms inventory is a dead canister seed can clear.
 
@@ -133,7 +134,13 @@ No extra inventory edit if step 3 is done. Confirm GaaS Casals in the descriptor
 realms seed --env test --identity deployer --yes
 ```
 
-From the Realms repo. Needs `CASALS_SRC`. First seed usually has no Realms GOS Casals to tear down; later seeds destroy **that** stack only.
+Adopts existing Realms GOS Casals + product canisters when ids are in `canister_ids.json`. For a full wipe:
+
+```bash
+realms seed --env test --identity deployer --rebuild --yes
+```
+
+From the Realms repo. Needs `CASALS_SRC`. First seed after `gaas new` with no Realms GOS Casals yet may still use `--rebuild` or let `env deploy` create missing canisters via `--from-phase env_deploy` after `casals new`.
 
 ---
 

@@ -1,5 +1,6 @@
 """Unit tests for ``realms new`` (issue #389). No replica / live IC."""
 
+import ast
 import json
 import re
 from pathlib import Path
@@ -11,11 +12,15 @@ from typer.testing import CliRunner
 
 from realms.cli.commands.new import (
     BRANDING_MAX_BYTES,
+    CATALOG_TOKENS,
+    DEFAULT_TOKEN_SYMBOL,
     DEPLOYMENT_COST_CREDITS,
     GAAS_STAGES,
     WIZARD_CHROME_EXTENSIONS,
     STANDALONE_STAGES,
     StageError,
+    catalog_token_draft,
+    catalog_token_symbol,
     _format_installer_job_failure,
     _local_manifest_dependencies,
     _parse_jsonish,
@@ -820,13 +825,35 @@ class TestFromStage:
             validate_merged_spec(merged, network="test", identity="alice")
         assert "unknown catalog token" in exc.value.message
 
-    def test_token_draft_accepts_catalog_symbol(self):
-        assert _token_draft({"symbol": "ckEURC"}) == {"symbol": "ckEURC"}
-        assert _token_draft({"canister": "aaaaa-aa", "symbol": "ckEURC"}) == {
+    def test_token_draft_resolves_catalog_ledger(self):
+        assert _token_draft({"symbol": "ckEURC"}, "test") == {
+            "symbol": "ckEURC",
+            "token_canister_id": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "decimals": 6,
+        }
+        assert _token_draft({"canister": "aaaaa-aa", "symbol": "ckEURC"}, "test") == {
             "token_canister_id": "aaaaa-aa",
             "symbol": "ckEURC",
         }
-        assert _token_draft({}) is None
+        assert _token_draft({}, "test") is None
+
+    def test_token_draft_default_matches_wizard_preselection(self):
+        # setup/+page.svelte preselects REALMS; the CLI default must agree.
+        assert DEFAULT_TOKEN_SYMBOL == "REALMS"
+        assert catalog_token_draft(DEFAULT_TOKEN_SYMBOL, "test") == {
+            "symbol": "REALMS",
+            "token_canister_id": "nusyl-jiaaa-aaaae-qj6mq-cai",
+            "decimals": 8,
+        }
+
+    def test_catalog_symbol_is_case_insensitive(self):
+        assert catalog_token_symbol("ckeurc") == "ckEURC"
+        assert catalog_token_symbol("realms") == "REALMS"
+        assert catalog_token_symbol("mytoken") is None
+
+    def test_ckbtc_carries_its_indexer(self):
+        draft = catalog_token_draft("ckBTC", "test")
+        assert draft["indexer_canister_id"] == "n5wcd-faaaa-aaaar-qaaea-cai"
 
     def test_unwrap_ok_json(self):
         inner = {"success": True, "backend_canister_id": "abc"}
@@ -854,15 +881,54 @@ def test_new_help_lists_from_stage():
     assert "from-stage" in text
 
 
-def test_wizard_chrome_is_host_not_codex():
-    assert WIZARD_CHROME_EXTENSIONS == (
-        "public_dashboard",
-        "member_dashboard",
-        "welcome",
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _lite_extensions() -> list:
+    """LITE_EXTENSIONS from the Casals arrangement generator, without importing it."""
+    source = (_repo_root() / "casals-config" / "_gen_arrangements.py").read_text(
+        encoding="utf-8"
     )
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", "") == "LITE_EXTENSIONS" for t in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise AssertionError("LITE_EXTENSIONS not found in _gen_arrangements.py")
+
+
+def test_wizard_chrome_is_the_shell_not_a_codex():
     agora_deps = _local_manifest_dependencies("agora")
     for chrome in WIZARD_CHROME_EXTENSIONS:
         assert chrome not in agora_deps
+    # The realm shell needs its own settings page; no codex declares it.
+    assert "realm_settings" in WIZARD_CHROME_EXTENSIONS
+
+
+def test_wizard_chrome_matches_sheet_realm_default_set():
+    """Wizard realms get what Casals gives sheet realms, minus demo-only toys."""
+    assert set(WIZARD_CHROME_EXTENSIONS) == set(_lite_extensions()) - {
+        "demo_simulator",
+        "hello_world",
+    }
+
+
+def test_cli_token_catalog_matches_setup_wizard():
+    """CLI catalog must not drift from src/realm_frontend/.../sharedTokens.ts."""
+    text = (
+        _repo_root() / "src/realm_frontend/src/lib/setup/sharedTokens.ts"
+    ).read_text(encoding="utf-8")
+    body = text.split("SHARED_TOKEN_CATALOG", 1)[1].split("];", 1)[0]
+    assert set(re.findall(r"id: '([^']+)'", body)) == set(CATALOG_TOKENS)
+    wizard_principals = set(re.findall(r"'([a-z0-9-]+-cai)'", body))
+    cli_principals = {
+        principal
+        for entry in CATALOG_TOKENS.values()
+        for group in ("ledgers", "indexers")
+        for principal in (entry.get(group) or {}).values()
+    }
+    assert cli_principals == wizard_principals
 
 
 def test_local_manifest_dependencies_lists_syntropia_extensions():

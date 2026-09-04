@@ -6,7 +6,7 @@
   "scripts": {
     "setup": "npm i && dfx canister create marketplace_backend && dfx generate marketplace_backend && dfx deploy",
     "start": "vite --port 3002",
-    "prebuild": "dfx generate marketplace_backend",
+    "prebuild": "node scripts/check-declarations.mjs",
     "build": "vite build",
     "postbuild": "node scripts/write-version-file.js",
     "test": "node --experimental-strip-types --test src/lib/*.test.ts && node --test ../../scripts/build-info.test.js",

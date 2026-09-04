@@ -358,7 +358,10 @@ def new(
         None, "--welcome", help="Welcome message (max 1024 chars)"
     ),
     token_symbol: Optional[str] = typer.Option(
-        None, "--token-symbol", help="Existing token symbol (omit to skip)"
+        None,
+        "--token-symbol",
+        help="Treasury token symbol: REALMS, ckBTC, ckUSDC, ckEURC, or any "
+        "symbol together with --token-canister (default: REALMS)",
     ),
     token_canister: Optional[str] = typer.Option(
         None, "--token-canister", help="Existing token canister id"
@@ -453,7 +456,7 @@ def new(
       realms new --deploy-mode standalone --network demo --identity deployer \\
         --codex agora --name Acme --yes
       realms new spec.json --gaas-config environments/test.json \\
-        --identity deployer --slug acme --from-stage setup --token-symbol ckEURC --yes
+        --identity deployer --slug acme --from-stage setup --yes
     """
     start_run_log(
         network or (gaas_config.stem if gaas_config else "new"),
@@ -1854,30 +1857,43 @@ def seed(
         "--destroy-except-marketplace-frontend",
         hidden=True,
         help=(
-            "Deprecated: realms seed always destroys Casals and product "
-            "canisters except marketplace_frontend. Kept so existing scripts "
-            "still parse. Cannot be combined with --skip-product."
+            "Deprecated alias for --rebuild. Kept so existing scripts still "
+            "parse. Cannot be combined with --skip-product."
         ),
+    ),
+    rebuild: bool = typer.Option(
+        False,
+        "--rebuild",
+        help=(
+            "Destroy Realms GOS Casals + product canisters (keep "
+            "marketplace_frontend DNS), mint a new conductor, then redeploy."
+        ),
+    ),
+    destroy_and_recreate: bool = typer.Option(
+        False,
+        "--destroy-and-recreate",
+        hidden=True,
+        help="Alias for --rebuild.",
     ),
     from_phase: Optional[str] = typer.Option(
         None,
         "--from-phase",
         "--from",
         help=(
-            "Resume after a failed rebuild: catalog (retry Casals catalog "
-            "seed then product deploy), env_deploy (skip destroy + casals new), "
-            "or authorize (skip product deploy too)."
+            "Resume after a failed rebuild: destroy (full wipe + casals new), "
+            "catalog (retry Casals catalog seed then product deploy), "
+            "env_deploy (skip destroy + casals new), or authorize "
+            "(skip env deploy; adopt + reconcile only)."
         ),
     ),
 ) -> None:
     """Deploy Realms GOS product infra (``*.realmsgos.org``) and publish the catalog.
 
-    Always destroys and re-creates **Realms GOS** Casals, then marketplace, fleet
-    file_registry, token, and nft (keeps marketplace_frontend for DNS).
-    Then publishes extensions/codices into that file_registry. Registers
-    product canisters on that conductor and deploys ``casals.json``. Does not
-    touch GaaS Casals or the GaaS portal (``gaas new``). ``--skip-product`` is
-    catalog-only and does not destroy.
+    By default adopts existing **Realms GOS** Casals and product canisters
+    (authorize, register, sheet reconcile). Use ``--rebuild`` to destroy and
+    mint a new conductor. Then publishes extensions/codices into the fleet
+    file_registry. Does not touch GaaS Casals or the GaaS portal (``gaas new``).
+    ``--skip-product`` is catalog-only and does not destroy.
     """
     seed_command(
         env_name=env,
@@ -1890,6 +1906,7 @@ def seed(
         skip_branding=skip_branding,
         with_domain=with_domain,
         destroy_except_frontend=destroy_except_frontend,
+        rebuild=rebuild or destroy_and_recreate,
         from_phase=from_phase,
     )
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 import os
 import re
@@ -13,7 +15,7 @@ from typing import Dict, Optional, Tuple
 
 import typer
 
-from .commands.env import _read_canister_ids, load_env_config
+from .commands.env import _read_canister_ids, _write_canister_ids, load_env_config
 from .utils import console, get_project_root
 
 _SRV_CASALS = Path("/srv/dev/Casals")
@@ -326,12 +328,173 @@ def canister_ids_from_tree(tree: dict) -> Dict[str, str]:
     return out
 
 
+def sync_product_canister_ids_from_tree(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    casals_src: Path,
+    project_root: Optional[Path] = None,
+) -> None:
+    """Update ``canister_ids.json`` product entries from the Casals tree."""
+    root = project_root or get_project_root()
+    tree = run_casals_tree(
+        network=network,
+        identity=identity,
+        casals_src=casals_src,
+        canister=conductor,
+    )
+    # Tree names use hyphens (token-frontend); keys use underscores (token_frontend).
+    tree_ids = canister_ids_from_tree(tree)
+    data = _read_canister_ids(root)
+    changed = False
+    for _stand, tree_name, ids_key, _kind in _PRODUCT_REGISTRATIONS:
+        tree_cid = (tree_ids.get(tree_name) or "").strip()
+        if not tree_cid:
+            continue
+        current = ((data.get(ids_key) or {}).get(network) or "").strip()
+        if current == tree_cid:
+            continue
+        data.setdefault(ids_key, {})[network] = tree_cid
+        changed = True
+        console.print(
+            f"[green]✓ canister_ids.json[/green] {ids_key}.{network}: "
+            f"{current or '(unset)'} → {tree_cid}"
+        )
+    if changed:
+        _write_canister_ids(root, data)
+
+
 def _product_canister_id(
     network: str,
     key: str,
     project_root: Path,
 ) -> str:
     return (_read_canister_ids(project_root).get(key) or {}).get(network, "").strip()
+
+
+_DEAD_CANISTER_MARKERS = (
+    "not found",
+    "does not exist",
+    "canister_not_found",
+    "canister not found",
+    "no route",
+)
+
+# A canister whose controller was deleted still answers on the IC, but the
+# deployer can neither read its status nor install into it, so an id pinned to
+# one is as unusable as a deleted one: seed must mint a replacement rather than
+# fail. IC0542 is the management canister's rejection for that.
+_UNCONTROLLED_CANISTER_MARKERS = (
+    "ic0542",
+    "is not allowed to read the canister status",
+)
+
+
+def check_canister_liveness(
+    canister_id: str,
+    *,
+    network: str,
+    identity: Optional[str] = None,
+) -> bool:
+    """Return True when the canister exists and this identity can control it.
+
+    Return False when the replica reports not-found, or when it exists but
+    rejects the status read (orphaned by a deleted controller) — both mean the
+    pinned id is unusable and seed should mint a replacement. Raise
+    ``RuntimeError`` for anything else, such as a transient replica error.
+    """
+    canister_id = (canister_id or "").strip()
+    if not canister_id:
+        raise RuntimeError("check_canister_liveness requires a canister id")
+
+    network_key = network.strip().lower()
+    if network_key in ("local", "localhost"):
+        cmd = ["dfx", "canister", "status", canister_id, "--network", network]
+        if identity:
+            cmd.extend(["--identity", identity])
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_dfx_subprocess_env(),
+        )
+    else:
+        cmd = [
+            "icp",
+            "canister",
+            "status",
+            canister_id,
+            "-n",
+            "https://icp0.io",
+            "--root-key",
+            "mainnet",
+        ]
+        if identity:
+            cmd.extend(["--identity", identity])
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_dfx_subprocess_env(),
+        )
+        # icp answers definitively here (status, "was not found", or a rejection
+        # code), so there is no dfx fallback: hosts that wrap dfx reject a bare
+        # invocation, which used to turn a readable answer into a hard failure.
+
+    if result.returncode == 0:
+        return True
+    combined = f"{result.stderr}\n{result.stdout}"
+    if any(marker in combined.lower() for marker in _DEAD_CANISTER_MARKERS):
+        return False
+    if "ic0301" in combined.lower():
+        return False
+    if any(
+        marker in combined.lower() for marker in _UNCONTROLLED_CANISTER_MARKERS
+    ):
+        return False
+    raise RuntimeError(
+        f"cannot check liveness for {canister_id}: {combined.strip()}"
+    )
+
+
+def partition_product_canister_inventory(
+    network: str,
+    project_root: Path,
+    *,
+    identity: Optional[str] = None,
+) -> tuple[dict[str, str], list[tuple[str, str, str]]]:
+    """Split product inventory into live ids and absent (stale) entries.
+
+    Returns ``(live, dead)`` where ``live`` maps ``ids_key`` → canister_id and
+    ``dead`` is ``(ids_key, registered_name, stale_cid)`` tuples.
+    """
+    live: dict[str, str] = {}
+    dead: list[tuple[str, str, str]] = []
+    for _stand, reg_name, ids_key, _kind in _PRODUCT_REGISTRATIONS:
+        cid = _product_canister_id(network, ids_key, project_root)
+        if not cid:
+            continue
+        if check_canister_liveness(cid, network=network, identity=identity):
+            live[ids_key] = cid
+        else:
+            dead.append((ids_key, reg_name, cid))
+    return live, dead
+
+
+def log_stale_product_canisters(
+    dead: list[tuple[str, str, str]],
+    *,
+    action: str,
+) -> None:
+    """Log every stale product principal so operators see what was healed."""
+    for ids_key, reg_name, cid in dead:
+        console.print(
+            f"[yellow]⚠️  {reg_name} ({ids_key}): stale principal {cid} "
+            f"not on IC — {action}[/yellow]"
+        )
 
 
 def _already_exists(exc: Exception) -> bool:
@@ -446,6 +609,13 @@ def register_product_canisters(
 ) -> None:
     """Register existing product canisters on Casals stands (idempotent)."""
     root = project_root or get_project_root()
+    live, dead = partition_product_canister_inventory(
+        network, root, identity=identity
+    )
+    if dead:
+        log_stale_product_canisters(
+            dead, action="skipping Casals registration"
+        )
     tree = run_casals_tree(
         network=network,
         identity=identity,
@@ -455,8 +625,10 @@ def register_product_canisters(
     registered = canister_ids_from_tree(tree)
 
     for stand, name, ids_key, kind in _PRODUCT_REGISTRATIONS:
-        cid = _product_canister_id(network, ids_key, root)
+        cid = live.get(ids_key)
         if not cid:
+            if any(entry[0] == ids_key for entry in dead):
+                continue
             raise RuntimeError(
                 f"missing {ids_key} canister id for network {network!r} "
                 f"(needed to register {name})"
@@ -486,6 +658,18 @@ _IC_TOKENS_BASE = (
     "https://github.com/smart-social-contracts/ic-tokens/releases/download/"
     f"v{_IC_TOKENS_VERSION}"
 )
+_IC_TOKENS_TOKEN_BACKEND_SHA256 = (
+    "a1734ad2ec260ce85e541f860dbcaf8c846423709177587c7e5f70adc47e461a"
+)
+_IC_TOKENS_NFT_BACKEND_SHA256 = (
+    "abea08d97de800d4e299545be786dd02c9c6a7d93aaccc3770a08c213dfa484b"
+)
+_WASM_MAGIC = b"\x00asm"
+_GZIP_MAGIC = b"\x1f\x8b"
+_CANISTER_ID_RE = re.compile(
+    r"([a-z0-9]{5}(?:-[a-z0-9]{5}){3,10}-[a-z0-9]{3})"
+)
+_CONTROLLERS_RE = re.compile(r"controllers:\s*(.+)", re.I)
 _CERTIFIED_ASSETS_URL = (
     "https://github.com/smart-social-contracts/certified-assets"
     "/releases/download/v0.3.0/assetstorage.wasm.gz"
@@ -639,32 +823,44 @@ def configure_gaas_installer_product_pointers(
         env=_dfx_subprocess_env(),
     )
     if result.returncode != 0:
-        dfx_cmd = [
-            "dfx",
-            "canister",
-            "call",
-            installer,
-            "configure",
-            arg,
-        ]
-        if identity:
-            dfx_cmd.extend(["--identity", identity])
-        if network:
-            dfx_cmd.extend(["--network", network])
-        result = subprocess.run(
-            dfx_cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-            env=_dfx_subprocess_env(),
-        )
-    if result.returncode != 0:
         err = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(f"installer configure (product pointers) failed: {err}")
+    # The installer answers an authorization failure with a 200 and
+    # {"success": false}, so the exit code alone is not evidence it took effect.
+    applied = _parse_installer_configure_response(result.stdout)
+    if not applied.get("success"):
+        raise RuntimeError(
+            f"installer configure rejected: {applied.get('error') or result.stdout.strip()}"
+        )
+    for key, expected in (
+        ("file_registry_id", file_registry),
+        ("marketplace_id", marketplace),
+    ):
+        if applied.get(key) and applied[key] != expected:
+            raise RuntimeError(
+                f"installer {key} is {applied[key]}, expected {expected}"
+            )
     console.print(
         f"[green]✓ installer file_registry + marketplace[/green] "
         f"[dim]({installer})[/dim]"
     )
+
+
+def _parse_installer_configure_response(raw: str) -> dict:
+    """Pull the JSON payload out of a candid ``(\"{...}\")`` reply.
+
+    Returns an empty dict when the reply is not the expected shape, which the
+    caller treats as a failure rather than assuming success.
+    """
+    match = re.search(r'"(\{.*\})"', raw or "", re.S)
+    if not match:
+        return {}
+    body = match.group(1).replace('\\"', '"').replace("\\\\", "\\")
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _candid_text_arg(payload: str) -> str:
@@ -758,26 +954,6 @@ def publish_casals_frontend_to_marketplace(
         check=False,
         env=_dfx_subprocess_env(),
     )
-    if result.returncode != 0:
-        dfx_cmd = [
-            "dfx",
-            "canister",
-            "call",
-            marketplace,
-            "set_casals_frontend_canister_id",
-            arg,
-        ]
-        if identity:
-            dfx_cmd.extend(["--identity", identity])
-        if network:
-            dfx_cmd.extend(["--network", network])
-        result = subprocess.run(
-            dfx_cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-            env=_dfx_subprocess_env(),
-        )
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(
@@ -953,15 +1129,24 @@ def parse_cycles_balance(text: str) -> Optional[int]:
 
 
 def cycles_ledger_balance(*, identity: Optional[str] = None) -> Optional[int]:
-    cmd = ["dfx", "cycles", "balance", "--network", "ic"]
+    cmd = [
+        "icp",
+        "cycles",
+        "balance",
+        "-n",
+        "https://icp0.io",
+        "--root-key",
+        "mainnet",
+    ]
     if identity:
         cmd.extend(["--identity", identity])
-    env = os.environ.copy()
-    env["TERM"] = "xterm-256color"
-    env["DFX_WARNING"] = "-mainnet_plaintext_identity"
-    env.pop("NO_COLOR", None)
-    env.pop("FORCE_COLOR", None)
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_dfx_subprocess_env(),
+    )
     if result.returncode != 0:
         return None
     return parse_cycles_balance(result.stdout or result.stderr or "")
@@ -994,14 +1179,19 @@ def top_up_canister_cycles(
                 f"(wanted {amount / 1_000_000_000_000:.1f} TC)[/yellow]"
             )
             amount = sendable
+    # icp, not dfx: operator hosts wrap dfx and reject a bare invocation, which
+    # turned this top-up into a hard seed failure.
     cmd = [
-        "dfx",
-        "cycles",
+        "icp",
+        "canister",
         "top-up",
         canister_id,
+        "--amount",
         str(amount),
-        "--network",
-        "ic",
+        "-n",
+        "https://icp0.io",
+        "--root-key",
+        "mainnet",
     ]
     if identity:
         cmd.extend(["--identity", identity])
@@ -1014,7 +1204,7 @@ def top_up_canister_cycles(
     if result.returncode != 0:
         stderr = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(
-            f"dfx cycles top-up {canister_id} {amount} failed: {stderr}"
+            f"icp canister top-up {canister_id} {amount} failed: {stderr}"
         )
     console.print(
         f"[dim]topped up {canister_id} with {amount / 1_000_000_000_000:.1f} TC[/dim]"
@@ -1054,7 +1244,7 @@ def install_gos_file_registry_wasm(
             "or place file_registry.wasm.gz in .external-wasms/)"
         )
     cmd = [
-        "dfx",
+        "icp",
         "canister",
         "install",
         canister_id,
@@ -1062,23 +1252,28 @@ def install_gos_file_registry_wasm(
         str(wasm),
         "--mode",
         "upgrade",
-        "--network",
-        "ic",
-        "--yes",
-        "--argument",
+        "--args",
         "(null)",
+        "-y",
+        "-n",
+        "https://icp0.io",
+        "--root-key",
+        "mainnet",
     ]
     if identity:
         cmd.extend(["--identity", identity])
-    env_vars = os.environ.copy()
-    env_vars["TERM"] = "xterm-256color"
-    env_vars["DFX_WARNING"] = "-mainnet_plaintext_identity"
-    env_vars.pop("NO_COLOR", None)
-    env_vars.pop("FORCE_COLOR", None)
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env_vars)
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_dfx_subprocess_env(),
+    )
     if result.returncode != 0:
         stderr = (result.stderr or result.stdout or "").strip()
-        raise RuntimeError(f"install GOS file_registry on {canister_id} failed: {stderr}")
+        raise RuntimeError(
+            f"install GOS file_registry on {canister_id} failed: {stderr}"
+        )
     console.print(f"[dim]installed GOS file_registry WASM on {canister_id}[/dim]")
 
 
@@ -1182,6 +1377,63 @@ def finish_casals_rebuild(
     )
 
 
+def _seed_wasm_cache_dir() -> Path:
+    raw = os.environ.get("REALMS_SEED_WASM_CACHE", "").strip()
+    return Path(raw) if raw else Path("/tmp/realms-seed-wasms")
+
+
+def _wasm_payload(data: bytes) -> bytes:
+    if data[:2] == _GZIP_MAGIC:
+        return gzip.decompress(data)
+    return data
+
+
+def _validate_wasm_artifact(
+    path: Path,
+    *,
+    label: str,
+    expected_sha256: str | None = None,
+) -> None:
+    if not path.is_file():
+        raise RuntimeError(f"{label}: missing artifact at {path}")
+    raw = path.read_bytes()
+    if not raw:
+        raise RuntimeError(f"{label}: artifact at {path} is empty")
+    actual_sha256 = hashlib.sha256(raw).hexdigest()
+    if expected_sha256 and actual_sha256 != expected_sha256.lower():
+        raise RuntimeError(
+            f"{label}: sha256 mismatch for {path.name}: "
+            f"expected {expected_sha256}, got {actual_sha256}"
+        )
+    payload = _wasm_payload(raw)
+    if not payload.startswith(_WASM_MAGIC):
+        raise RuntimeError(
+            f"{label}: {path.name} is not a valid WASM module "
+            f"(missing \\x00asm magic; sha256={actual_sha256})"
+        )
+
+
+def _ensure_cached_wasm(
+    url: str,
+    dest: Path,
+    *,
+    label: str,
+    expected_sha256: str,
+) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.is_file():
+        try:
+            _validate_wasm_artifact(
+                dest, label=label, expected_sha256=expected_sha256
+            )
+            return dest
+        except RuntimeError:
+            dest.unlink(missing_ok=True)
+    _download_url(url, dest)
+    _validate_wasm_artifact(dest, label=label, expected_sha256=expected_sha256)
+    return dest
+
+
 def _download_url(url: str, dest: Path) -> Path:
     import urllib.request
 
@@ -1195,6 +1447,514 @@ def _certified_assets_wasm() -> Path:
         return _CERTIFIED_ASSETS_CACHE
     _download_url(_CERTIFIED_ASSETS_URL, _CERTIFIED_ASSETS_CACHE)
     return _CERTIFIED_ASSETS_CACHE
+
+
+def _ic_canister_call(
+    canister_id: str,
+    method: str,
+    arg: str,
+    *,
+    network: str,
+    identity: Optional[str],
+    query: bool = False,
+) -> str:
+    cmd = [
+        "icp",
+        "canister",
+        "call",
+        canister_id,
+        method,
+        arg,
+        "-n",
+        "https://icp0.io",
+        "--root-key",
+        "mainnet",
+    ]
+    if query:
+        cmd.append("--query")
+    if identity:
+        cmd.extend(["--identity", identity])
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_dfx_subprocess_env(),
+    )
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"{method} on {canister_id} failed: {err}")
+    return (result.stdout or "").strip()
+
+
+def _parse_controllers(status_raw: str) -> tuple[str, ...]:
+    for line in status_raw.splitlines():
+        match = _CONTROLLERS_RE.search(line)
+        if match:
+            return tuple(_CANISTER_ID_RE.findall(match.group(1)))
+    return ()
+
+
+def _dfx_canister_status(
+    canister_id: str,
+    *,
+    network: str,
+    identity: Optional[str],
+) -> str:
+    network_key = network.strip().lower()
+    if network_key in ("local", "localhost"):
+        cmd = ["dfx", "canister", "status", canister_id, "--network", network]
+    else:
+        cmd = [
+            "icp",
+            "canister",
+            "status",
+            canister_id,
+            "-n",
+            "https://icp0.io",
+            "--root-key",
+            "mainnet",
+        ]
+    if identity:
+        cmd.extend(["--identity", identity])
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_dfx_subprocess_env(),
+    )
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"cannot read status for {canister_id}: {err}")
+    return (result.stdout or "").strip()
+
+
+def _add_canister_controller(
+    canister_id: str,
+    controller: str,
+    *,
+    network: str,
+    identity: Optional[str],
+) -> None:
+    controller = (controller or "").strip()
+    if not controller:
+        raise RuntimeError("add_canister_controller requires a controller principal")
+    status = _dfx_canister_status(
+        canister_id, network=network, identity=identity
+    )
+    if controller in _parse_controllers(status):
+        console.print(
+            f"[dim]{canister_id}: {controller} already a controller[/dim]"
+        )
+        return
+    network_key = network.strip().lower()
+    if network_key in ("local", "localhost"):
+        cmd = [
+            "dfx",
+            "canister",
+            "update-settings",
+            canister_id,
+            "--add-controller",
+            controller,
+            "--network",
+            network,
+        ]
+    else:
+        cmd = [
+            "icp",
+            "canister",
+            "settings",
+            "update",
+            canister_id,
+            "--add-controller",
+            controller,
+            "-n",
+            "https://icp0.io",
+            "--root-key",
+            "mainnet",
+        ]
+    if identity:
+        cmd.extend(["--identity", identity])
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_dfx_subprocess_env(),
+    )
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(
+            f"add controller {controller} to {canister_id} failed: {err}"
+        )
+
+
+def _live_product_canister_inventory(
+    network: str,
+    project_root: Path,
+    *,
+    identity: Optional[str] = None,
+) -> tuple[dict[str, str], list[tuple[str, str, str]]]:
+    """Return live product canisters; log and omit stale principals."""
+    live, dead = partition_product_canister_inventory(
+        network, project_root, identity=identity
+    )
+    if dead:
+        log_stale_product_canisters(
+            dead, action="skipping controller changes"
+        )
+    return live, dead
+
+
+def apply_product_controller_topology(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+) -> None:
+    """Add the Realms GOS Casals conductor as co-controller on product canisters."""
+    if network.strip().lower() in ("local", "localhost"):
+        console.print(
+            "[yellow]skip product controller topology on local network[/yellow]"
+        )
+        return
+    root = project_root or get_project_root()
+    inventory, _dead = _live_product_canister_inventory(
+        network, root, identity=identity
+    )
+    if not inventory:
+        console.print(
+            "[dim]no live product canisters for controller topology[/dim]"
+        )
+        return
+    changed = 0
+    for name, canister_id in inventory.items():
+        status = _dfx_canister_status(
+            canister_id, network=network, identity=identity
+        )
+        if conductor in _parse_controllers(status):
+            console.print(f"[dim]{name}: Casals conductor already a controller[/dim]")
+            continue
+        console.print(
+            f"[dim]{name}: adding Casals conductor {conductor} as co-controller[/dim]"
+        )
+        _add_canister_controller(
+            canister_id,
+            conductor,
+            network=network,
+            identity=identity,
+        )
+        changed += 1
+    if changed:
+        console.print(
+            f"[green]✓ added Casals conductor on {changed} product canister(s)[/green]"
+        )
+    else:
+        console.print("[dim]product controller topology already applied[/dim]")
+
+
+def verify_product_controller_topology(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+) -> None:
+    """Fail loudly if the Casals conductor is missing from any product canister."""
+    if network.strip().lower() in ("local", "localhost"):
+        return
+    root = project_root or get_project_root()
+    inventory, dead = _live_product_canister_inventory(
+        network, root, identity=identity
+    )
+    if dead:
+        log_stale_product_canisters(
+            dead, action="skipping controller verification"
+        )
+    if not inventory:
+        console.print(
+            "[dim]no live product canisters to verify controller topology[/dim]"
+        )
+        return
+    errors: list[str] = []
+    for name, canister_id in inventory.items():
+        status = _dfx_canister_status(
+            canister_id, network=network, identity=identity
+        )
+        controllers = set(_parse_controllers(status))
+        if conductor not in controllers:
+            errors.append(
+                f"{name} ({canister_id}): missing Casals conductor controller "
+                f"{conductor} (actual={sorted(controllers)})"
+            )
+    if errors:
+        raise RuntimeError(
+            "product controller verification failed:\n  - "
+            + "\n  - ".join(errors)
+        )
+    console.print(
+        f"[green]✓ verified Casals conductor on {len(inventory)} product canister(s)[/green]"
+    )
+
+
+def ensure_product_controller_topology(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+) -> None:
+    apply_product_controller_topology(
+        conductor=conductor,
+        network=network,
+        identity=identity,
+        project_root=project_root,
+    )
+    verify_product_controller_topology(
+        conductor=conductor,
+        network=network,
+        identity=identity,
+        project_root=project_root,
+    )
+
+
+def _parse_casals_settings(raw: str) -> dict:
+    from .commands._dfx_utils import parse_candid_json_response
+
+    return parse_candid_json_response(raw)
+
+
+def _casals_settings(
+    conductor: str,
+    *,
+    network: str,
+    identity: Optional[str],
+) -> dict:
+    raw = _ic_canister_call(
+        conductor,
+        "get_settings",
+        "()",
+        network=network,
+        identity=identity,
+        query=True,
+    )
+    return _parse_casals_settings(raw)
+
+
+def canister_cycles_balance(
+    canister_id: str,
+    *,
+    identity: Optional[str] = None,
+) -> Optional[int]:
+    """Live cycle balance of ``canister_id``, or None when unreadable."""
+    cmd = [
+        "icp",
+        "canister",
+        "status",
+        canister_id,
+        "-n",
+        "https://icp0.io",
+        "--root-key",
+        "mainnet",
+    ]
+    if identity:
+        cmd.extend(["--identity", identity])
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_dfx_subprocess_env(),
+    )
+    if result.returncode != 0:
+        return None
+    match = re.search(r"Cycles:\s*([0-9_]+)", result.stdout or "")
+    if not match:
+        return None
+    return int(match.group(1).replace("_", ""))
+
+
+# Provisioning one realm makes the conductor mint three canisters: backend,
+# frontend, and the stand's baton.
+CONDUCTOR_CANISTERS_PER_REALM = 3
+_CONDUCTOR_FALLBACK_REQUIREMENT = 10_000_000_000_000
+
+
+def conductor_cycles_requirement(
+    conductor: str,
+    *,
+    network: str,
+    identity: Optional[str],
+) -> int:
+    """Cycles the conductor needs on hand to provision one more realm.
+
+    Casals funds each new canister with ``create_cycles`` and refuses to spend
+    below ``treasury_reserve``, so the floor is reserve + 3 × create_cycles.
+    """
+    try:
+        settings = _casals_settings(conductor, network=network, identity=identity)
+    except RuntimeError:
+        return _CONDUCTOR_FALLBACK_REQUIREMENT
+    try:
+        create = int(settings.get("create_cycles") or 0)
+        reserve = int(settings.get("treasury_reserve") or 0)
+    except (TypeError, ValueError):
+        return _CONDUCTOR_FALLBACK_REQUIREMENT
+    if create <= 0:
+        return _CONDUCTOR_FALLBACK_REQUIREMENT
+    return reserve + create * CONDUCTOR_CANISTERS_PER_REALM
+
+
+def ensure_conductor_cycles(
+    conductor: str,
+    *,
+    network: str,
+    identity: Optional[str],
+    realms: int = 1,
+) -> None:
+    """Top the conductor up to what provisioning ``realms`` more realms costs.
+
+    The conductor is its own treasury and nothing refills it as realms are
+    created, so it drains after a few deploys and the next one dies mid-job with
+    IC0504 — after the realm canisters exist but before the baton hand-off.
+    Checking the live balance here (not Casals' cached snapshot, which can be
+    hours stale) turns that into an automatic top-up.
+    """
+    target = conductor_cycles_requirement(
+        conductor, network=network, identity=identity
+    ) * max(1, realms)
+    balance = canister_cycles_balance(conductor, identity=identity)
+    if balance is None:
+        console.print(
+            f"[yellow]⚠️  cannot read conductor {conductor} cycles; "
+            f"skipping top-up preflight[/yellow]"
+        )
+        return
+    if balance >= target:
+        console.print(
+            f"[dim]conductor cycles {balance / 1_000_000_000_000:.1f} TC "
+            f"(needs {target / 1_000_000_000_000:.1f} TC)[/dim]"
+        )
+        return
+    shortfall = target - balance
+    console.print(
+        f"conductor {conductor} at {balance / 1_000_000_000_000:.1f} TC, "
+        f"needs {target / 1_000_000_000_000:.1f} TC — topping up "
+        f"{shortfall / 1_000_000_000_000:.1f} TC"
+    )
+    top_up_canister_cycles(conductor, identity=identity, amount=shortfall)
+
+
+def ensure_orchestra_name(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+) -> None:
+    """Set Casals orchestra_name from the product sheet (idempotent)."""
+    root = project_root or get_project_root()
+    sheet = load_product_sheet(root)
+    desired = (sheet.get("name") or "").strip()
+    if not desired:
+        raise RuntimeError("product sheet is missing a non-empty name field")
+    current = (_casals_settings(conductor, network=network, identity=identity)
+               .get("orchestra_name") or "").strip()
+    if current == desired:
+        console.print(
+            f"[dim]orchestra_name already {desired!r}[/dim]"
+        )
+        return
+    payload = json.dumps({"orchestra_name": desired})
+    raw = _ic_canister_call(
+        conductor,
+        "set_settings",
+        _candid_text_arg(payload),
+        network=network,
+        identity=identity,
+    )
+    result = _parse_casals_settings(raw)
+    if isinstance(result, dict) and result.get("ok") is False:
+        raise RuntimeError(
+            f"set_settings orchestra_name failed: {result.get('error', result)}"
+        )
+    updated = (_casals_settings(conductor, network=network, identity=identity)
+                 .get("orchestra_name") or "").strip()
+    if updated != desired:
+        raise RuntimeError(
+            f"orchestra_name mismatch after set_settings: "
+            f"expected {desired!r}, got {updated!r}"
+        )
+    console.print(f"[green]✓ orchestra_name[/green] {desired}")
+
+
+def ensure_casals_frontend_canister_id(
+    *,
+    conductor: str,
+    network: str,
+    identity: Optional[str],
+    project_root: Optional[Path] = None,
+) -> None:
+    """Set Casals conductor casals_frontend_canister_id (idempotent)."""
+    root = project_root or get_project_root()
+    desired = _product_canister_id(network, "casals_frontend", root)
+    if not desired:
+        console.print(
+            "[dim]skip casals_frontend_canister_id: no casals_frontend in "
+            "canister_ids.json[/dim]"
+        )
+        return
+    try:
+        live = check_canister_liveness(
+            desired, network=network, identity=identity
+        )
+    except RuntimeError as exc:
+        console.print(
+            f"[dim]skip casals_frontend_canister_id: {exc}[/dim]"
+        )
+        return
+    if not live:
+        console.print(
+            f"[dim]skip casals_frontend_canister_id: {desired} not on IC[/dim]"
+        )
+        return
+    current = (
+        _casals_settings(conductor, network=network, identity=identity)
+        .get("casals_frontend_canister_id")
+        or ""
+    ).strip()
+    if current == desired:
+        console.print(
+            f"[dim]casals_frontend_canister_id already {desired!r}[/dim]"
+        )
+        return
+    payload = json.dumps({"casals_frontend_canister_id": desired})
+    raw = _ic_canister_call(
+        conductor,
+        "set_settings",
+        _candid_text_arg(payload),
+        network=network,
+        identity=identity,
+    )
+    result = _parse_casals_settings(raw)
+    if isinstance(result, dict) and result.get("ok") is False:
+        raise RuntimeError(
+            "set_settings casals_frontend_canister_id failed: "
+            f"{result.get('error', result)}"
+        )
+    updated = (
+        _casals_settings(conductor, network=network, identity=identity)
+        .get("casals_frontend_canister_id")
+        or ""
+    ).strip()
+    if updated != desired:
+        raise RuntimeError(
+            "casals_frontend_canister_id mismatch after set_settings: "
+            f"expected {desired!r}, got {updated!r}"
+        )
+    console.print(f"[green]✓ casals_frontend_canister_id[/green] {desired}")
 
 
 def authorize_product_wasms(
@@ -1223,7 +1983,7 @@ def authorize_product_wasms(
         )
 
     assets = _certified_assets_wasm()
-    cache = Path("/tmp/realms-seed-wasms")
+    cache = _seed_wasm_cache_dir()
     cache.mkdir(parents=True, exist_ok=True)
     empty_dist = cache / "empty-frontend-dist"
     empty_dist.mkdir(parents=True, exist_ok=True)
@@ -1239,12 +1999,18 @@ def authorize_product_wasms(
     file_registry_dist = (
         root / ".external-assets" / "file_registry_frontend" / "dist"
     )
-    token_wasm = cache / "token_backend.wasm"
-    nft_wasm = cache / "nft_backend.wasm"
-    if not token_wasm.is_file():
-        _download_url(f"{_IC_TOKENS_BASE}/token_backend.wasm", token_wasm)
-    if not nft_wasm.is_file():
-        _download_url(f"{_IC_TOKENS_BASE}/nft_backend.wasm", nft_wasm)
+    token_wasm = _ensure_cached_wasm(
+        f"{_IC_TOKENS_BASE}/token_backend.wasm",
+        cache / "token_backend.wasm",
+        label="ic-tokens token_backend.wasm",
+        expected_sha256=_IC_TOKENS_TOKEN_BACKEND_SHA256,
+    )
+    nft_wasm = _ensure_cached_wasm(
+        f"{_IC_TOKENS_BASE}/nft_backend.wasm",
+        cache / "nft_backend.wasm",
+        label="ic-tokens nft_backend.wasm",
+        expected_sha256=_IC_TOKENS_NFT_BACKEND_SHA256,
+    )
 
     missing: list[str] = []
     for path, label in (
@@ -1255,6 +2021,15 @@ def authorize_product_wasms(
             missing.append(label)
     if missing:
         raise RuntimeError("missing artifacts to authorize: " + "; ".join(missing))
+
+    _validate_wasm_artifact(
+        marketplace_wasm,
+        label="marketplace backend WASM",
+    )
+    _validate_wasm_artifact(
+        file_registry_wasm,
+        label="fleet file_registry WASM",
+    )
 
     jobs: list[dict] = [
         {
@@ -1324,6 +2099,24 @@ def deploy_product_sheet_on_casals(
     except RuntimeError as exc:
         return False, str(exc)
 
+    ensure_orchestra_name(
+        conductor=conductor,
+        network=network,
+        identity=identity,
+        project_root=root,
+    )
+    ensure_casals_frontend_canister_id(
+        conductor=conductor,
+        network=network,
+        identity=identity,
+        project_root=root,
+    )
+    ensure_product_controller_topology(
+        conductor=conductor,
+        network=network,
+        identity=identity,
+        project_root=root,
+    )
     ensure_sheet_stands(
         sheet,
         conductor=conductor,
@@ -1345,5 +2138,18 @@ def deploy_product_sheet_on_casals(
         casals_src=casals_src,
         canister=conductor,
     )
+    try:
+        sync_product_canister_ids_from_tree(
+            conductor=conductor,
+            network=network,
+            identity=identity,
+            casals_src=casals_src,
+            project_root=root,
+        )
+    except Exception as exc:
+        console.print(
+            "[yellow]⚠️  could not sync canister_ids.json from Casals tree: "
+            f"{exc}[/yellow]"
+        )
     return True, f"conductor {conductor} (product sheet)"
 

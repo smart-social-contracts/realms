@@ -86,15 +86,66 @@ GEISTER_INSTALL_HINT = (
     "https://github.com/smart-social-contracts/geister"
 )
 GEISTER_AGENT_PREFIX = "swarm_agent"
-# Host chrome every wizard realm needs after launch. Codex manifests do not
-# list these (sheet realms get them from Casals arrangements).
+# Realm shell extensions every wizard realm needs after launch. No codex
+# manifest lists these; sheet realms get them from the Casals arrangements'
+# LITE_EXTENSIONS (casals-config/_gen_arrangements.py). This mirrors that set
+# minus demo_simulator / hello_world, which are demo-only.
 WIZARD_CHROME_EXTENSIONS: Tuple[str, ...] = (
     "public_dashboard",
     "member_dashboard",
     "welcome",
+    "realm_settings",
+    "extensions_manager",
+    "admin_dashboard",
+    "codex_viewer",
+    "vault",
+    "voting",
+    "census",
 )
-# Shared-catalog symbols the wizard can attach without a new ledger canister.
-CATALOG_TOKEN_SYMBOLS = frozenset({"ckEURC", "ckBTC", "ckUSDC", "REALMS"})
+# Shared treasury tokens, mirroring the founder setup wizard catalog in
+# src/realm_frontend/src/lib/setup/sharedTokens.ts. That wizard pre-selects
+# REALMS, so a spec with no token gets REALMS here too.
+DEFAULT_TOKEN_SYMBOL = "REALMS"
+CATALOG_TOKENS: Dict[str, Dict[str, Any]] = {
+    "REALMS": {
+        "decimals": 8,
+        "ledgers": {
+            "test": "nusyl-jiaaa-aaaae-qj6mq-cai",
+            "staging": "cj65k-laaaa-aaaac-bfxqq-cai",
+            "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
+        },
+    },
+    "ckBTC": {
+        "decimals": 8,
+        "ledgers": {
+            "test": "mxzaz-hqaaa-aaaar-qaada-cai",
+            "staging": "mxzaz-hqaaa-aaaar-qaada-cai",
+            "demo": "mxzaz-hqaaa-aaaar-qaada-cai",
+        },
+        "indexers": {
+            "test": "n5wcd-faaaa-aaaar-qaaea-cai",
+            "staging": "n5wcd-faaaa-aaaar-qaaea-cai",
+            "demo": "n5wcd-faaaa-aaaar-qaaea-cai",
+        },
+    },
+    "ckUSDC": {
+        "decimals": 6,
+        "ledgers": {
+            "test": "xevnm-gaaaa-aaaar-qafnq-cai",
+            "staging": "xevnm-gaaaa-aaaar-qafnq-cai",
+            "demo": "xevnm-gaaaa-aaaar-qafnq-cai",
+        },
+    },
+    "ckEURC": {
+        "decimals": 6,
+        "ledgers": {
+            "test": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "staging": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "demo": "pe5t5-diaaa-aaaar-qahwa-cai",
+        },
+    },
+}
+CATALOG_TOKEN_SYMBOLS = frozenset(CATALOG_TOKENS)
 
 POLL_INTERVAL_S = 10
 POLL_TIMEOUT_S = 3600
@@ -688,12 +739,12 @@ def validate_merged_spec(
     token = merged.get("token")
     if isinstance(token, dict) and token.get("symbol") and not token.get("canister"):
         symbol = str(token.get("symbol") or "").strip()
-        if symbol not in CATALOG_TOKEN_SYMBOLS:
+        if not catalog_token_symbol(symbol):
+            known = ", ".join(sorted(CATALOG_TOKEN_SYMBOLS))
             errors.append(
                 f"unknown catalog token {symbol!r}: pass --token-canister for "
-                "an existing ledger, or use a wizard catalog symbol "
-                "(ckEURC, ckBTC, ckUSDC, REALMS). v1 cannot provision a new "
-                "token canister"
+                f"an existing ledger, or use a catalog symbol ({known}). "
+                "v1 cannot provision a new token canister"
             )
     if errors:
         raise StageError("validate", "\n".join(errors))
@@ -756,6 +807,25 @@ def credits_shortfall_message(principal: str, balance: int, network: str) -> str
 def assert_credits_sufficient(balance: int, principal: str, network: str) -> None:
     if balance < DEPLOYMENT_COST_CREDITS:
         raise StageError("credits", credits_shortfall_message(principal, balance, network))
+
+
+def grant_registry_credits(
+    registry_id: str,
+    principal: str,
+    amount: int,
+    network: str,
+    identity: str,
+) -> None:
+    """Credit the founder through the registry's admin billing endpoint.
+
+    A registry that was just deployed holds no credits for anybody, so the first
+    realm on a fresh environment would always stop for a manual add_credits.
+    ``add_credits`` is admin-gated on the registry, so this only succeeds for an
+    operator identity; for anyone else the caller falls back to reporting the
+    shortfall.
+    """
+    arg = f'("{principal}", {amount} : nat64, "", "realms new: founder deployment")'
+    _canister_call(registry_id, "add_credits", arg, network, identity)
 
 
 def classify_identity(
@@ -1522,12 +1592,24 @@ def register_co_admin_principal(
     network: str,
     identity: str,
 ) -> None:
-    """After launch, register --co-admin as a second admin User. Idempotent.
+    """After launch, register --co-admin as a second admin User. Idempotent."""
+    register_admin_principal(
+        str(merged.get("co_admin") or "").strip(), backend_id, network, identity
+    )
+
+
+def register_admin_principal(
+    principal: str,
+    backend_id: str,
+    network: str,
+    identity: str,
+) -> None:
+    """Give ``principal`` an admin profile in the root org. Idempotent.
 
     Prefers ``register_co_admin``. If this realm WASM does not have that
     method yet, falls back to founder ``__shell__`` using existing APIs.
     """
-    principal = str(merged.get("co_admin") or "").strip()
+    principal = (principal or "").strip()
     if not principal:
         return
     console.print(f"  register_co_admin {principal}")
@@ -1571,6 +1653,50 @@ def register_co_admin_principal(
     if raw.get("success") is False:
         _fail("co-admin", raw.get("error") or "register_co_admin failed")
     console.print(f"  co-admin {principal} (admin profile + root org)")
+
+
+def test_identity_creator_principal() -> str:
+    """Index-0 ("Identity 1 (Creator)") principal of the II-bypass roster."""
+    path = get_project_root() / "config" / "deterministic-test-identity-principals.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    for entry in data.get("identities") or []:
+        if entry.get("index") == 0:
+            return str(entry.get("principal") or "").strip()
+    return ""
+
+
+def register_test_mode_admin(
+    gaas: Optional["GaasConfig"],
+    backend_id: str,
+    network: str,
+    identity: str,
+) -> None:
+    """On an II-bypass environment, make Identity 1 an admin of the new realm.
+
+    A browser on such an environment is auto-logged-in as the deterministic
+    Identity 1, while a CLI deploy's founder is the deploy key — a principal no
+    browser can ever present. Without this, a realm created by `realms new` has
+    no admin anyone can reach through the UI.
+    """
+    if gaas is None:
+        return
+    bypass = bool(gaas.test_flags.get("ii_bypass")) or bool(
+        gaas.test_flags.get("test_mode")
+    )
+    if not (gaas.can_test_mode and bypass):
+        return
+    principal = test_identity_creator_principal()
+    if not principal:
+        console.print(
+            "[yellow]⚠️  II-bypass env but no Identity 1 principal in "
+            "config/deterministic-test-identity-principals.json[/yellow]"
+        )
+        return
+    console.print("  test-mode env: granting Identity 1 admin (browser login)")
+    register_admin_principal(principal, backend_id, network, identity)
 
 
 def _local_manifest_dependencies(package: str) -> List[str]:
@@ -1691,13 +1817,48 @@ def preinstall_codex_dependencies(
             raise
 
 
-def _token_draft(token: Any) -> Optional[Dict[str, str]]:
-    """Normalize spec.token for setup_save_draft. Catalog symbols need no ledger."""
+def catalog_token_symbol(symbol: str) -> Optional[str]:
+    """Canonical catalog symbol for a case-insensitive match."""
+    wanted = (symbol or "").strip().upper()
+    if not wanted:
+        return None
+    for known in CATALOG_TOKENS:
+        if known.upper() == wanted:
+            return known
+    return None
+
+
+def catalog_token_draft(symbol: str, network: str) -> Optional[Dict[str, Any]]:
+    """Fill ledger / decimals / indexer for a catalog symbol on ``network``."""
+    known = catalog_token_symbol(symbol)
+    if not known:
+        return None
+    entry = CATALOG_TOKENS[known]
+    ledger = str(entry["ledgers"].get(network) or "").strip()
+    if not ledger:
+        return None
+    draft: Dict[str, Any] = {
+        "symbol": known,
+        "token_canister_id": ledger,
+        "decimals": entry["decimals"],
+    }
+    indexer = str((entry.get("indexers") or {}).get(network) or "").strip()
+    if indexer:
+        draft["indexer_canister_id"] = indexer
+    return draft
+
+
+def _token_draft(token: Any, network: str) -> Optional[Dict[str, Any]]:
+    """Normalize spec.token for setup_save_draft, resolving catalog symbols."""
     if not isinstance(token, dict):
         return None
-    out: Dict[str, str] = {}
     canister = str(token.get("canister") or token.get("token_canister_id") or "").strip()
     symbol = str(token.get("symbol") or "").strip()
+    if not canister:
+        resolved = catalog_token_draft(symbol, network)
+        if resolved:
+            return resolved
+    out: Dict[str, Any] = {}
     if canister:
         out["token_canister_id"] = canister
     if symbol:
@@ -1786,7 +1947,19 @@ def run_setup_stage(
     identity: str,
 ) -> None:
     branding = merged.get("branding") or {}
-    token_draft = _token_draft(merged.get("token"))
+    token_draft = _token_draft(merged.get("token"), network)
+    if not token_draft and not _setup_state_has_token(backend_id, network, identity):
+        token_draft = catalog_token_draft(DEFAULT_TOKEN_SYMBOL, network)
+        if not token_draft:
+            _fail(
+                "setup",
+                f"setup_launch needs a treasury token, and {DEFAULT_TOKEN_SYMBOL} has "
+                f"no known ledger on {network!r}. Pass --token-symbol / --token-canister.",
+            )
+        console.print(
+            f"  no token in spec: defaulting to {DEFAULT_TOKEN_SYMBOL} "
+            f"({token_draft['token_canister_id']}), as the setup wizard does"
+        )
     draft: Dict[str, Any] = {
         "codex": {
             "package": merged["codex"]["package"],
@@ -1819,15 +1992,21 @@ def run_setup_stage(
         }
         if token_draft.get("symbol"):
             token_args["symbol"] = token_draft["symbol"]
+        if token_draft.get("decimals") is not None:
+            token_args["decimals"] = token_draft["decimals"]
+        if token_draft.get("indexer_canister_id"):
+            token_args["indexer_canister_id"] = token_draft["indexer_canister_id"]
         _setup_json_call(
             backend_id, "setup_configure_token", token_args, network, identity, timeout=300
         )
-    elif not token_draft and not _setup_state_has_token(backend_id, network, identity):
+    elif token_draft:
         _fail(
             "setup",
-            "setup_launch needs a treasury token. Pass --token-symbol ckEURC "
-            "(or spec.token.symbol / spec.token.canister).",
+            f"treasury token {token_draft.get('symbol') or '?'} has no ledger for "
+            f"{network!r}: pass --token-canister <ledger canister id>.",
         )
+    else:
+        console.print("  treasury token already configured; leaving it as is")
 
     branding_args: Dict[str, Any] = {}
     if branding.get("logo"):
@@ -2304,6 +2483,31 @@ def _run_in_dir(
     return result
 
 
+def ensure_conductor_cycles_for_realm(
+    gaas: Optional["GaasConfig"],
+    network: str,
+    identity: str,
+) -> None:
+    """Fund the Casals conductor before asking it to mint a realm.
+
+    The conductor pays for the realm's backend, frontend and baton out of its own
+    balance. Without this the deploy fails half-way — the realm canisters exist
+    and the extensions install, then the baton hand-off dies with IC0504 and the
+    realm is never registered.
+    """
+    if gaas is None:
+        return
+    conductor = (gaas.canisters.get("casals_backend") or "").strip()
+    if not conductor:
+        return
+    try:
+        from ..casals_product import ensure_conductor_cycles
+
+        ensure_conductor_cycles(conductor, network=network, identity=identity)
+    except Exception as exc:  # noqa: BLE001 - never block a deploy on the preflight
+        console.print(f"[yellow]⚠️  conductor cycles preflight skipped: {exc}[/yellow]")
+
+
 def _file_registry_id_or_empty(network: str) -> str:
     try:
         from .files import _resolve_registry
@@ -2652,6 +2856,7 @@ def new_command(
             if "co-admin" in run_ids:
                 stage = "co-admin"
                 register_co_admin_principal(merged, backend_id, network, identity)
+                register_test_mode_admin(gaas, backend_id, network, identity)
             if "config" in run_ids:
                 stage = "config"
                 apply_runtime_config(merged, backend_id, network, identity)
@@ -2691,6 +2896,21 @@ def new_command(
                 raise
             except Exception as exc:
                 _fail("credits", f"get_credits failed: {exc}")
+            if balance < DEPLOYMENT_COST_CREDITS:
+                shortfall = DEPLOYMENT_COST_CREDITS - balance
+                console.print(
+                    f"  balance {balance} < {DEPLOYMENT_COST_CREDITS}; "
+                    f"granting {shortfall} as registry admin"
+                )
+                try:
+                    grant_registry_credits(
+                        registry_id, founder, shortfall, network, identity
+                    )
+                    balance = query_credit_balance(
+                        registry_id, founder, network, identity
+                    )
+                except Exception as exc:
+                    console.print(f"[yellow]  auto top-up failed: {exc}[/yellow]")
             assert_credits_sufficient(balance, founder, network)
             console.print(f"  balance {balance} (need {DEPLOYMENT_COST_CREDITS})")
 
@@ -2748,6 +2968,7 @@ def new_command(
                 infra["file_registry_canister_id"] = live_fr
             if live_mp:
                 infra["marketplace_canister_id"] = live_mp
+            ensure_conductor_cycles_for_realm(gaas, network, identity)
             job_id = request_deployment(manifest, registry_id, network, identity)
             console.print(f"  job_id {job_id}")
 
@@ -2789,6 +3010,7 @@ def new_command(
         if "co-admin" in run_ids:
             stage = "co-admin"
             register_co_admin_principal(merged, backend_id, network, identity)
+            register_test_mode_admin(gaas, backend_id, network, identity)
 
         if "config" in run_ids:
             stage = "config"

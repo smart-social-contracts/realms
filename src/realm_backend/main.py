@@ -8045,10 +8045,13 @@ def resync_extension_frontends(args: text) -> Async[text]:
     Use after a frontend asset canister reinstall/redeploy wipes ``/ext/``
     paths. Same-origin extension loading has no file_registry fallback.
 
+    Bundles already present are skipped unless "force" is set.
+
     Args (JSON): {
         "registry_canister_id": str|null,   (defaults to realm's file registry)
         "frontend_canister_id": str|null,   (defaults to realm's frontend)
-        "extension_ids": [str, ...]|null     (defaults to all installed)
+        "extension_ids": [str, ...]|null,    (defaults to all installed)
+        "force": bool                        (re-copy bundles already present)
     }
     """
     try:
@@ -8056,10 +8059,11 @@ def resync_extension_frontends(args: text) -> Async[text]:
         registry_id = params.get("registry_canister_id") or ""
         frontend_id = params.get("frontend_canister_id") or _get_frontend_canister_id()
         extension_ids = params.get("extension_ids")
+        force = bool(params.get("force"))
 
         from api.file_registry import resync_extension_frontends as _resync
 
-        return (yield from _resync(registry_id, frontend_id, extension_ids))
+        return (yield from _resync(registry_id, frontend_id, extension_ids, force))
     except Exception as e:
         logger.error(f"resync_extension_frontends error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})

@@ -13,7 +13,7 @@ Covers core/codex_hooks.py:
 import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -816,3 +816,103 @@ class TestFederationHookDispatch:
         assert "from ggg import Quarter" not in prepared
         assert "def assign_quarter" in prepared
         assert "assign_quarter_hook" in prepared
+
+
+# ---------------------------------------------------------------------------
+# resync_extension_frontends: skip bundles already on the asset canister
+# ---------------------------------------------------------------------------
+
+
+class TestFrontendBundlePresence:
+    @staticmethod
+    def _present(keys, ext_id, version):
+        # Same canister-only import chain as TestDependencyResolution.
+        for mod in (
+            "basilisk", "basilisk.services", "ggg", "ggg.system",
+            "ggg.system.user_profile", "ic_python_db", "ic_basilisk_toolkit",
+            "ic_basilisk_toolkit.crypto",
+        ):
+            if mod not in sys.modules:
+                sys.modules[mod] = MagicMock()
+        from api.file_registry import _frontend_bundle_present
+
+        return _frontend_bundle_present(keys, ext_id, version)
+
+    def test_index_js_counts_as_present(self):
+        keys = ["/ext/voting/1.2.0/frontend/dist/index.js"]
+        assert self._present(keys, "voting", "1.2.0") is True
+
+    def test_sandboxed_index_html_counts_as_present(self):
+        keys = [
+            "/ext/member_dashboard/1.1.19/frontend/dist/index.html",
+            "/ext/member_dashboard/1.1.19/frontend/dist/assets/main-a1b2.js",
+        ]
+        assert self._present(keys, "member_dashboard", "1.1.19") is True
+
+    def test_other_version_does_not_count(self):
+        keys = ["/ext/voting/1.1.0/frontend/dist/index.js"]
+        assert self._present(keys, "voting", "1.2.0") is False
+
+    def test_partial_bundle_without_entry_point_is_not_present(self):
+        # A copy cut off mid-way must still be re-copied.
+        keys = ["/ext/voting/1.2.0/frontend/dist/assets/chunk-9f.js"]
+        assert self._present(keys, "voting", "1.2.0") is False
+
+    def test_empty_inputs(self):
+        assert self._present([], "voting", "1.2.0") is False
+        assert self._present(["/ext/voting/1.2.0/frontend/dist/index.js"], "", "1.2.0") is False
+        assert self._present(["/ext/voting/1.2.0/frontend/dist/index.js"], "voting", "") is False
+
+    def test_prefix_collision_between_similar_ids(self):
+        keys = ["/ext/voting_extra/1.2.0/frontend/dist/index.js"]
+        assert self._present(keys, "voting", "1.2.0") is False
+
+
+class TestAssetKeyListingPagination:
+    """The asset canister caps every list page at 100 entries, whatever length asks."""
+
+    @staticmethod
+    def _module():
+        for mod in (
+            "basilisk", "basilisk.services", "ggg", "ggg.system",
+            "ggg.system.user_profile", "ic_python_db", "ic_basilisk_toolkit",
+            "ic_basilisk_toolkit.crypto",
+        ):
+            if mod not in sys.modules:
+                sys.modules[mod] = MagicMock()
+        import api.file_registry as fr
+
+        return fr
+
+    def _drive(self, pages):
+        """Run the generator, feeding one list page per yield.
+
+        Owns its AssetCanisterService mock: the module-level one carries
+        leftover state from other tests in this file.
+        """
+        fr = self._module()
+        with patch.object(fr, "AssetCanisterService", MagicMock()):
+            gen = fr._list_frontend_asset_keys(MagicMock())
+            gen.send(None)
+            try:
+                for page in pages:
+                    gen.send({"Ok": [{"key": k} for k in page]})
+            except StopIteration as stop:
+                return stop.value or []
+        raise AssertionError("generator asked for more pages than provided")
+
+    def test_walks_past_the_first_full_page(self):
+        fr = self._module()
+        page1 = [f"/_app/immutable/a{i}.js" for i in range(fr._ASSET_LIST_PAGE)]
+        page2 = ["/ext/voting/1.2.0/frontend/dist/index.js", "/images/logo.png"]
+        keys = self._drive([page1, page2])
+        assert len(keys) == fr._ASSET_LIST_PAGE + 2
+        # The whole point: /ext/ keys sort after a full page of base assets.
+        assert "/ext/voting/1.2.0/frontend/dist/index.js" in keys
+
+    def test_stops_on_short_page(self):
+        keys = self._drive([["/a.js", "/b.js"]])
+        assert keys == ["/a.js", "/b.js"]
+
+    def test_stops_on_empty_first_page(self):
+        assert self._drive([[]]) == []

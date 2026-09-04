@@ -2,18 +2,18 @@
   "casals_backend": {
     "demo": "jo3cj-faaaa-aaaac-bffea-cai",
     "staging": "jj2e5-iyaaa-aaaac-bffeq-cai",
-    "test": "yk5de-aiaaa-aaaaj-a6woa-cai"
+    "test": "o3mbf-pqaaa-aaaan-q6pyq-cai"
   },
   "casals_file_registry": {
-    "test": "yn4fq-nqaaa-aaaaj-a6woq-cai"
+    "test": "ospkz-zyaaa-aaaan-q6pza-cai"
   },
   "casals_file_registry_frontend": {
-    "test": "ye7om-3yaaa-aaaaj-a6wpa-cai"
+    "test": "mbqjz-raaaa-aaaan-q6pxq-cai"
   },
   "casals_frontend": {
     "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
     "staging": "mcqbx-hyaaa-aaaaj-qsarq-cai",
-    "test": "yd6iy-waaaa-aaaaj-a6wpq-cai"
+    "test": "o4nhr-ciaaa-aaaan-q6pya-cai"
   },
   "ckbtc_indexer": {
     "demo": "n5wcd-faaaa-aaaar-qaaea-cai"
@@ -24,28 +24,28 @@
   "file_registry": {
     "demo": "krch6-ryaaa-aaaas-amw3q-cai",
     "staging": "hacwc-baaaa-aaaac-bfxmq-cai",
-    "test": "bbwyi-raaaa-aaaas-amxfa-cai"
+    "test": "dapmr-viaaa-aaaas-amxiq-cai"
   },
   "file_registry_frontend": {
     "demo": "l4mdq-6qaaa-aaaas-amw4a-cai",
     "ic": "rbex3-xyaaa-aaaah-qumma-cai",
     "staging": "hoa3k-2qaaa-aaaac-bfxnq-cai",
-    "test": "bgx64-4yaaa-aaaas-amxfq-cai"
+    "test": "djmhn-daaaa-aaaas-amxja-cai"
   },
   "marketplace_backend": {
     "demo": "l3nfe-tiaaa-aaaas-amw4q-cai",
     "staging": "h3hkh-3yaaa-aaaac-bfxoa-cai",
-    "test": "btqpr-5qaaa-aaaas-amxga-cai"
+    "test": "donbz-oyaaa-aaaas-amxjq-cai"
   },
   "marketplace_frontend": {
     "demo": "lsooy-faaaa-aaaas-amw5a-cai",
     "staging": "h4gmt-waaaa-aaaac-bfxoq-cai",
-    "test": "mxyd5-3qaaa-aaaao-ba2xq-cai"
+    "test": "d3kqu-pqaaa-aaaas-amxka-cai"
   },
   "nft_backend": {
     "demo": "6hrip-iiaaa-aaaaf-qdoha-cai",
     "staging": "ca5ww-5iaaa-aaaac-bfxra-cai",
-    "test": "b2ten-lyaaa-aaaas-amxhq-cai"
+    "test": "dvi54-uaaaa-aaaas-amxla-cai"
   },
   "nft_frontend": {
     "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai",
@@ -80,7 +80,7 @@
   "token_backend": {
     "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
     "staging": "cj65k-laaaa-aaaac-bfxqq-cai",
-    "test": "burjf-qiaaa-aaaas-amxgq-cai"
+    "test": "d4lwa-ciaaa-aaaas-amxkq-cai"
   },
   "token_frontend": {
     "demo": "xglmt-7aaaa-aaaah-qq3yq-cai",

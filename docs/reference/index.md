@@ -25,7 +25,7 @@ Complete reference documentation for the Realms GOS platform.
 
 ### Deployment & Operations
 - **[Casals Rollout](./CASALS_ROLLOUT)** — Publish-build → rollout (preferred deploy path; see also `AGENTS.md` in repo root)
-- **[gaas new / realms seed](./GAAS_NEW_AND_REALMS_SEED)** — Two Casals instances; destroy / re-create / DNS-reinstall per command
+- **[gaas new / realms seed](./GAAS_NEW_AND_REALMS_SEED)** — Two Casals instances; adopt vs `--rebuild` destroy per command
 - **[gaas new / seed / realms new runbook](./GAAS_NEW_REALMS_SEED_RUNBOOK)** — Manual steps the CLIs do not do (descriptor conductor id, inventories, installer, credits)
 - **[On-chain `deploy_realm` (removed)](./ONCHAIN_REALM_DEPLOY)** - See queue + dfx path instead
 - **[Realm Registration](./REALM_REGISTRATION_GUIDE)** - Join the registry

@@ -478,7 +478,12 @@ def test_nested_init_py_path_is_also_refused():
 # ---------------------------------------------------------------------------
 
 
-def test_copy_frontend_to_asset_canister_errors_on_empty_registry_namespace():
+def test_copy_frontend_to_asset_canister_reports_no_bundle_not_an_error():
+    """A package with no bundle in the registry is normal (codices, backend-only).
+
+    The caller turns this sentinel into a "no frontend bundle" skip; returning a
+    plain error string here made every resync of such a package fail the step.
+    """
     original_pull = fr._pull_extension_frontend_files
     original_resolve = fr._resolve_registry_namespace
     original_frs = fr.FileRegistryService
@@ -507,9 +512,7 @@ def test_copy_frontend_to_asset_canister_errors_on_empty_registry_namespace():
             ),
             [],
         )
-        assert err == (
-            "no frontend files found in registry namespace ext/public_dashboard/1.3.9"
-        )
+        assert err == fr.NO_FRONTEND_FILES
     finally:
         fr._pull_extension_frontend_files = original_pull
         fr._resolve_registry_namespace = original_resolve

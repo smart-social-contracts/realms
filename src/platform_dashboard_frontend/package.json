@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "vite --port 3003",
-    "prebuild": "dfx generate realm_registry_backend && dfx generate realm_installer && dfx generate marketplace_backend && dfx generate file_registry && dfx generate realm_backend",
+    "prebuild": "node scripts/check-declarations.mjs",
     "build": "vite build",
     "test": "vitest run",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,svelte}\""

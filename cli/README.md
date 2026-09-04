@@ -302,18 +302,17 @@ ls extensions/
 
 Deploy the Realms GOS **product** stack (`*.realmsgos.org`: marketplace + file_registry UI) and publish the extension/codex catalog into the fleet `file_registry` backend.
 
-After `realms env deploy` (still used in this slice for DNS-safe dfx deploy), seed registers existing product canister IDs on the **GaaS Casals conductor** and runs:
+**Default:** adopts existing product canister IDs and the **Realms GOS Casals** conductor (authorize WASM catalog, register ids from `canister_ids.json`, then `casals sheet deploy` of repo-root `casals.json`). Idempotent on a healthy environment.
 
-```bash
-casals sheet deploy casals.json
-```
+**`--rebuild`:** destroys Realms GOS Casals + product canisters (keeps `marketplace_frontend` DNS), mints a new conductor, then redeploys. Requires confirmation unless `--yes`.
 
-via a local Casals checkout (`CASALS_SRC`, sibling `../Casals`, or `/srv/dev/Casals`). The conductor is resolved from `environments/<env>.json` (`casals_backend`), sibling `gos-as-a-service/environments/<env>.json`, or `CASALS_BACKEND`.
+Conductor is resolved from `environments/<env>.json` (`casals_backend`), or `canister_ids.json`. Needs a local Casals checkout (`CASALS_SRC`, sibling `../Casals`, or `/srv/dev/Casals`).
 
 **One shared `file_registry` backend** — seed never mints a second registry. The product sheet includes the backend so Casals can adopt the existing canister by name. Per-stand batons stay on realm stands and GaaS `infra-baton`, not here.
 
 ```bash
 realms seed --env test --identity deployer --yes
+realms seed --env test --identity deployer --rebuild --yes   # destructive
 ```
 
 ## GUI alternative: the Package Manager extension

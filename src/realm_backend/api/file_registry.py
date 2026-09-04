@@ -1212,14 +1212,62 @@ def _extract_asset_key(entry) -> str:
     return ""
 
 
+# The asset canister caps every `list` page at 100 entries, whatever `length`
+# asks for. A single unpaginated call therefore returned only the first 100 keys
+# — on a realm frontend that is all base bundle assets, so every `/ext/` key was
+# invisible and callers concluded the extension bundles were absent.
+_ASSET_LIST_PAGE = 100
+_ASSET_LIST_MAX_PAGES = 200
+
+
 def _list_frontend_asset_keys(frontend_principal: Principal) -> Async[list]:
-    """Return all asset keys from the frontend canister."""
+    """Return all asset keys from the frontend canister, across every page."""
     asset = AssetCanisterService(frontend_principal)
-    list_res: CallResult = yield asset.list({"start": None, "length": None})
-    entries = _unwrap_call_result(list_res)
-    if not isinstance(entries, list):
-        return []
-    return [k for k in (_extract_asset_key(e) for e in entries) if k]
+    keys = []
+    start = 0
+    for _ in range(_ASSET_LIST_MAX_PAGES):
+        list_res: CallResult = yield asset.list(
+            {"start": start, "length": _ASSET_LIST_PAGE}
+        )
+        entries = _unwrap_call_result(list_res)
+        if not isinstance(entries, list) or not entries:
+            break
+        keys.extend(k for k in (_extract_asset_key(e) for e in entries) if k)
+        if len(entries) < _ASSET_LIST_PAGE:
+            break
+        start += len(entries)
+    else:
+        logger.warning(
+            f"asset key listing hit the {_ASSET_LIST_MAX_PAGES}-page cap; "
+            f"treating {len(keys)} keys as the full set"
+        )
+    return keys
+
+
+# Sentinel from _copy_frontend_to_asset_canister: the package carries no
+# frontend bundle at all, which is normal for codices and backend-only
+# extensions. Distinct from a copy that was attempted and failed.
+NO_FRONTEND_FILES = "__no_frontend_files__"
+
+
+def _frontend_bundle_present(existing_keys: list, ext_id: str, version: str) -> bool:
+    """True when this extension's bundle is already on the asset canister.
+
+    The entry point is required, not just any key under the prefix: a bundle
+    that was cut off mid-copy must still be re-copied. Sandboxed extensions
+    serve ``index.html`` plus hashed assets, others a plain ``index.js``, so
+    either entry point counts.
+    """
+    if not (ext_id and version):
+        return False
+    prefix = f"/ext/{ext_id}/{version}/"
+    for key in existing_keys or []:
+        if key.startswith(prefix) and key.rsplit("/", 1)[-1] in (
+            "index.js",
+            "index.html",
+        ):
+            return True
+    return False
 
 
 def _delete_frontend_asset_key(frontend_principal: Principal, key: str) -> Async[None]:
@@ -1314,7 +1362,14 @@ def _copy_frontend_to_asset_canister(
             if ns_err:
                 err_obj = json.loads(ns_err)
                 return err_obj.get("error", ns_err)
-            return f"no frontend files found in registry namespace {namespace}"
+            # Backend-only packages (codices, extensions with no UI) legitimately
+            # ship no bundle, and the install path treats that as nothing to copy.
+            # Returning a hard error here made every resync of such a package fail.
+            logger.info(
+                f"{ext_id}@{version}: no frontend files in registry "
+                f"namespace {namespace}"
+            )
+            return NO_FRONTEND_FILES
         return None
 
     resolved_version = version
@@ -1373,6 +1428,7 @@ def resync_extension_frontends(
     registry_canister_id: str = "",
     frontend_canister_id: str = None,
     extension_ids: list = None,
+    force: bool = False,
 ) -> Async[str]:
     """Re-copy installed extensions' frontend bundles to the realm frontend.
 
@@ -1380,6 +1436,10 @@ def resync_extension_frontends(
     ``frontend_canister_id`` was configured) leave ``/ext/{id}/{ver}/...``
     missing. The SPA fallback then serves ``text/html`` for those URLs and
     runtime extension loading fails with a MIME type error.
+
+    Bundles already present are left alone: ``install_extension_from_registry``
+    copies them at install time, so a re-copy costs ~a minute per extension to
+    write bytes that are already there. Pass ``force`` to re-copy regardless.
     """
     from core.runtime_extensions import (
         get_extension_source,
@@ -1418,6 +1478,18 @@ def resync_extension_frontends(
     skipped = []
     errors = []
 
+    # One list call covers every extension. If it fails we simply copy
+    # everything, which is the old behaviour.
+    existing_keys = []
+    if not force:
+        try:
+            existing_keys = yield from _list_frontend_asset_keys(
+                Principal.from_str(fe_canister)
+            )
+        except Exception as e:
+            logger.warning(f"could not list frontend assets, copying all: {e}")
+            existing_keys = []
+
     for ext_id in ext_ids:
         src = get_extension_source(ext_id) or {}
         manifest = _load_manifest(ext_id) or {}
@@ -1433,13 +1505,31 @@ def resync_extension_frontends(
             )
             continue
 
+        if _frontend_bundle_present(existing_keys, ext_id, version):
+            skipped.append(
+                {
+                    "extension_id": ext_id,
+                    "version": version,
+                    "reason": "already present",
+                }
+            )
+            continue
+
         copy_err = yield from _copy_frontend_to_asset_canister(
             reg_id,
             ext_id,
             version,
             fe_canister,
         )
-        if copy_err:
+        if copy_err == NO_FRONTEND_FILES:
+            skipped.append(
+                {
+                    "extension_id": ext_id,
+                    "version": version,
+                    "reason": "no frontend bundle",
+                }
+            )
+        elif copy_err:
             errors.append(
                 {"extension_id": ext_id, "version": version, "error": copy_err}
             )
