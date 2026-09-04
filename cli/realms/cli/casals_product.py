@@ -1779,7 +1779,11 @@ def canister_cycles_balance(
 # Provisioning one realm makes the conductor mint three canisters: backend,
 # frontend, and the stand's baton.
 CONDUCTOR_CANISTERS_PER_REALM = 3
-_CONDUCTOR_FALLBACK_REQUIREMENT = 10_000_000_000_000
+_CONDUCTOR_FALLBACK_REQUIREMENT = 24_000_000_000_000
+
+# Mirrors PREFLIGHT_OPS_MARGIN_CYCLES in the installer's cycles_preflight; keep
+# in step with it.
+CONDUCTOR_OPS_MARGIN_CYCLES = 1_000_000_000_000
 
 
 def conductor_cycles_requirement(
@@ -1790,8 +1794,16 @@ def conductor_cycles_requirement(
 ) -> int:
     """Cycles the conductor needs on hand to provision one more realm.
 
-    Casals funds each new canister with ``create_cycles`` and refuses to spend
-    below ``treasury_reserve``, so the floor is reserve + 3 × create_cycles.
+    Two costs, not one. Casals funds each new canister with ``create_cycles``
+    and will not spend below ``treasury_reserve``, so the mint itself costs
+    reserve + 3 × create. On top of that the installer re-runs its own preflight
+    on every step of the job and demands 3 × create + ops_margin of *spendable*
+    treasury each time — including after the mint has already been paid for.
+
+    Funding only the mint therefore buys a deploy that dies half way: the realm
+    canisters exist, then a later step fails its preflight because the balance
+    that satisfied it has been spent. So the requirement covers the spend and
+    leaves the installer's floor standing behind it.
     """
     try:
         settings = _casals_settings(conductor, network=network, identity=identity)
@@ -1804,7 +1816,9 @@ def conductor_cycles_requirement(
         return _CONDUCTOR_FALLBACK_REQUIREMENT
     if create <= 0:
         return _CONDUCTOR_FALLBACK_REQUIREMENT
-    return reserve + create * CONDUCTOR_CANISTERS_PER_REALM
+    mint = create * CONDUCTOR_CANISTERS_PER_REALM
+    installer_floor = mint + CONDUCTOR_OPS_MARGIN_CYCLES
+    return reserve + mint + installer_floor
 
 
 def ensure_conductor_cycles(
@@ -1837,14 +1851,48 @@ def ensure_conductor_cycles(
             f"[dim]conductor cycles {balance / 1_000_000_000_000:.1f} TC "
             f"(needs {target / 1_000_000_000_000:.1f} TC)[/dim]"
         )
-        return
-    shortfall = target - balance
-    console.print(
-        f"conductor {conductor} at {balance / 1_000_000_000_000:.1f} TC, "
-        f"needs {target / 1_000_000_000_000:.1f} TC — topping up "
-        f"{shortfall / 1_000_000_000_000:.1f} TC"
-    )
-    top_up_canister_cycles(conductor, identity=identity, amount=shortfall)
+    else:
+        shortfall = target - balance
+        console.print(
+            f"conductor {conductor} at {balance / 1_000_000_000_000:.1f} TC, "
+            f"needs {target / 1_000_000_000_000:.1f} TC — topping up "
+            f"{shortfall / 1_000_000_000_000:.1f} TC"
+        )
+        top_up_canister_cycles(conductor, identity=identity, amount=shortfall)
+    # Unconditional: a snapshot taken before an earlier deposit blocks the
+    # installer even when the live balance has been sufficient for hours, and
+    # that state is reached by any run that topped up and then failed later.
+    refresh_conductor_cycles_snapshot(conductor, network=network, identity=identity)
+
+
+def refresh_conductor_cycles_snapshot(
+    conductor: str,
+    *,
+    network: str,
+    identity: Optional[str],
+) -> None:
+    """Make Casals re-read its own balance after a deposit.
+
+    The installer's preflight reads ``get_cycles_cached``, not the management
+    canister, so a deposit is invisible to it until the snapshot is retaken —
+    a top-up alone leaves the deploy rejected against a pre-top-up balance no
+    matter how many times it is retried or how large the deposit is.
+    ``get_cycles`` is the update form that refreshes the cache.
+    """
+    try:
+        _ic_canister_call(
+            conductor,
+            "get_cycles",
+            "()",
+            network=network,
+            identity=identity,
+            query=False,
+        )
+        console.print("  refreshed conductor cycles snapshot")
+    except Exception as exc:  # noqa: BLE001 - a stale snapshot must not abort here
+        console.print(
+            f"[yellow]⚠️  could not refresh conductor cycles snapshot: {exc}[/yellow]"
+        )
 
 
 def ensure_orchestra_name(

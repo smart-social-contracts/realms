@@ -1403,3 +1403,89 @@ def test_deploy_sync_failure_does_not_fail_deploy(
     assert ok is True
     assert "product sheet" in detail
     mock_sync.assert_called_once()
+
+
+@patch("realms.cli.casals_product._casals_settings")
+def test_conductor_requirement_survives_paying_for_the_mint(mock_settings):
+    """The installer re-checks its floor after the mint has been paid for.
+
+    A requirement of reserve + mint funds the canisters and nothing else, so the
+    next step of the same job fails its preflight and the realm is left half
+    provisioned. Sizing has to leave the floor standing after the spend.
+    """
+    from realms.cli.casals_product import conductor_cycles_requirement
+
+    create = 2_000_000_000_000
+    reserve = 2_000_000_000_000
+    mock_settings.return_value = {
+        "create_cycles": str(create),
+        "treasury_reserve": str(reserve),
+    }
+
+    required = conductor_cycles_requirement(
+        "hudjn-jyaaa-aaaac-qhd6q-cai", network="staging", identity="deployer"
+    )
+
+    mint = 3 * create
+    installer_floor = mint + 1_000_000_000_000
+    assert required == reserve + mint + installer_floor
+    assert required - mint >= installer_floor
+
+
+def test_conductor_requirement_matches_the_installer_constants():
+    """Pins our copy of the installer's numbers to the installer's own module."""
+    import sys
+
+    installer = (
+        Path(__file__).resolve().parents[3]
+        / "gos-as-a-service"
+        / "src"
+        / "realm_installer"
+    )
+    if not (installer / "cycles_preflight.py").exists():
+        pytest.skip("gos-as-a-service checkout not available")
+    sys.path.insert(0, str(installer))
+    try:
+        import cycles_preflight as preflight
+    finally:
+        sys.path.pop(0)
+
+    from realms.cli import casals_product as cp
+
+    assert (
+        cp.CONDUCTOR_OPS_MARGIN_CYCLES == preflight.PREFLIGHT_OPS_MARGIN_CYCLES
+    )
+    assert cp.CONDUCTOR_CANISTERS_PER_REALM == preflight.estimate_canister_creation_count(
+        {"deploy_scope": "both"}, create_stand_baton=True
+    )
+
+
+@patch("realms.cli.casals_product._ic_canister_call")
+@patch("realms.cli.casals_product.canister_cycles_balance")
+@patch("realms.cli.casals_product._casals_settings")
+def test_ensure_conductor_cycles_refreshes_snapshot_even_when_funded(
+    mock_settings, mock_balance, mock_call
+):
+    """A funded conductor can still be blocked by a pre-deposit snapshot.
+
+    The installer reads get_cycles_cached, so skipping the refresh on the
+    already-funded path leaves every retry rejected against a balance that is no
+    longer real.
+    """
+    from realms.cli.casals_product import ensure_conductor_cycles
+
+    mock_settings.return_value = {
+        "create_cycles": "2000000000000",
+        "treasury_reserve": "2000000000000",
+    }
+    mock_balance.return_value = 99_000_000_000_000
+    mock_call.return_value = "()"
+
+    with patch("realms.cli.casals_product.top_up_canister_cycles") as mock_top_up:
+        ensure_conductor_cycles(
+            "7rdqw-oqaaa-aaaae-qkk3a-cai", network="staging", identity="deployer"
+        )
+
+    mock_top_up.assert_not_called()
+    assert mock_call.call_args.args[1] == "get_cycles"
+    assert mock_call.call_args.kwargs["query"] is False
