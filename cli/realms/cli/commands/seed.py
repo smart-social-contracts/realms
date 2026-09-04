@@ -40,6 +40,9 @@ from ..casals_product import (
 from .env import (
     DNS_PRODUCT_FRONTEND,
     PRODUCT_STACK_DESTROY,
+    # Takes (name, network, root). casals_product has a same-named helper that
+    # takes (network, key, root); swapping them returns nothing rather than
+    # failing, which reads as "no product canisters exist".
     _product_canister_id,
     _read_canister_ids,
     env_deploy_command,
@@ -181,7 +184,7 @@ def _plan_rebuild_destroy_targets(
     gos = load_gos_canisters(env_name, project_root)
     keep_ids: list[str] = []
     for cid in (
-        (_product_canister_id(network, DNS_PRODUCT_FRONTEND, project_root) or "").strip(),
+        (_product_canister_id(DNS_PRODUCT_FRONTEND, network, project_root) or "").strip(),
         (gos.get(DNS_PRODUCT_FRONTEND) or "").strip(),
     ):
         if cid and cid not in keep_ids:
@@ -191,7 +194,7 @@ def _plan_rebuild_destroy_targets(
     seen: set[str] = set(keep_ids)
     for name in PRODUCT_STACK_DESTROY:
         cids: list[str] = []
-        primary = (_product_canister_id(network, name, project_root) or "").strip()
+        primary = (_product_canister_id(name, network, project_root) or "").strip()
         if primary:
             cids.append(primary)
         extra = (gos.get(name) or "").strip()
@@ -376,7 +379,7 @@ def seed_command(
                 # If the conductor was already minted, the destroy + mint work is
                 # done and only the finish/catalog steps are missing.
                 minted = _product_canister_id(
-                    network, "casals_backend", project_root
+                    "casals_backend", network, project_root
                 )
                 _print_resume_hint(
                     env_name,

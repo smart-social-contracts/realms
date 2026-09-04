@@ -483,8 +483,12 @@ def test_seed_rebuild_skips_confirmation_with_yes(
 
 
 @patch("realms.cli.commands.seed.check_canister_liveness", return_value=True)
+# _product_canister_id asks dfx before reading the file, and dfx answers from
+# the operator's real checkout — so without this the assertions run against
+# whatever is deployed on the machine instead of the inventory written below.
+@patch("realms.cli.commands.env._dfx_canister_id", return_value=None)
 def test_plan_rebuild_destroy_targets_reads_inventory(
-    _live, tmp_path, monkeypatch
+    _dfx_id, _live, tmp_path, monkeypatch
 ):
     import json
 
