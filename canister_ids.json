@@ -1,18 +1,20 @@
 {
   "casals_backend": {
     "demo": "jo3cj-faaaa-aaaac-bffea-cai",
-    "staging": "jj2e5-iyaaa-aaaac-bffeq-cai",
+    "staging": "hudjn-jyaaa-aaaac-qhd6q-cai",
     "test": "o3mbf-pqaaa-aaaan-q6pyq-cai"
   },
   "casals_file_registry": {
+    "staging": "h5acr-7qaaa-aaaac-qhd7a-cai",
     "test": "ospkz-zyaaa-aaaan-q6pza-cai"
   },
   "casals_file_registry_frontend": {
+    "staging": "h2bef-siaaa-aaaac-qhd7q-cai",
     "test": "mbqjz-raaaa-aaaan-q6pxq-cai"
   },
   "casals_frontend": {
     "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
-    "staging": "mcqbx-hyaaa-aaaaj-qsarq-cai",
+    "staging": "htcpz-eaaaa-aaaac-qhd6a-cai",
     "test": "o4nhr-ciaaa-aaaan-q6pya-cai"
   },
   "ckbtc_indexer": {
@@ -23,33 +25,33 @@
   },
   "file_registry": {
     "demo": "krch6-ryaaa-aaaas-amw3q-cai",
-    "staging": "hacwc-baaaa-aaaac-bfxmq-cai",
+    "staging": "dsj3i-zyaaa-aaaas-amxlq-cai",
     "test": "dapmr-viaaa-aaaas-amxiq-cai"
   },
   "file_registry_frontend": {
     "demo": "l4mdq-6qaaa-aaaas-amw4a-cai",
     "ic": "rbex3-xyaaa-aaaah-qumma-cai",
-    "staging": "hoa3k-2qaaa-aaaac-bfxnq-cai",
+    "staging": "c7h7g-wqaaa-aaaas-amxma-cai",
     "test": "djmhn-daaaa-aaaas-amxja-cai"
   },
   "marketplace_backend": {
     "demo": "l3nfe-tiaaa-aaaas-amw4q-cai",
-    "staging": "h3hkh-3yaaa-aaaac-bfxoa-cai",
+    "staging": "cygzs-3iaaa-aaaas-amxmq-cai",
     "test": "donbz-oyaaa-aaaas-amxjq-cai"
   },
   "marketplace_frontend": {
     "demo": "lsooy-faaaa-aaaas-amw5a-cai",
-    "staging": "h4gmt-waaaa-aaaac-bfxoq-cai",
+    "staging": "crfso-naaaa-aaaas-amxna-cai",
     "test": "d3kqu-pqaaa-aaaas-amxka-cai"
   },
   "nft_backend": {
     "demo": "6hrip-iiaaa-aaaaf-qdoha-cai",
-    "staging": "ca5ww-5iaaa-aaaac-bfxra-cai",
+    "staging": "cecdd-miaaa-aaaas-amxoq-cai",
     "test": "dvi54-uaaaa-aaaas-amxla-cai"
   },
   "nft_frontend": {
     "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai",
-    "staging": "ch4qc-qqaaa-aaaac-bfxrq-cai",
+    "staging": "cnbi7-2aaaa-aaaas-amxpa-cai",
     "test": "dhokf-yqaaa-aaaas-amxia-cai"
   },
   "platform_dashboard_frontend": {
@@ -79,12 +81,12 @@
   },
   "token_backend": {
     "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
-    "staging": "cj65k-laaaa-aaaac-bfxqq-cai",
+    "staging": "cweu2-ayaaa-aaaas-amxnq-cai",
     "test": "d4lwa-ciaaa-aaaas-amxkq-cai"
   },
   "token_frontend": {
     "demo": "xglmt-7aaaa-aaaah-qq3yq-cai",
-    "staging": "hjb56-xiaaa-aaaac-bfxna-cai",
+    "staging": "cddfx-bqaaa-aaaas-amxoa-cai",
     "test": "b5scz-gaaaa-aaaas-amxha-cai"
   },
   "website": {
