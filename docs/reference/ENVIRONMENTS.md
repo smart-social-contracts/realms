@@ -131,24 +131,60 @@ Prints canister IDs from dfx / `canister_ids.json` plus a one-line
 
 After deploy, the marketplace frontend asset canister serves
 `/.well-known/ic-domains` listing the environment domain (e.g.
-`demo.realmsgos.org`). Complete setup manually:
+`demo.realmsgos.org`). An IC custom domain needs three records:
 
-1. **DNS** — add a CNAME record:
-   ```
-   demo.realmsgos.org  →  demo.realmsgos.org.icp1.io
-   ```
-   Alternatively use the A/AAAA records shown at
-   [reg.icp0.io](https://reg.icp0.io) for your domain.
+| Type | Host | Value |
+|---|---|---|
+| CNAME | `demo.realmsgos.org` | `demo.realmsgos.org.icp1.io` |
+| TXT | `_canister-id.demo.realmsgos.org` | the `marketplace_frontend` canister ID |
+| CNAME | `_acme-challenge.demo.realmsgos.org` | `_acme-challenge.demo.realmsgos.org.icp2.io` |
 
-2. **Registration** — open [https://reg.icp0.io](https://reg.icp0.io) and
-   register the domain against the `marketplace_frontend` canister ID printed
-   at the end of deploy.
+Note the hyphen in `_canister-id`, and leave every record **unproxied** (grey
+cloud on Cloudflare) — a proxied record hides the IC gateway and breaks
+certificate issuance.
 
-3. **Verify** — once DNS propagates, `https://<domain>/.well-known/ic-domains`
-   should return the domain name and the site should load over HTTPS.
+Only the TXT record names a canister. The other two are derived from the domain,
+so **re-minting a fleet only changes `_canister-id`** — that is the whole of a
+"remap".
 
-Until registration completes, use the default gateway URL:
-`https://<marketplace_frontend_id>.icp0.io/`.
+`realms env deploy` prints these records, and applies them for you when the
+environment file opts in.
+
+### Automatic (Cloudflare)
+
+```json
+"dns": { "provider": "cloudflare" }
+```
+
+Then export a token with **Zone:Read** and **DNS:Edit** on the zone:
+
+```bash
+export CLOUDFLARE_API_TOKEN=...
+realms env deploy --env demo --identity deployer
+```
+
+The deploy checks the token up front (before minting anything), then creates or
+updates the three records and reports `created` / `updated` / `unchanged` per
+record. It is idempotent, so re-running changes nothing. A configured provider
+that fails aborts the deploy rather than quietly reverting to manual — otherwise
+a forgotten remap leaves the domain pointing at a dead canister.
+
+The token is read only from the environment. Never put it in
+`environments/*.json`; those are committed. Optional keys: `zone` (defaults to
+the last two labels of the domain), `token_env` (defaults to
+`CLOUDFLARE_API_TOKEN`), and `ttl` (defaults to 60).
+
+### Manual
+
+With the default `"provider": "manual"`, enter the three records at your DNS
+host, then register the domain at [reg.icp0.io](https://reg.icp0.io) against the
+`marketplace_frontend` canister ID printed at the end of deploy.
+
+### Verify
+
+Once DNS propagates, `https://<domain>/.well-known/ic-domains` returns the
+domain name and the site loads over HTTPS. Until registration completes, use the
+gateway URL `https://<marketplace_frontend_id>.icp0.io/`.
 
 ## Related commands
 

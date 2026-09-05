@@ -37,6 +37,14 @@ from .marketplace import (
     _dfx_subprocess_env,
 )
 from ..basilisk_env import basilisk_python_executable, dfx_env_with_basilisk
+from ..cloudflare import (
+    CloudflareError,
+    apply_records,
+    cloudflare_record_type,
+    token_from_env,
+    zone_for_domain,
+)
+from ..dns import render_dns_records
 from ..utils import (
     console,
     display_canister_urls_json,
@@ -45,6 +53,8 @@ from ..utils import (
     run_command,
     set_log_dir,
 )
+
+_DNS_PROVIDERS = ("manual", "cloudflare")
 
 FILE_REGISTRY_FRONTEND = "file_registry_frontend"
 
@@ -102,6 +112,32 @@ def load_env_config(env_name: str, project_root: Optional[Path] = None) -> Dict[
             f"[yellow]⚠️  Config name '{data.get('name')}' does not match --env '{env_name}'[/yellow]"
         )
     return data
+
+
+def _dns_settings(env_cfg: dict) -> tuple[str, str, str, int]:
+    """Return (provider, zone, token_env, ttl) from the env file's optional dns block."""
+    dns = env_cfg.get("dns") or {}
+    if not isinstance(dns, dict):
+        dns = {}
+
+    provider = (dns.get("provider") or "manual").strip().lower()
+    if provider not in _DNS_PROVIDERS:
+        raise ValueError(
+            f"dns.provider must be one of {', '.join(_DNS_PROVIDERS)}, got {dns.get('provider')!r}"
+        )
+
+    zone = (dns.get("zone") or "").strip()
+    token_env = (dns.get("token_env") or "CLOUDFLARE_API_TOKEN").strip()
+
+    ttl_raw = dns.get("ttl", 60)
+    try:
+        ttl = int(ttl_raw)
+    except (TypeError, ValueError):
+        raise ValueError(f"dns.ttl must be an integer, got {ttl_raw!r}")
+    if ttl != 1 and ttl < 60:
+        raise ValueError("dns.ttl must be 1 (automatic) or at least 60 seconds")
+
+    return provider, zone, token_env, ttl
 
 
 def _read_canister_ids(project_root: Path) -> Dict[str, Dict[str, str]]:
@@ -777,15 +813,43 @@ def _wire_marketplace_backend(
             console.print(f"[yellow]   warning: {result.stderr.strip()[:200]}[/yellow]")
 
 
-def _print_dns_instructions(domain: str, frontend_id: str) -> None:
+def _check_dns_credentials(env_cfg: Dict[str, Any], domain: str) -> None:
+    """Fail now if the configured DNS provider cannot possibly work later."""
+    provider, zone, token_env, _ttl = _dns_settings(env_cfg)
+    if provider != "cloudflare":
+        return
+    if not token_from_env(token_env):
+        raise RuntimeError(
+            f"dns.provider is cloudflare but {token_env} is not set. "
+            f"Export the API token (Zone:Read + DNS:Edit on the zone) or set "
+            f"dns.provider to manual."
+        )
+    console.print(
+        f"[dim]DNS: cloudflare zone {zone or zone_for_domain(domain)} "
+        f"(token from ${token_env})[/dim]"
+    )
+
+
+def _print_dns_instructions(
+    domain: str,
+    frontend_id: str,
+    env_cfg: Dict[str, Any],
+) -> None:
+    provider, zone, token_env, ttl = _dns_settings(env_cfg)
+    records = render_dns_records(domain, frontend_id)
+
     console.print("\n[bold cyan]🌐 Custom domain setup[/bold cyan]")
     console.print(
         f"  1. Upload complete — [bold].well-known/ic-domains[/bold] lists [cyan]{domain}[/cyan]."
     )
-    console.print(
-        f"  2. DNS: add a [bold]CNAME[/bold] record:\n"
-        f"       [cyan]{domain}[/cyan]  →  [cyan]{domain}.icp1.io[/cyan]"
-    )
+    console.print("  2. DNS: add these records (do not proxy through Cloudflare):")
+    table = Table(title=f"DNS records for {domain}")
+    table.add_column("Type")
+    table.add_column("Host")
+    table.add_column("Value")
+    for record in records:
+        table.add_row(record.record_type, record.host, record.value)
+    console.print(table)
     console.print(
         "     (Alternatively use the A/AAAA records shown at "
         "[link=https://reg.icp0.io]reg.icp0.io[/link] for your domain.)"
@@ -797,6 +861,45 @@ def _print_dns_instructions(domain: str, frontend_id: str) -> None:
     console.print(
         f"  4. After DNS propagates, open [link=https://{domain}]https://{domain}[/link]"
     )
+
+    if provider != "cloudflare":
+        return
+
+    token = token_from_env(token_env)
+    if not token:
+        raise RuntimeError(
+            f"dns.provider is cloudflare but {token_env} is not set. "
+            f"Export the API token (Zone:Read + DNS:Edit on the zone) or set "
+            f"dns.provider to manual."
+        )
+
+    zone_name = zone or zone_for_domain(domain)
+    try:
+        outcomes = apply_records(
+            records,
+            token=token,
+            zone=zone_name,
+            domain=domain,
+            ttl=ttl,
+        )
+    except CloudflareError as exc:
+        raise RuntimeError(f"Cloudflare DNS apply failed for zone {zone_name}: {exc}") from exc
+
+    for outcome in outcomes:
+        colour = (
+            "green"
+            if outcome.action == "created"
+            else "yellow"
+            if outcome.action == "updated"
+            else "dim"
+        )
+        detail = f" ({outcome.detail})" if outcome.detail else ""
+        console.print(
+            f"  cloudflare {zone_name}: [{colour}]{outcome.action}[/{colour}] "
+            f"{cloudflare_record_type(outcome.record)} {outcome.record.host}{detail}"
+        )
+    if all(outcome.action == "unchanged" for outcome in outcomes):
+        console.print("  cloudflare: zone already correct")
 
 
 def _print_deploy_summary(
@@ -857,6 +960,11 @@ def env_deploy_command(
     if identity:
         logger.info(f"identity={identity}")
     logger.info("=" * 60)
+
+    # DNS is wired at the very end, so check the provider is usable before
+    # spending a deploy on it.
+    if with_domain and domain:
+        _check_dns_credentials(env_config, domain)
 
     dfx_env = dfx_env_with_basilisk(project_root)
 
@@ -959,7 +1067,7 @@ def env_deploy_command(
     _print_deploy_summary(env_config, network, final_ids)
 
     if with_domain and domain:
-        _print_dns_instructions(domain, mf_id)
+        _print_dns_instructions(domain, mf_id, env_config)
 
 
 def env_status_command(*, env_name: str, identity: Optional[str] = None) -> None:
