@@ -9,7 +9,7 @@
 	export let reloadOnClick = false;
 	export let mainClass = 'bg-gray-50 dark:bg-gray-900';
 	export let mainDivClass =
-		'flex flex-col justify-center items-center px-6 mx-auto h-screen xl:px-0 dark:bg-gray-900';
+		'flex flex-col justify-center items-center px-6 mx-auto h-viewport xl:px-0 dark:bg-gray-900';
 	export let h1Class =
 		'mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl lg:text-5xl dark:text-white';
 	export let imgDiv = 'block md:max-w-lg';

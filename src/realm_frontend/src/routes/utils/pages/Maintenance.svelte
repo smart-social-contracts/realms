@@ -12,7 +12,7 @@
 	export let btnHref = '/';
 	export let mainClass = 'bg-gray-50 dark:bg-gray-900';
 	export let mainDivClass =
-		'flex flex-col justify-center items-center px-6 mx-auto h-screen xl:px-0 dark:bg-gray-900';
+		'flex flex-col justify-center items-center px-6 mx-auto h-viewport xl:px-0 dark:bg-gray-900';
 	export let h1Class =
 		'mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl lg:text-5xl dark:text-white';
 	export let imgDiv = 'block mb-5 md:max-w-md';
@@ -62,7 +62,7 @@
 @prop export let btnHref = '/';
 @prop export let mainClass = 'bg-gray-50 dark:bg-gray-900';
 @prop export let mainDivClass =
-		'flex flex-col justify-center items-center px-6 mx-auto h-screen xl:px-0 dark:bg-gray-900';
+		'flex flex-col justify-center items-center px-6 mx-auto h-viewport xl:px-0 dark:bg-gray-900';
 @prop export let h1Class =
 		'mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl lg:text-5xl dark:text-white';
 @prop export let imgDiv = 'block mb-5 md:max-w-md';

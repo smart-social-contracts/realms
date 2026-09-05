@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8" />
 	<link rel="icon" href="/custom/logo.png" />
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 	<meta name="keywords" content="Governance,Blockchain,ICP" />
 	<!-- Git commit hash for deployment verification - populated during build -->
 	<meta name="commit-hash" content="COMMIT_HASH_PLACEHOLDER" />
@@ -37,6 +37,23 @@
 			display: grid;
 			place-items: center;
 			color: #8a8a8a;
+		}
+
+		#app-splash .splash-mark {
+			display: none;
+			position: relative;
+			z-index: 1;
+			width: 88px;
+			height: 88px;
+			object-fit: contain;
+		}
+
+		#app-splash .globe-stage.has-logo .splash-mark {
+			display: block;
+		}
+
+		#app-splash .globe-stage.has-logo .globe-svg {
+			display: none;
 		}
 
 		#app-splash .globe-glow {
@@ -185,6 +202,13 @@
 			<div class="globe-stage">
 				<span class="globe-glow"></span>
 				<span class="globe-halo"></span>
+				<img
+					class="splash-mark"
+					src="/custom/logo.png"
+					alt=""
+					onload="this.closest('.globe-stage')?.classList.add('has-logo')"
+					onerror="this.remove()"
+				/>
 				<svg class="globe-svg" viewBox="0 0 64 64" aria-hidden="true">
 					<defs>
 						<radialGradient id="app-splash-core" cx="34%" cy="28%" r="72%">

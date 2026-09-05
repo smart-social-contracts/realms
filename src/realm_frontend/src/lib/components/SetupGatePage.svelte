@@ -23,16 +23,7 @@
 			: $_('setup.gate.creator_body')
 	);
 
-	const LOGO_SVG = '/images/logo_sphere_only.svg';
-	const LOGO_PNG = '/images/logo.png';
-
-	let logoSrc = $state(LOGO_SVG);
-
-	function onLogoError() {
-		if (logoSrc !== LOGO_PNG) {
-			logoSrc = LOGO_PNG;
-		}
-	}
+	let showLogo = $state(true);
 </script>
 
 <svelte:head>
@@ -41,7 +32,16 @@
 
 <main class="setup-gate">
 	<div class="setup-gate__card">
-		<img src={logoSrc} alt="" class="setup-gate__logo" onerror={onLogoError} />
+		{#if showLogo}
+			<img
+				src="/custom/logo.png"
+				alt=""
+				class="setup-gate__logo"
+				onerror={() => {
+					showLogo = false;
+				}}
+			/>
+		{/if}
 		<h1>{title}</h1>
 		<P class="setup-gate__text">{description}</P>
 		{#if variant === 'anonymous'}

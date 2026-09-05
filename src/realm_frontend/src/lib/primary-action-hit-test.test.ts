@@ -50,6 +50,8 @@ describe('primary action mouse hit-testing', () => {
 		const html = readFileSync(join(srcDir, '../app.html'), 'utf8');
 		expect(html).toContain('#app-splash');
 		expect(html).toMatch(/#app-splash[\s\S]*pointer-events:\s*none/);
+		expect(html).toContain('/custom/logo.png');
+		expect(html).toContain('has-logo');
 		const splash = readSrc('app-splash.ts');
 		expect(splash).toContain('dismissAppSplash');
 	});
@@ -80,6 +82,9 @@ describe('primary action mouse hit-testing', () => {
 	it('does not let Test Mode banner stacking steal header chrome clicks', () => {
 		const layout = readSrc('../routes/(sidebar)/+layout.svelte');
 		const navbar = readSrc('../routes/(sidebar)/Navbar.svelte');
+		expect(layout.indexOf('<DemoBanner')).toBeLessThan(layout.indexOf('<header'));
+		expect(layout).toContain('--realm-banner-h');
+		expect(layout).toContain('max-lg:top-[var(--realm-banner-h)]');
 		expect(layout).toContain('z-[70]');
 		expect(layout).toContain('<Navbar bind:drawerHidden />');
 		expect(navbar).toContain('pointer-events: auto');

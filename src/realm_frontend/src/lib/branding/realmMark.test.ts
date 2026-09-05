@@ -50,7 +50,7 @@ describe('live realm chrome', () => {
 		const customDir = resolve(here, '../../../static/custom');
 		expect(existsSync(resolve(customDir, 'logo.png'))).toBe(false);
 		expect(existsSync(resolve(customDir, 'background.png'))).toBe(false);
-		expect(existsSync(resolve(here, '../../../static/images/logo.png'))).toBe(true);
+		expect(existsSync(resolve(here, '../../../static/images/logo.png'))).toBe(false);
 		expect(existsSync(resolve(here, '../../../static/images/background.png'))).toBe(true);
 	});
 });

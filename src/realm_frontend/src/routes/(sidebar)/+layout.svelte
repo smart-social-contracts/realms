@@ -28,8 +28,10 @@
 	let drawerHidden = true;
 	let initialized = false;
 	let embeddedInPortal = false;
+	let bannerEl;
 	let headerEl;
 	let mainContentEl;
+	let bannerHeight = 0;
 	let headerHeight = 56;
 	let headerHidden = false;
 	let hideScrollState = initialHideOnScrollState();
@@ -117,7 +119,13 @@
 			
 			window.addEventListener('resize', handleResize);
 
+			measureBanner();
 			measureHeader();
+			const bannerObserver =
+				typeof ResizeObserver !== 'undefined' && bannerEl
+					? new ResizeObserver(measureBanner)
+					: null;
+			if (bannerEl) bannerObserver?.observe(bannerEl);
 			const headerObserver =
 				typeof ResizeObserver !== 'undefined' && headerEl
 					? new ResizeObserver(measureHeader)
@@ -156,6 +164,7 @@
 			return () => {
 				window.removeEventListener('resize', handleResize);
 				mainContentEl?.removeEventListener('scroll', handleMainScroll);
+				bannerObserver?.disconnect();
 				headerObserver?.disconnect();
 				unsubHostActions();
 				unsubFocus();
@@ -183,6 +192,12 @@
 	$: mobileDrawerOpen =
 		browser && !drawerHidden && typeof window !== 'undefined' && window.innerWidth < 1024;
 
+	function measureBanner() {
+		if (bannerEl) {
+			bannerHeight = bannerEl.offsetHeight || 0;
+		}
+	}
+
 	function measureHeader() {
 		if (headerEl) {
 			headerHeight = headerEl.offsetHeight || headerHeight;
@@ -209,10 +224,16 @@
 	}
 </script>
 
-<div class="relative flex h-screen flex-col overflow-hidden">
+<div
+	class="relative flex h-viewport flex-col overflow-hidden"
+	style="--realm-banner-h: {bannerHeight}px"
+>
+	<div bind:this={bannerEl} class="shrink-0">
+		<DemoBanner />
+	</div>
 	<header
 		bind:this={headerEl}
-		class="relative z-[70] mx-auto w-full border-b border-gray-200 bg-white transition-transform duration-200 ease-out motion-reduce:transition-none lg:flex-none max-lg:absolute max-lg:inset-x-0 max-lg:top-0 {headerHidden
+		class="relative z-[70] mx-auto w-full border-b border-gray-200 bg-white transition-transform duration-200 ease-out motion-reduce:transition-none lg:flex-none max-lg:absolute max-lg:inset-x-0 max-lg:top-[var(--realm-banner-h)] {headerHidden
 			? 'max-lg:-translate-y-full'
 			: 'translate-y-0'}"
 		data-mobile-header-hidden={headerHidden ? 'true' : 'false'}
@@ -232,7 +253,7 @@
 		     reveals content instead of collapsing the flex row (which jumps). -->
 		<div
 			bind:this={mainContentEl}
-			class="main-content-area relative min-w-0 flex-1 overflow-x-hidden bg-white {isFullBleedExtension ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-y-auto'}"
+			class="main-content-area relative min-w-0 flex-1 overflow-x-hidden bg-white max-lg:pb-[env(safe-area-inset-bottom,0px)] {isFullBleedExtension ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-y-auto'}"
 			inert={mobileDrawerOpen ? true : undefined}
 		>
 			{#if !isFullBleedExtension}
@@ -242,7 +263,6 @@
 					aria-hidden="true"
 				></div>
 			{/if}
-			<DemoBanner />
 			<DelegationBanner />
 
 			<div
