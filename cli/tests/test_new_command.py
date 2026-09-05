@@ -41,6 +41,7 @@ from realms.cli.commands.new import (
     parse_subnet,
     portal_url_for_slug,
     resolve_gos_queue,
+    run_setup_stage,
     slugify,
     stage_ids_to_run,
     standalone_artifact_urls,
@@ -392,6 +393,87 @@ class TestBrandingSize:
         with pytest.raises(StageError) as exc:
             validate_merged_spec(merged, network="staging", identity="alice")
         assert "1.5 MiB" in exc.value.message
+
+
+class TestBrandingReachesTheDraft:
+    """Images must travel the wizard's route: setup_save_draft, not setup_set_branding.
+
+    setup_launch's upload phase reads the draft asset store; anything written by
+    setup_set_branding lands under a key it never reads, so branding passed to
+    ``realms new`` used to be accepted and then silently dropped.
+    """
+
+    @staticmethod
+    def _drive(tmp_path: Path, branding: dict) -> list:
+        merged = _merged()
+        merged["branding"] = branding
+        calls: list = []
+
+        with patch(
+            "realms.cli.commands.new._setup_json_call",
+            side_effect=lambda backend, method, payload, *a, **k: (
+                calls.append((method, payload)) or {"success": True}
+            ),
+        ), patch(
+            "realms.cli.commands.new._setup_state_has_token", return_value=True
+        ), patch(
+            "realms.cli.commands.new.preinstall_codex_dependencies"
+        ), patch(
+            "realms.cli.commands.new.call_setup_install_codex"
+        ), patch(
+            "realms.cli.commands.new.poll_setup_launch"
+        ):
+            run_setup_stage(merged, "be-1", "test", "deployer")
+        return calls
+
+    def test_images_go_out_as_save_draft_branding(self, tmp_path: Path):
+        logo = tmp_path / "logo.png"
+        logo.write_bytes(b"\x89PNG-logo")
+        bg = tmp_path / "bg.png"
+        bg.write_bytes(b"\x89PNG-bg")
+
+        calls = self._drive(
+            tmp_path,
+            {"logo": str(logo), "background": str(bg), "primary": "#123456"},
+        )
+
+        assert "setup_set_branding" not in [method for method, _ in calls]
+
+        branding = [
+            payload["branding"]
+            for method, payload in calls
+            if method == "setup_save_draft" and "branding" in (payload or {})
+        ]
+        assert [sorted(part) for part in branding] == [
+            ["logo_data_url"],
+            ["background_data_url"],
+            ["colors"],
+        ]
+        assert branding[0]["logo_data_url"].startswith("data:image/png;base64,")
+        assert branding[2]["colors"] == {"primary": "#123456"}
+
+    def test_branding_precedes_launch(self, tmp_path: Path):
+        logo = tmp_path / "logo.png"
+        logo.write_bytes(b"\x89PNG")
+
+        methods = [method for method, _ in self._drive(tmp_path, {"logo": str(logo)})]
+        assert methods.index("setup_save_draft") < methods.index("setup_launch")
+
+    def test_text_only_branding_sends_no_branding_draft(self):
+        calls = self._drive(Path("."), {"manifesto": "We build together."})
+
+        assert "setup_set_branding" not in [method for method, _ in calls]
+        assert not [
+            payload
+            for method, payload in calls
+            if method == "setup_save_draft" and "branding" in (payload or {})
+        ]
+        identity = [
+            payload["identity"]
+            for method, payload in calls
+            if method == "setup_save_draft" and "identity" in (payload or {})
+        ]
+        assert identity == [{"manifesto": "We build together."}]
 
 
 class TestIdentityClassification:

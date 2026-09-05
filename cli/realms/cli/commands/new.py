@@ -2008,17 +2008,34 @@ def run_setup_stage(
     else:
         console.print("  treasury token already configured; leaving it as is")
 
-    branding_args: Dict[str, Any] = {}
+    # setup_save_draft is what the wizard uses (saveSetupDraft in
+    # src/realm_frontend/src/lib/setup/api.ts): it puts the images in the draft
+    # asset store, which is where setup_launch's upload phase reads them from
+    # before writing /custom/logo.png. setup_set_branding stores them under a
+    # different key that the launch phase never looks at.
+    #
+    # One call per asset: a data URL may be up to 1.5 MiB, and two of them plus
+    # envelope would exceed the ~2 MiB ingress limit. The backend merges draft
+    # partials, so splitting is equivalent.
+    branding_parts: List[Dict[str, Any]] = []
     if branding.get("logo"):
-        branding_args["logo_data_url"] = file_to_data_url(branding["logo"])
+        branding_parts.append({"logo_data_url": file_to_data_url(branding["logo"])})
     if branding.get("background"):
-        branding_args["background_data_url"] = file_to_data_url(branding["background"])
+        branding_parts.append(
+            {"background_data_url": file_to_data_url(branding["background"])}
+        )
     if branding.get("primary"):
-        branding_args["colors"] = {"primary": branding["primary"]}
-    branding_args.update(identity_block)
-    if branding_args:
-        console.print("  setup_set_branding")
-        _setup_json_call(backend_id, "setup_set_branding", branding_args, network, identity)
+        branding_parts.append({"colors": {"primary": branding["primary"]}})
+    for part in branding_parts:
+        console.print(f"  setup_save_draft (branding: {', '.join(part)})")
+        _setup_json_call(
+            backend_id,
+            "setup_save_draft",
+            {"branding": part},
+            network,
+            identity,
+            timeout=300,
+        )
 
     console.print("  setup_launch")
     _setup_json_call(backend_id, "setup_launch", None, network, identity, timeout=300)
