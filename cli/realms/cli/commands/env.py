@@ -99,7 +99,7 @@ def load_env_config(env_name: str, project_root: Optional[Path] = None) -> Dict[
     if not path.is_file():
         console.print(
             f"[red]❌ Environment config not found: {path}[/red]\n"
-            f"[dim]Expected environments/{{demo,staging,test}}.json at the repo root.[/dim]"
+            f"[dim]Expected environments/{{demo,staging,test,production}}.json at the repo root.[/dim]"
         )
         raise typer.Exit(1)
     try:
@@ -492,7 +492,7 @@ def _create_canister(
     logger,
 ) -> str:
     cmd = _dfx_cmd("canister", "create", canister_name, "--network", network, "--no-wallet")
-    # Mainnet-style networks (demo/staging/test/ic) have many subnets; dfx
+    # Mainnet-style networks (demo/staging/test/production/ic) have many subnets; dfx
     # refuses to pick one unless we name a type. ``application`` is not a
     # cycles-ledger subnet type; ``european`` matches ``realms new --subnet``.
     if network not in ("local", "localhost"):

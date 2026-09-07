@@ -1733,7 +1733,7 @@ def registry_call(
 
 env_app = typer.Typer(
     name="env",
-    help="Deploy the Realms GOS product stack per environment (demo/staging/test).",
+    help="Deploy the Realms GOS product stack per environment (demo/staging/test/production).",
 )
 app.add_typer(env_app, name="env", rich_help_panel="Lifecycle")
 
@@ -1744,7 +1744,7 @@ def env_deploy(
         ...,
         "--env",
         "-e",
-        help="Environment name (demo, staging, test) — loads environments/<name>.json",
+        help="Environment name (demo, staging, test, production) — loads environments/<name>.json",
     ),
     mode: str = typer.Option(
         "auto",
@@ -1797,7 +1797,7 @@ def env_status(
         ...,
         "--env",
         "-e",
-        help="Environment name (demo, staging, test)",
+        help="Environment name (demo, staging, test, production)",
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity (informational only)"
@@ -1813,7 +1813,7 @@ def seed(
         ...,
         "--env",
         "-e",
-        help="Environment name (demo, staging, test) — loads environments/<name>.json",
+        help="Environment name (demo, staging, test, production) — loads environments/<name>.json",
     ),
     mode: str = typer.Option(
         "auto",

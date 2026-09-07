@@ -75,6 +75,7 @@ DERIVATION_ORIGINS = {
     "demo": "https://demo.realmsgos.org",
     "test": "https://test.realmsgos.org",
     "ic": "https://realmsgos.org",
+    "production": "https://realmsgos.org",
 }
 
 # Live GOS queue IDs come from ``--gaas-config`` (``gaas new --output-file``).

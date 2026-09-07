@@ -1,0 +1,22 @@
+{
+  "name": "production",
+  "network": "production",
+  "domain": "realmsgos.org",
+  "portal_url": "https://registry.realmsgos.org",
+  "casals_url": "",
+  "realms_version": "main",
+  "billing_service_principal": "javg6-s4zkq-cojsk-vapf2-tltma-ymhkt-6kypi-mik2v-l4dfx-xsnyy-cqe",
+  "dns": {
+    "provider": "manual"
+  },
+  "canisters": [
+    "file_registry",
+    "file_registry_frontend",
+    "marketplace_backend",
+    "marketplace_frontend",
+    "token_backend",
+    "token_frontend",
+    "nft_backend",
+    "nft_frontend"
+  ]
+}
