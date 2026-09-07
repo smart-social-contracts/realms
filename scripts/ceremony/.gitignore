@@ -1,0 +1,6 @@
+# Ceremony workspace — never commit outputs
+vm/cache/
+artifacts/
+secrets/
+sim-yubikeys/
+.operator-credentials.txt
