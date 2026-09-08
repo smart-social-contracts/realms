@@ -54,7 +54,6 @@ from api.ggg_entities import (
     search_objects,
 )
 from api.quarter_provisioning import (
-    request_provision_quarter as _request_provision_quarter,
     request_casals_create_canister as _request_casals_create_canister,
     bootstrap_quarter as _bootstrap_quarter,
     parse_casals_spec as _parse_casals_spec,
@@ -3797,15 +3796,12 @@ def process_quarter_scaling() -> Async[text]:
     """Act on a pending auto-scale request: provision a new quarter, bring it to
     parity, register it locally, then clear the in-flight guard.
 
-    Two transports, preferred in order:
-
-    1. **Direct** — when ``manifest_data.casals.casals_canister_id`` is set, the
-       capital (commander of its Casals stand) asks Casals to ``create_canister``
-       a backend-only quarter, then drives ``bootstrap_as_quarter`` on it (Casals
-       co-adds the capital as a controller of canisters minted in its stand, so
-       the gated bootstrap calls are authorized).
-    2. **Broker** — otherwise, if ``installer_canister_id`` is set, ask the
-       installer to provision via Casals on the capital's behalf.
+    When ``manifest_data.casals.casals_canister_id`` is set, the capital
+    (commander of its Casals stand) asks Casals to ``create_canister`` a
+    backend-only quarter, then drives ``bootstrap_as_quarter`` on it (Casals
+    co-adds the capital as a controller of canisters minted in its stand, so
+    the gated bootstrap calls are authorized). Without ``casals_canister_id``,
+    provisioning is blocked until an operator wires the direct path.
 
     Non-blocking by design — user registration only sets ``scale_in_flight``;
     this endpoint (called by a controller, timer, or task manager) performs the

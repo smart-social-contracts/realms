@@ -195,3 +195,50 @@ class TestBootstrapQuarter:
         out = _run(qp.bootstrap_quarter("new-can-123", {}), "boom")
         assert out["success"] is False
         assert "Unparseable" in out["error"]
+
+
+# ---------------------------------------------------------------------------
+# request_casals_hand_to_baton — Casals reply parsing
+# ---------------------------------------------------------------------------
+
+class TestRequestCasalsHandToBaton:
+    def test_ok_nested_payload(self):
+        resp = json.dumps({"ok": {"target": "agora-2", "baton": "baton-cai"}})
+        out = _run(qp.request_casals_hand_to_baton("jj2e5-cai", {"target": "agora-2"}), resp)
+        assert out["ok"] is True
+        assert out["raw"]["target"] == "agora-2"
+
+    def test_ok_true(self):
+        resp = json.dumps({"ok": True})
+        out = _run(qp.request_casals_hand_to_baton("jj2e5-cai", {"target": "agora-2"}), resp)
+        assert out["ok"] is True
+
+    def test_err_payload(self):
+        resp = json.dumps({"err": "no baton canister configured for stand"})
+        out = _run(qp.request_casals_hand_to_baton("jj2e5-cai", {"target": "agora-2"}), resp)
+        assert out["ok"] is False
+        assert "no baton" in out["error"]
+
+    def test_unparseable(self):
+        out = _run(qp.request_casals_hand_to_baton("jj2e5-cai", {}), "<<not json>>")
+        assert out["ok"] is False
+        assert "Unparseable" in out["error"]
+
+    def test_casals_error_envelope(self):
+        # Casals ``_err`` replies {"ok": false, "error": ...} — there is no "err" key.
+        resp = json.dumps({"ok": False, "error": "no Baton canister in stand 'agora'"})
+        out = _run(qp.request_casals_hand_to_baton("jj2e5-cai", {"target": "agora-2"}), resp)
+        assert out["ok"] is False
+        assert "no baton" in out["error"].lower()
+
+    def test_executed_governance_is_not_pending(self):
+        resp = json.dumps({"ok": True, "governance": {"status": "EXECUTED", "request_id": "r1"}})
+        out = _run(qp.request_casals_hand_to_baton("jj2e5-cai", {"target": "agora-2"}), resp)
+        assert out["ok"] is True
+        assert out["pending"] is False
+
+    def test_pending_governance_request(self):
+        resp = json.dumps({"ok": True, "status": "PENDING", "request_id": "r1"})
+        out = _run(qp.request_casals_hand_to_baton("jj2e5-cai", {"target": "agora-2"}), resp)
+        assert out["ok"] is True
+        assert out["pending"] is True

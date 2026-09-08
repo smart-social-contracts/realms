@@ -146,9 +146,9 @@ Custom codexes can implement arbitrary rules (geography, invitation codes, profi
 
 ## Auto-Scaling / Sharding
 
-Sharding is **policy-driven, non-blocking, and brokered through Casals**
-(issue #156). It is triggered on **every new user registration** and never
-blocks the join.
+Sharding is **policy-driven, non-blocking, and provisioned directly through
+Casals** (issue #156). It is triggered on **every new user registration** and
+never blocks the join.
 
 ### The decision (codex hook + default)
 
@@ -170,12 +170,14 @@ realm)` hook. `populations` is the list of per-quarter resident counts
    **idempotent guard** `Realm.scale_in_flight = True` and records the time. It
    never performs the deploy itself — joins are never blocked on provisioning.
 2. A separate async endpoint `process_quarter_scaling()` (called by a
-   controller, timer, or task manager) acts on the flag: it asks the
-   `realm_installer` broker to provision **one backend-only quarter** via
-   Casals (`provision_quarter` → `create_canister` under the realm's existing
-   stand → `set_commander`), then **registers** the new canister as a Quarter
-   (assigning the next catalog index) and clears the guard so the next
-   threshold crossing can re-trigger.
+   controller, timer, or task manager) acts on the flag: when
+   `manifest_data.casals.casals_canister_id` is set, the capital asks Casals to
+   provision **one backend-only quarter** (`create_canister` under the realm's
+   existing stand), drives `bootstrap_as_quarter` on it, optionally hands the
+   canister to the stand baton, then **registers** the new canister as a Quarter
+   (assigning the next catalog index) and clears the guard so the next threshold
+   crossing can re-trigger. Without `casals_canister_id`, provisioning stays
+   blocked until an operator wires the direct path.
 3. **Users stay put.** Existing users are not migrated; the assignment strategy
    simply starts directing *new* registrations to the freshest quarter once it
    is registered.
@@ -276,10 +278,10 @@ class Quarter(Entity, TimestampedMixin):
 | `sync_quarters()` | Peer gossip: exchange quarter list + populations |
 | `report_quarter_population(population)` | Quarter→capital push of live `User.count()` after join |
 | `get_scale_status()` | Report auto-scale state |
-| `process_quarter_scaling()` | Provision + register a new quarter |
+| `process_quarter_scaling()` | Provision + register a new quarter (direct Casals path) |
 
-`realm_installer.provision_quarter(args)` is the Casals broker endpoint that
-mints a backend-only quarter canister under the realm's existing stand.
+The capital must have `manifest_data.casals.casals_canister_id` set so it can
+command its Casals stand to mint backend-only quarter canisters.
 
 ---
 
@@ -327,5 +329,5 @@ it does not re-sync on later capital changes.
 ### Phase 3: Automation (Low Priority)
 - Auto-provisioning new quarters at capacity — **implemented** (codex
   `should_deploy_quarter` hook + 90%-of-N default, `scale_in_flight` guard,
-  `process_quarter_scaling()` → Casals broker `provision_quarter`)
+  `process_quarter_scaling()` → direct Casals `create_canister` + bootstrap)
 - Optional QuarterRouter canister (cache/accelerator, not required)

@@ -101,10 +101,10 @@ def _capital_runtime_config(realm) -> dict:
 def run_quarter_scaling() -> Async[text]:
     """Core auto-scale provisioning driver (un-gated).
 
-    Creates a quarter via Casals (direct) or the installer (broker), seeds the
-    new quarter's local self-bootstrap, registers it locally, then clears the
-    in-flight guard. Shared by the ``process_quarter_scaling`` endpoint and the
-    recurring autoscale task (``run_autoscale_tick``).
+    Creates a quarter via Casals (direct path), seeds the new quarter's local
+    self-bootstrap, registers it locally, then clears the in-flight guard.
+    Shared by the ``process_quarter_scaling`` endpoint and the recurring
+    autoscale task (``run_autoscale_tick``).
     """
     try:
         from ggg import Realm
@@ -135,7 +135,6 @@ def run_quarter_scaling() -> Async[text]:
             })
 
         casals_id = (spec.get("casals_canister_id") or "").strip()
-        installer_id = (getattr(realm, "installer_canister_id", "") or "").strip()
         bootstrap_result = None
 
         # Auto-derive the install set from the capital's *own live state* so the
@@ -162,6 +161,7 @@ def run_quarter_scaling() -> Async[text]:
         )
 
         new_canister_id = ""
+        baton_handed = False
         if casals_id:
             # ── Direct path: the capital commands its own Casals stand. ──
             from api.quarter_provisioning import request_casals_create_canister
@@ -194,28 +194,35 @@ def run_quarter_scaling() -> Async[text]:
                 "frontend_canister_id": spec.get("frontend_canister_id", ""),
                 "config": capital_config,
             })
-        elif installer_id:
-            # ── Broker path: ask the installer to provision on our behalf. ──
-            from api.quarter_provisioning import request_provision_quarter
+            # Hand-off replaces IC controllers — only safe after bootstrap adds
+            # the capital to the quarter's trusted_principals.
+            if isinstance(bootstrap_result, dict) and bootstrap_result.get("success"):
+                from api.quarter_provisioning import request_casals_hand_to_baton
 
-            result = yield from request_provision_quarter(installer_id, {
-                "stand": spec["stand"],
-                "backend_wasm_key": spec["backend_wasm_key"],
-                "name": spec["name"],
-            })
-            if not result.get("ok"):
-                realm.scale_in_flight = False
-                return json.dumps({"success": False, "status": "failed",
-                                   "error": result.get("error", "provision failed")})
-            new_canister_id = (result.get("canister_id") or "").strip()
+                hand_res = yield from request_casals_hand_to_baton(casals_id, {
+                    "target": spec["name"],
+                })
+                if hand_res.get("ok") and not hand_res.get("pending"):
+                    baton_handed = True
+                    logger.info(f"Handed quarter canister {spec['name']} to stand baton")
+                elif hand_res.get("ok"):
+                    logger.warning(
+                        f"Baton hand-off for {spec['name']} is queued for governance "
+                        f"approval; the quarter is not baton-managed yet"
+                    )
+                else:
+                    err = (hand_res.get("error") or "").strip()
+                    if "no baton" in err.lower():
+                        logger.info(f"No baton hand-off for {spec['name']}: {err}")
+                    else:
+                        logger.warning(f"Baton hand-off failed for {spec['name']}: {err}")
         else:
             # Intent recorded but no transport wired; keep the flag set so an
             # operator can finish wiring and retry.
             return json.dumps({
                 "success": False,
                 "status": "blocked",
-                "error": "no provisioning transport: set manifest_data.casals.casals_canister_id "
-                         "(direct) or installer_canister_id (broker)",
+                "error": "no provisioning transport: set manifest_data.casals.casals_canister_id",
             })
 
         from ggg import Quarter, QuarterStatus
@@ -247,6 +254,7 @@ def run_quarter_scaling() -> Async[text]:
             "canister_id": new_canister_id,
             "index": new_index,
             "bootstrap": bootstrap_result,
+            "baton_handed": baton_handed,
         })
     except Exception as e:
         logger.error(f"Error in process_quarter_scaling: {e}\n{traceback.format_exc()}")

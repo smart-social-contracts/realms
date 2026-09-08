@@ -1,16 +1,10 @@
 """Inter-canister transport for quarter auto-scaling (issue #156).
 
-Two provisioning transports live here, both thin yield/generator wrappers
-(mirroring ``api/cross_quarter.py``); the *decision* of whether to scale lives
-in ``core.autoscale``:
-
-1. **Direct (preferred).** The capital commands its own Casals stand, so it
-   asks Casals to ``create_canister`` a backend-only quarter directly. Because
-   Casals co-adds the stand commander (the capital) as a controller of canisters
-   minted in its stand, the capital can then drive ``bootstrap_as_quarter`` on
-   the fresh canister to bring it to parity (config + codex + extensions).
-2. **Broker (legacy).** Ask a ``realm_installer`` to provision via Casals on the
-   capital's behalf. Kept for realms wired with an installer broker.
+Thin yield/generator wrappers (mirroring ``api/cross_quarter.py``); the
+*decision* of whether to scale lives in ``core.autoscale``. The capital commands
+its own Casals stand, asks Casals to ``create_canister`` a backend-only quarter
+directly, then drives ``bootstrap_as_quarter`` on the fresh canister (Casals
+co-adds the stand commander as a controller of canisters minted in its stand).
 """
 
 import json
@@ -70,14 +64,6 @@ def parse_casals_spec(manifest_data: str, next_index: int) -> Dict:
     }
 
 
-class InstallerProvisionService(Service):
-    """Remote interface of the realm_installer ``provision_quarter`` broker."""
-
-    @service_update
-    def provision_quarter(self, args: text) -> text:
-        ...
-
-
 class CasalsProvisionService(Service):
     """Remote interface of the Casals orchestrator's ``create_canister``.
 
@@ -88,6 +74,10 @@ class CasalsProvisionService(Service):
 
     @service_update
     def create_canister(self, args: text) -> text:
+        ...
+
+    @service_update
+    def orchestration_hand_to_baton(self, args: text) -> text:
         ...
 
 
@@ -134,6 +124,45 @@ def request_casals_create_canister(casals_canister_id: str, args: Dict) -> Async
         return {"ok": False, "error": str(e)}
 
 
+def request_casals_hand_to_baton(casals_canister_id: str, args: Dict) -> Async[Dict]:
+    """Hand a stand canister to the stand's orchestration Baton.
+
+    ``args`` is forwarded as JSON (``{target, baton?}``). Omit ``baton`` to let
+    Casals resolve the stand's baton. Returns ``{"ok": True, "pending": bool}``
+    or ``{"ok": False, "error": ...}``.
+
+    A section may put ``orchestration.baton.hand_off`` behind an N-of-M policy,
+    in which case Casals stores a PENDING governance request and still answers
+    ``ok``; ``pending`` distinguishes that from a completed hand-off.
+    """
+    logger.info(f"Requesting orchestration_hand_to_baton from Casals {casals_canister_id}: {args}")
+    try:
+        service = CasalsProvisionService(Principal.from_str(casals_canister_id))
+        result: CallResult[text] = yield service.orchestration_hand_to_baton(json.dumps(args))
+        raw = _unwrap_call_text(result)
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {"ok": False, "error": f"Unparseable Casals response: {raw[:200]}"}
+        if isinstance(parsed, dict) and parsed.get("err") is not None:
+            return {"ok": False, "error": str(parsed.get("err"))}
+        if isinstance(parsed, dict) and parsed.get("ok") is not None:
+            if parsed.get("ok") is False:
+                return {
+                    "ok": False,
+                    "error": str(parsed.get("error") or parsed.get("err") or "hand-off failed"),
+                }
+            payload = parsed["ok"] if isinstance(parsed.get("ok"), dict) else parsed
+            status = str(payload.get("status") or "").strip().upper()
+            return {"ok": True, "pending": status == "PENDING", "raw": payload}
+        return {"ok": False, "error": f"Unexpected Casals hand_to_baton response: {raw[:200]}"}
+    except Exception as e:
+        logger.error(
+            f"Error calling Casals orchestration_hand_to_baton via {casals_canister_id}: {e}"
+        )
+        return {"ok": False, "error": str(e)}
+
+
 def bootstrap_quarter(quarter_canister_id: str, args: Dict) -> Async[Dict]:
     """Drive ``bootstrap_as_quarter`` on a freshly minted quarter canister.
 
@@ -153,23 +182,3 @@ def bootstrap_quarter(quarter_canister_id: str, args: Dict) -> Async[Dict]:
         logger.error(f"Error bootstrapping quarter {quarter_canister_id}: {e}")
         return {"success": False, "error": str(e)}
 
-
-def request_provision_quarter(installer_canister_id: str, args: Dict) -> Async[Dict]:
-    """Ask the installer to provision a new backend-only quarter via Casals.
-
-    ``args`` is forwarded as JSON (``{stand, backend_wasm_key, name?}``).
-    Returns the parsed installer response, e.g. ``{"ok": True, "canister_id": ...}``
-    or ``{"ok": False, "error": ...}``.
-    """
-    logger.info(f"Requesting quarter provisioning from installer {installer_canister_id}")
-    try:
-        service = InstallerProvisionService(Principal.from_str(installer_canister_id))
-        result: CallResult[text] = yield service.provision_quarter(json.dumps(args))
-        raw = _unwrap_call_text(result)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            return {"ok": False, "error": f"Unparseable installer response: {raw[:200]}"}
-    except Exception as e:
-        logger.error(f"Error provisioning quarter via {installer_canister_id}: {e}")
-        return {"ok": False, "error": str(e)}

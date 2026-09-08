@@ -1,9 +1,9 @@
 """Quarter auto-scaling policy (pure decision logic).
 
 Decides *whether* a federation should spawn a new quarter when a new user is
-created. The *how* (Casals provisioning) lives in the installer broker +
-``main.py`` async trigger; this module is intentionally pure so the policy is
-unit-testable without a replica.
+created. The *how* (direct Casals provisioning) lives in
+``core/quarter_scaling`` + ``api/quarter_provisioning``; this module is
+intentionally pure so the policy is unit-testable without a replica.
 
 Design (see issue #156):
 
