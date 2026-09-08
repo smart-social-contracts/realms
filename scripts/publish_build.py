@@ -42,6 +42,12 @@ from realms.cli.casals_versions import git_short_sha, main_build_version  # noqa
 from realms.cli.commands.files import file_registry_id_for  # noqa: E402
 from realms.cli.commands.rollout import _CASALS_IDS  # noqa: E402
 
+# Keep test-variant labels out of the production ``main.*`` channel (``-v main``).
+TEST_MAIN_CHANNEL_PREFIX = "main-test"
+TEST_VERSION_SUFFIX = "+test"
+BUILD_VARIANTS = ("production", "test")
+DEFAULT_BUILD_VARIANT = "production"
+
 # GaaS stack (realm_registry_backend, realm_installer, realm_registry_frontend)
 # is published from github.com/smart-social-contracts/gos-as-a-service releases.
 # family -> {"backend": (canister_name, main_py) | None, "frontend": dir | None}
@@ -131,8 +137,14 @@ def _stamp_version_http(root: Path, release_tag: str | None) -> None:
             )
 
 
-def _build_realm_backend(root: Path) -> Path:
+def _build_realm_backend(root: Path, variant: str = DEFAULT_BUILD_VARIANT) -> Path:
     """Layered base realm_backend WASM (Issue #168 stubs)."""
+    sys.path.insert(0, str(root / "scripts"))
+    from pack_realm_backend import (  # noqa: E402
+        select_build_variant,
+        verify_build_variant,
+    )
+
     bpy = _basilisk_python(root)
     env = {
         **os.environ,
@@ -140,17 +152,25 @@ def _build_realm_backend(root: Path) -> Path:
             root / "src" / "realm_backend" / "realm_backend.did"
         ),
     }
-    _run([bpy, "scripts/build_base_wasm.py", "--gzip"], cwd=root, env=env)
-    gz = root / ".basilisk" / "realm_backend" / "realm_backend.wasm.gz"
-    if not gz.is_file():
-        sys.exit(f"build_base_wasm did not produce {gz}")
+    select_build_variant(root, variant)
+    try:
+        _run([bpy, "scripts/build_base_wasm.py", "--gzip"], cwd=root, env=env)
+        wasm = root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
+        gz = wasm.with_suffix(wasm.suffix + ".gz")
+        if not gz.is_file():
+            sys.exit(f"build_base_wasm did not produce {gz}")
+        verify_build_variant(wasm, variant)
+    finally:
+        select_build_variant(root, DEFAULT_BUILD_VARIANT)
     print(f"  backend wasm: {gz} ({gz.stat().st_size:,} bytes)")
     return gz
 
 
-def _build_backend(root: Path, canister: str, main_py: str) -> Path:
+def _build_backend(
+    root: Path, canister: str, main_py: str, variant: str = DEFAULT_BUILD_VARIANT
+) -> Path:
     if canister == "realm_backend":
-        return _build_realm_backend(root)
+        return _build_realm_backend(root, variant=variant)
     bpy = _basilisk_python(root)
     did = root / "src" / canister / f"{canister}.did"
     env = {**os.environ, "CANISTER_CANDID_PATH": str(did)}
@@ -195,9 +215,13 @@ def _sync_declarations(root: Path, fe_dir: str) -> None:
     print(f"  synced declarations -> {dst}")
 
 
-def _build_frontend(root: Path, fe_dir: str, environment: str) -> Path:
+def _build_frontend(
+    root: Path, fe_dir: str, environment: str, variant: str = "production"
+) -> Path:
     d = root / fe_dir
-    env = {**os.environ, "DFX_NETWORK": environment}
+    # The realm frontend gates its Internet Identity bypass on a compile-time
+    # constant, so the variant has to be chosen here rather than at runtime.
+    env = {**os.environ, "DFX_NETWORK": environment, "REALMS_BUILD_VARIANT": variant}
     _sync_declarations(root, fe_dir)
     # Workspace frontends (registry, dashboard, …) hoist shared deps from the repo
     # root; installing only in the subdirectory leaves @sveltejs/kit at the root
@@ -207,6 +231,11 @@ def _build_frontend(root: Path, fe_dir: str, environment: str) -> Path:
     dist = d / "dist"
     if not dist.is_dir():
         sys.exit(f"frontend build did not produce {dist}")
+    if fe_dir == "src/realm_frontend":
+        sys.path.insert(0, str(root / "scripts"))
+        from check_frontend_variant import verify_frontend_variant
+
+        verify_frontend_variant(dist, variant)
     print(f"  frontend dist: {dist}")
     return dist
 
@@ -248,6 +277,28 @@ def _resolve_version(from_main: bool, explicit: str | None, root: Path) -> str:
     return explicit.strip()
 
 
+def apply_build_variant_label(version: str, variant: str) -> str:
+    """Return a publish label that cannot be rolled out as production."""
+    if variant == DEFAULT_BUILD_VARIANT:
+        return version
+    if variant != "test":
+        raise ValueError(f"unknown build variant {variant!r}")
+    if version.startswith("main."):
+        # Separate channel prefix — ``main.<ts>.<sha>+test`` would still match
+        # ``-v main`` because ``is_main_channel`` treats any ``main.*`` as main.
+        return f"{TEST_MAIN_CHANNEL_PREFIX}.{version[len('main.'):]}"
+    return f"{version}{TEST_VERSION_SUFFIX}"
+
+
+def parse_build_variant_label(labeled: str) -> tuple[str, str]:
+    """Inverse of :func:`apply_build_variant_label`."""
+    if labeled.startswith(f"{TEST_MAIN_CHANNEL_PREFIX}."):
+        return f"main.{labeled[len(TEST_MAIN_CHANNEL_PREFIX) + 1:]}", "test"
+    if labeled.endswith(TEST_VERSION_SUFFIX):
+        return labeled[: -len(TEST_VERSION_SUFFIX)], "test"
+    return labeled, DEFAULT_BUILD_VARIANT
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--environment", required=True, help="test | staging | demo")
@@ -272,6 +323,12 @@ def main():
         action="store_true",
         help="also record the version in the realm catalog (Casals-only envs)",
     )
+    ap.add_argument(
+        "--variant",
+        choices=BUILD_VARIANTS,
+        default=DEFAULT_BUILD_VARIANT,
+        help="realm backend build variant (default: production)",
+    )
     args = ap.parse_args()
 
     if args.family not in FAMILIES:
@@ -281,6 +338,7 @@ def main():
 
     root = _root()
     version = _resolve_version(args.from_main, args.version, root)
+    build_variant = args.variant
 
     env = args.environment
     casals = _CASALS_IDS.get(env)
@@ -303,13 +361,29 @@ def main():
     frontend_dist = None
     assets_wasm = args.assets_wasm
 
+    # The variant applies to the realm as a whole: the backend WASM drops the
+    # test code paths and the frontend drops the login UI that would call them.
+    # Publishing one half as "test" and the other as "production" would ship a
+    # realm whose two sides disagree about whether test mode exists.
+    realm_variant = (
+        build_variant if args.family == "realm" else DEFAULT_BUILD_VARIANT
+    )
+    if realm_variant == "test":
+        version = apply_build_variant_label(version, "test")
+        print(f"  test-variant publish label: {version}")
+
     if want_backend:
         canister, main_py = spec["backend"]
-        release_tag = None if args.from_main else f"v{version}"
+        base_version, _ = parse_build_variant_label(version)
+        release_tag = None if args.from_main else f"v{base_version}"
         _stamp_version_http(root, release_tag)
-        backend_wasm = _build_backend(root, canister, main_py)
+        backend_wasm = _build_backend(
+            root, canister, main_py, variant=realm_variant
+        )
     if want_frontend:
-        frontend_dist = _build_frontend(root, spec["frontend"], env)
+        frontend_dist = _build_frontend(
+            root, spec["frontend"], env, variant=realm_variant
+        )
         if not assets_wasm:
             assets_wasm = _find_assets_wasm(root, env)
 

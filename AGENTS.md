@@ -758,6 +758,63 @@ authorization model, cycle budget).
 
 ---
 
+## Build variants: production vs test WASM
+
+Test-mode code paths are **compiled out** of a production build, not merely
+switched off at runtime. A stale `test_mode` row in the database, a compromised
+admin session, or an extension writing to the `Realm` entity all have nothing to
+switch on, because the code is not in the artifact.
+
+**Production is the default.** Every build is production unless you explicitly
+ask for the test variant.
+
+```bash
+python3 scripts/pack_realm_backend.py                    # production (default)
+python3 scripts/pack_realm_backend.py --variant test     # test
+```
+
+### How it works
+
+`basilisk` packs the whole `src/realm_backend` tree, so anything left in that
+tree ships. The variants therefore live **outside** it, in
+`scripts/build_variants/{production,test}.py`, and the packer copies the selected
+one over `src/realm_backend/core/build_variant.py` before packing and restores
+production afterwards. Whatever was not selected is *absent*, not disabled.
+
+After packing, the WASM is byte-scanned for `REALMS_TEST_BUILD_AUTH_BYPASS`. A
+production build containing it fails; a test build missing it fails too — a
+one-sided check would pass vacuously.
+
+| | Production | Test |
+|---|---|---|
+| `is_test_mode()` | always `False` | reads the realm flag |
+| `is_ii_bypass_active()` | always `False` | reads the realm flag |
+| `test_flags_allowed(...)` | always `False` | network-gated |
+| Sentinel in WASM | absent | present |
+
+`status()` reports `build_variant` and `network`, so you can tell a production
+artifact from a test one without trusting the deploy log.
+
+### Frontend
+
+The realm frontend has the matching split, via a Vite compile-time constant.
+Unset means production; only the exact value `test` opts in.
+
+```bash
+npm run build                                # production bundle
+REALMS_BUILD_VARIANT=test npm run build      # test bundle
+python3 scripts/check_frontend_variant.py src/realm_frontend/dist production
+```
+
+`npm run dev` keeps test identities available. `publish_build.py --variant test`
+builds both halves as test and labels the artifact `main-test.*` so a test build
+is never picked up by a production `main` rollout.
+
+**Never deploy a test variant to a production network.** Test builds exist for
+CI and for demo environments that need deterministic identities.
+
+---
+
 ## Realm config via Casals arrangements (branding, registration, runtime flags)
 
 A sheet rollout stands up the canisters (code); a Casals **arrangement** configures
