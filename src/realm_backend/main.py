@@ -1400,8 +1400,13 @@ def join_realm(
         except Exception:
             pass
 
+        from core.runtime_flags import are_test_join_shortcuts_enabled
+
+        # Open registration: who may join at all. Ordinary product configuration.
         _self_reg_bypass = bool(getattr(realm, "test_mode_user_self_registration", False))
-        _test_code_bypass = _self_reg_bypass or bool(getattr(realm, "test_mode_ii_bypass", False))
+        # Test shortcuts: who may join *as an administrator* without an invite.
+        # Deliberately not derived from _self_reg_bypass.
+        _test_code_bypass = are_test_join_shortcuts_enabled()
 
         if has_invite:
             # Test mode shortcuts: sha256("admin") / sha256("member") / sha256("dev") / sha256("developer") grant respective profiles
@@ -1446,7 +1451,7 @@ def join_realm(
             pass
 
         elif profile == "admin":
-            if not _self_reg_bypass:
+            if not _test_code_bypass:
                 from core.api_errors import INVITE_REQUIRED
 
                 return _join_fail(
@@ -2067,7 +2072,11 @@ def _set_canister_config_impl(
                 try:
                     parsed_incoming = json.loads(test_flags_json)
                     if isinstance(parsed_incoming, dict):
-                        incoming_flags = parsed_incoming
+                        from core.runtime_flags import normalize_flag_key
+
+                        incoming_flags = {
+                            normalize_flag_key(k): v for k, v in parsed_incoming.items()
+                        }
                 except (TypeError, ValueError):
                     incoming_flags = {}
             if not previous_network:
@@ -2080,7 +2089,7 @@ def _set_canister_config_impl(
                     realm.test_mode_disable_monetary_tokens = (
                         default_disable_monetary_tokens(network)
                     )
-                if "demo_notice" not in incoming_flags:
+                if "demo_notice_enabled" not in incoming_flags:
                     realm.test_mode_demo_notice = default_demo_notice(network)
 
         if can_test_mode is not None:
@@ -2088,31 +2097,42 @@ def _set_canister_config_impl(
 
         # Apply test flags (network-gated: rejected on production unless can_test_mode)
         if test_flags_json:
-            from core.runtime_flags import test_flags_allowed
+            from core.runtime_flags import (
+                NON_PRODUCTION_NETWORKS,
+                is_test_only_flag,
+                normalize_flag_key,
+                test_flags_allowed,
+            )
 
             effective_network = network or getattr(realm, "network", "") or ""
-            flags = json.loads(test_flags_json)
-            if "can_test_mode" in flags:
-                if can_test_mode is None:
-                    realm.can_test_mode = bool(flags.pop("can_test_mode"))
-                else:
-                    flags.pop("can_test_mode")
-            bool_flag_values = [
-                v
-                for k, v in flags.items()
-                if k not in ("demo_notice_body", "notice_body")
-            ]
-            any_flag_true = any(v for v in bool_flag_values if v)
+            raw_flags = json.loads(test_flags_json)
+            # can_test_mode is the switch that permits test flags on a production
+            # network, so it is only settable through the dedicated parameter of
+            # the controller-gated set_canister_config — never from this payload,
+            # which set_test_flags_json exposes without authentication.
+            raw_flags.pop("can_test_mode", None)
+            # Accept both the canonical product-flag names and their legacy
+            # test_mode-era spellings.
+            flags = {normalize_flag_key(k): v for k, v in raw_flags.items()}
+            # Only flags that actually weaken the realm are network-gated; product
+            # configuration that happens to live in this payload is not.
+            enabled_test_flags = sorted(
+                k for k, v in flags.items() if v and is_test_only_flag(k)
+            )
             allowed = test_flags_allowed(
                 effective_network, bool(getattr(realm, "can_test_mode", False))
             )
-            if any_flag_true and not allowed:
+            if enabled_test_flags and not allowed:
                 return RealmResponse(
                     success=False,
                     data=RealmResponseData(
                         error=(
-                            "Test mode flags cannot be enabled on mainnet (network=ic) "
-                            "unless can_test_mode is set"
+                            "Test mode flags "
+                            + ", ".join(enabled_test_flags)
+                            + " are not permitted on network "
+                            f"'{effective_network or '(unset)'}' unless can_test_mode "
+                            "is set by a controller. Networks allowing test flags: "
+                            + ", ".join(NON_PRODUCTION_NETWORKS)
                         )
                     ),
                 )
@@ -2123,13 +2143,18 @@ def _set_canister_config_impl(
                 "demo_data": "test_mode_demo_data",
                 "skip_terms": "test_mode_skip_terms",
                 "skip_passport_zkproof": "test_mode_skip_passport_zkproof",
-                "skip_authentication": "test_mode_skip_authentication",
                 "disable_monetary_tokens": "test_mode_disable_monetary_tokens",
-                "demo_notice": "test_mode_demo_notice",
+                "demo_notice_enabled": "test_mode_demo_notice",
             }
             for key, attr in _FLAG_MAP.items():
                 if key in flags:
                     setattr(realm, attr, bool(flags[key]))
+            if flags.get("ii_bypass"):
+                # The II-bypass principals sign in without Internet Identity, so
+                # give them a real admin profile rather than a blanket bypass.
+                from core.test_identity_seed import seed_ii_bypass_admin
+
+                seed_ii_bypass_admin(test_flags_permitted=allowed)
             notice_raw = flags.get("demo_notice_body", flags.get("notice_body"))
             if notice_raw is not None:
                 from core.demo_notice import dump_notice_bodies, parse_notice_bodies
@@ -2297,16 +2322,28 @@ def set_canister_config_json(args: text) -> Async[text]:
         params = json.loads(args) if args else {}
         can_test_mode = params.get("can_test_mode")
         flags = params.get("test_flags_json")
+
+        # can_test_mode is the switch that permits test flags on a production
+        # network, so it has to be asked for deliberately. It used to be lifted
+        # out of the test_flags blob, which meant a blob copied between
+        # descriptors or arrangements could unlock production without anyone
+        # writing it at the top level. Reject it there instead of honouring it.
+        def _reject_nested(flag_dict):
+            if "can_test_mode" in flag_dict:
+                raise ValueError(
+                    "can_test_mode does not belong in test_flags; pass it as a "
+                    "top-level argument so unlocking a production network is "
+                    "explicit rather than inherited from a copied blob"
+                )
+
         if flags is None and isinstance(params.get("test_flags"), dict):
             test_flags_dict = dict(params["test_flags"])
-            if can_test_mode is None and "can_test_mode" in test_flags_dict:
-                can_test_mode = test_flags_dict.pop("can_test_mode")
+            _reject_nested(test_flags_dict)
             flags = json.dumps(test_flags_dict)
         elif flags is not None:
             parsed_flags = json.loads(flags)
             if isinstance(parsed_flags, dict):
-                if can_test_mode is None and "can_test_mode" in parsed_flags:
-                    can_test_mode = parsed_flags.pop("can_test_mode")
+                _reject_nested(parsed_flags)
                 flags = json.dumps(parsed_flags)
 
         accounting_currency = None
@@ -2381,14 +2418,18 @@ def set_test_flags_json(args: text) -> text:
     _set_canister_config_impl.
 
     Args (JSON): {"test_flags": {...}} or a bare flags object with keys
-    test_mode, ii_bypass, user_self_registration, demo_data, skip_terms,
-    skip_passport_zkproof, disable_monetary_tokens, demo_notice,
-    demo_notice_body.
+    test_mode, ii_bypass, demo_data, skip_terms, skip_passport_zkproof.
+
+    Only test-only flags are accepted here. Product configuration that merely
+    happens to share the old ``test_mode_*`` prefix — disable_monetary_tokens,
+    demo_notice, demo_notice_body, user_self_registration — is real settings
+    that outlive test mode, so it stays behind set_canister_config's admin
+    check rather than this unauthenticated editor.
 
     Returns: {"success": bool, "message"?: str, "error"?: str}.
     """
     try:
-        from core.runtime_flags import is_test_mode
+        from core.runtime_flags import is_test_mode, is_test_only_flag, normalize_flag_key
 
         if not is_test_mode():
             return json.dumps(
@@ -2403,9 +2444,20 @@ def set_test_flags_json(args: text) -> text:
             flags = params if isinstance(params, dict) else {}
         if not flags:
             return json.dumps({"success": False, "error": "No test_flags provided"})
-        # skip_authentication disables every permission check — never allow the
-        # unauthenticated editor to set it.
-        flags.pop("skip_authentication", None)
+
+        rejected = [k for k in flags if not is_test_only_flag(normalize_flag_key(k))]
+        if rejected:
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": (
+                        "Not editable without admin rights: "
+                        + ", ".join(sorted(rejected))
+                        + ". This endpoint only accepts test-only flags; use "
+                        "set_canister_config for realm configuration."
+                    ),
+                }
+            )
         resp = _set_canister_config_impl(test_flags_json=json.dumps(flags))
         return json.dumps(_realm_response_to_json_dict(resp))
     except Exception as e:

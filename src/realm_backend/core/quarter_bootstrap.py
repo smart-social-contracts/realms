@@ -277,7 +277,6 @@ _QUARTER_TEST_FLAG_FIELDS = (
     "test_mode_user_self_registration",
     "test_mode_skip_terms",
     "test_mode_skip_passport_zkproof",
-    "test_mode_skip_authentication",
     "test_mode_disable_monetary_tokens",
     "test_mode_demo_notice",
 )

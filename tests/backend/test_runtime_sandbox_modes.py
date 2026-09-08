@@ -2,10 +2,13 @@
 
 The in-process fallback was removed: an extension that resolves to ``sandbox``
 either runs in the subinterpreter or its call fails. Running with host access
-is therefore a declaration made before the call — core/system membership, a
-manifest ``"runtime"``, or an explicit admin override — and never a runtime
-downgrade. These tests pin that resolution and the guards that stop an admin
-from configuring a mode which is known in advance to fail.
+is therefore a declaration made before the call, never a runtime downgrade.
+
+It is also a decision the *host* makes. A manifest may request in-process
+execution and an admin may ask for it, but both are honoured only for an id the
+host already trusts (``core.privileged_extensions``). These tests pin that
+resolution, and the guards that stop an admin from configuring a mode which is
+known in advance to fail.
 """
 
 import sys
@@ -56,25 +59,53 @@ class TestModeResolution:
         assert mode == "in_process"
         assert reason == "core/system extension"
 
-    def test_manifest_declaration_wins_over_realm_default(self, monkeypatch):
+    def test_host_granted_manifest_declaration_wins_over_realm_default(
+        self, monkeypatch
+    ):
+        """demo_simulator is on the audited exemption list, so it is granted."""
+        _declare(monkeypatch, demo_simulator="in_process")
+        mode, reason = runtime_sandbox.resolve_mode("demo_simulator")
+        assert mode == "in_process"
+        assert reason == "requested by manifest, granted by host"
+        assert runtime_sandbox.should_sandbox("demo_simulator") is False
+
+    def test_manifest_cannot_grant_itself_in_process(self, monkeypatch):
+        """The package does not decide how much privilege it gets.
+
+        Without this, installing an extension is equivalent to host access, and
+        the sandbox only protects against extensions that opt into it.
+        """
         _declare(monkeypatch, justice_litigation="in_process")
         mode, reason = runtime_sandbox.resolve_mode("justice_litigation")
-        assert mode == "in_process"
-        assert reason == "declared by manifest"
-        assert runtime_sandbox.should_sandbox("justice_litigation") is False
+        assert mode == "sandbox"
+        assert reason == "manifest requested in_process; not granted by host"
+        assert runtime_sandbox.should_sandbox("justice_litigation") is True
 
     def test_manifest_declaration_beats_admin_override(self, monkeypatch):
         """An override cannot resurrect a spawn that is known to fail."""
-        _declare(monkeypatch, notifications="in_process")
-        runtime_sandbox.update_config({"extensions": {"notifications": "in_process"}})
-        assert runtime_sandbox.resolve_mode("notifications") == (
+        _declare(monkeypatch, demo_simulator="in_process")
+        runtime_sandbox.update_config({"extensions": {"demo_simulator": "in_process"}})
+        assert runtime_sandbox.resolve_mode("demo_simulator") == (
             "in_process",
-            "declared by manifest",
+            "requested by manifest, granted by host",
         )
 
-    def test_admin_override_applies_to_undeclared_extension(self):
+    def test_admin_override_can_grant_in_process_only_to_a_trusted_id(self):
+        """An admin may narrow privilege, never widen it.
+
+        Handing host access to an arbitrary package is a build-time decision, so
+        that it cannot be made by whoever currently holds an admin session.
+        """
         runtime_sandbox.update_config({"extensions": {"welcome": "in_process"}})
         assert runtime_sandbox.resolve_mode("welcome") == (
+            "sandbox",
+            "admin requested in_process; not granted by host",
+        )
+
+        runtime_sandbox.update_config(
+            {"extensions": {"demo_simulator": "in_process"}}
+        )
+        assert runtime_sandbox.resolve_mode("demo_simulator") == (
             "in_process",
             "admin override",
         )

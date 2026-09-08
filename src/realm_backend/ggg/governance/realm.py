@@ -16,7 +16,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 10
+    __version__ = 11
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -47,6 +47,10 @@ class Realm(Entity, TimestampedMixin):
             seed_host_flag_defaults(obj)
         if from_version < 10:
             obj.setdefault("codex_install_state", "")
+        if from_version < 11:
+            # test_mode_skip_authentication disabled every permission check and
+            # no longer exists. Drop any stored value so it cannot be read back.
+            obj.pop("test_mode_skip_authentication", None)
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.SETUP)
@@ -90,8 +94,8 @@ class Realm(Entity, TimestampedMixin):
     sync_state = String(max_length=8192, default="")
     # Codex install job cursor (multi-message IC0522-safe install).
     codex_install_state = String(max_length=8192, default="")
-    # Canister id of the realm_installer broker used to provision new quarters
-    # via Casals. Empty => auto-scale records intent but cannot self-provision.
+    # Canister id of the realm_installer that provisioned this realm. Used for
+    # bootstrap-admin bypass after setup. Empty on realms not wired to an installer.
     installer_canister_id = String(max_length=64, default="")
     # Comma-separated canister principal IDs trusted for inter-canister calls
     # (DAO controllers, AI agents, parent realms). These bypass User-based access checks.
@@ -135,7 +139,6 @@ class Realm(Entity, TimestampedMixin):
     test_mode_demo_data = Boolean(default=False)
     test_mode_skip_terms = Boolean(default=False)
     test_mode_skip_passport_zkproof = Boolean(default=False)
-    test_mode_skip_authentication = Boolean(default=False)
     # Host go-live flags (gos.earth). Staging/demo default on via migrate +
     # descriptors; do not strip an already-configured treasury ledger.
     test_mode_disable_monetary_tokens = Boolean(default=False)

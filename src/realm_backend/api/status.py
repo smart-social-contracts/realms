@@ -128,13 +128,26 @@ def get_status() -> "dict[str, Any]":
     test_mode_demo_data = False
     test_mode_skip_terms = False
     test_mode_skip_passport_zkproof = False
+    realm_network = ""
+
+    # Which variant this WASM was compiled as. Reported so an operator can tell a
+    # production artifact from a test one without trusting the deploy log.
+    try:
+        from core.build_variant import BUILD_VARIANT as build_variant
+    except Exception:
+        build_variant = "unknown"
 
     # Read test flags from Realm entity (set via set_canister_config)
     try:
         _tm_realm = Realm.load("1")
         if _tm_realm:
             test_mode = bool(getattr(_tm_realm, "test_mode", False))
-            test_mode_ii_bypass = bool(getattr(_tm_realm, "test_mode_ii_bypass", False))
+            realm_network = getattr(_tm_realm, "network", "") or ""
+            # Reported through the variant-gated accessor so the frontend never
+            # offers a test login that the production canister will not honour.
+            from core.runtime_flags import is_ii_bypass_active
+
+            test_mode_ii_bypass = is_ii_bypass_active()
             test_mode_user_self_registration = bool(getattr(_tm_realm, "test_mode_user_self_registration", False))
             test_mode_demo_data = bool(getattr(_tm_realm, "test_mode_demo_data", False))
             test_mode_skip_terms = bool(getattr(_tm_realm, "test_mode_skip_terms", False))
@@ -363,6 +376,11 @@ def get_status() -> "dict[str, Any]":
         "commit": commit_hash,
         "commit_datetime": commit_datetime,
         "extensions": extension_entries,
+        "build_variant": build_variant,
+        # The network is self-declared and gates whether test flags may be
+        # enabled. An empty value is treated as production, so surface it here
+        # rather than letting a realm sit in that state unnoticed.
+        "network": realm_network,
         "test_mode": test_mode,
         "test_mode_ii_bypass": test_mode_ii_bypass,
         "test_mode_user_self_registration": test_mode_user_self_registration,

@@ -69,10 +69,16 @@ def test_get_realm_flag_no_realm_uses_default(fake_ggg):
     assert fake_ggg.get_realm_flag("test_mode", default=False) is False
 
 
-def test_is_test_mode(fake_ggg):
+def test_is_test_mode(fake_ggg, test_build):
     _set_realm(test_mode=True)
     assert fake_ggg.is_test_mode() is True
     _set_realm(test_mode=False)
+    assert fake_ggg.is_test_mode() is False
+
+
+def test_is_test_mode_is_false_in_a_production_build(fake_ggg):
+    """A realm upgraded from a test build keeps its test_mode row."""
+    _set_realm(test_mode=True)
     assert fake_ggg.is_test_mode() is False
 
 
@@ -105,18 +111,145 @@ def test_flags_default_false_when_realm_load_raises(fake_ggg, monkeypatch):
     assert fake_ggg.skip_passport_zkproof() is False
 
 
+@pytest.fixture
+def test_build(monkeypatch):
+    """Pretend the canister was compiled as the test variant.
+
+    The checked-in variant is production, where the test code paths are absent
+    and the gate refuses everything regardless of network. The network matrix
+    below is only meaningful for a test build, so it is selected explicitly.
+    """
+    import core.build_variant as build_variant
+
+    monkeypatch.setattr(build_variant, "test_flags_available", lambda: True)
+    yield
+
+
+@pytest.fixture
+def test_build_ii(monkeypatch):
+    """Pretend the canister was compiled with the II bypass available."""
+    import core.build_variant as build_variant
+
+    monkeypatch.setattr(build_variant, "ii_bypass_available", lambda: True)
+    yield
+
+
 @pytest.mark.parametrize(
     "network,can_test_mode,expected",
     [
+        # Known non-production networks allow test flags outright.
+        ("test", False, True),
+        ("staging", False, True),
+        ("demo", False, True),
+        ("local", False, True),
+        ("localhost", False, True),
+        ("  TEST  ", False, True),
+        # Production is refused unless a controller set can_test_mode.
         ("ic", False, False),
         ("ic", True, True),
-        ("test", False, True),
         ("production", False, False),
-        ("", False, True),
+        ("production", True, True),
+        # The gate fails closed: an unset or unrecognised network is not a
+        # licence to enable test flags, because the field is self-declared.
+        ("", False, False),
+        ("   ", False, False),
+        ("mainnet", False, False),
+        ("prod", False, False),
+        ("totally-unknown", False, False),
+        ("", True, True),
     ],
 )
-def test_test_flags_allowed(network, can_test_mode, expected, fake_ggg):
+def test_test_flags_allowed(network, can_test_mode, expected, fake_ggg, test_build):
     assert fake_ggg.test_flags_allowed(network, can_test_mode) is expected
+
+
+@pytest.mark.parametrize(
+    "network,can_test_mode",
+    [
+        ("test", False),
+        ("staging", False),
+        ("local", False),
+        ("ic", True),
+        ("production", True),
+        ("", True),
+    ],
+)
+def test_production_build_refuses_test_flags_everywhere(
+    network, can_test_mode, fake_ggg
+):
+    """The build variant is not overridable by network or by can_test_mode.
+
+    This is the property that runtime gating alone could not give: in a
+    production WASM the test code paths are not present, so there is nothing for
+    a stale database value or a compromised admin session to switch on.
+    """
+    assert fake_ggg.test_flags_allowed(network, can_test_mode) is False
+
+
+class TestIiBypassIsBehindTheBuildVariant:
+    """Admin-granting shortcuts require the test build, not a runtime flag."""
+
+    def test_production_build_ignores_the_realm_flag(self, fake_ggg):
+        _set_realm(test_mode_ii_bypass=True, test_mode=True)
+        assert fake_ggg.is_ii_bypass_active() is False
+        assert fake_ggg.are_test_join_shortcuts_enabled() is False
+
+    def test_test_build_still_requires_the_realm_flag(self, fake_ggg, test_build_ii):
+        _set_realm(test_mode_ii_bypass=False)
+        assert fake_ggg.is_ii_bypass_active() is False
+
+        _set_realm(test_mode_ii_bypass=True)
+        assert fake_ggg.is_ii_bypass_active() is True
+        assert fake_ggg.are_test_join_shortcuts_enabled() is True
+
+    def test_open_registration_does_not_imply_admin_shortcuts(
+        self, fake_ggg, test_build_ii
+    ):
+        """user_self_registration means "anyone may join", never "as an admin".
+
+        The published sha256 join codes hand out the admin profile, and admin
+        self-registration skips the invite entirely, so neither may be reachable
+        by turning on ordinary open registration.
+        """
+        _set_realm(test_mode_user_self_registration=True, test_mode_ii_bypass=False)
+        assert fake_ggg.are_test_join_shortcuts_enabled() is False
+
+
+class TestFlagTaxonomy:
+    """Product configuration is not a test flag and must not be gated like one."""
+
+    def test_flags_that_weaken_the_realm_are_test_only(self, fake_ggg):
+        for flag in (
+            "test_mode",
+            "ii_bypass",
+            "demo_data",
+            "skip_terms",
+            "skip_passport_zkproof",
+        ):
+            assert fake_ggg.is_test_only_flag(flag) is True
+
+    def test_product_configuration_is_not_test_only(self, fake_ggg):
+        """These are settable on a production realm.
+
+        Counting them as test flags is what made ``disable_monetary_tokens=true``
+        fail on ``network=ic`` with "test mode flags cannot be enabled".
+        """
+        for flag in (
+            "disable_monetary_tokens",
+            "demo_notice_enabled",
+            "user_self_registration",
+        ):
+            assert fake_ggg.is_test_only_flag(flag) is False
+
+    def test_legacy_spellings_normalise_to_canonical_names(self, fake_ggg):
+        assert fake_ggg.normalize_flag_key("demo_notice") == "demo_notice_enabled"
+        # Names that did not change round-trip unchanged.
+        for flag in ("disable_monetary_tokens", "user_self_registration", "test_mode"):
+            assert fake_ggg.normalize_flag_key(flag) == flag
+
+    def test_unknown_keys_are_not_treated_as_test_flags(self, fake_ggg):
+        assert fake_ggg.is_test_only_flag("something_new") is False
+        assert fake_ggg.normalize_flag_key("something_new") == "something_new"
 
 
 def test_runtime_flags_payload_includes_realm_stage(fake_ggg):

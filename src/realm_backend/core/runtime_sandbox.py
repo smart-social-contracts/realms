@@ -25,15 +25,26 @@ failure into a privilege escalation and made the sandbox unfalsifiable — you
 could not tell from the outside whether isolation was in effect.
 
 Running in-process is therefore a *declaration*, never a runtime discovery.
-Three things can make it one, all of them visible before a call happens:
 
-* Core/system extensions (CORE_EXTENSION_IDS or manifest ``"system": true``)
-  are never sandboxed — they are the trusted platform surface and depend on
-  host modules (``ggg``, ``core``) that do not exist inside a sandbox.
-* An extension manifest may declare ``"runtime": "in_process"``, which is
-  required for any extension that imports host modules. Admins cannot override
-  such an extension to ``sandbox``: the spawn is known in advance to fail.
-* An admin (or governance proposal) may set ``extensions: {id: "in_process"}``.
+**Privilege is granted by the host, never claimed by the package.** An installed
+manifest may *request* in-process execution, but the request is honoured only for
+an id the host already trusts (``core.privileged_extensions.may_run_in_process``:
+``CORE_EXTENSION_IDS`` plus the audited, shrinking exemption list). Anything else
+requesting in-process is resolved to ``sandbox``. A manifest's ``"system": true``
+is ignored entirely. Otherwise the code being sandboxed would be deciding whether
+it gets sandboxed, and the only real boundary would be the permission check on
+installing an extension.
+
+* Core extensions (``CORE_EXTENSION_IDS``) are never sandboxed — they are the
+  trusted platform surface and depend on host modules (``ggg``, ``core``) that do
+  not exist inside a sandbox.
+* An extension manifest may declare ``"runtime": "in_process"``, which is required
+  for any extension that imports host modules. Admins cannot override such an
+  extension to ``sandbox``: the spawn is known in advance to fail.
+* An admin (or governance proposal) may set ``extensions: {id: "sandbox"}`` to
+  narrow privilege. Widening it to ``in_process`` is refused unless the host
+  already grants that id, so host access cannot be handed out by whoever holds
+  an admin session.
 
 ``get_status`` reports the resolved mode and its reason for every installed
 extension, so the trusted set is auditable in Realm Settings.
@@ -350,20 +361,16 @@ def _save_config(config: dict) -> None:
 
 
 def is_system_extension(ext_id: str) -> bool:
-    """Core extensions and manifests flagged ``"system": true`` are part of
-    the trusted platform surface and are never sandboxed."""
+    """True for core extensions — the trusted platform surface, never sandboxed.
+
+    Membership is decided by the host list in ``core.core_extensions``. A
+    manifest's ``"system": true`` is *not* consulted: an installed package
+    claiming to be part of the platform is a request, not a grant.
+    """
     try:
         from core.core_extensions import is_core_extension
 
-        if is_core_extension(ext_id):
-            return True
-    except Exception:
-        pass
-    try:
-        from core.runtime_extensions import _load_manifest
-
-        manifest = _load_manifest(ext_id)
-        return bool(manifest and manifest.get("system"))
+        return is_core_extension(ext_id)
     except Exception:
         return False
 
@@ -418,12 +425,22 @@ def resolve_mode(ext_id: str) -> tuple:
     if not config.get("enabled"):
         return "in_process", "sandboxing disabled"
 
+    from core.privileged_extensions import may_run_in_process
+
+    host_grants_privilege = may_run_in_process(ext_id)
     declared = manifest_runtime_mode(ext_id)
     if declared == "in_process":
-        return "in_process", "declared by manifest"
+        if host_grants_privilege:
+            return "in_process", "requested by manifest, granted by host"
+        return "sandbox", "manifest requested in_process; not granted by host"
 
     override = config.get("extensions", {}).get(ext_id)
     if override in VALID_MODES:
+        if override == "in_process" and not host_grants_privilege:
+            # An admin may narrow privilege but not widen it. Granting host
+            # access to an arbitrary package is a build-time decision, so that
+            # it cannot be made by whoever currently holds an admin session.
+            return "sandbox", "admin requested in_process; not granted by host"
         return override, "admin override"
     if declared == "sandbox":
         return "sandbox", "declared by manifest"

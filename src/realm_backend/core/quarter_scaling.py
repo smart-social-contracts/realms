@@ -88,7 +88,6 @@ def _capital_runtime_config(realm) -> dict:
             "test_mode_user_self_registration": bool(g("test_mode_user_self_registration", False)),
             "test_mode_skip_terms": bool(g("test_mode_skip_terms", False)),
             "test_mode_skip_passport_zkproof": bool(g("test_mode_skip_passport_zkproof", False)),
-            "test_mode_skip_authentication": bool(g("test_mode_skip_authentication", False)),
             "test_mode_disable_monetary_tokens": bool(
                 g("test_mode_disable_monetary_tokens", False)
             ),

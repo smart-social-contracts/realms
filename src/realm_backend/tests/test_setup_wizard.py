@@ -111,7 +111,6 @@ class _FakeRealm:
         self.network = network
         self.installer_canister_id = ""
         self.trusted_principals = ""
-        self.test_mode_skip_authentication = False
 
     @classmethod
     def load(cls, _realm_id):

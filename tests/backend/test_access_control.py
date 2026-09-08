@@ -19,6 +19,9 @@ sys.path.insert(0, str(src_path))
 
 # Mock IC-specific modules before importing anything that uses them
 _mock_cdk = MagicMock()
+# A bare MagicMock returns a truthy sentinel, which would make every caller look
+# like an IC controller and silently pass the step-0a bypass in _check_access.
+_mock_cdk.ic.is_controller.return_value = False
 sys.modules["_cdk"] = _mock_cdk
 
 # Mock all basilisk submodules the import chain may touch
@@ -58,6 +61,9 @@ _mock_db.OneToMany = lambda *a, **kw: None
 _mock_db.OneToOne = lambda *a, **kw: None
 _mock_db.TimestampedMixin = type("TimestampedMixin", (), {})
 sys.modules["ic_python_db"] = _mock_db
+# Entities import property types from the submodule; a bare MagicMock is not a
+# package, so ``from ic_python_db.properties import ...`` needs its own entry.
+sys.modules["ic_python_db.properties"] = _mock_db
 
 # Mock logger
 _mock_logging = MagicMock()
@@ -124,12 +130,23 @@ class TestProfilesConsistency:
     def test_admin_has_all(self):
         assert Operations.ALL in Profiles.ADMIN["allowed_to"]
 
-    def test_observer_has_nothing(self):
-        assert len(Profiles.OBSERVER["allowed_to"]) == 0
+    def test_observer_is_read_only(self):
+        """Observers may look at the realm but never change it."""
+        observer_ops = Profiles.OBSERVER["allowed_to"]
+        assert Operations.ALL not in observer_ops
+        for forbidden in (
+            Operations.REALM_ADMIN,
+            Operations.REALM_CONFIGURE,
+            Operations.EXTENSION_INSTALL,
+            Operations.SHELL_EXECUTE,
+            Operations.TRANSFER_CREATE,
+            Operations.SELF_DATA_MANAGE,
+        ):
+            assert forbidden not in observer_ops
 
     def test_member_has_self_service(self):
         member_ops = Profiles.MEMBER["allowed_to"]
-        assert Operations.SELF_PROFILE_PICTURE in member_ops
+        assert Operations.SELF_UPDATE_PUBLIC_PROFILE in member_ops
         assert Operations.SELF_CHANGE_QUARTER in member_ops
         assert Operations.SELF_INVOICE_REFRESH in member_ops
 
@@ -215,6 +232,29 @@ class TestCheckAccess:
 
     @patch("ggg.Realm")
     @patch("ggg.User")
+    def test_stale_skip_authentication_grants_nothing(self, MockUser, MockRealm):
+        """A realm still carrying the removed flag must not bypass anything.
+
+        ``test_mode_skip_authentication`` used to short-circuit _check_access
+        before every other check. Realms written before the migration can still
+        have the attribute set, so the value must be inert rather than trusted.
+        """
+        realm = MagicMock()
+        realm.trusted_principals = ""
+        realm.status = "alpha"
+        realm.installer_canister_id = ""
+        realm.test_mode_skip_authentication = True
+        realm.test_mode = True
+        MockRealm.load.return_value = realm
+        MockUser.__getitem__ = MagicMock(return_value=None)
+
+        from core.access import _check_access
+        assert _check_access("random-attacker", Operations.REALM_ADMIN) is False
+        assert _check_access("random-attacker", Operations.EXTENSION_INSTALL) is False
+        assert _check_access("random-attacker", Operations.SHELL_EXECUTE) is False
+
+    @patch("ggg.Realm")
+    @patch("ggg.User")
     def test_trusted_principal_allowed(self, MockUser, MockRealm):
         realm = MagicMock()
         realm.trusted_principals = "dao-canister-abc, ai-agent-xyz"
@@ -244,7 +284,6 @@ class TestCheckAccess:
         realm.trusted_principals = ""
         realm.status = "setup"
         realm.installer_canister_id = ""
-        realm.test_mode_skip_authentication = False
         MockRealm.load.return_value = realm
         MockUser.__getitem__ = MagicMock(return_value=None)
 
@@ -258,7 +297,6 @@ class TestCheckAccess:
         realm.trusted_principals = ""
         realm.status = "setup"
         realm.installer_canister_id = ""
-        realm.test_mode_skip_authentication = False
         MockRealm.load.return_value = realm
         MockUser.__getitem__ = MagicMock(return_value=None)
 
@@ -276,7 +314,6 @@ class TestCheckAccess:
         realm.trusted_principals = ""
         realm.status = "alpha"
         realm.installer_canister_id = ""
-        realm.test_mode_skip_authentication = False
         MockRealm.load.return_value = realm
         MockUser.__getitem__ = MagicMock(return_value=None)
 
