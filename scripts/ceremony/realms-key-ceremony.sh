@@ -57,6 +57,7 @@ EOF
 cmd_online_setup() {
   require_online
   ensure_root_or_sudo
+  prepare_live_session_for_apt
   log "installing ceremony packages (Ubuntu 22.04 Desktop live)"
   export DEBIAN_FRONTEND=noninteractive
   local apt=(apt-get)

@@ -7,11 +7,13 @@
 hostname: realms-ceremony-live
 
 users:
+  - default
   - name: ubuntu
     sudo: ALL=(ALL) NOPASSWD:ALL
     groups: [adm, sudo]
     shell: /bin/bash
     lock_passwd: false
+    # ssh_authorized_keys injected by vm/run-ubuntu-2204-vm-test.sh when building cidata.iso
 
 ssh_pwauth: false
 

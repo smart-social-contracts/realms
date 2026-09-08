@@ -44,6 +44,8 @@ sudo -E env \
   DO_NOT_TRACK=1 \
   ./realms-key-ceremony.sh run-offline
 
+sudo chown -R ubuntu:ubuntu "${CEREMONY_ROOT}"
+
 manifest="${CEREMONY_ROOT}/artifacts/manifest.json"
 [[ -f "${manifest}" ]] || die "manifest missing"
 jq -e '.environments.dev.principal and .environments.prod.principal' "${manifest}" >/dev/null \

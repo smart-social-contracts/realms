@@ -55,3 +55,43 @@ require_offline() {
   fi
   log "network check: offline (OK for ceremony)"
 }
+
+prepare_live_session_for_apt() {
+  # Ubuntu Desktop live ISO defaults to CD-ROM-only apt sources; QEMU user-net needs explicit DNS.
+  if ! grep -q casper /proc/cmdline 2>/dev/null; then
+    return 0
+  fi
+
+  local write=(tee)
+  if [[ "${EUID}" -ne 0 ]]; then
+    write=(sudo tee)
+  fi
+
+  if ip route 2>/dev/null | grep -q 'default via 10.0.2.2'; then
+    log "QEMU user-net detected — setting resolver to 10.0.2.3"
+    if [[ "${EUID}" -eq 0 ]]; then
+      rm -f /etc/resolv.conf
+      echo nameserver 10.0.2.3 > /etc/resolv.conf
+    else
+      sudo rm -f /etc/resolv.conf
+      echo nameserver 10.0.2.3 | sudo tee /etc/resolv.conf >/dev/null
+    fi
+  elif ! getent hosts archive.ubuntu.com >/dev/null 2>&1; then
+    log "warning: archive.ubuntu.com does not resolve; apt may fail until DNS is configured"
+  fi
+
+  if ! grep -q '^deb http://archive.ubuntu.com/ubuntu jammy main' /etc/apt/sources.list 2>/dev/null; then
+    log "enabling Ubuntu archive apt sources for live session"
+    if [[ "${EUID}" -eq 0 ]]; then
+      sed -i 's/^deb cdrom:/# deb cdrom:/' /etc/apt/sources.list 2>/dev/null || true
+    else
+      sudo sed -i 's/^deb cdrom:/# deb cdrom:/' /etc/apt/sources.list 2>/dev/null || true
+    fi
+    cat <<'EOF' | "${write[@]}" -a /etc/apt/sources.list >/dev/null
+
+deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+EOF
+  fi
+}
