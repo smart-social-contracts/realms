@@ -9,7 +9,7 @@ export function resolveAuthChannel(
 	testModeIIBypass: boolean
 ): AuthChannel {
 	if (embeddedInPortal) return 'portal';
-	if (testModeIIBypass) return 'test';
+	if (__REALMS_TEST_BUILD__ && testModeIIBypass) return 'test';
 	return 'ii';
 }
 
@@ -33,7 +33,7 @@ export function shouldUseTestModeAuth(
 	embeddedInPortal: boolean,
 	testModeIIBypass: boolean
 ): boolean {
-	return testModeIIBypass && !embeddedInPortal;
+	return __REALMS_TEST_BUILD__ && testModeIIBypass && !embeddedInPortal;
 }
 
 /** Join page may opt into test identities even inside the portal iframe. */
@@ -41,6 +41,7 @@ export function shouldPreferTestModeLogin(
 	preferTestMode: boolean,
 	_testModeIIBypass?: boolean
 ): boolean {
+	if (!__REALMS_TEST_BUILD__) return false;
 	// The picker is already gated on the live bypass flag. Requiring a second
 	// canister_ids hint dropped Continue clicks in the portal iframe.
 	return !!preferTestMode;
@@ -60,6 +61,7 @@ export function shouldLoginWithTestIdentity(options: {
 	testModeIIBypass?: boolean;
 	embeddedInPortal?: boolean;
 } = {}): boolean {
+	if (!__REALMS_TEST_BUILD__) return false;
 	const { identityIndex = null, preferTestMode = false, testModeIIBypass = false, embeddedInPortal = false } =
 		options;
 	if (identityIndex != null && Number.isFinite(identityIndex)) return true;
@@ -69,5 +71,5 @@ export function shouldLoginWithTestIdentity(options: {
 
 /** Test sessions may be restored after iframe reloads when II bypass is on. */
 export function shouldRestoreTestModeSession(testModeIIBypass: boolean): boolean {
-	return testModeIIBypass;
+	return __REALMS_TEST_BUILD__ && testModeIIBypass;
 }

@@ -73,6 +73,7 @@
   /** @type {ReturnType<typeof listTestIdentities>} */
   let testIdentities = listTestIdentities();
   function readSelectedTestIdentityIndex() {
+    if (!__REALMS_TEST_BUILD__) return 0;
     if (typeof window === 'undefined') return 0;
     const parsed = parseTestIdentitySearch(window.location.search);
     return parsed.identityIndex ?? 0;
@@ -91,7 +92,7 @@
   $: maxCustomIdentityNumber = testIdentityNumber(TEST_IDENTITY_MAX_INDEX);
   $: selectedIdentityLabel = testIdentityLabel(selectedTestIdentityIndex);
   // Host nav:sync may add `?ti=` after mount without remounting this page.
-  $: {
+  $: if (__REALMS_TEST_BUILD__) {
     const parsed = parseTestIdentitySearch($page.url.search);
     if (parsed.identityIndex != null && parsed.identityIndex !== selectedTestIdentityIndex) {
       selectedTestIdentityIndex = parsed.identityIndex;
@@ -298,7 +299,7 @@
       inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
       const quarterParam = urlParams.get('quarter') || '';
       const fromQuery = parseTestIdentitySearch(urlParams);
-      if (fromQuery.identityIndex != null) {
+      if (__REALMS_TEST_BUILD__ && fromQuery.identityIndex != null) {
         persistSelectedTestIdentity(fromQuery.identityIndex);
       }
 
@@ -499,6 +500,7 @@
   }
 
   function persistSelectedTestIdentity(index) {
+    if (!__REALMS_TEST_BUILD__) return;
     selectedTestIdentityIndex = normalizeTestIdentityIndex(index);
     if (selectedTestIdentityIndex > TEST_IDENTITY_FIXED_PICKER_MAX_INDEX) {
       customIdentityNumber = testIdentityNumber(selectedTestIdentityIndex);
@@ -522,6 +524,7 @@
   }
 
   async function continueAsSelectedTestIdentity() {
+    if (!__REALMS_TEST_BUILD__) return;
     persistSelectedTestIdentity(selectedTestIdentityIndex);
     await handleLogin({
       identityIndex: selectedTestIdentityIndex,
@@ -802,7 +805,7 @@
             </div>
             <h2 class="text-2xl font-bold text-gray-900 mb-2">{$_('join.sign_in_title')}</h2>
             <p class="text-gray-500">
-              {#if $testModeIIBypass}
+              {#if __REALMS_TEST_BUILD__ && $testModeIIBypass}
                 {$_('join.sign_in_test', { values: { name: realmName } })}
               {:else}
                 {$_('join.sign_in_ii', { values: { name: realmName } })}
@@ -810,7 +813,7 @@
             </p>
           </div>
 
-          {#if $testModeIIBypass}
+          {#if __REALMS_TEST_BUILD__ && $testModeIIBypass}
             <div class="space-y-3">
               <p class="text-sm text-gray-600 text-center mb-2">
                 {$_('join.test_identity_hint')}

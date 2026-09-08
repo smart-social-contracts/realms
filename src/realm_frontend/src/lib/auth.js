@@ -87,7 +87,8 @@ function persistAuthChannel(channel) {
 function readPersistedAuthChannel() {
   try {
     const raw = sessionStorage.getItem(AUTH_CHANNEL_KEY);
-    if (raw === 'portal' || raw === 'test' || raw === 'ii') return raw;
+    if (raw === 'portal' || raw === 'ii') return raw;
+    if (raw === 'test' && __REALMS_TEST_BUILD__) return raw;
     return null;
   } catch {
     return null;
@@ -187,6 +188,7 @@ async function hydrateTestAuthStores(identity) {
 }
 
 async function restoreTestAuthSession() {
+  if (!__REALMS_TEST_BUILD__) return null;
   if (!shouldRestoreTestModeSession(getTestModeIIBypass())) return null;
 
   if (!_testLoggedIn || !_testIdentity) {
@@ -205,7 +207,15 @@ async function restoreTestAuthSession() {
 }
 
 async function _createTestIdentity({ random = false, identityIndex = null } = {}) {
-  const { createTestIdentityFromIndex } = await import('$lib/test-identities.js');
+  if (!__REALMS_TEST_BUILD__) {
+    throw new Error('Test identities are not available in production builds');
+  }
+  const { createTestIdentityFromIndex, TEST_BUILD_AUTH_SENTINEL } = await import(
+    '$lib/test-identities.js'
+  );
+  // Anchors the sentinel to the code path it certifies: it reaches the bundle
+  // only if this function survives, which is what the variant check measures.
+  globalThis.__REALMS_TEST_AUTH__ = TEST_BUILD_AUTH_SENTINEL;
   // createTestIdentityFromIndex is sync; dynamic import keeps the initial bundle small.
   if (identityIndex != null && Number.isFinite(identityIndex)) {
     const { normalizeTestIdentityIndex, testIdentityLabel } = await import('$lib/test-identities.js');
@@ -296,7 +306,7 @@ export async function login({ random = false, identityIndex = null, preferTestMo
     embeddedInPortal: isEmbeddedInPortal(),
   });
 
-  if (useTestAuth) {
+  if (useTestAuth && __REALMS_TEST_BUILD__) {
     const urlParams = new URLSearchParams(window.location.search);
     const asParam = urlParams.get('as');
     const pemParam = urlParams.get('pem');
@@ -409,7 +419,7 @@ export async function login({ random = false, identityIndex = null, preferTestMo
 export async function logout() {
   resetAuthSessionRestore();
   clearPersistedAuthChannel();
-  if (getTestModeIIBypass()) {
+  if (__REALMS_TEST_BUILD__ && getTestModeIIBypass()) {
     _testLoggedIn = false;
     _testIdentity = null;
     _testIdentityIndex = null;
@@ -422,7 +432,7 @@ export async function logout() {
 }
 
 export async function isAuthenticated() {
-  if (readPersistedAuthChannel() === 'test' || getTestModeIIBypass()) {
+  if (__REALMS_TEST_BUILD__ && (readPersistedAuthChannel() === 'test' || getTestModeIIBypass())) {
     if (_testLoggedIn || readPersistedTestAuthIndex() != null) {
       return true;
     }
@@ -432,7 +442,7 @@ export async function isAuthenticated() {
     const client = await initializeAuthClient();
     return client.isAuthenticated();
   }
-  if (getTestModeIIBypass()) {
+  if (__REALMS_TEST_BUILD__ && getTestModeIIBypass()) {
     return _testLoggedIn;
   }
   const client = await initializeAuthClient();
@@ -535,7 +545,7 @@ async function _restoreAuthSession() {
 /** Recover the identity for an established session (pinned test, portal, or II). */
 export async function getEstablishedIdentity() {
   const pinned = readPersistedAuthChannel();
-  if (pinned === 'test') {
+  if (__REALMS_TEST_BUILD__ && pinned === 'test') {
     if (_testLoggedIn && _testIdentity) return _testIdentity;
     const persistedIndex = readPersistedTestAuthIndex();
     if (persistedIndex != null) {

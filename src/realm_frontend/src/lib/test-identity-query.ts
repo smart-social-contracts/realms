@@ -1,7 +1,15 @@
 /** Query keys that select / keep a bypass identity across portal redirects. */
-export const TEST_IDENTITY_QUERY_KEYS = ['ti', 'skip_ii', 'test_mode'] as const;
+export const TEST_IDENTITY_QUERY_KEYS = __REALMS_TEST_BUILD__
+	? (['ti', 'skip_ii', 'test_mode'] as const)
+	: ([] as const);
 
 const TEST_IDENTITY_MAX_INDEX = 0xffffffff;
+
+const EMPTY_SEARCH: TestIdentitySearch = {
+	identityIndex: null,
+	skipII: false,
+	testMode: false
+};
 
 function asSearchParams(search: string | URLSearchParams | null | undefined): URLSearchParams {
 	if (search instanceof URLSearchParams) return new URLSearchParams(search);
@@ -34,6 +42,7 @@ export type TestIdentitySearch = {
 export function parseTestIdentitySearch(
 	search: string | URLSearchParams | null | undefined
 ): TestIdentitySearch {
+	if (!__REALMS_TEST_BUILD__) return { ...EMPTY_SEARCH };
 	const params = asSearchParams(search);
 	const tiRaw = params.get('ti');
 	let identityIndex: number | null = null;
@@ -57,6 +66,7 @@ export function applyTestIdentitySearch(
 	search: string | URLSearchParams | null | undefined,
 	{ identityIndex }: { identityIndex?: number | null } = {}
 ): string {
+	if (!__REALMS_TEST_BUILD__) return asSearchParams(search).toString();
 	const params = asSearchParams(search);
 	if (identityIndex != null && Number.isFinite(Number(identityIndex))) {
 		params.set('ti', String(normalizeIndex(identityIndex)));
@@ -71,6 +81,7 @@ export function hrefWithPreservedTestIdentityParams(
 	currentSearch: string | URLSearchParams | null | undefined,
 	href: string
 ): string {
+	if (!__REALMS_TEST_BUILD__) return String(href || '/');
 	const target = new URL(String(href || '/'), 'https://realm.invalid');
 	const current = asSearchParams(currentSearch);
 	for (const key of TEST_IDENTITY_QUERY_KEYS) {

@@ -13,12 +13,20 @@
  *     for login at that index instead of the deterministic seed.
  *
  * Reference roster (indices 0–9): config/deterministic-test-identity-principals.json
+ *
+ * The Ed25519 seed machinery is compiled out of production bundles
+ * (__REALMS_TEST_BUILD__ === false).
  */
 
 import { Ed25519KeyIdentity } from '@dfinity/identity';
 import { Secp256k1KeyIdentity } from '@dfinity/identity-secp256k1';
 
-export const TEST_IDENTITY_MAGIC = [0xed, 0x57];
+/** Scanned by scripts/check_frontend_variant.py — test builds only. */
+export const TEST_BUILD_AUTH_SENTINEL = __REALMS_TEST_BUILD__
+  ? 'REALMS_TEST_BUILD_AUTH_BYPASS'
+  : '';
+
+export const TEST_IDENTITY_MAGIC = __REALMS_TEST_BUILD__ ? [0xed, 0x57] : [];
 /** Indices 0–1 shown as fixed cards in the join-page picker (Identity 1–2). */
 export const TEST_IDENTITY_FIXED_PICKER_MAX_INDEX = 1;
 /** @deprecated alias for fixed picker cards */
@@ -41,6 +49,7 @@ export function testIdentityLabel(index) {
 
 /** @param {number} index */
 export function testIdentitySeed(index) {
+  if (!__REALMS_TEST_BUILD__) return new Uint8Array(32);
   const seed = new Uint8Array(32);
   seed[0] = TEST_IDENTITY_MAGIC[0];
   seed[1] = TEST_IDENTITY_MAGIC[1];
@@ -76,6 +85,9 @@ function expectedPrincipal(index) {
  * @param {number} index
  */
 export function createTestIdentityFromIndex(index) {
+  if (!__REALMS_TEST_BUILD__) {
+    throw new Error('Test identities are not available in production builds');
+  }
   const pems = globalThis.__TEST_IDENTITY_PEms;
   const pemRaw = Array.isArray(pems) && pems[index] ? String(pems[index]) : '';
   if (pemRaw) {
@@ -94,6 +106,7 @@ export function createTestIdentityFromIndex(index) {
 
 /** @param {number} index */
 export function testIdentityPrincipal(index) {
+  if (!__REALMS_TEST_BUILD__) return '';
   return createTestIdentityFromIndex(index).getPrincipal().toText();
 }
 
@@ -130,6 +143,16 @@ export function isValidCustomIdentityNumber(identityNumber) {
  */
 export function getTestIdentityPersona(index) {
   const normalized = normalizeTestIdentityIndex(index);
+  if (!__REALMS_TEST_BUILD__) {
+    return {
+      index: normalized,
+      label: testIdentityLabel(normalized),
+      principal: '',
+      loginPrincipal: '',
+      hasPem: false,
+      description: '',
+    };
+  }
   const pems = globalThis.__TEST_IDENTITY_PEms;
   const hasPem = Array.isArray(pems) && !!pems[normalized];
   const configured = expectedPrincipal(normalized);
@@ -157,6 +180,7 @@ export function getTestIdentityPersona(index) {
  * @returns {{ index: number, label: string, principal: string, loginPrincipal: string, description: string, hasPem: boolean }[]}
  */
 export function listTestIdentities(maxIndex = TEST_IDENTITY_FIXED_PICKER_MAX_INDEX) {
+  if (!__REALMS_TEST_BUILD__) return [];
   const items = [];
   for (let index = 0; index <= maxIndex; index++) {
     items.push(getTestIdentityPersona(index));

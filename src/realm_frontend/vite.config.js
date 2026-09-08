@@ -31,7 +31,18 @@ function getBuildTimeValues() {
 
 const buildValues = getBuildTimeValues();
 
-export default defineConfig({
+/** True when the bundle may include II-bypass / deterministic test identities. */
+function realmsTestBuild(command) {
+  if (process.env.REALMS_BUILD_VARIANT === 'test') return true;
+  // `npm run dev` / `vite dev` — keep test identities available locally.
+  if (command === 'serve') return true;
+  return false;
+}
+
+export default defineConfig(({ command }) => {
+  const testBuild = realmsTestBuild(command);
+
+  return {
   build: {
     emptyOutDir: true,
     rollupOptions: {
@@ -53,11 +64,13 @@ export default defineConfig({
     '__BUILD_VERSION__': JSON.stringify(buildValues.version),
     '__BUILD_COMMIT__': JSON.stringify(buildValues.commitHash),
     '__BUILD_TIME__': JSON.stringify(buildValues.buildTime),
+    '__REALMS_TEST_BUILD__': testBuild,
   },
   optimizeDeps: {
     esbuildOptions: {
       define: {
         global: "globalThis",
+        __REALMS_TEST_BUILD__: String(testBuild),
       },
     },
     include: [
@@ -100,4 +113,5 @@ export default defineConfig({
       },
     },
   },
+};
 });

@@ -302,7 +302,9 @@ export const testMode = derived(realmInfo, $r => $r.testMode);
 /** Backend status is source of truth; fall back to /canister_ids.js sync hint during boot. */
 export const testModeIIBypass = derived(
 	realmInfo,
-	$r => $r.testModeIIBypass || !!globalThis.__CANISTER_IDS?.test_mode_ii_bypass,
+	$r =>
+		__REALMS_TEST_BUILD__ &&
+		($r.testModeIIBypass || !!globalThis.__CANISTER_IDS?.test_mode_ii_bypass),
 );
 export const testModeUserSelfRegistration = derived(realmInfo, $r => $r.testModeUserSelfRegistration);
 export const testModeDemoData = derived(realmInfo, $r => $r.testModeDemoData);

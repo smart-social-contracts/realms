@@ -22,6 +22,7 @@ import { realmInfo } from '$lib/stores/realmInfo';
 
 export function getTestMode() { return get(realmInfo).testMode; }
 export function getTestModeIIBypass() {
+  if (!__REALMS_TEST_BUILD__) return false;
   if (get(realmInfo).testModeIIBypass) return true;
   // Sync hint from /canister_ids.js before backend status() loads (portal iframe boot).
   return !!globalThis.__CANISTER_IDS?.test_mode_ii_bypass;

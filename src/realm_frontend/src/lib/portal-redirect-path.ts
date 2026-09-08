@@ -16,7 +16,7 @@ export function normalizePortalRedirectPath(pathname: string): string {
 
 const IFRAME_ONLY_PARAMS = ['portal', 'slug'];
 /** Kept on iframe + portal URLs so `/join?ti=1` survives host pathname-only syncs. */
-const TEST_IDENTITY_PARAMS = ['ti', 'skip_ii', 'test_mode'];
+const TEST_IDENTITY_PARAMS = __REALMS_TEST_BUILD__ ? ['ti', 'skip_ii', 'test_mode'] : [];
 const STICKY_PARAMS = [...IFRAME_ONLY_PARAMS, ...TEST_IDENTITY_PARAMS];
 
 function meaningfulSearch(params: URLSearchParams): string {
