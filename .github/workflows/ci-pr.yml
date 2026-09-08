@@ -93,6 +93,25 @@ jobs:
                     tests/backend/test_repl_ui_parity.py \
                     tests/backend/test_shell_access_denied.py \
                     tests/backend/test_department_table.py
+      - name: Test-flag ratchet
+        # Blocking on purpose: these are source and config scans that keep the
+        # removed authentication bypass deleted, keep can_test_mode out of the
+        # unauthenticated test_flags payload, and keep the network gate an
+        # allowlist that fails closed. See realms#395.
+        run: |
+          pytest -q tests/backend/test_test_flag_ratchet.py \
+                    tests/backend/test_runtime_flags.py \
+                    tests/backend/test_build_variant.py \
+                    tests/backend/test_descriptor_flag_map.py
+          pytest -q tests/backend/test_access_control.py
+      - name: Casals arrangement drift
+        # Arrangements are generated from the deployment descriptors, so a
+        # hand-edit is how a removed flag comes back on a live environment.
+        # The generator was silently broken while the committed JSON still
+        # carried skip_authentication, which is exactly the drift this catches.
+        run: |
+          python3 casals-config/_gen_arrangements.py
+          git diff --exit-code casals-config/arrangements/
       - name: Cedar policy drift
         # The embedded policy text the canister runs must mirror the .cedar
         # source files; a stale copy silently changes what a realm enforces.

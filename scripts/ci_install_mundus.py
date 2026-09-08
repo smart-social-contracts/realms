@@ -39,6 +39,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from realms.cli.descriptor_flags import TEST_PARAM_MAP
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # The realms-extensions submodule has a nested layout — manifests live at
 # `extensions/extensions/<name>/manifest.json` (the outer dir is the
@@ -1620,20 +1622,9 @@ def _link_token_nft_canisters(
 
         test_flags_json = ""
         if parameters:
-            _TEST_PARAM_MAP = {
-                "TEST_MODE": "test_mode",
-                "TEST_MODE_II_BYPASS": "ii_bypass",
-                "TEST_MODE_USER_SELF_REGISTRATION": "user_self_registration",
-                "TEST_MODE_DEMO_DATA": "demo_data",
-                "TEST_MODE_SKIP_TERMS": "skip_terms",
-                "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
-                "TEST_MODE_SKIP_AUTHENTICATION": "skip_authentication",
-                "TEST_MODE_DISABLE_MONETARY_TOKENS": "disable_monetary_tokens",
-                "TEST_MODE_DEMO_NOTICE": "demo_notice",
-            }
             flags = {
                 fk: bool(parameters[pk])
-                for pk, fk in _TEST_PARAM_MAP.items()
+                for pk, fk in TEST_PARAM_MAP.items()
                 if pk in parameters
             }
             if flags:

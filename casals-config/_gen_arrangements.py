@@ -28,6 +28,8 @@ try:
 except ImportError as exc:  # pragma: no cover - dev dependency
     raise SystemExit("PyYAML required: pip install pyyaml") from exc
 
+from realms.cli.descriptor_flags import TEST_PARAM_MAP
+
 ROOT = Path(__file__).resolve().parents[1]
 ARRANGEMENTS_DIR = Path(__file__).resolve().parent / "arrangements"
 CANISTER_IDS_PATH = ROOT / "canister_ids.json"
@@ -36,19 +38,6 @@ ENV_DESCRIPTORS: dict[str, Path] = {
     "test": ROOT / "deployment-descriptors/test-mundus-layered.yml",
     "staging": ROOT / "deployment-descriptors/staging-mundus-layered.yml",
     "demo": ROOT / "deployment-descriptors/demo-mundus-layered.yml",
-}
-
-# Same mapping as cli/realms/cli/commands/mundus.py (descriptor parameters → flags).
-TEST_PARAM_MAP: dict[str, str] = {
-    "TEST_MODE": "test_mode",
-    "TEST_MODE_SKIP_AUTHENTICATION": "skip_authentication",
-    "TEST_MODE_II_BYPASS": "ii_bypass",
-    "TEST_MODE_USER_SELF_REGISTRATION": "user_self_registration",
-    "TEST_MODE_DEMO_DATA": "demo_data",
-    "TEST_MODE_SKIP_TERMS": "skip_terms",
-    "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
-    "TEST_MODE_DISABLE_MONETARY_TOKENS": "disable_monetary_tokens",
-    "TEST_MODE_DEMO_NOTICE": "demo_notice",
 }
 
 LITE_EXTENSIONS = [

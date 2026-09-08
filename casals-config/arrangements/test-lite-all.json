@@ -9,7 +9,6 @@
     "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
     "test_flags": {
       "test_mode": true,
-      "skip_authentication": true,
       "ii_bypass": true,
       "user_self_registration": true,
       "demo_data": true,
@@ -30,7 +29,6 @@
         "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
         "test_flags": {
           "test_mode": true,
-          "skip_authentication": true,
           "ii_bypass": true,
           "user_self_registration": true,
           "demo_data": true,
@@ -211,7 +209,6 @@
         "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
         "test_flags": {
           "test_mode": true,
-          "skip_authentication": true,
           "ii_bypass": true,
           "user_self_registration": true,
           "demo_data": true,
@@ -392,7 +389,6 @@
         "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
         "test_flags": {
           "test_mode": true,
-          "skip_authentication": true,
           "ii_bypass": true,
           "user_self_registration": true,
           "demo_data": true,

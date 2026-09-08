@@ -20,6 +20,7 @@ import typer
 import yaml
 from rich.console import Console
 
+from ..descriptor_flags import TEST_PARAM_MAP
 from ..utils import console, get_project_root
 
 DEPLOYER_URL = os.environ.get("DEPLOYER_URL", "https://deploy.realmsgos.dev")
@@ -725,19 +726,8 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
     # Build test_flags_json from deployment descriptor parameters
     test_flags_json = ""
     if parameters:
-        _TEST_PARAM_MAP = {
-            "TEST_MODE": "test_mode",
-            "TEST_MODE_II_BYPASS": "ii_bypass",
-            "TEST_MODE_USER_SELF_REGISTRATION": "user_self_registration",
-            "TEST_MODE_DEMO_DATA": "demo_data",
-            "TEST_MODE_SKIP_TERMS": "skip_terms",
-            "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
-            "TEST_MODE_SKIP_AUTHENTICATION": "skip_authentication",
-            "TEST_MODE_DISABLE_MONETARY_TOKENS": "disable_monetary_tokens",
-            "TEST_MODE_DEMO_NOTICE": "demo_notice",
-        }
         flags = {}
-        for param_name, flag_key in _TEST_PARAM_MAP.items():
+        for param_name, flag_key in TEST_PARAM_MAP.items():
             if param_name in parameters:
                 flags[flag_key] = bool(parameters[param_name])
         if flags:
