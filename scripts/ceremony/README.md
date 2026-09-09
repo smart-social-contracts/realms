@@ -45,6 +45,21 @@ Or run steps 5–6 in one shot after `check-offline`:
 sudo ./realms-key-ceremony.sh run-offline
 ```
 
+### Optional: export a dfx-style PEM (dev only, transitional)
+
+The default ceremony **never** leaves PEMs on disk — keys go to YubiKey and `destroy` shreds the workspace. If you need a plaintext `identity.pem` (e.g. `~/.config/dfx/identity/non_production_controller_identity/`) for a transitional dev controller, opt in **after** `offline-generate` and **before** `destroy`:
+
+```bash
+export CEREMONY_EXPORT_PEM_I_UNDERSTAND=1
+sudo -E ./realms-key-ceremony.sh export-pem dev ~/.config/dfx/identity/non_production_controller_identity
+# or: export-pem dev /path/to/identity.pem
+icp identity import non_production_controller_identity \
+  --from-pem ~/.config/dfx/identity/non_production_controller_identity/identity.pem \
+  --storage plaintext
+```
+
+**Do not use this for production.** Prefer YubiKey HSM identities from `artifacts/operator-dfx-identity.txt`.
+
 ## Testing before the real ceremony
 
 ### Recommended: Ubuntu 22.04 Desktop official ISO in a VM
@@ -99,6 +114,7 @@ Use `realms-prod` for production keys. Principals must match `manifest.json`.
 | `CEREMONY_FORCE_OFFLINE=1` | Skip network-off check |
 | `CEREMONY_PIV_RESET=1` | Factory-reset PIV before import (destructive) |
 | `CEREMONY_ROOT` | Workspace path (default `/run/realms-ceremony`) |
+| `CEREMONY_EXPORT_PEM_I_UNDERSTAND=1` | Required to run `export-pem` |
 
 ## Layout
 

@@ -8,6 +8,7 @@
 #   provision-dev    Load dev key onto the 5C Nano (touch never).
 #   provision-prod   Load prod key onto 3× 5 NFC (touch cached).
 #   finalize         Verify principals, write operator instructions.
+#   export-pem       Opt-in: copy dev/prod signing key to a dfx identity.pem path.
 #   destroy          Shred secrets and unmount tmpfs.
 #   run-offline      check-offline → offline-generate → provision-* (interactive).
 #
@@ -37,8 +38,13 @@ Commands:
   provision-dev      Import dev key to the dev YubiKey (touch never).
   provision-prod     Import prod key to three prod YubiKeys (touch cached).
   finalize           Validate manifest and print next steps for operators.
+  export-pem         Opt-in export of dev/prod signing key to identity.pem (see below).
   destroy            Securely wipe ceremony workspace.
   run-offline        Full offline flow (generate + provision dev + 3× prod).
+
+  export-pem <dev|prod> <path>
+      <path> = dfx identity directory (writes identity.pem) or explicit *.pem file.
+      Requires CEREMONY_EXPORT_PEM_I_UNDERSTAND=1 and offline-generate completed.
 
 Environment:
   CEREMONY_ROOT          Workspace path (default: /run/realms-ceremony)
@@ -47,6 +53,7 @@ Environment:
   CEREMONY_FORCE_ONLINE=1    Skip offline requirement (tests only).
   CEREMONY_PIV_RESET=1     Reset PIV before import (destructive).
   CEREMONY_USE_TMPFS=0     Disable tmpfs mount (Docker tests).
+  CEREMONY_EXPORT_PEM_I_UNDERSTAND=1   Required for export-pem (acknowledges PEM-on-disk risk).
 
 Copy public artifacts out before destroy:
   ${CEREMONY_ARTIFACTS}/manifest.json
@@ -192,6 +199,17 @@ cmd_destroy() {
   destroy_ceremony_state
 }
 
+cmd_export_pem() {
+  local env="${1:-}"
+  local dest="${2:-}"
+  [[ -n "${env}" && -n "${dest}" ]] \
+    || die "usage: export-pem <dev|prod> <destination-dir-or-identity.pem>"
+  init_secure_workspace
+  require_phase_at_least "generated"
+  require_offline
+  export_signing_key_pem "${env}" "${dest}"
+}
+
 cmd_run_offline() {
   cmd_check_offline
   cmd_offline_generate
@@ -210,6 +228,7 @@ main() {
     provision-dev) cmd_provision_dev ;;
     provision-prod) cmd_provision_prod ;;
     finalize) cmd_finalize ;;
+    export-pem) shift; cmd_export_pem "$@" ;;
     destroy) cmd_destroy ;;
     run-offline) cmd_run_offline ;;
     -h|--help|help|"") usage ;;

@@ -242,6 +242,46 @@ provision_prod_yubikey_copy() {
   log "PROD copy ${copy_num} principal: ${principal}"
 }
 
+require_export_pem_opt_in() {
+  if [[ "${CEREMONY_EXPORT_PEM_I_UNDERSTAND:-}" == "1" ]]; then
+    return 0
+  fi
+  die "export-pem is opt-in only: set CEREMONY_EXPORT_PEM_I_UNDERSTAND=1 (PEM on disk bypasses hardware-only ceremony)"
+}
+
+export_signing_key_pem() {
+  local env="$1"
+  local dest="$2"
+  local src dest_pem principal manifest expected
+
+  require_export_pem_opt_in
+  src="$(signing_key_pem_path "${env}")"
+  dest_pem="$(resolve_dfx_identity_pem_path "${dest}")"
+
+  log "WARNING: exporting ${env} private key PEM to ${dest_pem}"
+  log "WARNING: PEM on disk is high risk — prefer YubiKey HSM; use only for transitional dev/CI needs"
+  install_signing_key_pem_copy "${src}" "${dest_pem}"
+  openssl ec -in "${dest_pem}" -check -noout >/dev/null 2>&1 \
+    || die "exported PEM failed openssl ec -check: ${dest_pem}"
+
+  principal="$(_principal_from_pem "${dest_pem}" "realms-export-${env}")"
+  log "exported ${env} PEM — IC principal: ${principal}"
+
+  manifest="${CEREMONY_ARTIFACTS}/manifest.json"
+  if [[ -f "${manifest}" ]] && command -v jq >/dev/null 2>&1; then
+    expected="$(jq -r --arg env "${env}" '.environments[$env].principal // empty' "${manifest}")"
+    if [[ -n "${expected}" && "${expected}" != "null" ]]; then
+      [[ "${principal}" == "${expected}" ]] \
+        || die "exported ${env} PEM principal mismatch (manifest ${expected}, got ${principal})"
+      log "export-pem principal matches manifest.environments.${env}"
+    fi
+  fi
+
+  log "dfx/icp import example:"
+  log "  icp identity import <name> --from-pem ${dest_pem} --storage plaintext"
+  printf '%s\n' "${dest_pem}"
+}
+
 verify_prod_principals_match() {
   local key_pem="${CEREMONY_SECRETS}/prod-signing-key.pem"
   [[ -f "${key_pem}" ]] || return 0

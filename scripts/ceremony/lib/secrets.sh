@@ -67,6 +67,32 @@ generate_ec_key_pem() {
   chmod 600 "${out}"
 }
 
+signing_key_pem_path() {
+  case "$1" in
+    dev) printf '%s/dev-signing-key.pem\n' "${CEREMONY_SECRETS}" ;;
+    prod) printf '%s/prod-signing-key.pem\n' "${CEREMONY_SECRETS}" ;;
+    *) die "export-pem env must be dev or prod (got: ${1})" ;;
+  esac
+}
+
+resolve_dfx_identity_pem_path() {
+  local dest="$1"
+  if [[ "${dest}" == *.pem ]]; then
+    mkdir_p "$(dirname "${dest}")"
+    printf '%s\n' "${dest}"
+    return 0
+  fi
+  mkdir_p "${dest}"
+  printf '%s/identity.pem\n' "${dest%/}"
+}
+
+install_signing_key_pem_copy() {
+  local src="$1"
+  local dest_pem="$2"
+  [[ -f "${src}" ]] || die "missing ${src} — run offline-generate first"
+  install -m 600 "${src}" "${dest_pem}"
+}
+
 shred_path() {
   local path="$1"
   [[ -e "${path}" ]] || return 0
