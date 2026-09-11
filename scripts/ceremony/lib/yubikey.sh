@@ -337,7 +337,7 @@ _verify_yubikey_via_signature() {
   while (( attempt < max_attempts )); do
     attempt=$(( attempt + 1 ))
     if (( needs_touch )); then
-      log_user "Touch the YubiKey NOW — it is waiting (touch policy: ${touch_policy}, ~15s window, attempt ${attempt}/${max_attempts})"
+      log_touch_now "proving the imported key by on-card signature (attempt ${attempt}/${max_attempts})"
     fi
     if _yubico_piv_sign "${serial}" "${msg}" "${sig}" "${err}"; then
       if openssl dgst -sha256 -verify "${pub}" -signature "${sig}" "${msg}" >/dev/null 2>&1; then
@@ -451,7 +451,7 @@ _principal_from_hsm_dfx() {
 
   log_detail "[principal] derive IC principal via PKCS#11 (serial ${serial}, key id ${CEREMONY_HSM_KEY_ID})"
   if touch_required_for_hsm_verify "${touch_policy}"; then
-    log_user "Touch the YubiKey when the LED blinks — required to verify the HSM key (touch policy: ${touch_policy})"
+    log_touch_now "verifying the HSM key through PKCS#11 (touch policy: ${touch_policy})"
   else
     log_no_touch
     log_detail "[principal] touch policy is never — leave the key alone; this step is fully automatic"
@@ -503,7 +503,9 @@ _principal_from_hsm() {
   _install_slot_certificate "${serial}" "${key_pem}" "${name}"
 
   local principal=""
-  if principal="$(_principal_from_hsm_dfx "${serial}" "${name}" "${touch_policy}" 2>/dev/null)" \
+  # Not `2>/dev/null`: that also swallowed the touch prompt, so the LED started
+  # blinking with nothing on screen explaining why.
+  if principal="$(_principal_from_hsm_dfx "${serial}" "${name}" "${touch_policy}")" \
     && [[ -n "${principal}" ]]; then
     log_detail "principal derived via dfx HSM: ${principal}"
     printf '%s' "${principal}"

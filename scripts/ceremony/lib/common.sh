@@ -17,19 +17,28 @@ CEREMONY_SIMULATE="${CEREMONY_SIMULATE:-0}"
 CEREMONY_FORCE_ONLINE="${CEREMONY_FORCE_ONLINE:-0}"
 CEREMONY_FORCE_OFFLINE="${CEREMONY_FORCE_OFFLINE:-0}"
 
+# Colour only when stderr is a terminal; NO_COLOR=1 or CEREMONY_COLOR=0 disables.
+if [[ -t 2 && "${NO_COLOR:-}" == "" && "${CEREMONY_COLOR:-1}" != "0" ]]; then
+  C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'
+  C_RED=$'\033[1;31m'; C_GREEN=$'\033[1;32m'; C_YELLOW=$'\033[1;33m'
+  C_CYAN=$'\033[1;36m'
+else
+  C_RESET=''; C_BOLD=''; C_RED=''; C_GREEN=''; C_YELLOW=''; C_CYAN=''
+fi
+
 log() {
   printf '[ceremony] %s\n' "$*" >&2
 }
 
 log_banner() {
   local title="$1"
-  printf '\n[ceremony] ═══ %s ═══\n' "${title}" >&2
+  printf '\n[ceremony] %s═══ %s ═══%s\n' "${C_CYAN}" "${title}" "${C_RESET}" >&2
 }
 
 log_step() {
   local n="$1"
   local msg="$2"
-  printf '[ceremony]   %s. %s\n' "${n}" "${msg}" >&2
+  printf '[ceremony]   %s%s. %s%s\n' "${C_BOLD}" "${n}" "${msg}" "${C_RESET}" >&2
 }
 
 log_detail() {
@@ -37,7 +46,29 @@ log_detail() {
 }
 
 log_user() {
-  printf '[ceremony] ► ACTION: %s\n' "$*" >&2
+  printf '[ceremony] %s► ACTION: %s%s\n' "${C_YELLOW}" "$*" "${C_RESET}" >&2
+}
+
+# The next command(s) the operator should run — highlighted so they stand out
+# in a long scroll of ceremony output.
+log_next() {
+  printf '\n[ceremony] %s▶ NEXT:%s\n' "${C_GREEN}" "${C_RESET}" >&2
+  local line
+  for line in "$@"; do
+    printf '[ceremony]     %s%s%s\n' "${C_BOLD}${C_GREEN}" "${line}" "${C_RESET}" >&2
+  done
+  printf '\n' >&2
+}
+
+# Blocking touch prompt. Printed *before* the card operation and flushed, so the
+# operator is never left guessing why the LED started blinking.
+log_touch_now() {
+  local why="$1"
+  printf '\n' >&2
+  printf '[ceremony] %s┌──────────────────────────────────────────────┐%s\n' "${C_YELLOW}" "${C_RESET}" >&2
+  printf '[ceremony] %s│  TOUCH THE YUBIKEY NOW — it is waiting       │%s\n' "${C_YELLOW}${C_BOLD}" "${C_RESET}" >&2
+  printf '[ceremony] %s└──────────────────────────────────────────────┘%s\n' "${C_YELLOW}" "${C_RESET}" >&2
+  printf '[ceremony]   %s (about 15s before the card gives up)\n\n' "${why}" >&2
 }
 
 log_no_touch() {
@@ -73,7 +104,7 @@ log_touch_policy() {
 }
 
 die() {
-  log "ERROR: $*"
+  printf '[ceremony] %sERROR: %s%s\n' "${C_RED}" "$*" "${C_RESET}" >&2
   exit 1
 }
 

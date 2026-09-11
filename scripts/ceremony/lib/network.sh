@@ -45,13 +45,64 @@ require_online() {
   die "network check: offline — connect to the internet before online-setup"
 }
 
+_net_sudo() {
+  if [[ "${EUID}" -eq 0 ]]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo -n "$@" 2>/dev/null || sudo "$@"
+  else
+    return 1
+  fi
+}
+
+# Cut every interface the ceremony machine has. Belt and braces on purpose: a
+# single mechanism is not enough (rfkill misses wired, nmcli is absent on some
+# live images), and being wrong here means generating keys on a networked host.
+network_disable_all() {
+  local did_something=0
+
+  if command -v nmcli >/dev/null 2>&1; then
+    if _net_sudo nmcli networking off >/dev/null 2>&1; then
+      log_detail "NetworkManager: networking off"
+      did_something=1
+    fi
+    _net_sudo nmcli radio all off >/dev/null 2>&1 \
+      && log_detail "NetworkManager: all radios off (Wi‑Fi, WWAN, Bluetooth)"
+  fi
+
+  if command -v rfkill >/dev/null 2>&1; then
+    _net_sudo rfkill block all >/dev/null 2>&1 \
+      && { log_detail "rfkill: all wireless blocked"; did_something=1; }
+  fi
+
+  # Wired links stay up even with radios blocked, so take them down by name.
+  local iface
+  for iface in $(ls /sys/class/net 2>/dev/null); do
+    [[ "${iface}" == "lo" ]] && continue
+    if _net_sudo ip link set "${iface}" down >/dev/null 2>&1; then
+      log_detail "interface ${iface}: down"
+      did_something=1
+    fi
+  done
+
+  [[ "${did_something}" == "1" ]] || return 1
+  # Links drop asynchronously; probing too early reports a stale "online".
+  sleep 3
+  return 0
+}
+
 require_offline() {
   if [[ "${CEREMONY_FORCE_OFFLINE}" == "1" ]]; then
     log "network check: forced offline (OK for ceremony)"
     return 0
   fi
+  if is_online && [[ "${CEREMONY_NO_AUTO_OFFLINE:-0}" != "1" ]]; then
+    log "network check: still online — disconnecting all interfaces now"
+    network_disable_all \
+      || log "warning: could not disconnect automatically (no sudo/nmcli/ip?)"
+  fi
   if is_online; then
-    die "network check: still online — disconnect Wi‑Fi/Ethernet before offline phases"
+    die "network check: still online — disconnect Wi‑Fi/Ethernet manually, then re-run (set CEREMONY_NO_AUTO_OFFLINE=1 to skip auto-disconnect)"
   fi
   log "network check: offline (OK for ceremony)"
 }

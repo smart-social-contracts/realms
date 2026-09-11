@@ -33,10 +33,71 @@ REQUIRE_CERT=""
 MANIFEST=""
 ENV_ID="prod"
 
-die() { printf '[verify] ERROR: %s\n' "$*" >&2; exit 1; }
+if [[ -t 1 && "${NO_COLOR:-}" == "" && "${CEREMONY_COLOR:-1}" != "0" ]]; then
+  C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'
+  C_RED=$'\033[1;31m'; C_GREEN=$'\033[1;32m'; C_YELLOW=$'\033[1;33m'
+else
+  C_RESET=''; C_BOLD=''; C_RED=''; C_GREEN=''; C_YELLOW=''
+fi
+
+die() { printf '[verify] %sERROR: %s%s\n' "${C_RED}" "$*" "${C_RESET}" >&2; exit 1; }
 log() { printf '[verify] %s\n' "$*"; }
-ok() { printf '[verify]   PASS  %s\n' "$*"; }
-bad() { printf '[verify]   FAIL  %s\n' "$*" >&2; }
+ok() { printf '[verify]   %sPASS%s  %s\n' "${C_GREEN}" "${C_RESET}" "$*"; }
+bad() { printf '[verify]   %sFAIL%s  %s\n' "${C_RED}" "${C_RESET}" "$*" >&2; }
+
+touch_now() {
+  printf '\n'
+  printf '[verify] %s┌──────────────────────────────────────────────┐%s\n' "${C_YELLOW}" "${C_RESET}"
+  printf '[verify] %s│  TOUCH THE YUBIKEY NOW — it is waiting       │%s\n' "${C_YELLOW}${C_BOLD}" "${C_RESET}"
+  printf '[verify] %s└──────────────────────────────────────────────┘%s\n' "${C_YELLOW}" "${C_RESET}"
+  printf '[verify]   %s (about 15s before the card gives up)\n\n' "$*"
+}
+
+_as_root() {
+  if [[ "${EUID}" -eq 0 ]]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    return 1
+  fi
+}
+
+# A running QEMU holds the YubiKey through USB passthrough, and the host's PC/SC
+# daemon is stopped to let it. Undo both here rather than making the operator
+# remember, since this script always runs after the VM ceremony.
+release_yubikey_from_vm() {
+  local pidfile="${SCRIPT_DIR}/vm/cache/interactive-qemu.pid"
+  local stopper="${SCRIPT_DIR}/vm/stop-interactive-vm.sh"
+  local pid=""
+  [[ -f "${pidfile}" ]] && pid="$(cat "${pidfile}" 2>/dev/null || true)"
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+    log "ceremony VM is running (pid ${pid}) and is holding the YubiKey — stopping it"
+    if [[ -x "${stopper}" ]]; then
+      "${stopper}" >/dev/null 2>&1 || kill "${pid}" 2>/dev/null || true
+    else
+      kill "${pid}" 2>/dev/null || true
+    fi
+    local i
+    for i in $(seq 1 20); do
+      kill -0 "${pid}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -0 "${pid}" 2>/dev/null && log "warning: VM pid ${pid} still alive — stop it manually"
+  fi
+}
+
+ensure_card_reader() {
+  command -v systemctl >/dev/null 2>&1 || return 0
+  systemctl is-active --quiet pcscd 2>/dev/null && return 0
+  log "starting the host card reader (pcscd)"
+  if systemctl is-enabled pcscd.socket 2>/dev/null | grep -q masked; then
+    _as_root systemctl unmask pcscd.socket >/dev/null 2>&1 || true
+  fi
+  _as_root systemctl start pcscd >/dev/null 2>&1 \
+    || log "warning: could not start pcscd — run: sudo systemctl unmask pcscd.socket && sudo systemctl start pcscd"
+  sleep 2
+}
 
 usage() { sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0; }
 
@@ -118,6 +179,11 @@ fi
 : "${REQUIRE_CERT:=true}"
 [[ -n "${EXPECTED_PRINCIPAL}" ]] || die "pass --principal <id> or --manifest <file>"
 [[ -n "${EXPECTED_TOUCH}" ]] || die "pass --touch-policy <never|cached|always> or --manifest <file>"
+
+if [[ "${CEREMONY_VERIFY_NO_PREFLIGHT:-0}" != "1" ]]; then
+  release_yubikey_from_vm
+  ensure_card_reader
+fi
 
 slot_json="$("${PYTHON}" "${SLOT_HELPER}" "${SLOT}" "${EXPECTED_KEY_TYPE}" || true)"
 [[ -n "${slot_json}" ]] || die "could not read PIV slot metadata"
@@ -229,7 +295,11 @@ else
   }
   signed=0
   for attempt in 1 2 3; do
-    log "signing a challenge on-card — touch the key NOW if it blinks (attempt ${attempt}/3)"
+    if [[ "${EXPECTED_TOUCH,,}" != "never" ]]; then
+      touch_now "proving the key by on-card signature (attempt ${attempt}/3)"
+    else
+      log "signing a challenge on-card (attempt ${attempt}/3) — no touch needed"
+    fi
     if _sign_challenge; then
       signed=1
       break

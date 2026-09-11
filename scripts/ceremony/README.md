@@ -115,10 +115,14 @@ VM ISO only (bootstrap — rebuild only when `usb/*` bootstrap files change):
    ```bash
    sudo ./realms-key-ceremony.sh online-setup
    ```
-4. **Disconnect all network** (Wi‑Fi off, Ethernet unplugged).
+4. **Network off.** `check-offline` does this for you — it turns off
+   NetworkManager, blocks all radios with `rfkill`, and takes every non-loopback
+   interface down, then re-probes and refuses to continue if anything still
+   reaches the internet. Pull the Ethernet cable too if you want the physical
+   guarantee. Set `CEREMONY_NO_AUTO_OFFLINE=1` to disconnect by hand instead.
 5. **Offline** (see [Operator credentials & YubiKey prep](#operator-credentials--yubikey-prep)):
    ```bash
-   sudo ./realms-key-ceremony.sh check-offline
+   sudo ./realms-key-ceremony.sh check-offline   # disconnects, then verifies
    sudo ./realms-key-ceremony.sh offline-generate --credentials-file /path/to/my-piv.txt
    # or random PINs: sudo ./realms-key-ceremony.sh offline-generate
    sudo ./realms-key-ceremony.sh provision-dev      # insert dev Nano
@@ -180,8 +184,6 @@ Plug in the ceremony USB, then per key:
 ```bash
 sudo apt install yubikey-manager python3 jq openssl exfatprogs
 # yubico-piv-tool is optional: verify-yubikeys.sh signs pre-5.3 keys via yubikit
-sudo systemctl unmask pcscd.socket   # only if `systemctl start pcscd` says "masked"
-sudo systemctl start pcscd
 # If `No module named 'ykman'`: deactivate any project venv (realms/basilisk)
 # and retry — verification uses /usr/bin/python3 so the apt package is visible.
 
@@ -189,6 +191,10 @@ cd "/media/$USER/CEREMONY DATA/realms-key-verification"
 ./verify-yubikeys.sh --manifest manifest.json --env dev     # insert dev Nano
 ./verify-yubikeys.sh --manifest manifest.json --env prod    # then each prod key
 ```
+
+The script handles its own prerequisites: if the ceremony VM is still running it
+stops it (QEMU holds the YubiKey through USB passthrough), and it unmasks and
+starts `pcscd` on the host. `CEREMONY_VERIFY_NO_PREFLIGHT=1` disables both.
 
 Insert **one** key at a time (the script refuses if it sees several). Expect:
 
@@ -360,6 +366,9 @@ on any mismatch.
 | `CEREMONY_DATA_FSTYPE` | Data filesystem (default `exfat`) |
 | `CEREMONY_OS_LABEL` | Live ISO volume ID (default `CEREMONY OS`) |
 | `CEREMONY_VERIFY_PIN` | PIV PIN for `verify-yubikeys.sh` on pre-5.3 firmware (else prompted) |
+| `CEREMONY_NO_AUTO_OFFLINE=1` | Do not disconnect the network automatically in `check-offline` |
+| `CEREMONY_VERIFY_NO_PREFLIGHT=1` | `verify-yubikeys.sh`: do not stop the ceremony VM or start `pcscd` |
+| `CEREMONY_COLOR=0` / `NO_COLOR=1` | Plain output, no ANSI colour |
 
 ## Layout
 

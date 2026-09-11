@@ -125,8 +125,9 @@ cmd_online_setup() {
   write_manifest_header
   phase_marker "online-complete"
   log "online-setup complete"
-  log_user "Disconnect Wi‑Fi/Ethernet, then run: ./realms-key-ceremony.sh check-offline"
-  log_user "Next: ./realms-key-ceremony.sh offline-generate [--credentials-file PATH]"
+  log_next \
+    "sudo ./realms-key-ceremony.sh check-offline          # disconnects the network for you" \
+    "sudo ./realms-key-ceremony.sh offline-generate [--credentials-file PATH]"
 }
 
 cmd_check_offline() {
@@ -184,9 +185,11 @@ cmd_offline_generate() {
   done < <(config_env_ids_ordered)
   phase_marker "generated"
   log "offline-generate complete"
-  log_user "Provision YubiKeys next — dev first, then prod (see touch policy in logs):"
-  log_user "  sudo ./realms-key-ceremony.sh provision-dev"
-  log_user "  sudo ./realms-key-ceremony.sh provision-prod"
+  log_user "Provision YubiKeys next — dev first, then prod (see touch policy in logs)"
+  log_next \
+    "CEREMONY_PIV_RESET=1 sudo -E ./realms-key-ceremony.sh provision-dev" \
+    "CEREMONY_PIV_RESET=1 sudo -E ./realms-key-ceremony.sh provision-prod" \
+    "(drop CEREMONY_PIV_RESET=1 if the YubiKeys are factory-fresh)"
 }
 
 cmd_provision_env() {
@@ -203,6 +206,13 @@ cmd_provision_env() {
   provision_environment "${env_id}"
   verify_environment_principals_match "${env_id}"
   log "provision-env ${env_id} complete ($(config_env_copies "${env_id}") copy/copies)"
+  local remaining
+  remaining="$(config_env_ids_ordered | awk -v cur="${env_id}" 'seen{print} $0==cur{seen=1}')"
+  if [[ -n "${remaining}" ]]; then
+    log_next "$(printf 'CEREMONY_PIV_RESET=1 sudo -E ./realms-key-ceremony.sh provision-%s' "$(head -1 <<< "${remaining}")")"
+  else
+    log_next "sudo ./realms-key-ceremony.sh finalize"
+  fi
 }
 
 cmd_provision_dev() {
@@ -254,9 +264,11 @@ cmd_finalize() {
   # ceremony stick, otherwise the 9p share (QEMU test VM).
   ceremony_export_configured_pems
   ceremony_export_verification_bundle
-  log "RECORD ON PAPER then destroy:"
-  log "  ${CEREMONY_SECRETS}/operator-credentials.txt"
   jq '.' "${manifest}" >&2
+  log_user "RECORD ON PAPER now — these values exist nowhere else after destroy:"
+  log_next \
+    "sudo cat ${CEREMONY_SECRETS}/operator-credentials.txt   # PIN / PUK / management key" \
+    "sudo ./realms-key-ceremony.sh destroy                   # after writing them down"
 }
 
 cmd_export_verification() {
@@ -306,7 +318,8 @@ cmd_run_offline() {
   done < <(config_env_ids_ordered)
   cmd_finalize
   log "run-offline complete"
-  log_user "Record PINs on paper, then: ./realms-key-ceremony.sh destroy"
+  log_user "Record the PIN / PUK / management key on paper — they are not in the bundle"
+  log_next "sudo ./realms-key-ceremony.sh destroy"
 }
 
 main() {
