@@ -18,6 +18,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CEREMONY_SCRIPT_DIR="${SCRIPT_DIR}"
+CEREMONY_LIB_DIR="${SCRIPT_DIR}/lib"
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 # shellcheck source=lib/network.sh
@@ -28,8 +30,12 @@ source "${SCRIPT_DIR}/lib/secrets.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 # shellcheck source=lib/dfx.sh
 source "${SCRIPT_DIR}/lib/dfx.sh"
+# shellcheck source=lib/icp.sh
+source "${SCRIPT_DIR}/lib/icp.sh"
 # shellcheck source=lib/packages.sh
 source "${SCRIPT_DIR}/lib/packages.sh"
+# shellcheck source=lib/export_bundle.sh
+source "${SCRIPT_DIR}/lib/export_bundle.sh"
 # shellcheck source=lib/yubikey.sh
 source "${SCRIPT_DIR}/lib/yubikey.sh"
 
@@ -50,7 +56,10 @@ Commands:
   provision-dev      Import dev key (per ceremony-config.json).
   provision-prod     Import prod key to all prod copies (per config).
   provision-env ID   Import one environment from config (e.g. dev, prod, staging).
-  finalize           Validate manifest and print next steps for operators.
+  finalize           Validate manifest, print operator next steps, and write the
+                     verification bundle (USB CEREMONY DATA, or the 9p share in a VM).
+  export-verification  Re-save the verification bundle (public material only).
+                     Optional: --dest PATH (default: same as finalize).
   export-pem         Opt-in export of dev/prod signing key to identity.pem (see below).
   destroy            Securely wipe ceremony workspace.
   run-offline        Full offline flow (generate + provision every environment in config).
@@ -99,9 +108,7 @@ cmd_online_setup() {
     "${apt[@]}" update -qq
     "${apt[@]}" install -y --no-install-recommends "${CEREMONY_APT_PACKAGES[@]}"
   fi
-  if ! command -v icp >/dev/null 2>&1; then
-    log_detail "icp-cli not installed — dfx is enough for HSM principal verification"
-  fi
+  install_icp_for_ceremony
   install_dfx_for_ceremony
   if [[ ! -f "${CEREMONY_PKCS11_LIB}" ]]; then
     die "PKCS#11 library missing after install: ${CEREMONY_PKCS11_LIB} (expected package ykcs11)"
@@ -243,15 +250,30 @@ cmd_finalize() {
   fi
   phase_marker "finalized"
   log "finalize complete"
-  log "COPY BEFORE DESTROY:"
-  log "  ${manifest}"
-  log "  ${CEREMONY_ARTIFACTS}/operator-dfx-identity.txt (if present)"
+  # Always persist the public bundle before destroy: USB data volume on the
+  # ceremony stick, otherwise the 9p share (QEMU test VM).
+  ceremony_export_configured_pems
+  ceremony_export_verification_bundle
   log "RECORD ON PAPER then destroy:"
   log "  ${CEREMONY_SECRETS}/operator-credentials.txt"
   jq '.' "${manifest}" >&2
 }
 
+cmd_export_verification() {
+  local dest=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dest) dest="${2:-}"; shift 2 ;;
+      *) die "usage: export-verification [--dest <dir>]" ;;
+    esac
+  done
+  log_banner "export-verification"
+  ceremony_bootstrap
+  ceremony_export_verification_bundle "${dest}"
+}
+
 cmd_destroy() {
+  ceremony_export_configured_pems
   destroy_ceremony_state
 }
 
@@ -284,7 +306,7 @@ cmd_run_offline() {
   done < <(config_env_ids_ordered)
   cmd_finalize
   log "run-offline complete"
-  log_user "Copy artifacts off the machine, record PINs on paper, then: ./realms-key-ceremony.sh destroy"
+  log_user "Record PINs on paper, then: ./realms-key-ceremony.sh destroy"
 }
 
 main() {
@@ -297,6 +319,7 @@ main() {
     provision-prod) cmd_provision_prod ;;
     provision-env) shift; cmd_provision_env "${1:-}" ;;
     finalize) cmd_finalize ;;
+    export-verification) shift; cmd_export_verification "$@" ;;
     export-pem) shift; cmd_export_pem "$@" ;;
     destroy) cmd_destroy ;;
     run-offline) shift; cmd_run_offline "$@" ;;

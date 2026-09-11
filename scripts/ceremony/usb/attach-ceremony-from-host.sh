@@ -80,7 +80,7 @@ mount_from_http() {
   log "fetching ceremony tree from ${base} (HTTP push on host)"
   local probe_err
   probe_err="$(curl -fsSL --max-time 15 "${base}/realms-ceremony-update.tar.gz" -o /dev/null 2>&1)" || {
-    log "HTTP probe failed (${base}): ${probe_err:-no response — is ./vm/push-ceremony-scripts.sh running on the host?)"
+    log "HTTP probe failed (${base}): ${probe_err:-no response from host push server}"
     return 1
   }
   tmp="$(mktemp -d)"

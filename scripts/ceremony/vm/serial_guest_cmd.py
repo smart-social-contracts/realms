@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import re
 import socket
 import sys
 import time
 
 PROMPT = "ubuntu@ubuntu:"
-PROMPT_MARKERS = (PROMPT, f"{PROMPT}~", f"{PROMPT}$")
+PROMPT_MARKERS = (PROMPT, "root@")
+# The live session may drop to either the ubuntu user or a root shell, and the
+# prompt arrives wrapped in ANSI / bracketed-paste escapes.
+ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07|\r")
+PROMPT_RE = re.compile(r"[\w.-]+@[\w.-]+:[^\n]*[#$]\s*$")
+
+
+def strip_ansi(text: str) -> str:
+    return ANSI_RE.sub("", text)
 
 
 def log(msg: str) -> None:
@@ -71,12 +80,8 @@ def send_line(sock: socket.socket, line: str) -> None:
 
 
 def at_prompt(buf: str) -> bool:
-    tail = buf[-320:]
-    return any(marker in tail for marker in PROMPT_MARKERS) and (
-        tail.rstrip().endswith(PROMPT)
-        or f"{PROMPT}~" in tail[-40:]
-        or f"{PROMPT}$" in tail[-40:]
-    )
+    tail = strip_ansi(buf[-2000:]).rstrip()
+    return bool(PROMPT_RE.search(tail))
 
 
 def wake_serial(sock: socket.socket, timeout: float = 20.0) -> str:
@@ -89,10 +94,8 @@ def wake_serial(sock: socket.socket, timeout: float = 20.0) -> str:
         if chunk:
             stream_write(chunk)
             buf += chunk
-            if at_prompt(buf) or PROMPT in buf:
-                log("shell prompt ready")
-                return buf
-        elif buf and at_prompt(buf):
+        if at_prompt(buf):
+            log("shell prompt ready")
             return buf
     raise SystemExit("serial shell prompt not available — is the VM running?")
 
@@ -104,7 +107,14 @@ def run_cmd(sock: socket.socket, cmd: str, timeout: float = 180.0) -> str:
     out = ""
     deadline = time.time() + timeout
     last_heartbeat = time.time()
+    # Ignore the prompt echoed back with the command itself.
+    settle_until = time.time() + 1.0
     while time.time() < deadline:
+        if time.time() < settle_until:
+            echo = read_for(sock, 0.2)
+            stream_write(echo)
+            out += echo
+            continue
         try:
             chunk = sock.recv(4096)
         except socket.timeout:
@@ -131,7 +141,7 @@ def run_cmd(sock: socket.socket, cmd: str, timeout: float = 180.0) -> str:
 
 def login(sock: socket.socket) -> None:
     buf = wake_serial(sock)
-    if at_prompt(buf) or PROMPT in buf:
+    if at_prompt(buf):
         return
     if "login:" in buf.lower():
         log("logging in as ubuntu")

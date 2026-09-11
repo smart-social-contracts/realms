@@ -46,6 +46,11 @@ load_ceremony_config() {
   CEREMONY_HSM_KEY_ID="$(jq -r '.piv.pkcs11_key_id // "02"' "${cfg}")"
   CEREMONY_PKCS11_LIB="$(jq -r '.piv.pkcs11_lib // "/usr/lib/x86_64-linux-gnu/libykcs11.so"' "${cfg}")"
   CEREMONY_EC_CURVE="$(jq -r '.piv.ec_curve // "prime256v1"' "${cfg}")"
+  CEREMONY_PIN_POLICY="$(jq -r '.piv.pin_policy // "once"' "${cfg}")"
+  case "${CEREMONY_PIN_POLICY}" in
+    never|once|always) ;;
+    *) die "invalid piv.pin_policy '${CEREMONY_PIN_POLICY}' (use never|once|always)" ;;
+  esac
 
   mkdir_p "${CEREMONY_ARTIFACTS}"
   cp "${cfg}" "${CEREMONY_ARTIFACTS}/ceremony-config.json"
@@ -91,6 +96,12 @@ config_env_signing_key_basename() {
 
 config_env_signing_key_path() {
   printf '%s/%s' "${CEREMONY_SECRETS}" "$(config_env_signing_key_basename "$1")"
+}
+
+config_env_export_private_pem() {
+  local v
+  v="$(_config_jq_env "$1" '.environments[] | select(.id == $id) | .export_private_pem // false')"
+  [[ "${v}" == "true" ]]
 }
 
 config_env_exists() {

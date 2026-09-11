@@ -14,6 +14,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CEREMONY_DIR="${SCRIPT_DIR}"
+# shellcheck source=lib/usb_labels.sh
+source "${SCRIPT_DIR}/lib/usb_labels.sh"
+# shellcheck source=lib/usb_disk.sh
+source "${SCRIPT_DIR}/lib/usb_disk.sh"
 CACHE_DIR="${CEREMONY_DIR}/vm/cache"
 ISO_URL="https://releases.ubuntu.com/22.04/ubuntu-22.04.5-desktop-amd64.iso"
 ISO_SHA256="bfd1cee02bc4f35db939e69b934ba49a39a378797ce9aee20f6e3e3e728fefbf"
@@ -85,8 +89,9 @@ Examples:
 
 Safety:
   - Confirms the target device is removable USB and not your system disk.
-  - Unmounts all partitions on the device before writing.
-  - The USB stick is fully overwritten (~5 GB ISO).
+  - Wipes every partition table (including a leftover GPT at the end of the stick).
+  - Writes the live ISO, then creates an empty exFAT "CEREMONY DATA" volume
+    in the remaining space. ALL data on the device is destroyed.
 EOF
 }
 
@@ -124,6 +129,12 @@ require_cmd lsblk util-linux
 require_cmd blockdev util-linux
 require_cmd findmnt util-linux
 require_cmd sha256sum coreutils
+if [[ -n "${DEVICE}" ]]; then
+  require_cmd wipefs util-linux
+  require_cmd sgdisk gdisk
+  require_cmd parted parted
+  require_cmd mkfs.exfat exfatprogs
+fi
 require_cmd unsquashfs squashfs-tools
 require_cmd mksquashfs squashfs-tools
 
@@ -171,7 +182,9 @@ stage_bootstrap_tree() {
   install -m 755 "${CEREMONY_DIR}/usb/find-ceremony-dir.sh" "${dest}/"
   install -m 755 "${CEREMONY_DIR}/usb/launch-ceremony-terminal.sh" "${dest}/"
   install -m 755 "${CEREMONY_DIR}/usb/realms-ceremony-launch.sh" "${dest}/"
+  install -m 644 "${CEREMONY_DIR}/usb/realms-ceremony-attach.service" "${dest}/" 2>/dev/null || true
   install -m 644 "${CEREMONY_DIR}/usb/CEREMONY-START-HERE.txt" "${dest}/"
+  install -m 644 "${CEREMONY_DIR}/operator-credentials.example" "${dest}/" 2>/dev/null || true
   install -m 644 "${CEREMONY_DIR}/usb/Realms-Key-Ceremony.desktop" "${dest}/" 2>/dev/null || true
   install -m 644 "${CEREMONY_DIR}/usb/CEREMONY-START-HERE.txt" "${stage}/CEREMONY-START-HERE.txt"
 }
@@ -204,15 +217,39 @@ _run_mksquashfs() {
 
 _unmount_squashfs_chroot() {
   local root="$1"
-  local wrap=()
+  local wrap=() tgt
   if [[ "${EUID}" -ne 0 ]]; then
     wrap=(sudo)
   fi
+  # Deepest mounts first. Never `rm -rf` this tree while anything is mounted —
+  # a leftover /run bind is the host's udev/docker runtime.
+  while IFS= read -r tgt; do
+    [[ -n "${tgt}" ]] || continue
+    "${wrap[@]}" umount "${tgt}" 2>/dev/null || "${wrap[@]}" umount -l "${tgt}" 2>/dev/null || true
+  done < <(findmnt -Rn -o TARGET 2>/dev/null | grep "^${root}/" | sort -r)
   "${wrap[@]}" umount "${root}/run" 2>/dev/null || true
   "${wrap[@]}" umount "${root}/sys" 2>/dev/null || true
   "${wrap[@]}" umount "${root}/proc" 2>/dev/null || true
   "${wrap[@]}" umount "${root}/dev/pts" 2>/dev/null || true
   "${wrap[@]}" umount "${root}/dev" 2>/dev/null || true
+}
+
+_squashfs_still_mounted() {
+  local root="$1"
+  findmnt -Rn -o TARGET 2>/dev/null | grep -q "^${root}/"
+}
+
+_safe_rm_work_dir() {
+  local work="$1"
+  local root="${work}/squashfs-root"
+  [[ -d "${work}" ]] || return 0
+  _unmount_squashfs_chroot "${root}"
+  if _squashfs_still_mounted "${root}"; then
+    log "ERROR: refusing to delete ${work} — chroot mounts still active:"
+    findmnt -Rn -o TARGET 2>/dev/null | grep "^${root}/" >&2 || true
+    return 1
+  fi
+  rm -rf "${work}"
 }
 
 install_packages_into_squashfs() {
@@ -245,19 +282,43 @@ install_packages_into_squashfs() {
 
   log_step "2c-pkg" "apt-get install ceremony packages into live squashfs (needs network)"
   "${as_root[@]}" mkdir -p "${root}/dev" "${root}/dev/pts" "${root}/proc" "${root}/sys" "${root}/run"
+  # Always tear down chroot mounts, including if apt or resolv setup fails.
+  trap '_unmount_squashfs_chroot "'"${root}"'"' RETURN
   "${as_root[@]}" mount --bind /dev "${root}/dev"
   "${as_root[@]}" mount --bind /dev/pts "${root}/dev/pts"
   "${as_root[@]}" mount --bind /proc "${root}/proc"
   "${as_root[@]}" mount --bind /sys "${root}/sys"
-  "${as_root[@]}" mount --bind /run "${root}/run"
-  if [[ -f /etc/resolv.conf ]]; then
-    "${as_root[@]}" cp /etc/resolv.conf "${root}/etc/resolv.conf"
+  # Empty tmpfs — never bind-mount host /run (udev/docker). That made cleanup
+  # try to `rm` this laptop's runtime files.
+  "${as_root[@]}" mount -t tmpfs -o mode=755 tmpfs "${root}/run"
+  # Live image resolv.conf is a symlink into /run; replace with a real file
+  # for chroot DNS, then restore the symlink so the live session is unchanged.
+  "${as_root[@]}" rm -f "${root}/etc/resolv.conf"
+  printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' \
+    | "${as_root[@]}" tee "${root}/etc/resolv.conf" >/dev/null
+
+  # The Desktop live squashfs only has a cdrom: sources.list (main/restricted).
+  # pcscd, ykman, exfatprogs, etc. live in universe — point chroot at the archive.
+  "${as_root[@]}" mkdir -p "${root}/etc/apt/sources.list.d"
+  if [[ -f "${root}/etc/apt/sources.list" ]]; then
+    "${as_root[@]}" cp "${root}/etc/apt/sources.list" "${root}/etc/apt/sources.list.pre-ceremony"
   fi
+  printf '%s\n' \
+    'deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse' \
+    'deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse' \
+    'deb http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse' \
+    | "${as_root[@]}" tee "${root}/etc/apt/sources.list" >/dev/null
+  # Disable leftover cdrom / oem lists so apt does not wait on a missing disc.
+  local list
+  for list in "${root}/etc/apt/sources.list.d"/*.list; do
+    [[ -f "${list}" ]] || continue
+    "${as_root[@]}" mv "${list}" "${list}.disabled"
+  done
 
   local pkg_line rc start hb
   pkg_line="${CEREMONY_APT_PACKAGES[*]}"
   start="$(date +%s)"
-  log "starting: chroot apt-get update+install"
+  log "starting: chroot apt-get update+install (jammy universe enabled)"
   (
     while sleep 15; do
       log "  ... still running: chroot apt-get ($(($(date +%s) - start))s elapsed)"
@@ -266,12 +327,16 @@ install_packages_into_squashfs() {
   hb=$!
   set +e
   "${as_root[@]}" chroot "${root}" env DEBIAN_FRONTEND=noninteractive bash -lc \
-    "apt-get update -qq && apt-get install -y --no-install-recommends ${pkg_line} && (systemctl enable pcscd || true) && (systemctl enable ssh || true)"
+    "apt-get update && apt-get install -y --no-install-recommends ${pkg_line} && (systemctl enable pcscd || true) && (systemctl enable ssh || true)"
   rc=$?
   set -e
   kill "${hb}" 2>/dev/null || true
   wait "${hb}" 2>/dev/null || true
+  trap - RETURN
   _unmount_squashfs_chroot "${root}"
+  # Restore systemd-resolved layout used by the live session.
+  "${as_root[@]}" rm -f "${root}/etc/resolv.conf"
+  "${as_root[@]}" ln -s ../run/systemd/resolve/stub-resolv.conf "${root}/etc/resolv.conf"
   if [[ "${rc}" -ne 0 ]]; then
     die "failed to install ceremony packages into squashfs (exit ${rc})"
   fi
@@ -319,6 +384,30 @@ patch_live_squashfs_desktop() {
   # Fallback if 9p/cdrom launch script is missing.
   ln -sfn /usr/local/share/realms-ceremony/launch-ceremony-terminal.sh \
     "${root}/usr/local/bin/launch-ceremony-terminal.sh"
+
+  install -d -m 755 "${root}/opt/realms-ceremony"
+  install -d -m 755 "${root}/etc/modules-load.d"
+  install -m 644 "${CEREMONY_DIR}/usb/modules-load.d-realms-9p.conf" \
+    "${root}/etc/modules-load.d/realms-9p.conf"
+  install -d -m 755 "${root}/etc/systemd/system"
+  install -m 644 "${CEREMONY_DIR}/usb/realms-ceremony-attach.service" \
+    "${root}/etc/systemd/system/realms-ceremony-attach.service"
+  install -d -m 755 "${root}/etc/systemd/system/multi-user.target.wants"
+  install -d -m 755 "${root}/etc/systemd/system/graphical.target.wants"
+  ln -sfn /etc/systemd/system/realms-ceremony-attach.service \
+    "${root}/etc/systemd/system/multi-user.target.wants/realms-ceremony-attach.service"
+  ln -sfn /etc/systemd/system/realms-ceremony-attach.service \
+    "${root}/etc/systemd/system/graphical.target.wants/realms-ceremony-attach.service"
+
+  if ! grep -q 'realms_ceremony' "${root}/etc/fstab" 2>/dev/null; then
+    printf '%s\n' \
+      'realms_ceremony /opt/realms-ceremony 9p trans=virtio,version=9p2000.L,_netdev,nofail,x-systemd.automount 0 0' \
+      >> "${root}/etc/fstab"
+  fi
+  install -d -m 755 "${root}/etc/sudoers.d"
+  printf '%s\n' 'ubuntu ALL=(ALL) NOPASSWD:ALL' \
+    > "${root}/etc/sudoers.d/realms-ceremony"
+  chmod 440 "${root}/etc/sudoers.d/realms-ceremony"
 
   install -d -m 755 "${root}/etc/skel/Desktop"
   install -m 755 "${CEREMONY_DIR}/usb/skel-desktop/Realms Key Ceremony.desktop" \
@@ -386,6 +475,8 @@ remaster_iso() {
   fi
 
   work="$(mktemp -d)"
+  # EXIT (not RETURN): the inner apt function also uses a RETURN trap.
+  trap '_safe_rm_work_dir "'"${work}"'" || true' EXIT
   patch_live_squashfs_desktop "${work}"
   [[ -n "${SQUASHFS_PATCHED_OUT}" && -f "${SQUASHFS_PATCHED_OUT}" ]] \
     || die "squashfs desktop patch failed"
@@ -393,6 +484,7 @@ remaster_iso() {
   rm -f "${out_iso}"
   xorriso_maps=(
     -boot_image any replay
+    -volid "${CEREMONY_OS_LABEL:-CEREMONY OS}"
     -map "${stage}/realms-ceremony" /realms-ceremony
     -map "${stage}/CEREMONY-START-HERE.txt" /CEREMONY-START-HERE.txt
     -map "${SQUASHFS_PATCHED_OUT}" /casper/filesystem.squashfs
@@ -402,7 +494,8 @@ remaster_iso() {
     xorriso -indev "${ISO_PATH}" -outdev "${out_iso}" \
     "${xorriso_maps[@]}" \
     -commit
-  rm -rf "${work}"
+  _safe_rm_work_dir "${work}" || die "could not unmount squashfs work dir before delete"
+  trap - EXIT
 
   if command -v isohybrid >/dev/null 2>&1; then
     log "running isohybrid on output ISO"
@@ -470,20 +563,6 @@ validate_usb_device() {
   lsblk "${dev}" || true
 }
 
-unmount_device() {
-  local dev="$1"
-  local parts
-  mapfile -t parts < <(lsblk -ln -o NAME "${dev}" | tail -n +2)
-  local p mount
-  for p in "${parts[@]}"; do
-    mount="$(findmnt -n -o TARGET "/dev/${p}" 2>/dev/null || true)"
-    if [[ -n "${mount}" ]]; then
-      log "unmounting /dev/${p} (${mount})"
-      umount -l "/dev/${p}" 2>/dev/null || umount "/dev/${p}"
-    fi
-  done
-}
-
 confirm_write() {
   local dev="$1"
   [[ "${SKIP_CONFIRM}" == "1" ]] && return 0
@@ -505,15 +584,12 @@ write_usb() {
   if [[ "${EUID}" -ne 0 ]]; then
     die "writing ${dev} requires root — re-run with sudo"
   fi
-  unmount_device "${dev}"
-  log "writing ${out_iso} to ${dev} (several minutes)..."
   if [[ "${DRY_RUN}" == "1" ]]; then
-    log "[dry-run] would dd if=${out_iso} of=${dev}"
+    log "[dry-run] would wipe ${dev}, dd ${out_iso}, create exFAT '${CEREMONY_DATA_LABEL}'"
     return 0
   fi
-  dd if="${out_iso}" of="${dev}" bs=4M status=progress conv=fsync
-  sync
-  log "USB write complete — safe to remove after activity stops"
+  usb_flash_iso_and_partition "${out_iso}" "${dev}"
+  log "USB write complete — CEREMONY OS (live) + CEREMONY DATA (empty, for finalize)"
 }
 
 main() {
@@ -543,7 +619,7 @@ main() {
     if [[ "${EMBED_MODE}" == "bootstrap" ]]; then
       log "VM: ./vm/run-ubuntu-2204-vm-interactive.sh — scripts attach from host automatically"
     else
-      log "Write manually: sudo dd if=${out_iso} of=/dev/sdX bs=4M status=progress conv=fsync"
+      log "Write + partition: sudo $0 --full-embed --device /dev/sdX --yes"
     fi
     exit 0
   fi

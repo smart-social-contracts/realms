@@ -8,10 +8,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/usb_labels.sh
+source "${SCRIPT_DIR}/lib/usb_labels.sh"
+# shellcheck source=lib/usb_disk.sh
+source "${SCRIPT_DIR}/lib/usb_disk.sh"
 ISO="${SCRIPT_DIR}/vm/cache/realms-ceremony-live.iso"
 DEVICE=""
 PRESERVE_FROM=""
-DATA_LABEL="REALMS_DATA"
+DATA_LABEL="${CEREMONY_DATA_LABEL}"
 
 log() { printf '[flash-usb] %s\n' "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
@@ -21,9 +25,9 @@ usage() {
 Usage: sudo $0 --device /dev/sdX [--preserve-from DIR] [--iso PATH]
 
   --device DEV         Whole USB disk (e.g. /dev/sda)
-  --preserve-from DIR  Copy top-level folders from DIR onto a new NTFS data partition
+  --preserve-from DIR  Copy top-level folders from DIR onto the new data volume
   --iso PATH           Ceremony ISO (default: vm/cache/realms-ceremony-live.iso)
-  --data-label NAME    NTFS volume label (default: REALMS_DATA)
+  --data-label NAME    Data volume label (default: CEREMONY DATA, exFAT)
 EOF
 }
 
@@ -47,23 +51,7 @@ done
 root_disk="$(findmnt -n -o SOURCE / | sed -E 's/p?[0-9]+$//; s/[0-9]+$//')"
 [[ "${DEVICE}" != "${root_disk}" ]] || die "refusing system disk ${DEVICE}"
 
-for p in "${DEVICE}"*; do
-  [[ -b "${p}" ]] || continue
-  mountpoint="$(findmnt -n -o TARGET "${p}" 2>/dev/null || true)"
-  if [[ -n "${mountpoint}" ]]; then
-    log "unmounting ${p} (${mountpoint})"
-    umount -l "${p}" 2>/dev/null || umount "${p}"
-  fi
-done
-
-log "writing ceremony ISO to ${DEVICE} (~5 min)..."
-dd if="${ISO}" of="${DEVICE}" bs=4M status=progress conv=fsync
-sync
-partprobe "${DEVICE}" 2>/dev/null || true
-sleep 2
-
-log "partition layout after flash:"
-lsblk -o NAME,SIZE,FSTYPE,LABEL "${DEVICE}" || true
+usb_flash_iso_and_partition "${ISO}" "${DEVICE}"
 
 if [[ -n "${PRESERVE_FROM}" ]]; then
   "${SCRIPT_DIR}/restore-usb-data-partition.sh" \
