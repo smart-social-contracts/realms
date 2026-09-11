@@ -33,24 +33,78 @@ init_secure_workspace() {
   chmod 700 "${CEREMONY_ROOT}" "${CEREMONY_SECRETS}" "${CEREMONY_ARTIFACTS}" 2>/dev/null || true
 }
 
-generate_operator_pins() {
-  local pin puk mgmt
-  # YubiKey PIV: PIN 6–8 digits, PUK 8 digits, management key 24 bytes (48 hex).
-  pin="$(random_digits 6)"
-  puk="$(random_digits 8)"
-  mgmt="$(random_hex 24)"
+validate_piv_pin() {
+  local pin="$1" label="$2"
+  [[ "${#pin}" -ge 6 && "${#pin}" -le 8 ]] \
+    || die "${label} must be 6–8 characters (got ${#pin})"
+}
 
+validate_piv_management_key() {
+  local mgmt="$1"
+  [[ "${#mgmt}" -eq 48 ]] || die "PIV_MANAGEMENT_KEY must be 48 hex chars (24 bytes)"
+  [[ "${mgmt}" =~ ^[0-9a-fA-F]+$ ]] || die "PIV_MANAGEMENT_KEY must be hexadecimal"
+}
+
+write_operator_credentials_file() {
+  local pin="$1" puk="$2" mgmt="$3" source_note="$4"
   umask 077
   cat > "${CEREMONY_SECRETS}/operator-credentials.txt" <<EOF
 # Realms key ceremony — RECORD ON PAPER, then shred this file during destroy.
-# Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# ${source_note}
+# $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 PIV_PIN=${pin}
 PIV_PUK=${puk}
 PIV_MANAGEMENT_KEY=${mgmt}
 EOF
   chmod 600 "${CEREMONY_SECRETS}/operator-credentials.txt"
-  log "operator PIN/PUK/management key written to ${CEREMONY_SECRETS}/operator-credentials.txt"
+  log "operator credentials written to ${CEREMONY_SECRETS}/operator-credentials.txt"
+}
+
+generate_operator_pins() {
+  local pin puk mgmt
+  pin="$(random_digits 6)"
+  puk="$(random_digits 8)"
+  mgmt="$(random_hex 24)"
+  write_operator_credentials_file "${pin}" "${puk}" "${mgmt}" "Generated randomly"
+}
+
+load_operator_credentials_file() {
+  local src="$1"
+  [[ -f "${src}" ]] || die "credentials file not found: ${src}"
+  [[ -r "${src}" ]] || die "credentials file not readable: ${src}"
+  local pin="" puk="" mgmt=""
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line%%#*}"
+    line="$(echo "${line}" | tr -d '[:space:]')"
+    [[ -n "${line}" ]] || continue
+    case "${line}" in
+      PIV_PIN=*) pin="${line#PIV_PIN=}" ;;
+      PIV_PUK=*) puk="${line#PIV_PUK=}" ;;
+      PIV_MANAGEMENT_KEY=*) mgmt="${line#PIV_MANAGEMENT_KEY=}" ;;
+      *) die "unknown line in credentials file (expected PIV_PIN/PIV_PUK/PIV_MANAGEMENT_KEY): ${line}" ;;
+    esac
+  done < "${src}"
+  [[ -n "${pin}" ]] || die "credentials file missing PIV_PIN"
+  [[ -n "${puk}" ]] || die "credentials file missing PIV_PUK"
+  validate_piv_pin "${pin}" "PIV_PIN"
+  validate_piv_pin "${puk}" "PIV_PUK"
+  if [[ -z "${mgmt}" ]]; then
+    mgmt="$(random_hex 24)"
+    log "PIV_MANAGEMENT_KEY not set in file — generated random 24-byte key"
+  else
+    validate_piv_management_key "${mgmt}"
+    mgmt="$(printf '%s' "${mgmt}" | tr '[:upper:]' '[:lower:]')"
+  fi
+  write_operator_credentials_file "${pin}" "${puk}" "${mgmt}" "Loaded from ${src}"
+}
+
+prepare_operator_credentials() {
+  if [[ -n "${CEREMONY_OPERATOR_CREDENTIALS_FILE:-}" ]]; then
+    load_operator_credentials_file "${CEREMONY_OPERATOR_CREDENTIALS_FILE}"
+  else
+    generate_operator_pins
+  fi
 }
 
 load_operator_credentials() {
@@ -68,10 +122,15 @@ generate_ec_key_pem() {
 }
 
 signing_key_pem_path() {
-  case "$1" in
+  local env_id="$1"
+  if declare -F config_env_signing_key_path >/dev/null 2>&1 && config_env_exists "${env_id}" 2>/dev/null; then
+    config_env_signing_key_path "${env_id}"
+    return 0
+  fi
+  case "${env_id}" in
     dev) printf '%s/dev-signing-key.pem\n' "${CEREMONY_SECRETS}" ;;
     prod) printf '%s/prod-signing-key.pem\n' "${CEREMONY_SECRETS}" ;;
-    *) die "export-pem env must be dev or prod (got: ${1})" ;;
+    *) die "unknown environment for signing key: ${env_id}" ;;
   esac
 }
 

@@ -21,6 +21,57 @@ log() {
   printf '[ceremony] %s\n' "$*" >&2
 }
 
+log_banner() {
+  local title="$1"
+  printf '\n[ceremony] ═══ %s ═══\n' "${title}" >&2
+}
+
+log_step() {
+  local n="$1"
+  local msg="$2"
+  printf '[ceremony]   %s. %s\n' "${n}" "${msg}" >&2
+}
+
+log_detail() {
+  printf '[ceremony]      → %s\n' "$*" >&2
+}
+
+log_user() {
+  printf '[ceremony] ► ACTION: %s\n' "$*" >&2
+}
+
+log_no_touch() {
+  log_detail "YubiKey touch: not required for this step"
+}
+
+touch_policy_describe() {
+  local policy="$1"
+  case "${policy}" in
+    never)
+      printf '%s' "no touch when signing (dev / unattended deploys)"
+      ;;
+    cached)
+      printf '%s' "touch once per session when signing (~15s cache after each use)"
+      ;;
+    always)
+      printf '%s' "touch the YubiKey on every signing operation"
+      ;;
+    *)
+      printf '%s' "policy ${policy}"
+      ;;
+  esac
+}
+
+touch_required_for_hsm_verify() {
+  local policy="$1"
+  [[ "${policy}" != "never" ]]
+}
+
+log_touch_policy() {
+  local policy="$1"
+  log_detail "touch policy: ${policy} — $(touch_policy_describe "${policy}")"
+}
+
 die() {
   log "ERROR: $*"
   exit 1

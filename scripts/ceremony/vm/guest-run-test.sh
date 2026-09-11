@@ -18,10 +18,9 @@ sudo env DO_NOT_TRACK=1 ./realms-key-ceremony.sh online-setup
 
 log "== verify installed tools =="
 command -v ykman >/dev/null || die "ykman missing"
-command -v icp >/dev/null || die "icp missing"
+command -v dfx >/dev/null || command -v icp >/dev/null || die "dfx/icp missing"
 [[ -f /usr/lib/x86_64-linux-gnu/libykcs11.so ]] || die "libykcs11.so missing"
 systemctl is-active --quiet pcscd || die "pcscd not running"
-icp --version >/dev/null || die "icp cannot execute"
 
 log "== network gate: check-offline must fail while online =="
 if sudo ./realms-key-ceremony.sh check-offline 2>/dev/null; then
@@ -53,7 +52,9 @@ jq -e '.environments.dev.principal and .environments.prod.principal' "${manifest
 dev_p="$(jq -r '.environments.dev.principal' "${manifest}")"
 prod_p="$(jq -r '.environments.prod.principal' "${manifest}")"
 [[ "${dev_p}" != "${prod_p}" ]] || die "dev and prod principals must differ"
-[[ "$(wc -l < "${CEREMONY_ROOT}/artifacts/prod-serials.txt")" -eq 3 ]] || die "expected 3 prod serials"
+prod_copies="$(jq -r '.environments[] | select(.id=="prod") | .yubikey.copies' ceremony-config.json)"
+[[ "$(wc -l < "${CEREMONY_ROOT}/artifacts/prod-serials.txt")" -eq "${prod_copies}" ]] \
+  || die "expected ${prod_copies} prod serials"
 
 log "== destroy =="
 sudo -E env CEREMONY_ROOT="${CEREMONY_ROOT}" ./realms-key-ceremony.sh destroy

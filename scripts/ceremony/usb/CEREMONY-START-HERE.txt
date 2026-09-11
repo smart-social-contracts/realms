@@ -1,0 +1,39 @@
+Realms YubiKey key ceremony — Ubuntu 22.04 Desktop live USB
+=============================================================
+
+Boot this USB → choose "Try Ubuntu" (do NOT install to disk).
+
+1. Double-click **Realms Key Ceremony** on the desktop.
+   A terminal opens in /opt/realms-ceremony (scripts attach automatically).
+
+2. Packages (ykman, ykcs11, dfx, …) are already in this live image.
+   If `ykman` or `dfx` is missing, while ONLINE run:
+
+   sudo ./realms-key-ceremony.sh online-setup
+
+3. Disconnect ALL network (Wi‑Fi off, Ethernet unplugged).
+
+4. OFFLINE ceremony:
+
+   sudo ./realms-key-ceremony.sh check-offline
+   sudo ./realms-key-ceremony.sh run-offline
+
+   Or step by step:
+   sudo ./realms-key-ceremony.sh offline-generate
+   sudo ./realms-key-ceremony.sh provision-dev      # insert dev YubiKey 5C Nano
+   sudo ./realms-key-ceremony.sh provision-prod      # insert each prod 5 NFC (3×)
+   sudo ./realms-key-ceremony.sh finalize
+
+5. Copy artifacts to a SECOND USB stick (manifest only — no PEMs):
+   sudo cp /run/realms-ceremony/artifacts/manifest.json /media/ubuntu/<second-stick>/
+
+6. Write PINs from secrets/operator-credentials.txt on paper.
+
+7. Wipe ceremony workspace and power off:
+
+   sudo ./realms-key-ceremony.sh destroy
+   sudo poweroff
+
+Hardware: dev = YubiKey 5C Nano (touch never); prod = 3× YubiKey 5 NFC (touch cached).
+
+Full docs: realms-ceremony/README.md on this USB.

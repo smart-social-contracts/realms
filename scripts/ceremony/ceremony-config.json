@@ -1,0 +1,32 @@
+{
+  "ceremony_version": "1.0.0",
+  "description": "Realms IC operator key ceremony — default dev + prod layout",
+  "piv": {
+    "slot": "9c",
+    "pkcs11_key_id": "02",
+    "pkcs11_lib": "/usr/lib/x86_64-linux-gnu/libykcs11.so",
+    "ec_curve": "prime256v1"
+  },
+  "environments": [
+    {
+      "id": "dev",
+      "description": "Non-production IC networks (test, staging, demo)",
+      "signing_key": "dev-signing-key.pem",
+      "yubikey": {
+        "label": "YubiKey 5C Nano",
+        "touch_policy": "never",
+        "copies": 1
+      }
+    },
+    {
+      "id": "prod",
+      "description": "Production IC network",
+      "signing_key": "prod-signing-key.pem",
+      "yubikey": {
+        "label": "YubiKey 5 NFC",
+        "touch_policy": "cached",
+        "copies": 3
+      }
+    }
+  ]
+}

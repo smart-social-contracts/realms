@@ -4,3 +4,7 @@ artifacts/
 secrets/
 sim-yubikeys/
 .operator-credentials.txt
+# Bundled dfx binary (~150 MB) — fetch on the prep machine, do not commit
+bin/dfx
+bin/dfx-*
+*.tar.gz
