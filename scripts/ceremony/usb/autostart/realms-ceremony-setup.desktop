@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Realms Ceremony Desktop Setup
-Comment=Install trusted Realms Key Ceremony shortcut on the live desktop
-Exec=/usr/local/bin/realms-ceremony-desktop-setup.sh
-X-GNOME-Autostart-enabled=true
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-Phase=Applications
