@@ -234,7 +234,12 @@ install_packages_into_squashfs() {
     if sudo -n true 2>/dev/null; then
       as_root=(sudo)
     else
-      die "--with-packages needs root (re-run with sudo, or pass --skip-packages)"
+      log "WARNING: not root — skipping squashfs apt (need sudo to bake ykman/ykcs11). Desktop launcher + bundled dfx still apply."
+      if [[ -x "${CEREMONY_DIR}/bin/dfx" ]]; then
+        install -m 755 "${CEREMONY_DIR}/bin/dfx" "${root}/usr/local/bin/dfx"
+        log "copied bundled dfx to squashfs /usr/local/bin/dfx"
+      fi
+      return 0
     fi
   fi
 
