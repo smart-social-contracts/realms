@@ -22,6 +22,13 @@ from typing import Optional
 import typer
 from rich.panel import Panel
 
+from ..casals_governance import (
+    GOVERNANCE_SEED_PHASES,
+    parse_multisig_config,
+    plan_governance_phases,
+    run_governance_phases,
+    validate_multisig_config,
+)
 from ..casals_product import (
     _PRODUCT_CASALS_REALMS_KEYS,
     _gaas_casals_ids,
@@ -70,10 +77,54 @@ def _resolve_seed_phase(
     destroy_except_frontend: bool,
 ) -> str:
     if from_phase:
-        return from_phase.replace("-", "_")
+        key = from_phase.replace("-", "_")
+        if key in GOVERNANCE_SEED_PHASES:
+            return key
+        return key
     if rebuild or destroy_except_frontend:
         return "destroy"
     return "authorize"
+
+
+def _governance_from_phase(phase: str) -> bool:
+    return phase in GOVERNANCE_SEED_PHASES
+
+
+def _run_multisig_governance_if_configured(
+    *,
+    env_name: str,
+    network: str,
+    identity: Optional[str],
+    env_config: dict,
+    from_phase: Optional[str],
+    project_root: Path,
+    governance_only: bool = False,
+) -> None:
+    """Mint/configure/topology when ``multisig`` is declared; warn and skip otherwise."""
+    config = parse_multisig_config(env_config)
+    if config is None:
+        console.print(
+            "[yellow]⚠️  skip governance multisig: no multisig block in "
+            f"environments/{env_name}.json[/yellow]"
+        )
+        return
+    errors = validate_multisig_config(config)
+    if errors:
+        raise RuntimeError(
+            "multisig descriptor validation failed:\n  - " + "\n  - ".join(errors)
+        )
+    planned = plan_governance_phases(env_config)
+    console.print(
+        f"[dim]governance phases: {', '.join(planned)}[/dim]"
+    )
+    run_governance_phases(
+        env_name=env_name,
+        network=network,
+        identity=identity,
+        config=config,
+        from_phase=from_phase if governance_only else None,
+        project_root=project_root,
+    )
 
 
 def _print_resume_hint(env_name: str, phase: str) -> None:
@@ -167,6 +218,9 @@ def _reconcile_stale_product_ids_on_adopt(
                 dead_product, action="recreating via env deploy"
             )
         if missing:
+            # Nothing stale to heal, but nothing to adopt either: a fresh or
+            # torn-down environment. Adopt mode used to skip env deploy here and
+            # then fail at catalog publish for want of a file_registry.
             console.print(
                 f"[yellow]⚠️  no canister id for {', '.join(missing)} on "
                 f"'{network}' — creating via env deploy[/yellow]"
@@ -318,10 +372,17 @@ def seed_command(
     network = env_config.get("network", env_name)
     do_product = not skip_product
     phase = _resolve_seed_phase(from_phase, rebuild, destroy_except_frontend)
-    if phase not in ("destroy", "catalog", "env_deploy", "authorize"):
+    allowed_phases = (
+        "destroy",
+        "catalog",
+        "env_deploy",
+        "authorize",
+        *GOVERNANCE_SEED_PHASES,
+    )
+    if phase not in allowed_phases:
         console.print(
             f"[red]❌ unknown --from-phase {from_phase!r} "
-            "(destroy, catalog, env_deploy, authorize)[/red]"
+            f"({', '.join(allowed_phases)})[/red]"
         )
         raise typer.Exit(1)
 
@@ -351,13 +412,14 @@ def seed_command(
         )
         raise typer.Exit(1)
 
-    if skip_product and from_phase:
+    governance_only = _governance_from_phase(phase)
+    if skip_product and from_phase and not governance_only:
         console.print(
             "[red]❌ --from-phase cannot be combined with --skip-product[/red]"
         )
         raise typer.Exit(1)
 
-    if do_product:
+    if do_product and not governance_only:
         if phase == "destroy":
             _confirm_rebuild_destroy(
                 env_name=env_name,
@@ -485,7 +547,28 @@ def seed_command(
         except RuntimeError as exc:
             console.print(f"[yellow]⚠️  {exc}[/yellow]")
     else:
-        console.print("[dim]skip product stack (--skip-product)[/dim]")
+        if governance_only:
+            console.print(f"[dim]resume governance from phase {phase}[/dim]")
+        else:
+            console.print("[dim]skip product stack (--skip-product)[/dim]")
+
+    try:
+        _run_multisig_governance_if_configured(
+            env_name=env_name,
+            network=network,
+            identity=identity,
+            env_config=env_config,
+            from_phase=from_phase,
+            project_root=project_root,
+            governance_only=governance_only,
+        )
+    except RuntimeError as exc:
+        console.print(f"[red]❌ governance multisig failed: {exc}[/red]")
+        resume = "multisig_mint"
+        if phase in GOVERNANCE_SEED_PHASES:
+            resume = phase
+        _print_resume_hint(env_name, resume)
+        raise typer.Exit(1) from exc
 
     if not skip_catalog:
         console.print(Panel.fit("📚 Publishing extension/codex catalog", style="bold blue"))

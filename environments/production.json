@@ -21,5 +21,15 @@
     "token_frontend",
     "nft_backend",
     "nft_frontend"
-  ]
+  ],
+  "casals_id": "irfdo-ziaaa-aaaai-raswa-cai",
+  "multisig": {
+    "backend_id": null,
+    "signers": [
+      "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe",
+      "g53u4-3liee-2f7qe-m2b6g-p3bpg-6aatl-cnhs3-drrzi-fllp4-qxfgh-hqe",
+      "55alf-xclhd-rtshz-lk4lo-wav4q-q3a5e-sktkm-zlshq-vvhjs-re6os-wae"
+    ],
+    "threshold": 1
+  }
 }

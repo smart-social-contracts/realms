@@ -319,9 +319,13 @@ def test_deploy_uses_product_sheet_not_gaas_union(
 def test_product_sheet_includes_file_registry_token_nft_without_batons():
     root = Path(__file__).resolve().parents[2]
     sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))
+    sections = {sec["name"]: sec for sec in sheet["sections"]}
+    governance = sections["System"]["stands"][0]
+    assert governance["name"] == "governance"
+    assert governance["canisters"][0]["wasm_key"] == "orchestration-multisig"
     stands = {
         stand["name"]: stand
-        for stand in sheet["sections"][0]["stands"]
+        for stand in sections["Product"]["stands"]
     }
     assert set(stands) == {"marketplace", "file-registry", "token", "nft"}
     market = [c["name"] for c in stands["marketplace"]["canisters"]]
