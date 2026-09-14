@@ -851,12 +851,15 @@ def _print_dns_instructions(
         table.add_row(record.record_type, record.host, record.value)
     console.print(table)
     console.print(
-        "     (Alternatively use the A/AAAA records shown at "
-        "[link=https://reg.icp0.io]reg.icp0.io[/link] for your domain.)"
+        "     (An apex may keep existing A/AAAA records to the IC gateway instead "
+        "of the CNAME.)"
     )
     console.print(
-        f"  3. Register the domain at [link=https://reg.icp0.io]https://reg.icp0.io[/link] "
-        f"pointing to frontend canister [cyan]{frontend_id}[/cyan] (manual step)."
+        f"  3. Register the domain with the gateway (manual step), pointing at "
+        f"frontend canister [cyan]{frontend_id}[/cyan]:\n"
+        f"       curl -sL -X GET   https://icp0.io/custom-domains/v1/{domain}/validate\n"
+        f"       curl -sL -X POST  https://icp0.io/custom-domains/v1/{domain}   # first registration\n"
+        f"       curl -sL -X PATCH https://icp0.io/custom-domains/v1/{domain}   # re-point an existing one"
     )
     console.print(
         f"  4. After DNS propagates, open [link=https://{domain}]https://{domain}[/link]"

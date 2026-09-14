@@ -4,6 +4,25 @@
   "description": "Realms *.realmsgos.org product surface: marketplace, fleet file_registry, token, nft.",
   "sections": [
     {
+      "name": "System",
+      "description": "Realms GOS Casals governance (multisig). Minted by realms seed when environments/<env>.json declares multisig.",
+      "stands": [
+        {
+          "name": "governance",
+          "description": "Root multisig for Realms GOS Casals IC control. Signers configured post-deploy.",
+          "canisters": [
+            {
+              "name": "multisig",
+              "wasm_key": "orchestration-multisig",
+              "kind": "backend",
+              "wasm_type": "multisig",
+              "teardown_priority": 40
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Product",
       "description": "Marketplace, fleet file-registry, and token/NFT canisters. DNS frontend is reinstall keep-ID.",
       "stands": [

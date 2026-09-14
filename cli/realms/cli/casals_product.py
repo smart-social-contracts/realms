@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import gzip
 import hashlib
 import json
@@ -120,6 +121,33 @@ def load_product_sheet(project_root: Optional[Path] = None) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"invalid Casals sheet JSON: {exc}") from exc
+
+
+_GOVERNANCE_STAND_NAMES = frozenset({"governance"})
+
+
+def product_deploy_sheet(sheet: dict) -> dict:
+    """``sheet`` without its governance stands (and sections left empty by that).
+
+    The governance multisig is minted only by the seed's governance phases,
+    from ``casals_governance.governance_deploy_sheet`` and only when the
+    environment declares a ``multisig`` block. Passing it through the product
+    deploy would mint one on every network, before signers are configured.
+    """
+    trimmed = copy.deepcopy(sheet)
+    sections = []
+    for sec in trimmed.get("sections") or []:
+        stands = [
+            stand
+            for stand in (sec.get("stands") or [])
+            if (stand.get("name") or "").strip() not in _GOVERNANCE_STAND_NAMES
+        ]
+        if not stands:
+            continue
+        sec["stands"] = stands
+        sections.append(sec)
+    trimmed["sections"] = sections
+    return trimmed
 
 
 def load_gos_canisters(
@@ -454,10 +482,67 @@ def check_canister_liveness(
     if any(
         marker in combined.lower() for marker in _UNCONTROLLED_CANISTER_MARKERS
     ):
-        return False
+        # Not a controller. In production topology that is the normal state of
+        # a product canister once the Casals conductor owns it alone, so tell
+        # "handed to a live conductor" apart from "orphaned by a deleted one".
+        return _controlled_by_live_canister(canister_id, network=network)
     raise RuntimeError(
         f"cannot check liveness for {canister_id}: {combined.strip()}"
     )
+
+
+def _public_controllers(canister_id: str, *, network: str) -> Optional[list[str]]:
+    """Controllers via ``dfx canister info`` (public read_state, no controller
+    rights needed). ``None`` when the canister does not exist; raises when the
+    read itself is unavailable (e.g. a host that rejects bare dfx)."""
+    cmd = [
+        "dfx",
+        "canister",
+        "info",
+        canister_id,
+        "--network",
+        _dfx_network_alias(network),
+        "--identity",
+        "anonymous",
+    ]
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, check=False, env=_dfx_subprocess_env()
+    )
+    combined = f"{result.stderr}\n{result.stdout}".lower()
+    if result.returncode != 0:
+        if "ic0301" in combined or any(m in combined for m in _DEAD_CANISTER_MARKERS):
+            return None
+        raise RuntimeError(f"dfx canister info {canister_id} failed: {combined.strip()}")
+    for line in result.stdout.splitlines():
+        if line.strip().lower().startswith("controllers:"):
+            return line.split(":", 1)[1].split()
+    return []
+
+
+def _dfx_network_alias(network: str) -> str:
+    key = (network or "").strip().lower()
+    return "ic" if key in ("production", "staging", "test", "demo", "ic") else network
+
+
+def _controlled_by_live_canister(canister_id: str, *, network: str) -> bool:
+    """True when ``canister_id`` exists and at least one controller is a canister
+    that also exists (a conductor holding it). False when it is gone or every
+    canister controller is gone (orphaned)."""
+    try:
+        controllers = _public_controllers(canister_id, network=network)
+    except RuntimeError:
+        return False
+    if controllers is None:
+        return False
+    for controller in controllers:
+        if not controller.endswith("-cai"):
+            continue
+        try:
+            if _public_controllers(controller, network=network) is not None:
+                return True
+        except RuntimeError:
+            continue
+    return False
 
 
 def partition_product_canister_inventory(
@@ -482,6 +567,19 @@ def partition_product_canister_inventory(
         else:
             dead.append((ids_key, reg_name, cid))
     return live, dead
+
+
+def missing_product_canisters(network: str, project_root: Path) -> list[str]:
+    """Product ``ids_key``s with no canister id at all for ``network``.
+
+    A fresh environment (or one whose inventory was cleared after a teardown)
+    has nothing stale to heal, yet still needs the whole stack deployed.
+    """
+    return [
+        ids_key
+        for _stand, _reg_name, ids_key, _kind in _PRODUCT_REGISTRATIONS
+        if not _product_canister_id(network, ids_key, project_root)
+    ]
 
 
 def log_stale_product_canisters(
@@ -2143,7 +2241,8 @@ def deploy_product_sheet_on_casals(
         return False, "no Casals checkout (set CASALS_SRC or clone ../Casals)"
 
     try:
-        sheet = load_product_sheet(root)
+        # Governance (multisig) is minted by the seed's governance phases, not here.
+        sheet = product_deploy_sheet(load_product_sheet(root))
     except RuntimeError as exc:
         return False, str(exc)
 

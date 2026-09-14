@@ -11,7 +11,54 @@ Two inventories. Do not copy Realms GOS product ids into the GaaS descriptor. Do
 | `gos-as-a-service/environments/<env>.json` | GaaS descriptor. Destroy reads **`canisters.casals_backend` here**. |
 | `gos-as-a-service/canister_ids.json` | Last-known GaaS ids. Destroy does **not** read this. |
 | `realms/canister_ids.json` | Realms GOS Casals + product ids. Seed destroy reads **this**. |
-| `realms/environments/<env>.json` | Product stack list + `casals_url` (Realms GOS Casals frontend only). |
+| `realms/environments/<env>.json` | Product stack list + `casals_url` (Realms GOS Casals frontend only). Optional `multisig` block for governance seed (see §5.1). |
+
+---
+
+## 5.1 Governance multisig (`multisig` block)
+
+Production Realms GOS Casals can hand IC control to a **governance multisig** (parity with `gaas new`). Opt in per environment by adding to `realms/environments/<env>.json`:
+
+```json
+"multisig": {
+  "backend_id": null,
+  "signers": ["<principal>", "..."],
+  "threshold": 1
+}
+```
+
+- **`backend_id`**: `null` on first run; `realms seed` persists the minted id here and in `canister_ids.json` under `multisig`.
+- **`signers` / `threshold`**: N-of-M signers for the orchestration multisig (`configure` is idempotent).
+- **Missing block**: governance phases are skipped with a yellow warning (demo/test unchanged until you opt in).
+
+Last of all — after the product sheet deploy and the catalog publish, since the final phase drops the deployer's IC control — seed runs (when the block is present):
+
+1. **`multisig_mint`** — authorize `orchestration-multisig@1.2.0`, mint or adopt the `System/governance/multisig` canister from `realms/casals.json`. Casals mints it from its own cycles.
+2. **`multisig_configure`** — apply signers and threshold.
+3. **`controller_topology`** — **production network only**, same split as `gaas new`: `casals_backend` + `casals_frontend` → `[multisig]`; Casals file-registry pair and every product canister → `[casals_backend]`; deployer removed. Refuses to run while the deployer is the only commander on the conductor (grant a Casals section commander first, e.g. the Casals frontend's II principal). Verified via public `dfx canister info`. Non-production networks keep the deployer as co-controller.
+
+On production the deployer is the prod operator key (`--identity prod-identity`, the current controller of the conductor). Resume after a failure (governance-only resume skips the product stack and catalog):
+
+```bash
+realms seed --env production --identity prod-identity --yes --from-phase multisig_mint
+realms seed --env production --identity prod-identity --yes --from-phase multisig_configure
+realms seed --env production --identity prod-identity --yes --from-phase controller_topology
+```
+
+### Handover via multisig (production)
+
+Once topology is applied the deployer is no longer an IC controller of platform/product canisters. Further controller changes go through the multisig with an **Internet Identity–linked** identity that is a signer:
+
+```bash
+icp canister call <multisig-backend-id> propose \
+  '(variant { SetCanisterControllers = record {
+       canister_id = principal "<target-canister-id>";
+       controllers = vec { principal "<new-controller>"; };
+     } }, null)' \
+  -n https://icp0.io --root-key mainnet --identity <ii-linked-identity>
+```
+
+Collect approvals from other signers until the proposal executes (threshold from the descriptor).
 
 ---
 
