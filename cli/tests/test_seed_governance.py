@@ -254,6 +254,50 @@ def test_apply_controller_topology_production(
     assert mock_guard.call_args.kwargs["deployer"] == "deployer-principal"
 
 
+@patch("realms.cli.casals_governance.subprocess.run")
+def test_replace_controllers_uses_icp_on_ic_networks(mock_run):
+    from realms.cli.casals_governance import replace_canister_controllers
+
+    mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+    replace_canister_controllers(
+        "irfdo-ziaaa-aaaai-raswa-cai",
+        ["7jfys-wqaaa-aaaal-qxiuq-cai"],
+        network="production",
+        identity="prod-ii-realms",
+    )
+    cmd = mock_run.call_args[0][0]
+    # II-linked identities exist only in icp-cli, so the handover must not
+    # require a dfx identity; the set is replaced atomically in one call.
+    assert cmd[:4] == ["icp", "canister", "settings", "update"]
+    assert "--remove-all-controllers" in cmd and "--force" in cmd
+    assert cmd[cmd.index("--add-controller") + 1] == "7jfys-wqaaa-aaaal-qxiuq-cai"
+    assert cmd[cmd.index("--identity") + 1] == "prod-ii-realms"
+
+
+@patch("realms.cli.casals_governance.subprocess.run")
+def test_replace_controllers_keeps_dfx_on_local(mock_run):
+    from realms.cli.casals_governance import replace_canister_controllers
+
+    mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+    replace_canister_controllers(
+        "aaaaa-aa", ["bbbbb-bb"], network="local", identity="deployer"
+    )
+    cmd = mock_run.call_args[0][0]
+    assert cmd[0] == "dfx" and "--set-controller" in cmd and "--yes" in cmd
+
+
+@patch("realms.cli.casals_governance.subprocess.run")
+def test_deployer_principal_prefers_icp_then_dfx(mock_run):
+    from realms.cli.casals_governance import _get_deployer_principal
+
+    fail = type("R", (), {"returncode": 1, "stdout": "", "stderr": "no such identity"})()
+    ok = type("R", (), {"returncode": 0, "stdout": "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe\n", "stderr": ""})()
+    mock_run.side_effect = [fail, ok]
+    principal = _get_deployer_principal("prod-identity", network="production")
+    assert principal.startswith("rd4en-")
+    assert [c[0][0][0] for c in mock_run.call_args_list] == ["icp", "dfx"]
+
+
 @patch("realms.cli.casals_governance.run_casals_tree")
 @patch("realms.cli.casals_governance.resolve_casals_src", return_value=Path("/casals"))
 @patch("realms.cli.casals_governance.resolve_conductor_id", return_value="irfdo-ziaaa-aaaai-raswa-cai")

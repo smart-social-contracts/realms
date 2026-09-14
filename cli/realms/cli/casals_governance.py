@@ -236,24 +236,40 @@ def _canister_names(tree: dict[str, Any]) -> set[str]:
     return names
 
 
-def _get_deployer_principal(identity: Optional[str]) -> str:
+def _is_local_network(network: str) -> bool:
+    return (network or "").strip().lower() in ("local", "localhost")
+
+
+def _get_deployer_principal(identity: Optional[str], *, network: str = "ic") -> str:
+    """Principal of the deploying identity.
+
+    On IC networks ask icp-cli first: mint/configure already go through icp, and
+    Internet Identity–linked identities (``prod-ii-*``) exist only there. dfx is
+    the fallback (and the local-replica path)."""
+    attempts: list[list[str]] = []
+    if not _is_local_network(network):
+        cmd = ["icp", "identity", "principal"]
+        if identity:
+            cmd.extend(["--identity", identity])
+        attempts.append(cmd)
     cmd = ["dfx", "identity", "get-principal"]
     if identity:
         cmd.extend(["--identity", identity])
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        check=False,
-        env=_dfx_subprocess_env(),
-    )
-    if result.returncode != 0:
-        err = (result.stderr or result.stdout or "").strip()
-        raise RuntimeError(f"dfx identity get-principal failed: {err}")
-    principal = result.stdout.strip()
-    if not principal:
-        raise RuntimeError("dfx identity get-principal returned empty output")
-    return principal
+    attempts.append(cmd)
+    errors: list[str] = []
+    for cmd in attempts:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_dfx_subprocess_env(),
+        )
+        principal = (result.stdout or "").strip().splitlines()
+        if result.returncode == 0 and principal:
+            return principal[-1].strip()
+        errors.append(f"{' '.join(cmd[:3])}: {(result.stderr or result.stdout or '').strip()}")
+    raise RuntimeError("could not resolve deployer principal: " + "; ".join(errors))
 
 
 def _parse_controllers_from_info(stdout: str) -> tuple[str, ...]:
@@ -296,22 +312,44 @@ def replace_canister_controllers(
     network: str,
     identity: Optional[str],
 ) -> None:
-    """Replace the IC controller set for a canister (``--yes`` for non-interactive)."""
+    """Replace the IC controller set for a canister (non-interactive).
+
+    IC networks go through icp-cli so Internet Identity–linked identities can
+    drive the handover; the local replica keeps dfx."""
     if not controllers:
         raise RuntimeError("replace_canister_controllers requires at least one controller")
-    cmd = [
-        "dfx",
-        "canister",
-        "--network",
-        _dfx_network_alias(network),
-        "update-settings",
-        canister_id,
-    ]
-    if identity:
-        cmd.extend(["--identity", identity])
-    for controller in controllers:
-        cmd.extend(["--set-controller", controller])
-    cmd.append("--yes")
+    if _is_local_network(network):
+        cmd = [
+            "dfx",
+            "canister",
+            "--network",
+            _dfx_network_alias(network),
+            "update-settings",
+            canister_id,
+        ]
+        if identity:
+            cmd.extend(["--identity", identity])
+        for controller in controllers:
+            cmd.extend(["--set-controller", controller])
+        cmd.append("--yes")
+    else:
+        cmd = [
+            "icp",
+            "canister",
+            "settings",
+            "update",
+            canister_id,
+            "-n",
+            "https://icp0.io",
+            "--root-key",
+            "mainnet",
+            "--remove-all-controllers",
+            "--force",
+        ]
+        for controller in controllers:
+            cmd.extend(["--add-controller", controller])
+        if identity:
+            cmd.extend(["--identity", identity])
     result = subprocess.run(
         cmd,
         capture_output=True,
@@ -550,7 +588,7 @@ def configure_multisig_from_descriptor(
     signers = list(config.signers)
     threshold = int(config.threshold or 1)
     if not signers:
-        deployer = _get_deployer_principal(identity)
+        deployer = _get_deployer_principal(identity, network=network)
         signers = [deployer]
         console.print(
             "[yellow]⚠️  multisig.signers empty — using deployer as sole 1-of-1 signer[/yellow]"
@@ -629,7 +667,7 @@ def apply_controller_topology(
     casals_backend = _inventory_canister_id(root, "casals_backend", network)
     if not casals_backend:
         raise RuntimeError("casals_backend id required for controller topology")
-    deployer = _get_deployer_principal(identity)
+    deployer = _get_deployer_principal(identity, network=network)
     ensure_conductor_not_orphaned(
         env_name=env_name,
         network=network,
