@@ -32,6 +32,7 @@ from ..casals_product import (
     finish_casals_rebuild,
     load_gos_canisters,
     log_stale_product_canisters,
+    missing_product_canisters,
     partition_product_canister_inventory,
     publish_casals_frontend_to_marketplace,
     rebuild_casals_conductor,
@@ -159,10 +160,17 @@ def _reconcile_stale_product_ids_on_adopt(
             console.print(f"[red]❌ casals new failed: {exc}[/red]")
             raise typer.Exit(1) from exc
 
-    if dead_product:
-        log_stale_product_canisters(
-            dead_product, action="recreating via env deploy"
-        )
+    missing = missing_product_canisters(network, project_root)
+    if dead_product or missing:
+        if dead_product:
+            log_stale_product_canisters(
+                dead_product, action="recreating via env deploy"
+            )
+        if missing:
+            console.print(
+                f"[yellow]⚠️  no canister id for {', '.join(missing)} on "
+                f"'{network}' — creating via env deploy[/yellow]"
+            )
         env_deploy_command(
             env_name=env_name,
             mode="auto",

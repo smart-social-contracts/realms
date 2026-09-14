@@ -725,7 +725,7 @@ def _parse_candid_string(raw: str) -> str:
 #   icp addresses mainnet as "ic".
 # - The dfx identity "deployer" exists in the icp store as "my_dev_identity_1"
 #   (same principal). Unknown identity names are passed through unchanged.
-_ICP_NETWORK_ALIASES = {"test": "ic", "staging": "ic", "demo": "ic"}
+_ICP_NETWORK_ALIASES = {"test": "ic", "staging": "ic", "demo": "ic", "production": "ic"}
 _ICP_IDENTITY_ALIASES = {"deployer": "my_dev_identity_1"}
 
 
