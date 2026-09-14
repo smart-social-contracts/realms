@@ -46,6 +46,12 @@ _GOVERNANCE_SECTION = "System"
 _GOVERNANCE_STAND = "governance"
 _MULTISIG_TREE_NAME = "multisig"
 
+# Conductor canisters whose IC controller becomes the multisig. Same split as
+# gaas `platform_controller_expectations`: the Casals file registry pair is
+# operated by the conductor (uploads, reinstalls), so it stays under
+# casals_backend like every other platform canister.
+_MULTISIG_CONTROLLED_KEYS: tuple[str, ...] = ("casals_backend", "casals_frontend")
+
 GOVERNANCE_SEED_PHASES: tuple[str, ...] = (
     "multisig_mint",
     "multisig_configure",
@@ -171,6 +177,52 @@ def _find_canister_id(tree: dict[str, Any], name: str) -> str:
                 if (canister.get("name") or "").strip() == name:
                     return (canister.get("canister_id") or "").strip()
     return ""
+
+
+def _tree_commanders(tree: dict[str, Any]) -> set[str]:
+    """Every section-commander principal in a ``get_tree`` payload."""
+    found: set[str] = set()
+    for sec in tree.get("sections") or []:
+        for entry in sec.get("commanders") or []:
+            principal = entry.get("principal") if isinstance(entry, dict) else entry
+            principal = (str(principal) if principal else "").strip()
+            if principal:
+                found.add(principal)
+    return found
+
+
+def ensure_conductor_not_orphaned(
+    *,
+    env_name: str,
+    network: str,
+    identity: Optional[str],
+    deployer: str,
+    project_root: Path,
+) -> None:
+    """Refuse to drop the deployer's IC control while it is the only operator.
+
+    IC controllers act as commanders on Casals (``_is_controller``), so a
+    conductor whose sole controller is the deployer and whose sections name no
+    other commander would, after handover, be operable only through multisig
+    proposals. Require at least one other commander first (``set_commander``).
+    """
+    conductor = resolve_conductor_id(env_name, project_root)
+    casals_src = resolve_casals_src(project_root)
+    if not conductor or not casals_src:
+        raise RuntimeError("cannot verify Casals commanders before controller handover")
+    tree = run_casals_tree(
+        network=network,
+        identity=identity,
+        casals_src=casals_src,
+        canister=conductor,
+    )
+    others = _tree_commanders(tree) - {deployer}
+    if not others:
+        raise RuntimeError(
+            f"{conductor} has no commander other than the deployer {deployer}; "
+            "grant one first (casals set_commander) or the conductor is only "
+            "operable through multisig proposals after handover"
+        )
 
 
 def _canister_names(tree: dict[str, Any]) -> set[str]:
@@ -542,8 +594,12 @@ def platform_controller_expectations(
     expectations: dict[str, list[str]] = {}
     casals_stack = _casals_stack_ids(network, project_root)
     for name, canister_id in casals_stack.items():
-        if canister_id:
+        if not canister_id:
+            continue
+        if name in _MULTISIG_CONTROLLED_KEYS:
             expectations[name] = [multisig_id]
+        elif canister_id != casals_backend_id:
+            expectations[name] = [casals_backend_id]
     for name, canister_id in _product_canister_ids(network, project_root).items():
         if canister_id:
             expectations[name] = [casals_backend_id]
@@ -574,6 +630,13 @@ def apply_controller_topology(
     if not casals_backend:
         raise RuntimeError("casals_backend id required for controller topology")
     deployer = _get_deployer_principal(identity)
+    ensure_conductor_not_orphaned(
+        env_name=env_name,
+        network=network,
+        identity=identity,
+        deployer=deployer,
+        project_root=root,
+    )
     expectations = platform_controller_expectations(
         network=network,
         multisig_id=multisig_id,

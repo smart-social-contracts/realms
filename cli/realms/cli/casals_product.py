@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import gzip
 import hashlib
 import json
@@ -120,6 +121,33 @@ def load_product_sheet(project_root: Optional[Path] = None) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"invalid Casals sheet JSON: {exc}") from exc
+
+
+_GOVERNANCE_STAND_NAMES = frozenset({"governance"})
+
+
+def product_deploy_sheet(sheet: dict) -> dict:
+    """``sheet`` without its governance stands (and sections left empty by that).
+
+    The governance multisig is minted only by the seed's governance phases,
+    from ``casals_governance.governance_deploy_sheet`` and only when the
+    environment declares a ``multisig`` block. Passing it through the product
+    deploy would mint one on every network, before signers are configured.
+    """
+    trimmed = copy.deepcopy(sheet)
+    sections = []
+    for sec in trimmed.get("sections") or []:
+        stands = [
+            stand
+            for stand in (sec.get("stands") or [])
+            if (stand.get("name") or "").strip() not in _GOVERNANCE_STAND_NAMES
+        ]
+        if not stands:
+            continue
+        sec["stands"] = stands
+        sections.append(sec)
+    trimmed["sections"] = sections
+    return trimmed
 
 
 def load_gos_canisters(
@@ -2213,7 +2241,8 @@ def deploy_product_sheet_on_casals(
         return False, "no Casals checkout (set CASALS_SRC or clone ../Casals)"
 
     try:
-        sheet = load_product_sheet(root)
+        # Governance (multisig) is minted by the seed's governance phases, not here.
+        sheet = product_deploy_sheet(load_product_sheet(root))
     except RuntimeError as exc:
         return False, str(exc)
 

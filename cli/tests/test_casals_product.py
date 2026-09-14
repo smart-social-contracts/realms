@@ -349,6 +349,26 @@ def test_product_sheet_includes_file_registry_token_nft_without_batons():
     assert "never as a union" in comment.lower()
 
 
+def test_product_deploy_sheet_leaves_governance_to_the_seed_phases():
+    from realms.cli.casals_product import product_deploy_sheet
+
+    root = Path(__file__).resolve().parents[2]
+    sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))
+    trimmed = product_deploy_sheet(sheet)
+    names = {sec["name"] for sec in trimmed["sections"]}
+    # The multisig is minted only when environments/<env>.json opts in;
+    # the product deploy must not mint it on every network.
+    assert "System" not in names
+    assert {stand["name"] for stand in trimmed["sections"][0]["stands"]} == {
+        "marketplace",
+        "file-registry",
+        "token",
+        "nft",
+    }
+    # Input untouched: the governance phases read the full sheet.
+    assert {sec["name"] for sec in sheet["sections"]} == {"System", "Product"}
+
+
 def test_product_sheet_from_repo_has_no_gaas_stands():
     root = Path(__file__).resolve().parents[2]
     sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))

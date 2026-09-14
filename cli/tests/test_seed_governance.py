@@ -13,6 +13,7 @@ from realms.cli.casals_governance import (
     GOVERNANCE_SEED_PHASES,
     MultisigConfig,
     apply_controller_topology,
+    ensure_conductor_not_orphaned,
     ensure_multisig_minted,
     parse_multisig_config,
     plan_governance_phases,
@@ -152,6 +153,8 @@ def test_platform_controller_expectations_production(tmp_path: Path):
             {
                 "casals_backend": {"production": "irfdo-ziaaa-aaaai-raswa-cai"},
                 "casals_frontend": {"production": "iecsd-yaaaa-aaaai-rasvq-cai"},
+                "casals_file_registry": {"production": "iwef2-uqaaa-aaaai-raswq-cai"},
+                "casals_file_registry_frontend": {"production": "iddux-vyaaa-aaaai-rasva-cai"},
                 "marketplace_backend": {"production": "fxcax-yyaaa-aaaas-amx5q-cai"},
             }
         ),
@@ -164,8 +167,12 @@ def test_platform_controller_expectations_production(tmp_path: Path):
         deployer="rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe",
         project_root=realms,
     )
+    # Same split as gaas: only the conductor backend + frontend go under the
+    # multisig; the Casals file-registry pair stays operated by the conductor.
     assert expectations["casals_backend"] == ["7jfys-wqaaa-aaaal-qxiuq-cai"]
     assert expectations["casals_frontend"] == ["7jfys-wqaaa-aaaal-qxiuq-cai"]
+    assert expectations["casals_file_registry"] == ["irfdo-ziaaa-aaaai-raswa-cai"]
+    assert expectations["casals_file_registry_frontend"] == ["irfdo-ziaaa-aaaai-raswa-cai"]
     assert expectations["marketplace_backend"] == ["irfdo-ziaaa-aaaai-raswa-cai"]
 
 
@@ -193,6 +200,7 @@ def test_platform_controller_expectations_non_production_keeps_deployer(tmp_path
     assert deployer in expectations["marketplace_backend"]
 
 
+@patch("realms.cli.casals_governance.ensure_conductor_not_orphaned")
 @patch("realms.cli.casals_governance.verify_controller_topology")
 @patch("realms.cli.casals_governance.replace_canister_controllers")
 @patch("realms.cli.casals_governance.public_canister_controllers")
@@ -202,6 +210,7 @@ def test_apply_controller_topology_production(
     mock_controllers,
     mock_replace,
     _verify,
+    mock_guard,
     tmp_path: Path,
 ):
     realms = tmp_path / "realms"
@@ -240,6 +249,51 @@ def test_apply_controller_topology_production(
     assert first_call_controllers == ["7jfys-wqaaa-aaaal-qxiuq-cai"]
     product_call_controllers = mock_replace.call_args_list[-1][0][1]
     assert product_call_controllers == ["irfdo-ziaaa-aaaai-raswa-cai"]
+    # The lock-out guard runs before any controller is replaced.
+    mock_guard.assert_called_once()
+    assert mock_guard.call_args.kwargs["deployer"] == "deployer-principal"
+
+
+@patch("realms.cli.casals_governance.run_casals_tree")
+@patch("realms.cli.casals_governance.resolve_casals_src", return_value=Path("/casals"))
+@patch("realms.cli.casals_governance.resolve_conductor_id", return_value="irfdo-ziaaa-aaaai-raswa-cai")
+def test_orphan_guard_refuses_deployer_only_conductor(_conductor, _src, mock_tree, tmp_path):
+    deployer = "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe"
+    mock_tree.return_value = {
+        "sections": [{"name": "Casals", "commanders": [{"principal": deployer}]}]
+    }
+    with pytest.raises(RuntimeError, match="no commander other than the deployer"):
+        ensure_conductor_not_orphaned(
+            env_name="production",
+            network="production",
+            identity="prod-identity",
+            deployer=deployer,
+            project_root=tmp_path,
+        )
+
+
+@patch("realms.cli.casals_governance.run_casals_tree")
+@patch("realms.cli.casals_governance.resolve_casals_src", return_value=Path("/casals"))
+@patch("realms.cli.casals_governance.resolve_conductor_id", return_value="irfdo-ziaaa-aaaai-raswa-cai")
+def test_orphan_guard_passes_with_another_commander(_conductor, _src, mock_tree, tmp_path):
+    deployer = "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe"
+    mock_tree.return_value = {
+        "sections": [
+            {
+                "name": "Casals",
+                "commanders": [
+                    {"principal": "g53u4-3liee-2f7qe-m2b6g-p3bpg-6aatl-cnhs3-drrzi-fllp4-qxfgh-hqe"}
+                ],
+            }
+        ]
+    }
+    ensure_conductor_not_orphaned(
+        env_name="production",
+        network="production",
+        identity="prod-identity",
+        deployer=deployer,
+        project_root=tmp_path,
+    )
 
 
 @patch("realms.cli.casals_governance.replace_canister_controllers")
@@ -337,5 +391,11 @@ def test_seed_command_invokes_governance_with_multisig_block(
     _installer,
     mock_governance,
 ):
+    order: list[str] = []
+    _publish.side_effect = lambda *a, **k: order.append("catalog")
+    mock_governance.side_effect = lambda *a, **k: order.append("governance")
     seed_command(env_name="production", identity="deployer", yes=True)
     mock_governance.assert_called_once()
+    # controller_topology removes the deployer's IC control, so governance is
+    # the very last thing seed does — after the catalog publish.
+    assert order == ["catalog", "governance"]

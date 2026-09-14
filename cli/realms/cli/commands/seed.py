@@ -77,10 +77,7 @@ def _resolve_seed_phase(
     destroy_except_frontend: bool,
 ) -> str:
     if from_phase:
-        key = from_phase.replace("-", "_")
-        if key in GOVERNANCE_SEED_PHASES:
-            return key
-        return key
+        return from_phase.replace("-", "_")
     if rebuild or destroy_except_frontend:
         return "destroy"
     return "authorize"
@@ -552,25 +549,9 @@ def seed_command(
         else:
             console.print("[dim]skip product stack (--skip-product)[/dim]")
 
-    try:
-        _run_multisig_governance_if_configured(
-            env_name=env_name,
-            network=network,
-            identity=identity,
-            env_config=env_config,
-            from_phase=from_phase,
-            project_root=project_root,
-            governance_only=governance_only,
-        )
-    except RuntimeError as exc:
-        console.print(f"[red]❌ governance multisig failed: {exc}[/red]")
-        resume = "multisig_mint"
-        if phase in GOVERNANCE_SEED_PHASES:
-            resume = phase
-        _print_resume_hint(env_name, resume)
-        raise typer.Exit(1) from exc
-
-    if not skip_catalog:
+    if governance_only:
+        console.print("[dim]skip catalog (governance resume)[/dim]")
+    elif not skip_catalog:
         console.print(Panel.fit("📚 Publishing extension/codex catalog", style="bold blue"))
         registry = _live_file_registry_id(network, project_root)
         files_publish_command(
@@ -591,5 +572,25 @@ def seed_command(
                 )
     else:
         console.print("[dim]skip catalog (--skip-catalog)[/dim]")
+
+    # Last, as in gaas: controller_topology drops the deployer from the
+    # conductor canisters, so every install / publish must already be done.
+    try:
+        _run_multisig_governance_if_configured(
+            env_name=env_name,
+            network=network,
+            identity=identity,
+            env_config=env_config,
+            from_phase=from_phase,
+            project_root=project_root,
+            governance_only=governance_only,
+        )
+    except RuntimeError as exc:
+        console.print(f"[red]❌ governance multisig failed: {exc}[/red]")
+        resume = "multisig_mint"
+        if phase in GOVERNANCE_SEED_PHASES:
+            resume = phase
+        _print_resume_hint(env_name, resume)
+        raise typer.Exit(1) from exc
 
     console.print(f"\n[green]✅ realms seed complete for {env_name} ({network})[/green]")
