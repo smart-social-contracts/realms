@@ -36,7 +36,7 @@ from .commands.env import _set_canister_id, load_env_config
 from .utils import console, get_project_root
 
 # Matches gaas ORCHESTRATION_TEMPLATES orchestration-multisig version.
-ORCHESTRATION_MULTISIG_VERSION = "1.2.0"
+ORCHESTRATION_MULTISIG_VERSION = "1.4.0"
 ORCHESTRATION_MULTISIG_KEY = f"orchestration-multisig@{ORCHESTRATION_MULTISIG_VERSION}"
 
 _ANONYMOUS_PRINCIPAL = "2vxsx-fae"
@@ -358,7 +358,7 @@ def ensure_orchestration_multisig_authorized(
     identity: Optional[str],
     project_root: Optional[Path] = None,
 ) -> None:
-    """Ensure ``orchestration-multisig@1.2.0`` is authorized (via Casals seed catalog)."""
+    """Ensure ``orchestration-multisig@1.4.0`` is authorized (via Casals seed catalog)."""
     root = project_root or get_project_root()
     casals_src = resolve_casals_src(root)
     if not casals_src:

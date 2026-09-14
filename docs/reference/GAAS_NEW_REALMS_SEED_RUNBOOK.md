@@ -33,7 +33,7 @@ Production Realms GOS Casals can hand IC control to a **governance multisig** (p
 
 Last of all — after the product sheet deploy and the catalog publish, since the final phase drops the deployer's IC control — seed runs (when the block is present):
 
-1. **`multisig_mint`** — authorize `orchestration-multisig@1.2.0`, mint or adopt the `System/governance/multisig` canister from `realms/casals.json`. Casals mints it from its own cycles.
+1. **`multisig_mint`** — authorize `orchestration-multisig@1.4.0`, mint or adopt the `System/governance/multisig` canister from `realms/casals.json`. Casals mints it from its own cycles.
 2. **`multisig_configure`** — apply signers and threshold.
 3. **`controller_topology`** — **production network only**, same split as `gaas new`: `casals_backend` + `casals_frontend` → `[multisig]`; Casals file-registry pair and every product canister → `[casals_backend]`; deployer removed. Refuses to run while the deployer is the only commander on the conductor (grant a Casals section commander first, e.g. the Casals frontend's II principal). Verified via public `dfx canister info`. Non-production networks keep the deployer as co-controller.
 
