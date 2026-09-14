@@ -126,15 +126,22 @@ def load_product_sheet(project_root: Optional[Path] = None) -> dict:
 _GOVERNANCE_STAND_NAMES = frozenset({"governance"})
 
 
-def product_deploy_sheet(sheet: dict) -> dict:
-    """``sheet`` without its governance stands (and sections left empty by that).
+def product_deploy_sheet(sheet: dict, *, keep_governance: bool = False) -> dict:
+    """The sheet to deploy for the product phase.
 
-    The governance multisig is minted only by the seed's governance phases,
-    from ``casals_governance.governance_deploy_sheet`` and only when the
-    environment declares a ``multisig`` block. Passing it through the product
-    deploy would mint one on every network, before signers are configured.
+    Casals ``deploy_sheet`` reconciles the *whole* orchestra: every registered
+    canister missing from the sheet is stopped and retired to the pool, and the
+    pool is reused for anything the sheet asks to mint. The sheet the seed
+    deploys must therefore always name everything the conductor already holds.
+
+    ``keep_governance`` (the environment declares a ``multisig`` block): keep
+    the governance stand, so the multisig is minted here with the rest of the
+    stack and stays in the sheet on every later deploy. Otherwise drop it, so
+    networks without a multisig block never mint one.
     """
     trimmed = copy.deepcopy(sheet)
+    if keep_governance:
+        return trimmed
     sections = []
     for sec in trimmed.get("sections") or []:
         stands = [
@@ -307,6 +314,37 @@ def run_casals_register(
     )
 
 
+def sheet_canister_names(sheet: dict) -> set[str]:
+    names: set[str] = set()
+    for sec in sheet.get("sections") or []:
+        for stand in sec.get("stands") or []:
+            for c in stand.get("canisters") or []:
+                name = (c.get("name") or "").strip()
+                if name:
+                    names.add(name)
+    return names
+
+
+def canisters_sheet_would_retire(sheet: dict, tree: dict) -> list[str]:
+    """Registered canisters (outside Casals' own section) that ``sheet`` omits.
+
+    Casals ``deploy_sheet`` stops those and returns them to the pool, then
+    reuses the pool for whatever the sheet asks to mint — so a partial sheet
+    can reinstall a live product canister as something else.
+    """
+    wanted = sheet_canister_names(sheet)
+    at_risk: list[str] = []
+    for sec in tree.get("sections") or []:
+        if (sec.get("name") or "").strip() == "Casals":
+            continue
+        for stand in sec.get("stands") or []:
+            for c in stand.get("canisters") or []:
+                name = (c.get("name") or "").strip()
+                if name and name not in wanted:
+                    at_risk.append(name)
+    return at_risk
+
+
 def run_casals_sheet_deploy(
     sheet: dict | Path,
     *,
@@ -314,34 +352,51 @@ def run_casals_sheet_deploy(
     identity: Optional[str],
     casals_src: Path,
     canister: str,
+    allow_retire: bool = False,
 ) -> dict:
-    sheet_path: Path | None = None
-    tmp_path: Path | None = None
-    if isinstance(sheet, dict):
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".sheet.json",
-            delete=False,
-            encoding="utf-8",
+    """``casals sheet deploy`` with the given sheet.
+
+    Refuses (unless ``allow_retire``) when the conductor already holds
+    registered canisters the sheet does not name: ``deploy_sheet`` would retire
+    them to the pool and may reuse them for the sheet's new canisters.
+    """
+    if not isinstance(sheet, dict):
+        sheet = json.loads(Path(sheet).read_text(encoding="utf-8"))
+    if not allow_retire:
+        tree = run_casals_tree(
+            network=network,
+            identity=identity,
+            casals_src=casals_src,
+            canister=canister,
         )
-        json.dump(sheet, tmp)
-        tmp.close()
-        tmp_path = Path(tmp.name)
-        sheet_path = tmp_path
-    else:
-        sheet_path = Path(sheet)
+        at_risk = canisters_sheet_would_retire(sheet, tree)
+        if at_risk:
+            raise RuntimeError(
+                "refusing sheet deploy: it omits registered canisters "
+                f"{', '.join(sorted(at_risk))}, which Casals would stop and "
+                "retire to the pool (and may reinstall as the sheet's new "
+                "canisters). Deploy the full sheet instead."
+            )
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".sheet.json",
+        delete=False,
+        encoding="utf-8",
+    )
+    json.dump(sheet, tmp)
+    tmp.close()
+    tmp_path = Path(tmp.name)
 
     try:
         return _run_casals_cli(
-            ["sheet", "deploy", str(sheet_path)],
+            ["sheet", "deploy", str(tmp_path)],
             network=network,
             identity=identity,
             casals_src=casals_src,
             canister=canister,
         )
     finally:
-        if tmp_path is not None:
-            tmp_path.unlink(missing_ok=True)
+        tmp_path.unlink(missing_ok=True)
 
 
 def canister_ids_from_tree(tree: dict) -> Dict[str, str]:
@@ -2241,8 +2296,18 @@ def deploy_product_sheet_on_casals(
         return False, "no Casals checkout (set CASALS_SRC or clone ../Casals)"
 
     try:
-        # Governance (multisig) is minted by the seed's governance phases, not here.
-        sheet = product_deploy_sheet(load_product_sheet(root))
+        # Governance stays in the sheet when the environment declares a multisig
+        # block: deploy_sheet retires whatever the sheet omits, so the sheet must
+        # always name the whole orchestra. Signers are applied by the seed's
+        # governance phases afterwards.
+        try:
+            env_cfg = load_env_config(env_name, root)
+        except typer.Exit:
+            env_cfg = {}
+        keep_governance = isinstance(env_cfg.get("multisig"), dict)
+        sheet = product_deploy_sheet(
+            load_product_sheet(root), keep_governance=keep_governance
+        )
     except RuntimeError as exc:
         return False, str(exc)
 

@@ -31,6 +31,7 @@ from .casals_product import (
     run_casals_seed_catalog,
     run_casals_sheet_deploy,
     run_casals_tree,
+    sheet_canister_names,
 )
 from .commands.env import _set_canister_id, load_env_config
 from .utils import console, get_project_root
@@ -143,7 +144,25 @@ def is_production_topology_network(network: str) -> bool:
 
 
 def governance_deploy_sheet(project_root: Optional[Path] = None) -> dict[str, Any]:
-    """Sheet fragment Casals may mint: governance/multisig only."""
+    """The sheet to deploy when minting the multisig: the whole product sheet.
+
+    Casals ``deploy_sheet`` retires every registered canister the sheet omits
+    (stopped, returned to the pool) and mints new canisters from that pool
+    first. Deploying a governance-only fragment on a conductor that already
+    holds the product stack therefore stops the stack and can reinstall one of
+    its canisters as the multisig. The full sheet reuses the registered
+    canisters by name and mints only what is missing.
+    """
+    sheet = copy.deepcopy(load_product_sheet(project_root))
+    if _MULTISIG_TREE_NAME not in sheet_canister_names(sheet):
+        raise RuntimeError(
+            f"product sheet missing {_GOVERNANCE_SECTION}/{_GOVERNANCE_STAND}/multisig"
+        )
+    return sheet
+
+
+def governance_sheet_fragment(project_root: Optional[Path] = None) -> dict[str, Any]:
+    """Governance/multisig stand alone (inspection only — never deploy this)."""
     sheet = copy.deepcopy(load_product_sheet(project_root))
     sections: list[dict[str, Any]] = []
     for sec in sheet.get("sections") or []:
@@ -469,10 +488,12 @@ def ensure_multisig_minted(
         persist_multisig_backend_id(env_name, network, tree_id, project_root=root)
         return tree_id
 
-    console.print("  deploy_sheet (System/governance/multisig)…")
-    fragment = governance_deploy_sheet(root)
+    console.print("  deploy_sheet (full product sheet, mints System/governance/multisig)…")
+    # Full sheet, never a fragment: see governance_deploy_sheet. The deploy
+    # helper also refuses any sheet that would retire registered canisters.
+    sheet = governance_deploy_sheet(root)
     result = run_casals_sheet_deploy(
-        fragment,
+        sheet,
         network=network,
         identity=identity,
         casals_src=casals_src,
@@ -484,6 +505,12 @@ def ensure_multisig_minted(
     errors = result.get("errors") or []
     if errors:
         raise RuntimeError(f"deploy_sheet governance errors: {errors}")
+    retired = result.get("retired_canisters") or []
+    if retired:
+        raise RuntimeError(
+            f"deploy_sheet retired {', '.join(retired)} to the pool; restore them "
+            "(register by name, pool_remove, start) before continuing"
+        )
 
     tree = run_casals_tree(
         network=network,

@@ -43,6 +43,20 @@ def test_parse_multisig_config_optional_block():
     assert parse_multisig_config({"name": "demo"}) is None
 
 
+def test_governance_deploy_sheet_is_the_full_product_sheet():
+    """Never a governance-only fragment: Casals deploy_sheet retires every
+    registered canister the sheet omits and mints from that pool first."""
+    from realms.cli.casals_governance import governance_deploy_sheet
+    from realms.cli.casals_product import load_product_sheet, sheet_canister_names
+
+    root = Path(__file__).resolve().parents[2]
+    sheet = governance_deploy_sheet(root)
+    names = sheet_canister_names(sheet)
+    assert "multisig" in names
+    assert names == sheet_canister_names(load_product_sheet(root))
+    assert {"marketplace-backend", "file-registry"} <= names
+
+
 def test_parse_multisig_config_valid():
     cfg = parse_multisig_config(
         {

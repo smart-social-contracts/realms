@@ -369,6 +369,71 @@ def test_product_deploy_sheet_leaves_governance_to_the_seed_phases():
     assert {sec["name"] for sec in sheet["sections"]} == {"System", "Product"}
 
 
+def test_product_deploy_sheet_keeps_governance_when_env_declares_multisig():
+    from realms.cli.casals_product import product_deploy_sheet, sheet_canister_names
+
+    root = Path(__file__).resolve().parents[2]
+    sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))
+    kept = product_deploy_sheet(sheet, keep_governance=True)
+    # deploy_sheet retires whatever the sheet omits, so once a conductor holds
+    # a multisig every later product deploy must keep naming it.
+    assert "multisig" in sheet_canister_names(kept)
+    assert sheet_canister_names(kept) == sheet_canister_names(sheet)
+
+
+def test_canisters_sheet_would_retire_flags_registered_canisters_missing_from_sheet():
+    from realms.cli.casals_product import canisters_sheet_would_retire
+
+    fragment = {
+        "sections": [
+            {"name": "System", "stands": [{"name": "governance", "canisters": [{"name": "multisig"}]}]}
+        ]
+    }
+    tree = {
+        "sections": [
+            # Casals' own canisters are retire-protected by Casals itself.
+            {"name": "Casals", "stands": [{"name": "System", "canisters": [{"name": "file_registry"}]}]},
+            {
+                "name": "Product",
+                "stands": [
+                    {"name": "marketplace", "canisters": [{"name": "marketplace-backend"}, {"name": "marketplace-frontend"}]},
+                ],
+            },
+        ]
+    }
+    assert sorted(canisters_sheet_would_retire(fragment, tree)) == [
+        "marketplace-backend",
+        "marketplace-frontend",
+    ]
+    full = {
+        "sections": fragment["sections"]
+        + [{"name": "Product", "stands": [{"name": "marketplace", "canisters": [{"name": "marketplace-backend"}, {"name": "marketplace-frontend"}]}]}]
+    }
+    assert canisters_sheet_would_retire(full, tree) == []
+
+
+def test_run_casals_sheet_deploy_refuses_sheet_that_would_retire(tmp_path: Path):
+    from realms.cli import casals_product as cp
+
+    fragment = {"sections": [{"name": "System", "stands": [{"name": "governance", "canisters": [{"name": "multisig"}]}]}]}
+    tree = {"sections": [{"name": "Product", "stands": [{"name": "marketplace", "canisters": [{"name": "marketplace-backend"}]}]}]}
+    with patch.object(cp, "run_casals_tree", return_value=tree), patch.object(
+        cp, "_run_casals_cli"
+    ) as run_cli:
+        with pytest.raises(RuntimeError, match="marketplace-backend"):
+            cp.run_casals_sheet_deploy(
+                fragment, network="production", identity=None, casals_src=tmp_path, canister="aaaaa-aa"
+            )
+        run_cli.assert_not_called()
+        # Full sheet: nothing would be retired, deploy proceeds.
+        run_cli.return_value = {"ok": True}
+        full = {"sections": fragment["sections"] + tree["sections"]}
+        cp.run_casals_sheet_deploy(
+            full, network="production", identity=None, casals_src=tmp_path, canister="aaaaa-aa"
+        )
+        assert run_cli.call_args.args[0][:2] == ["sheet", "deploy"]
+
+
 def test_product_sheet_from_repo_has_no_gaas_stands():
     root = Path(__file__).resolve().parents[2]
     sheet = json.loads(product_sheet_path(root).read_text(encoding="utf-8"))
