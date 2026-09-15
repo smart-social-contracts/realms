@@ -187,10 +187,7 @@ def setup_save_draft(args_json: str) -> Async[str]:
         return json.dumps({"success": False, "error": "Realm not found"})
 
     if "token" in params:
-        params["token"] = _complete_catalog_token_draft(
-            params.get("token"),
-            getattr(realm, "network", "") or "",
-        )
+        params["token"] = _complete_catalog_token_draft(params.get("token"))
 
     partial = {
         k: params[k]
@@ -262,19 +259,13 @@ def _apply_persisted_draft_token(realm, token_value: Any) -> Async[Optional[dict
     Catalog symbols (ckEURC → pe5t5) are completed first. Explicit skip/null
     returns None and does not invent REALMS.
     """
-    completed = _complete_catalog_token_draft(
-        token_value,
-        getattr(realm, "network", "") or "",
-    )
+    completed = _complete_catalog_token_draft(token_value)
     token = _token_record(completed)
     if token is None:
         return None
     token_canister_id = (token.get("token_canister_id") or "").strip()
     if not token_canister_id:
-        catalog = _catalog_token_for_symbol(
-            str(token.get("symbol") or ""),
-            getattr(realm, "network", "") or "",
-        )
+        catalog = _catalog_token_for_symbol(str(token.get("symbol") or ""))
         if catalog:
             token_canister_id = (catalog.get("ledger") or "").strip()
     if not token_canister_id:
@@ -300,10 +291,7 @@ def _apply_draft_token_now(realm) -> Async[Optional[dict]]:
     error — do not proceed to a tick that paints the Settings fossil.
     """
     draft = dict(get_setup_draft(realm))
-    draft["token"] = _complete_catalog_token_draft(
-        draft.get("token"),
-        getattr(realm, "network", "") or "",
-    )
+    draft["token"] = _complete_catalog_token_draft(draft.get("token"))
     token = _token_record(draft.get("token"))
     token_canister_id = _configured_token_canister_id(realm, draft)
     if not token_canister_id:
@@ -418,10 +406,7 @@ def run_setup_launch_phase(realm, phase_name: str) -> Async[dict]:
         outcome = _launch_phase_install_codex(realm, draft)
     elif phase_name == "configure_token":
         draft = dict(draft)
-        draft["token"] = _complete_catalog_token_draft(
-            draft.get("token"),
-            getattr(realm, "network", "") or "",
-        )
+        draft["token"] = _complete_catalog_token_draft(draft.get("token"))
         outcome = _launch_phase_configure_token(realm, draft)
     elif phase_name == "upload_branding":
         outcome = _launch_phase_upload_branding(realm, draft)
@@ -536,20 +521,20 @@ def _token_record(value: Any) -> Optional[dict]:
     return out
 
 
-def _catalog_token_for_symbol(symbol: str, network: str = "") -> Optional[dict]:
+def _catalog_token_for_symbol(symbol: str) -> Optional[dict]:
     """Look up a shared-catalog token. Empty symbol does not invent REALMS."""
     symbol = (symbol or "").strip()
     if not symbol:
         return None
     try:
-        from api.tokens import resolve_catalog_token
+        from api.tokens import resolve_shared_token
     except ImportError:
         return None
 
-    return resolve_catalog_token(symbol, network)
+    return resolve_shared_token(symbol)
 
 
-def _complete_catalog_token_draft(token: Any, network: str = "") -> Any:
+def _complete_catalog_token_draft(token: Any) -> Any:
     """Coerce any catalog-shaped token into {symbol, ledger, decimals, indexer}.
 
     Strings, ``{id}``, ``{existing}``, and ``{symbol}`` all resolve through
@@ -563,10 +548,7 @@ def _complete_catalog_token_draft(token: Any, network: str = "") -> Any:
     completed = dict(record)
     if (completed.get("token_canister_id") or "").strip():
         return completed
-    catalog = _catalog_token_for_symbol(
-        str(completed.get("symbol") or ""),
-        network,
-    )
+    catalog = _catalog_token_for_symbol(str(completed.get("symbol") or ""))
     if not catalog:
         return completed
     ledger = (catalog.get("ledger") or "").strip()
@@ -597,7 +579,7 @@ def _configured_token_canister_id(realm, draft: dict) -> str:
     symbol = _token_symbol_from_value(token) or _token_symbol_from_value(setup_token)
     if not symbol:
         return ""
-    catalog = _catalog_token_for_symbol(symbol, getattr(realm, "network", "") or "")
+    catalog = _catalog_token_for_symbol(symbol)
     if not catalog:
         return ""
     return (catalog.get("ledger") or "").strip()
@@ -624,8 +606,7 @@ def _apply_configured_token(realm, params: dict) -> Async[dict]:
 
     from api.tokens import register_treasury_token, resolve_ledger_token_info
 
-    network = getattr(realm, "network", "") or ""
-    resolved = yield from resolve_ledger_token_info(token_canister_id, network)
+    resolved = yield from resolve_ledger_token_info(token_canister_id)
     if not resolved.get("success"):
         return {
             "success": False,
@@ -663,10 +644,7 @@ def _launch_phase_configure_token(realm, draft: dict) -> Async[dict]:
     from core.realm_currency import realm_currency
 
     draft = dict(draft or {})
-    draft["token"] = _complete_catalog_token_draft(
-        draft.get("token"),
-        getattr(realm, "network", "") or "",
-    )
+    draft["token"] = _complete_catalog_token_draft(draft.get("token"))
 
     token_canister_id = _configured_token_canister_id(realm, draft)
     if not token_canister_id:

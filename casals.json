@@ -9,6 +9,7 @@
         "provider": "none"
       },
       "portal_url": "http://localhost:8000",
+      "marketplace_host": "",
       "test_flags": {
         "test_mode": true,
         "ii_bypass": true,
@@ -34,6 +35,7 @@
         "ttl": 60
       },
       "portal_url": "https://gos.earth",
+      "marketplace_host": "realmsgos.org",
       "test_flags": {},
       "principals": {
         "operator": "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe",
@@ -107,6 +109,12 @@
       ]
     }
   },
+  "domains": [
+    {
+      "host": "$env.marketplace_host",
+      "canister": "marketplace-frontend"
+    }
+  ],
   "registry": {
     "$comment": "Product wasms are built in this repo before `casals up` (local:; recipes: .github/workflows/release.yml build steps); conductor wasms by the Casals CLI (build:); ic-tokens wasms are the v0.1.0 release copies in .external-wasms.",
     "wasms": [
@@ -230,7 +238,7 @@
         },
         {
           "name": "file-registry",
-          "description": "Fleet file registry (realm branding, extensions, catalogs) \u2014 not the conductor's own.",
+          "description": "Fleet file registry (realm branding, extensions, catalogs) — not the conductor's own.",
           "canisters": [
             {
               "name": "fleet-file-registry",

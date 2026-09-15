@@ -1,5 +1,6 @@
 """Realm treasury token and NFT canister resolution + Wallet registration."""
 
+import json
 from typing import Optional
 
 from _cdk import (
@@ -223,91 +224,6 @@ def _valid_canister_id(value: str) -> bool:
             return False
     return True
 
-# Shared ledger IDs per network (mirrors canister_ids.json + well-known IC tokens).
-_SHARED_TOKEN_LEDGERS = {
-    "staging": {
-        "REALMS": {
-            "ledger": "cj65k-laaaa-aaaac-bfxqq-cai",
-            "indexer": "cj65k-laaaa-aaaac-bfxqq-cai",
-            "decimals": 8,
-            "name": "REALMS Token",
-        },
-        "ckBTC": {
-            "ledger": "mxzaz-hqaaa-aaaar-qaada-cai",
-            "indexer": "n5wcd-faaaa-aaaar-qaaea-cai",
-            "decimals": 8,
-            "name": "ckBTC",
-        },
-        "ckUSDC": {
-            "ledger": "xckus-ciaaa-aaaam-qbssa-cai",
-            "indexer": "ufqgi-4qaaa-aaaam-qbsna-cai",
-            "decimals": 6,
-            "name": "ckUSDC",
-        },
-        # Official mainnet ICRC ledger. DFINITY docs / ckETH minter publish
-        # the ledger only; no separate index canister, so indexer = ledger.
-        "ckEURC": {
-            "ledger": "pe5t5-diaaa-aaaar-qahwa-cai",
-            "indexer": "pe5t5-diaaa-aaaar-qahwa-cai",
-            "decimals": 6,
-            "name": "ckEURC",
-        },
-    },
-    "demo": {
-        "REALMS": {
-            "ledger": "xbkkh-syaaa-aaaah-qq3ya-cai",
-            "indexer": "xbkkh-syaaa-aaaah-qq3ya-cai",
-            "decimals": 8,
-            "name": "REALMS Token",
-        },
-        "ckBTC": {
-            "ledger": "mxzaz-hqaaa-aaaar-qaada-cai",
-            "indexer": "n5wcd-faaaa-aaaar-qaaea-cai",
-            "decimals": 8,
-            "name": "ckBTC",
-        },
-        "ckUSDC": {
-            "ledger": "xckus-ciaaa-aaaam-qbssa-cai",
-            "indexer": "ufqgi-4qaaa-aaaam-qbsna-cai",
-            "decimals": 6,
-            "name": "ckUSDC",
-        },
-        "ckEURC": {
-            "ledger": "pe5t5-diaaa-aaaar-qahwa-cai",
-            "indexer": "pe5t5-diaaa-aaaar-qahwa-cai",
-            "decimals": 6,
-            "name": "ckEURC",
-        },
-    },
-    "test": {
-        "REALMS": {
-            "ledger": "nusyl-jiaaa-aaaae-qj6mq-cai",
-            "indexer": "nusyl-jiaaa-aaaae-qj6mq-cai",
-            "decimals": 8,
-            "name": "REALMS Token",
-        },
-        "ckBTC": {
-            "ledger": "mxzaz-hqaaa-aaaar-qaada-cai",
-            "indexer": "n5wcd-faaaa-aaaar-qaaea-cai",
-            "decimals": 8,
-            "name": "ckBTC",
-        },
-        "ckUSDC": {
-            "ledger": "xckus-ciaaa-aaaam-qbssa-cai",
-            "indexer": "ufqgi-4qaaa-aaaam-qbsna-cai",
-            "decimals": 6,
-            "name": "ckUSDC",
-        },
-        "ckEURC": {
-            "ledger": "pe5t5-diaaa-aaaar-qahwa-cai",
-            "indexer": "pe5t5-diaaa-aaaar-qahwa-cai",
-            "decimals": 6,
-            "name": "ckEURC",
-        },
-    },
-}
-
-
 def _realm_entity():
     try:
         from ggg import Realm
@@ -319,90 +235,59 @@ def _realm_entity():
 
 
 def get_token_canister_id() -> Optional[str]:
-    """Return the realm treasury token ledger ID (entity first, then static config)."""
+    """Return the realm treasury token ledger ID (set by the installer)."""
     realm = _realm_entity()
-    if realm:
-        token_id = (getattr(realm, "token_canister_id", "") or "").strip()
-        if token_id:
-            return token_id
-    try:
-        from config import CANISTER_IDS
-
-        for key in ("token_backend", "realm_token_ledger"):
-            value = (CANISTER_IDS.get(key) or "").strip()
-            if value:
-                return value
-    except Exception as e:
-        logger.warning(f"Could not get token canister ID from config: {e}")
-    return None
+    token_id = (getattr(realm, "token_canister_id", "") or "").strip() if realm else ""
+    return token_id or None
 
 
 def get_nft_canister_id() -> Optional[str]:
-    """Return the realm land NFT canister ID (entity first, then static config)."""
+    """Return the realm land NFT canister ID (set by the installer)."""
     realm = _realm_entity()
-    if realm:
-        nft_id = (getattr(realm, "nft_canister_id", "") or "").strip()
-        if nft_id:
-            return nft_id
-    try:
-        from config import CANISTER_IDS
+    nft_id = (getattr(realm, "nft_canister_id", "") or "").strip() if realm else ""
+    return nft_id or None
 
-        value = (CANISTER_IDS.get("nft_backend") or "").strip()
-        if value:
-            return value
-    except Exception as e:
-        logger.warning(f"Could not get NFT canister ID from config: {e}")
+
+def shared_token_catalog() -> dict:
+    """{symbol: {ledger, indexer, decimals, name?}}: the shared ledgers this realm
+    may adopt, handed over by the installer (`set_canister_config_json
+    shared_tokens`) from the environment's casals.json. The canister holds no
+    per-network table of its own."""
+    realm = _realm_entity()
+    try:
+        catalog = json.loads(getattr(realm, "shared_tokens_json", "") or "{}") if realm else {}
+    except (TypeError, ValueError):
+        return {}
+    return catalog if isinstance(catalog, dict) else {}
+
+
+def _catalog_entry(symbol: str, cfg: dict) -> dict:
+    out = dict(cfg)
+    out["symbol"] = symbol
+    out.setdefault("indexer", cfg.get("ledger"))
+    out.setdefault("name", symbol)
+    return out
+
+
+def resolve_shared_token(symbol: str) -> Optional[dict]:
+    """Catalog entry for a symbol (case-insensitive), or None."""
+    sym = (symbol or "").strip().upper()
+    if not sym:
+        return None
+    for key, cfg in shared_token_catalog().items():
+        if key.upper() == sym and isinstance(cfg, dict):
+            return _catalog_entry(key, cfg)
     return None
 
 
-def resolve_shared_token_by_ledger(ledger_canister_id: str, network: str = "") -> Optional[dict]:
-    """Reverse lookup: ledger canister ID -> shared token metadata."""
+def resolve_shared_token_by_ledger(ledger_canister_id: str) -> Optional[dict]:
+    """Reverse lookup: ledger canister id -> catalog entry, or None."""
     ledger = (ledger_canister_id or "").strip()
     if not ledger:
         return None
-    net = (network or "").strip().lower()
-    networks = [net] if net else list(_SHARED_TOKEN_LEDGERS.keys())
-    for net_key in networks:
-        net_map = _SHARED_TOKEN_LEDGERS.get(net_key, {})
-        for sym, cfg in net_map.items():
-            if (cfg.get("ledger") or "").strip() == ledger:
-                out = dict(cfg)
-                out["symbol"] = sym
-                return out
-    return None
-
-
-def resolve_shared_token(symbol: str, network: str) -> Optional[dict]:
-    """Resolve a shared token symbol to ledger metadata for a network."""
-    sym = (symbol or "").strip()
-    if not sym:
-        return None
-    net_map = _SHARED_TOKEN_LEDGERS.get((network or "").strip().lower(), {})
-    if sym in net_map:
-        return dict(net_map[sym])
-    upper = sym.upper()
-    for key, cfg in net_map.items():
-        if key.upper() == upper:
-            return dict(cfg)
-    return None
-
-
-def resolve_catalog_token(symbol: str, network: str = "") -> Optional[dict]:
-    """Resolve a catalog symbol, searching every network if one miss or network is empty.
-
-    ckEURC is the same ledger on staging/demo/test. Do not invent REALMS when
-    ``symbol`` is empty — callers must pass the draft/setup symbol.
-    """
-    cfg = resolve_shared_token(symbol, network)
-    if cfg and (cfg.get("ledger") or "").strip():
-        return cfg
-    preferred = (network or "").strip().lower()
-    for net_key in _SHARED_TOKEN_LEDGERS:
-        if net_key == preferred:
-            continue
-        cfg = resolve_shared_token(symbol, net_key)
-        if cfg and (cfg.get("ledger") or "").strip():
-            return cfg
+    for key, cfg in shared_token_catalog().items():
+        if isinstance(cfg, dict) and (cfg.get("ledger") or "").strip() == ledger:
+            return _catalog_entry(key, cfg)
     return None
 
 
@@ -422,9 +307,7 @@ def get_treasury_token_indexer(symbol: str = "", ledger_canister_id: str = "") -
             logger.warning(f"Could not load Token[{sym}] indexer: {e}")
     ledger = (ledger_canister_id or "").strip()
     if ledger:
-        realm = _realm_entity()
-        network = getattr(realm, "network", "") if realm else ""
-        shared = resolve_shared_token_by_ledger(ledger, network)
+        shared = resolve_shared_token_by_ledger(ledger)
         if shared and shared.get("indexer"):
             return str(shared["indexer"])
     return ledger
@@ -457,19 +340,19 @@ def _unwrap_query_result(result):
     return result
 
 
-def _indexer_for_ledger(ledger: str, network: str = "") -> str:
-    shared = resolve_shared_token_by_ledger(ledger, network)
+def _indexer_for_ledger(ledger: str) -> str:
+    shared = resolve_shared_token_by_ledger(ledger)
     if shared and shared.get("indexer"):
         return str(shared["indexer"]).strip()
     return ledger
 
 
-def resolve_ledger_token_info(ledger_canister_id: str, network: str = "") -> "Async[dict]":
+def resolve_ledger_token_info(ledger_canister_id: str) -> "Async[dict]":
     """Resolve symbol/decimals/indexer from live ICRC-1 ledger metadata.
 
     Queries ``icrc1_symbol``, ``icrc1_name``, and ``icrc1_decimals`` on the
-    canister. Falls back to the static shared-token registry only when the
-    ledger does not expose ICRC-1 metadata (e.g. legacy ledgers).
+    canister. Falls back to the shared-token catalog only when the ledger does
+    not expose ICRC-1 metadata (e.g. legacy ledgers).
     """
     ledger = (ledger_canister_id or "").strip()
     if not ledger:
@@ -490,7 +373,7 @@ def resolve_ledger_token_info(ledger_canister_id: str, network: str = "") -> "As
         decimals = int(decimals_raw) if decimals_raw is not None else 8
 
         if symbol:
-            shared = resolve_shared_token_by_ledger(ledger, network)
+            shared = resolve_shared_token_by_ledger(ledger)
             display_name = name or (shared or {}).get("name") or symbol
             return {
                 "success": True,
@@ -498,7 +381,7 @@ def resolve_ledger_token_info(ledger_canister_id: str, network: str = "") -> "As
                 "symbol": symbol[:16],
                 "name": str(display_name)[:64],
                 "decimals": decimals,
-                "indexer_canister_id": _indexer_for_ledger(ledger, network),
+                "indexer_canister_id": _indexer_for_ledger(ledger),
                 "source": "ledger",
             }
         ledger_error = "empty icrc1_symbol response"
@@ -506,7 +389,7 @@ def resolve_ledger_token_info(ledger_canister_id: str, network: str = "") -> "As
         ledger_error = str(e)
         logger.warning(f"ICRC-1 metadata query failed for {ledger}: {e}")
 
-    shared = resolve_shared_token_by_ledger(ledger, network)
+    shared = resolve_shared_token_by_ledger(ledger)
     symbol = str((shared or {}).get("symbol") or (shared or {}).get("name") or "").strip()
     if symbol:
         decimals = int(shared.get("decimals", 8))

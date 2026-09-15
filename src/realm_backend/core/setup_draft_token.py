@@ -1,7 +1,8 @@
 """Leftover-unshadowed treasury apply.
 
 Host ``main.py`` must import this module — never ``api.setup`` — so a leftover
-``api/setup.py`` cannot steal the apply body. ckEURC → pe5t5 only; no REALMS.
+``api/setup.py`` cannot steal the apply body. Catalog symbols resolve through
+the realm's shared-token catalog; no REALMS is invented.
 """
 
 from __future__ import annotations
@@ -15,9 +16,6 @@ from ic_python_logging import get_logger
 from core.setup import get_setup_draft, require_setup_authorized, update_setup_config
 
 logger = get_logger("core.setup_draft_token")
-
-CKEURC_LEDGER = "pe5t5-diaaa-aaaar-qahwa-cai"
-
 
 def _load_realm():
     from ggg import Realm
@@ -59,7 +57,7 @@ def _token_record(value: Any) -> Optional[dict]:
     return out
 
 
-def _complete_catalog_token(token: Any, network: str = "") -> Any:
+def _complete_catalog_token(token: Any) -> Any:
     if token is None:
         return None
     record = _token_record(token)
@@ -71,15 +69,9 @@ def _complete_catalog_token(token: Any, network: str = "") -> Any:
     symbol = str(completed.get("symbol") or "").strip()
     if not symbol:
         return completed
-    try:
-        from api.tokens import resolve_catalog_token
-    except ImportError:
-        if symbol.upper() == "CKEURC":
-            completed["token_canister_id"] = CKEURC_LEDGER
-            completed.setdefault("decimals", 6)
-            completed.setdefault("indexer_canister_id", CKEURC_LEDGER)
-        return completed
-    catalog = resolve_catalog_token(symbol, network)
+    from api.tokens import resolve_shared_token
+
+    catalog = resolve_shared_token(symbol)
     if not catalog:
         return completed
     ledger = (catalog.get("ledger") or "").strip()
@@ -108,8 +100,7 @@ def _apply_configured_token(realm, params: dict) -> Async[dict]:
 
     from api.tokens import register_treasury_token, resolve_ledger_token_info
 
-    network = getattr(realm, "network", "") or ""
-    resolved = yield from resolve_ledger_token_info(token_canister_id, network)
+    resolved = yield from resolve_ledger_token_info(token_canister_id)
     if not resolved.get("success"):
         return {
             "success": False,
@@ -169,7 +160,7 @@ def apply_persisted_draft_if_present() -> Async[dict]:
     if not realm:
         return {"success": False, "error": "Realm not found"}
     draft = dict(get_setup_draft(realm))
-    completed = _complete_catalog_token(draft.get("token"), getattr(realm, "network", "") or "")
+    completed = _complete_catalog_token(draft.get("token"))
     token = _token_record(completed)
     if token is None:
         return {"success": True, "skipped": True}
@@ -190,7 +181,7 @@ def apply_setup_draft_token_now() -> Async[str]:
         return json.dumps({"success": False, "error": "Realm not found"})
 
     draft = dict(get_setup_draft(realm))
-    completed = _complete_catalog_token(draft.get("token"), getattr(realm, "network", "") or "")
+    completed = _complete_catalog_token(draft.get("token"))
     token = _token_record(completed)
     if token is None:
         return json.dumps({"success": False, "error": "token_canister_id is required"})

@@ -2346,16 +2346,9 @@ def set_canister_config_json(args: text) -> Async[text]:
         treasury_token_indexer_id = None
         token_canister_id = params.get("token_canister_id")
         if token_canister_id and str(token_canister_id).strip():
-            from ggg import Realm
             from api.tokens import resolve_ledger_token_info
 
-            network = ""
-            realm = Realm.load("1")
-            if realm:
-                network = getattr(realm, "network", "") or ""
-            resolved = yield from resolve_ledger_token_info(
-                str(token_canister_id).strip(), network
-            )
+            resolved = yield from resolve_ledger_token_info(str(token_canister_id).strip())
             if not resolved.get("success"):
                 return json.dumps(
                     {
@@ -4903,7 +4896,7 @@ def get_objects_paginated(
 def get_objects(params: Vec[Tuple[str, str]]) -> RealmResponse:
     """Example:
 
-    $ dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects '(
+    $ dfx canister call --output json <realm-backend-id> get_objects '(
       vec { record { 0 = "User"; 1 = "1" };  record { 0 = "Realm"; 1 = "1" }; }
     )'
     {
@@ -6850,14 +6843,9 @@ def get_nft_config() -> text:
 def resolve_token_ledger(ledger_canister_id: text) -> Async[text]:
     """Resolve symbol, decimals, and suggested indexer from a ledger canister."""
     try:
-        from ggg import Realm
         from api.tokens import resolve_ledger_token_info
 
-        network = ""
-        realm = Realm.load("1")
-        if realm:
-            network = getattr(realm, "network", "") or ""
-        result = yield from resolve_ledger_token_info(ledger_canister_id, network)
+        result = yield from resolve_ledger_token_info(ledger_canister_id)
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"resolve_token_ledger failed: {e}")
@@ -6952,11 +6940,7 @@ def update_realm_config(config_json: str) -> Async[text]:
         if token_canister_id:
             from api.tokens import resolve_ledger_token_info
 
-            network = ""
-            realm = Realm.load("1")
-            if realm:
-                network = getattr(realm, "network", "") or ""
-            resolved = yield from resolve_ledger_token_info(token_canister_id, network)
+            resolved = yield from resolve_ledger_token_info(token_canister_id)
             if not resolved.get("success"):
                 return json.dumps(
                     {

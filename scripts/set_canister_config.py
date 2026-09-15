@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 
-CONFIG_FILE_BACKEND = Path("src/realm_backend/config.py")
 CONFIG_FILE_FRONTEND = Path("src/realm_frontend/src/lib/config.js")
 
 
@@ -67,34 +66,6 @@ def update_frontend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: s
     print(f"✅ Updated {CONFIG_FILE_FRONTEND}")
 
 
-def update_backend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: str, token_backend_id: str, nft_backend_id: str) -> None:
-    """Update backend config.py with canister IDs."""
-    import re
-    
-    if not CONFIG_FILE_BACKEND.exists():
-        print(f"Warning: Backend config not found at {CONFIG_FILE_BACKEND}")
-        return
-    
-    content = CONFIG_FILE_BACKEND.read_text()
-    
-    if ii_id:
-        content = re.sub(r'"internet_identity": "[^"]*"', f'"internet_identity": "{ii_id}"', content)
-    if ckbtc_ledger_id:
-        content = re.sub(r'"ckbtc_ledger": "[^"]*"', f'"ckbtc_ledger": "{ckbtc_ledger_id}"', content)
-    if ckbtc_indexer_id:
-        content = re.sub(r'"ckbtc_indexer": "[^"]*"', f'"ckbtc_indexer": "{ckbtc_indexer_id}"', content)
-    if token_backend_id:
-        content = re.sub(r'"token_backend": "[^"]*"', f'"token_backend": "{token_backend_id}"', content)
-        # Also update realm_token_ledger and realm_token_indexer (same canister for simple token)
-        content = re.sub(r'"realm_token_ledger": "[^"]*"', f'"realm_token_ledger": "{token_backend_id}"', content)
-        content = re.sub(r'"realm_token_indexer": "[^"]*"', f'"realm_token_indexer": "{token_backend_id}"', content)
-    if nft_backend_id:
-        content = re.sub(r'"nft_backend": "[^"]*"', f'"nft_backend": "{nft_backend_id}"', content)
-    
-    CONFIG_FILE_BACKEND.write_text(content)
-    print(f"✅ Updated {CONFIG_FILE_BACKEND}")
-
-
 def main(network: str):
     print(f"🔧 Setting canister config for network: {network}")
     
@@ -115,8 +86,9 @@ def main(network: str):
     print(f"   nft_backend: {nft_backend_id or 'not found'}")
 
     # Update config files
+    # The backend takes its ids at runtime from the installer
+    # (set_canister_config_json); only the frontend dev config is a file.
     update_frontend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id, nft_backend_id, network)
-    update_backend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id, nft_backend_id)
 
 
 if __name__ == "__main__":

@@ -318,9 +318,7 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     except Exception:
         pass
 
-    # 1b. GOS installer/registry first-boot. Casals is not a lasting
-    # controller; the installer (fltjm on test) must be able to call
-    # set_canister_config_json during setup without realm.admin on a User.
+    # 1b. The installer recorded at first boot (set_canister_config_json after setup).
     try:
         realm = Realm.load("1")
         if is_bootstrap_admin_caller(caller_principal, realm):
@@ -434,19 +432,11 @@ def require(operation: str):
 
 
 def is_bootstrap_admin_caller(caller_principal: str, realm) -> bool:
-    """Installer/registry may act as admin for first-boot without IC control.
-
-    During setup, any known GOS installer/registry principal is allowed.
-    After setup completes, only the recorded ``installer_canister_id``
-    keeps this bypass — not every GOS installer in every environment.
-    """
+    """The installer recorded at first boot may act as admin (it configures the
+    realm after setup). Being a controller is checked before this; there is no
+    baked-in list of installer ids."""
     if not realm:
         return False
-    from core.network_infra import is_known_bootstrap_principal
-
-    status = str(getattr(realm, "status", "") or "").strip()
-    if status == "setup" and is_known_bootstrap_principal(caller_principal):
-        return True
     installer_id = str(getattr(realm, "installer_canister_id", "") or "").strip()
     return bool(installer_id and installer_id == caller_principal)
 

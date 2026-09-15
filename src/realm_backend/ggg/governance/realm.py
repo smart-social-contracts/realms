@@ -66,9 +66,11 @@ class Realm(Entity, TimestampedMixin):
     frontend_canister_id = String(max_length=64)
     token_canister_id = String(max_length=64)
     nft_canister_id = String(max_length=64)
-    # Shared infrastructure canister IDs (typically set from deploy descriptor infra section)
+    # Shared infrastructure canister IDs (set by the installer from casals.json)
     file_registry_canister_id = String(max_length=64)
     marketplace_canister_id = String(max_length=64)
+    # {symbol: {ledger, indexer, decimals}} — shared ledgers this realm may adopt
+    shared_tokens_json = String(max_length=4096, default="{}")
     # Quarter/Federation fields (dormant for single-quarter realms)
     is_quarter = Boolean(default=False)
     is_capital = Boolean(default=False)  # This quarter coordinates federation governance

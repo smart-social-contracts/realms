@@ -22,7 +22,6 @@ _spec.loader.exec_module(tokens)
 
 _indexer_for_ledger = tokens._indexer_for_ledger
 resolve_shared_token = tokens.resolve_shared_token
-resolve_catalog_token = tokens.resolve_catalog_token
 resolve_shared_token_by_ledger = tokens.resolve_shared_token_by_ledger
 resolve_ledger_token_info = tokens.resolve_ledger_token_info
 register_treasury_token = tokens.register_treasury_token
@@ -44,68 +43,68 @@ def _finish_async_gen(gen):
             return exc.value
 
 
-def test_resolve_realms_staging():
-    cfg = resolve_shared_token("REALMS", "staging")
-    assert cfg is not None
-    assert cfg["ledger"] == "2rqin-xaaaa-aaaah-qunsq-cai"
-    assert cfg["decimals"] == 8
+_CATALOG = {
+    "RLM": {"ledger": "rlm-ledger-cai", "indexer": "rlm-ledger-cai", "decimals": 8},
+    "ckEURC": {"ledger": "pe5t5-diaaa-aaaar-qahwa-cai", "indexer": "pe5t5-diaaa-aaaar-qahwa-cai", "decimals": 6},
+    "ckBTC": {"ledger": "mxzaz-hqaaa-aaaar-qaada-cai", "indexer": "n5wcd-faaaa-aaaar-qaaea-cai", "decimals": 8},
+}
 
 
-def test_resolve_ckbtc_case_insensitive():
-    cfg = resolve_shared_token("ckbtc", "staging")
-    assert cfg is not None
-    assert cfg["ledger"] == "mxzaz-hqaaa-aaaar-qaada-cai"
+@pytest.fixture
+def catalog(monkeypatch):
+    """The catalog lives on the realm (set by the installer from casals.json)."""
+    import json as _json
+
+    realm = MagicMock()
+    realm.shared_tokens_json = _json.dumps(_CATALOG)
+    monkeypatch.setattr(tokens, "_realm_entity", lambda: realm)
+    return realm
 
 
-def test_resolve_ckeurc_official_ledger_on_all_catalog_networks():
-    """ckEURC uses the official mainnet ICRC ledger on test/staging/demo."""
-    official = "pe5t5-diaaa-aaaar-qahwa-cai"
-    for network in ("staging", "demo", "test"):
-        cfg = resolve_shared_token("ckEURC", network)
-        assert cfg is not None, network
-        assert cfg["ledger"] == official
-        assert cfg["indexer"] == official
-        assert cfg["decimals"] == 6
-        assert cfg["name"] == "ckEURC"
-        assert cfg["name"] != "ckEUR"
-        assert resolve_shared_token("CKEURC", network)["ledger"] == official
+def test_catalog_is_empty_without_a_realm(monkeypatch):
+    """No per-network table: an unconfigured realm knows no shared tokens."""
+    monkeypatch.setattr(tokens, "_realm_entity", lambda: None)
+    assert tokens.shared_token_catalog() == {}
+    assert resolve_shared_token("ckEURC") is None
+    assert resolve_shared_token_by_ledger("pe5t5-diaaa-aaaar-qahwa-cai") is None
 
 
-def test_resolve_catalog_token_ckeurc_without_network():
-    cfg = resolve_catalog_token("ckEURC", "")
-    assert cfg is not None
-    assert cfg["ledger"] == "pe5t5-diaaa-aaaar-qahwa-cai"
-    assert resolve_catalog_token("", "staging") is None
+def test_catalog_tolerates_bad_json(monkeypatch):
+    realm = MagicMock()
+    realm.shared_tokens_json = "not json"
+    monkeypatch.setattr(tokens, "_realm_entity", lambda: realm)
+    assert tokens.shared_token_catalog() == {}
 
 
-def test_resolve_ckeurc_by_ledger():
-    cfg = resolve_shared_token_by_ledger("pe5t5-diaaa-aaaar-qahwa-cai", "test")
-    assert cfg is not None
+def test_resolve_shared_token_case_insensitive(catalog):
+    cfg = resolve_shared_token("ckeurc")
     assert cfg["symbol"] == "ckEURC"
-    assert cfg["indexer"] == "pe5t5-diaaa-aaaar-qahwa-cai"
+    assert cfg["ledger"] == "pe5t5-diaaa-aaaar-qahwa-cai"
+    assert cfg["decimals"] == 6
+    assert resolve_shared_token("") is None
+    assert resolve_shared_token("NOPE") is None
 
 
-def test_resolve_realms_by_ledger_staging():
-    cfg = resolve_shared_token_by_ledger("2rqin-xaaaa-aaaah-qunsq-cai", "staging")
-    assert cfg is not None
-    assert cfg["symbol"] == "REALMS"
-    assert cfg["indexer"] == "2rqin-xaaaa-aaaah-qunsq-cai"
+def test_resolve_shared_token_by_ledger(catalog):
+    cfg = resolve_shared_token_by_ledger("rlm-ledger-cai")
+    assert cfg["symbol"] == "RLM"
+    assert cfg["indexer"] == "rlm-ledger-cai"
+    assert resolve_shared_token_by_ledger(_UNKNOWN_LEDGER) is None
 
 
-def test_indexer_for_ledger_uses_shared_registry():
-    assert _indexer_for_ledger("2rqin-xaaaa-aaaah-qunsq-cai", "staging") == (
-        "2rqin-xaaaa-aaaah-qunsq-cai"
-    )
+def test_indexer_for_ledger_uses_catalog(catalog):
+    assert _indexer_for_ledger("mxzaz-hqaaa-aaaar-qaada-cai") == "n5wcd-faaaa-aaaar-qaaea-cai"
+    assert _indexer_for_ledger(_UNKNOWN_LEDGER) == _UNKNOWN_LEDGER
 
 
 def test_resolve_ledger_token_info_requires_ledger():
-    result = _finish_async_gen(resolve_ledger_token_info("", "staging"))
+    result = _finish_async_gen(resolve_ledger_token_info(""))
     assert result["success"] is False
     assert "required" in result["error"]
 
 
 def test_resolve_ledger_token_info_invalid_canister_id():
-    result = _finish_async_gen(resolve_ledger_token_info("not-a-canister", "staging"))
+    result = _finish_async_gen(resolve_ledger_token_info("not-a-canister"))
     assert result["success"] is False
     assert "Invalid" in result["error"]
 
@@ -116,40 +115,23 @@ def test_unwrap_query_result_variants():
     assert _unwrap_query_result({"ok": 8}) == 8
 
 
-def test_resolve_ledger_token_info_falls_back_to_shared_registry():
-    """When ICRC-1 queries fail, known shared-registry ledgers still resolve."""
-    with patch.object(tokens, "Icrc1MetadataService", side_effect=RuntimeError("offline")):
-        result = _finish_async_gen(
-            resolve_ledger_token_info("2rqin-xaaaa-aaaah-qunsq-cai", "staging")
-        )
-    assert result["success"] is True
-    assert result["symbol"] == "REALMS"
-    assert result["source"] == "shared_registry_fallback"
-    assert result["indexer_canister_id"] == "2rqin-xaaaa-aaaah-qunsq-cai"
-
-
-def test_resolve_ledger_token_info_falls_back_to_ckeurc_catalog():
-    """pe5t5 / ckEURC must resolve from the catalog when ICRC metadata is offline."""
+def test_resolve_ledger_token_info_falls_back_to_catalog(catalog):
+    """When ICRC-1 queries fail, catalog ledgers still resolve."""
     official = "pe5t5-diaaa-aaaar-qahwa-cai"
-    for network in ("staging", "demo", "test"):
-        with patch.object(
-            tokens, "Icrc1MetadataService", side_effect=RuntimeError("offline")
-        ):
-            result = _finish_async_gen(resolve_ledger_token_info(official, network))
-        assert result["success"] is True, network
-        assert result["symbol"] == "ckEURC"
-        assert result["decimals"] == 6
-        assert result["source"] == "shared_registry_fallback"
-        assert result["indexer_canister_id"] == official
-        assert result.get("warning")
+    with patch.object(tokens, "Icrc1MetadataService", side_effect=RuntimeError("offline")):
+        result = _finish_async_gen(resolve_ledger_token_info(official))
+    assert result["success"] is True
+    assert result["symbol"] == "ckEURC"
+    assert result["decimals"] == 6
+    assert result["source"] == "shared_registry_fallback"
+    assert result["indexer_canister_id"] == official
+    assert result.get("warning")
 
 
-def test_resolve_ledger_token_info_fails_without_registry_symbol():
+def test_resolve_ledger_token_info_fails_without_catalog_symbol(catalog):
     """Unknown ledgers must not invent a treasury symbol."""
     with patch.object(tokens, "Icrc1MetadataService", side_effect=RuntimeError("offline")):
-        result = _finish_async_gen(
-            resolve_ledger_token_info(_UNKNOWN_LEDGER, "staging")
-        )
+        result = _finish_async_gen(resolve_ledger_token_info(_UNKNOWN_LEDGER))
     assert result["success"] is False
     assert "symbol" not in result
 

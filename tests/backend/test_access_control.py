@@ -292,7 +292,9 @@ class TestCheckAccess:
 
     @patch("ggg.Realm")
     @patch("ggg.User")
-    def test_installer_has_admin_during_setup_without_controller(self, MockUser, MockRealm):
+    def test_unrecorded_installer_has_no_admin_without_controller(self, MockUser, MockRealm):
+        """No baked-in installer ids: during setup the installer is a controller
+        (Casals stand template); an unrecorded non-controller gets nothing."""
         realm = MagicMock()
         realm.trusted_principals = ""
         realm.status = "setup"
@@ -301,10 +303,7 @@ class TestCheckAccess:
         MockUser.__getitem__ = MagicMock(return_value=None)
 
         from core.access import _check_access
-        installer = "fltjm-tyaaa-aaaap-qunhq-cai"
-        demo_installer = "moqmm-caaaa-aaaah-qu27q-cai"
-        assert _check_access(installer, Operations.REALM_ADMIN) is True
-        assert _check_access(demo_installer, Operations.REALM_ADMIN) is True
+        assert _check_access("fltjm-tyaaa-aaaap-qunhq-cai", Operations.REALM_ADMIN) is False
         assert _check_access("random-attacker", Operations.REALM_ADMIN) is False
 
     @patch("ggg.Realm")

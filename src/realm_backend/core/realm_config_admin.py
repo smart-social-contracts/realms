@@ -282,6 +282,13 @@ def apply_realm_config(config: dict) -> dict:
             f"accounting_currency_decimals={realm.accounting_currency_decimals}"
         )
 
+    if "shared_tokens" in config:
+        catalog = config.get("shared_tokens") or {}
+        if not isinstance(catalog, dict):
+            return {"success": False, "error": "shared_tokens must be an object {symbol: {ledger, indexer, decimals}}"}
+        realm.shared_tokens_json = json.dumps(catalog, sort_keys=True)
+        updated_fields.append(f"shared_tokens={','.join(sorted(catalog)) or '-'}")
+
     if "token_canister_id" in config:
         token_id = str(config.get("token_canister_id") or "").strip()
         realm.token_canister_id = token_id

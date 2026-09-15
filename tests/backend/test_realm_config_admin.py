@@ -84,6 +84,22 @@ def test_apply_realm_config_skips_treasury_token_without_symbol(fake_ggg):
     register.assert_not_called()
 
 
+def test_apply_realm_config_stores_shared_token_catalog(fake_ggg):
+    """The installer hands the sheet's shared ledgers over; the realm keeps no table."""
+    import json
+
+    realm = FakeRealm._rows[0]
+    catalog = {"RLM": {"ledger": "rlm-cai", "indexer": "rlm-cai", "decimals": 8}}
+    result = rca.apply_realm_config({"shared_tokens": catalog})
+    assert result["success"] is True
+    assert json.loads(realm.shared_tokens_json) == catalog
+    assert "shared_tokens=RLM" in result["updated_fields"]
+
+    assert rca.apply_realm_config({"shared_tokens": {}})["success"] is True
+    assert realm.shared_tokens_json == "{}"
+    assert rca.apply_realm_config({"shared_tokens": ["RLM"]})["success"] is False
+
+
 def test_realm_accounting_currency_defaults_empty():
     source = _REALM_PATH.read_text()
     assert 'accounting_currency = String(max_length=16, default="")' in source

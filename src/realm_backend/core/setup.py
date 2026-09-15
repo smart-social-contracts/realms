@@ -97,20 +97,13 @@ def set_realm_registry_canister_id(realm, registry_id: str) -> None:
 
 
 def can_enter_setup(caller: str, is_controller: bool = False) -> bool:
-    """Whether the caller may run first-boot enter_setup.
-
-    IC controllers still work (legacy mundus). The GOS installer is *not* a
-    lasting controller under Casals, so known installer/registry principals
-    and a configured installer/trusted principal may also enter once.
-    """
+    """Whether the caller may run first-boot enter_setup: a controller (the
+    installer is one, from the Casals stand template), the recorded installer,
+    or a trusted principal. No baked-in list of installer ids."""
     caller = (caller or "").strip()
     if not caller:
         return False
     if is_controller:
-        return True
-    from .network_infra import is_known_bootstrap_principal
-
-    if is_known_bootstrap_principal(caller):
         return True
     from ggg import Realm
 
@@ -151,8 +144,6 @@ def enter_setup(
     """Record founding creator and registry link when GOS enters in-realm setup."""
     from ggg import Realm
 
-    from .network_infra import apply_network_infra
-
     realm = Realm.load("1")
     if not realm:
         return {"ok": False, "error": "realm not initialized"}
@@ -171,9 +162,6 @@ def enter_setup(
     network = (environment or "").strip()
     if network:
         realm.network = network
-    infra_err = apply_network_infra(realm, network)
-    if infra_err:
-        return infra_err
     if caller:
         record_bootstrap_caller(realm, caller)
     return {"ok": True}

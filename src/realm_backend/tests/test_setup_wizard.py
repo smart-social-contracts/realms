@@ -78,6 +78,14 @@ class _FakeUser:
         cls._store = {}
 
 
+# The shared-ledger catalog the installer hands a realm (set_canister_config_json
+# shared_tokens, from the environment's casals.json). Tests that adopt ckEURC
+# by symbol rely on this entry; the canister itself has no table.
+_CATALOG_JSON = json.dumps(
+    {"ckEURC": {"ledger": "pe5t5-diaaa-aaaar-qahwa-cai", "indexer": "pe5t5-diaaa-aaaar-qahwa-cai", "decimals": 6}}
+)
+
+
 class _FakeRealm:
     instances_list = []
 
@@ -95,8 +103,10 @@ class _FakeRealm:
         accounting_currency="REALMS",
         accounting_currency_decimals=8,
         network="",
+        shared_tokens_json=_CATALOG_JSON,
     ):
         self.status = status
+        self.shared_tokens_json = shared_tokens_json
         self.manifest_data = manifest_data
         self.file_registry_canister_id = file_registry_canister_id
         self.frontend_canister_id = frontend_canister_id
@@ -295,7 +305,6 @@ def test_effective_status_fail_closed_to_setup():
 
 
 _TEST_INSTALLER = "fltjm-tyaaa-aaaap-qunhq-cai"
-_DEMO_LIVE_INSTALLER = "moqmm-caaaa-aaaah-qu27q-cai"
 
 
 def _enter_setup_with_auth_gate(
@@ -323,30 +332,12 @@ def test_enter_setup_sets_creator_and_registry():
     assert setup_cfg["creator_principal"] == "creator-1"
     assert setup_cfg["realm_registry_canister_id"] == "registry-canister"
     assert realm.network == "staging"
-    assert realm.file_registry_canister_id == "file-reg-id"
-    assert realm.marketplace_canister_id == "h3hkh-3yaaa-aaaac-bfxoa-cai"
+    assert realm.file_registry_canister_id == "file-reg-id"  # untouched: the installer sets infra ids
 
 
-def test_enter_setup_fills_empty_infra_ids_for_test():
-    realm = _FakeRealm(
-        status=RealmStatus.SETUP,
-        manifest_data="{}",
-        file_registry_canister_id="",
-        marketplace_canister_id="",
-    )
-    _FakeRealm.reset(realm)
-    mock_ic.is_controller.return_value = True
-
-    result = _enter_setup_with_auth_gate(
-        "creator-1", "registry-canister", "test"
-    )
-
-    assert result == {"ok": True}
-    assert realm.file_registry_canister_id == "bbwyi-raaaa-aaaas-amxfa-cai"
-    assert realm.marketplace_canister_id == "btqpr-5qaaa-aaaas-amxga-cai"
-
-
-def test_enter_setup_rejects_unknown_environment():
+def test_enter_setup_leaves_infra_ids_to_the_installer():
+    """No per-network table in the canister: infra ids arrive via
+    set_canister_config_json, and any environment name is accepted."""
     realm = _FakeRealm(
         status=RealmStatus.SETUP,
         manifest_data="{}",
@@ -360,7 +351,8 @@ def test_enter_setup_rejects_unknown_environment():
         "creator-1", "registry-canister", "production"
     )
 
-    assert result == {"ok": False, "error": "unknown environment: production"}
+    assert result == {"ok": True}
+    assert realm.network == "production"
     assert realm.file_registry_canister_id == ""
     assert realm.marketplace_canister_id == ""
 
@@ -448,10 +440,11 @@ def test_enter_setup_rejects_random_principal():
     assert realm.trusted_principals == ""
 
 
-def test_enter_setup_allows_installer_without_controller():
+def test_enter_setup_records_installer_controller():
+    """The installer is a controller (Casals stand template); first boot records it."""
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     _FakeRealm.reset(realm)
-    mock_ic.is_controller.return_value = False
+    mock_ic.is_controller.return_value = True
     mock_ic.caller.return_value.to_str.return_value = _TEST_INSTALLER
 
     result = _enter_setup_with_auth_gate(
@@ -468,7 +461,7 @@ def test_enter_setup_allows_installer_without_controller():
 def test_enter_setup_installer_once_is_idempotent_same_creator():
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     _FakeRealm.reset(realm)
-    mock_ic.is_controller.return_value = False
+    mock_ic.is_controller.return_value = True
 
     first = _enter_setup_with_auth_gate(
         "creator-1", "registry-canister", "test", caller=_TEST_INSTALLER
@@ -484,41 +477,38 @@ def test_enter_setup_installer_once_is_idempotent_same_creator():
     assert setup_cfg["realm_registry_canister_id"] == "other-registry"
 
 
-def test_enter_setup_rejects_random_after_installer_bootstrapped():
+def test_enter_setup_requires_controller_or_recorded_installer():
+    """No baked-in installer ids: a non-controller is refused unless it is the
+    installer recorded at first boot (or a trusted principal)."""
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     _FakeRealm.reset(realm)
     mock_ic.is_controller.return_value = False
 
-    assert _enter_setup_with_auth_gate(
-        "creator-1", "registry-canister", "test", caller=_TEST_INSTALLER
-    ) == {"ok": True}
     denied = _enter_setup_with_auth_gate(
-        "creator-2", "registry-canister", "test", caller="random-attacker"
+        "creator-1", "registry-canister", "local", caller=_TEST_INSTALLER
     )
     assert denied == {"ok": False, "error": "unauthorized"}
 
+    mock_ic.is_controller.return_value = True
+    assert _enter_setup_with_auth_gate(
+        "creator-1", "registry-canister", "local", caller=_TEST_INSTALLER
+    ) == {"ok": True}
+    assert realm.installer_canister_id == _TEST_INSTALLER
 
-def test_bootstrap_admin_allows_installer_during_setup_not_random():
-    from core.access import is_bootstrap_admin_caller
-
-    realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
-    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is True
-    assert is_bootstrap_admin_caller("yhw3g-fyaaa-aaaas-qgorq-cai", realm) is True
-    assert is_bootstrap_admin_caller(_DEMO_LIVE_INSTALLER, realm) is True
-    assert is_bootstrap_admin_caller("mjrky-pyaaa-aaaah-qu27a-cai", realm) is True
-    assert is_bootstrap_admin_caller("random-attacker", realm) is False
-    assert is_bootstrap_admin_caller(_TEST_INSTALLER, None) is False
+    mock_ic.is_controller.return_value = False
+    assert setup_core.can_enter_setup(_TEST_INSTALLER, is_controller=False) is True
+    assert setup_core.can_enter_setup("random-attacker", is_controller=False) is False
 
 
-def test_bootstrap_admin_recorded_installer_survives_setup_complete():
+def test_bootstrap_admin_is_only_the_recorded_installer():
     from core.access import is_bootstrap_admin_caller
 
     realm = _FakeRealm(status=RealmStatus.ALPHA, manifest_data="{}")
+    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is False
     realm.installer_canister_id = _TEST_INSTALLER
     assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is True
     assert is_bootstrap_admin_caller("random-attacker", realm) is False
-    realm.installer_canister_id = ""
-    assert is_bootstrap_admin_caller(_TEST_INSTALLER, realm) is False
+    assert is_bootstrap_admin_caller(_TEST_INSTALLER, None) is False
 
 
 def test_enter_setup_rejects_when_completed():
@@ -1292,7 +1282,7 @@ def test_setup_configure_token_returns_ledger_unresolvable(monkeypatch):
     realm = _FakeRealm(status=RealmStatus.SETUP, manifest_data="{}")
     _authorized_creator(realm)
 
-    def _unresolved(_ledger, _network):
+    def _unresolved(_ledger):
         result = {"success": False, "error": "offline"}
         yield result
         return result
@@ -1394,7 +1384,7 @@ def test_launch_configure_token_refused_when_ledger_unresolvable(monkeypatch):
     _FakeRealm.reset(realm)
     _authorized_creator(realm)
 
-    def _unresolved(_ledger, _network):
+    def _unresolved(_ledger):
         result = {"success": False, "error": "offline"}
         yield result
         return result
@@ -2018,7 +2008,7 @@ def test_launch_configure_token_proceeds_when_ledger_resolves(monkeypatch):
     _FakeRealm.reset(realm)
     _authorized_creator(realm)
 
-    def _resolved(_ledger, _network):
+    def _resolved(_ledger):
         result = {
             "success": True,
             "symbol": "AG",

@@ -27,7 +27,6 @@ def reconcile_treasury_token():
             }
 
         ledger = str(getattr(realm, "token_canister_id", "") or "").strip()
-        network = str(getattr(realm, "network", "") or "").strip()
         if not ledger:
             return {
                 "success": True,
@@ -37,7 +36,7 @@ def reconcile_treasury_token():
 
         from api.tokens import register_treasury_token, resolve_ledger_token_info
 
-        resolved = yield from resolve_ledger_token_info(ledger, network)
+        resolved = yield from resolve_ledger_token_info(ledger)
         if not resolved.get("success"):
             return {
                 "success": False,
