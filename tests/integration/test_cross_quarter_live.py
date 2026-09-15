@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """Live-replica integration tests for cross-quarter / cross-realm addressing.
 
-Runs against the local replica brought up by ``ci_install_mundus.py`` (see
-``.github/workflows/ci-pr.yml`` → ``layered-e2e``). Two parts:
+Runs against the demo realm of the product orchestra that ``casals up``
+converged on the local replica (see ``.github/workflows/realms-e2e.yml``):
+
+    REALM_BACKEND_ID=<demo-backend id> REPLICA_URL=http://127.0.0.1:8000 \
+        python3 tests/integration/test_cross_quarter_live.py
+
+Without ``REALM_BACKEND_ID`` it falls back to ``dfx canister id realm_backend``
+in the current dfx project (a plain ``dfx deploy realm_backend`` dev loop).
+Two parts:
 
   Part A — single canister (the installed ``realm_backend``):
     * get_quarter_directory returns this canister
@@ -33,6 +40,9 @@ PRIMARY = "realm_backend"
 PEER = "cross_quarter_peer"
 PEER_WASM = ".basilisk/realm_backend/realm_backend.wasm"
 CALL_TIMEOUT = 120
+# The converged realm's id and the replica it lives on; empty = local dfx project.
+REALM_BACKEND_ID = os.environ.get("REALM_BACKEND_ID", "").strip()
+REPLICA_URL = os.environ.get("REPLICA_URL", "").strip()
 
 passed = 0
 failed = 0
@@ -49,10 +59,14 @@ def _env():
     return e
 
 
+def _network_args():
+    return ["--network", REPLICA_URL] if REPLICA_URL else []
+
+
 def canister_id(name):
     try:
         cp = subprocess.run(
-            ["dfx", "canister", "id", name],
+            ["dfx", "canister", "id", name, *_network_args()],
             capture_output=True, text=True, timeout=20, env=_env(),
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -67,7 +81,7 @@ def call(canister, method, args="()", update=False):
     yields a JSON-encoded string that we decode twice. RealmResponse-returning
     methods (register_quarter) decode once to a dict.
     """
-    cmd = ["dfx", "canister", "call"]
+    cmd = ["dfx", "canister", "call", *_network_args()]
     if not update:
         cmd.append("--query")
     cmd.extend(["--output", "json", canister, method, args])
@@ -120,7 +134,7 @@ DUMMY_CID = "aaaaa-aa"  # management canister id — valid principal text
 
 
 def test_quarter_directory_lists_self(cap):
-    resp = call(PRIMARY, "get_quarter_directory")
+    resp = call(cap, "get_quarter_directory")
     quarters = resp.get("quarters", [])
     ids = [q.get("canister_id") for q in quarters]
     assert cap in ids, f"self ({cap}) not in directory: {ids}"
@@ -128,7 +142,7 @@ def test_quarter_directory_lists_self(cap):
 
 def test_resolve_local_entity(cap):
     # The system user is created at init with _id "1".
-    resp = call(PRIMARY, "resolve_ref", text_arg(f"realm://{cap}/User/1"))
+    resp = call(cap, "resolve_ref", text_arg(f"realm://{cap}/User/1"))
     assert resp.get("status") == "local", f"expected local, got {resp}"
     assert "object" in resp, f"local resolve missing object: {resp}"
 
@@ -136,24 +150,24 @@ def test_resolve_local_entity(cap):
 def test_record_and_get_migration(cap):
     next_ref = f"realm://{DUMMY_CID}/User/{MIGRANT}"
     payload = json.dumps({"subject": MIGRANT, "next_ref": next_ref})
-    rec = call(PRIMARY, "record_migration", text_arg(payload), update=True)
+    rec = call(cap, "record_migration", text_arg(payload), update=True)
     assert rec.get("success") is True, f"record_migration failed: {rec}"
 
-    got = call(PRIMARY, "get_migration", text_arg(MIGRANT))
+    got = call(cap, "get_migration", text_arg(MIGRANT))
     assert got.get("found") is True, f"stub not found: {got}"
     assert got.get("next_ref") == next_ref, f"next_ref mismatch: {got}"
 
 
 def test_resolve_follows_local_stub(cap):
     # No live User with id == MIGRANT, but a stub forwards it onward.
-    resp = call(PRIMARY, "resolve_ref", text_arg(f"realm://{cap}/User/{MIGRANT}"))
+    resp = call(cap, "resolve_ref", text_arg(f"realm://{cap}/User/{MIGRANT}"))
     assert resp.get("status") == "remote", f"expected forward to remote: {resp}"
     assert resp.get("final_ref") == f"realm://{DUMMY_CID}/User/{MIGRANT}", resp
     assert resp.get("canister_id") == DUMMY_CID, resp
 
 
 def test_resolve_remote_ref_returns_route(cap):
-    resp = call(PRIMARY, "resolve_ref", text_arg(f"realm://{DUMMY_CID}/Proposal/7"))
+    resp = call(cap, "resolve_ref", text_arg(f"realm://{DUMMY_CID}/Proposal/7"))
     assert resp.get("status") == "remote", resp
     assert resp.get("canister_id") == DUMMY_CID, resp
     assert resp.get("entity_type") == "Proposal", resp
@@ -161,7 +175,7 @@ def test_resolve_remote_ref_returns_route(cap):
 
 def test_get_objects_by_ref_mixed(cap):
     refs = [f"realm://{cap}/User/1", f"realm://{DUMMY_CID}/User/x"]
-    resp = call(PRIMARY, "get_objects_by_ref", vec_text_arg(refs))
+    resp = call(cap, "get_objects_by_ref", vec_text_arg(refs))
     results = {r["ref"]: r for r in resp.get("results", [])}
     local = results[f"realm://{cap}/User/1"]
     remote = results[f"realm://{DUMMY_CID}/User/x"]
@@ -178,8 +192,10 @@ def deploy_peer():
     if not os.path.exists(PEER_WASM):
         print(f"\n  (peer wasm {PEER_WASM} absent — skipping gossip tests)")
         return ""
+    # On a replica that is not this dfx project's own (REPLICA_URL) there is no
+    # wallet: create the canister with provisional cycles instead.
     cp = subprocess.run(
-        ["dfx", "deploy", PEER],
+        ["dfx", "deploy", PEER, *_network_args(), *(["--no-wallet"] if REPLICA_URL else [])],
         capture_output=True, text=True, timeout=300, env=_env(),
     )
     if cp.returncode != 0:
@@ -191,18 +207,18 @@ def deploy_peer():
 def test_sync_quarters_real_icc(cap, peer):
     # Give the peer something to gossip: a quarter in its directory.
     synthetic_cid = "2vxsx-fae"  # anonymous principal text — just an id here
-    reg = call(PEER, "register_quarter",
+    reg = call(peer, "register_quarter",
                "(" + json.dumps("PeerLocalQuarter") + ", " + json.dumps(synthetic_cid) + ")",
                update=True)
     assert isinstance(reg, dict) and reg.get("success") is True, f"peer register_quarter failed: {reg}"
 
     # Genuine inter-canister call: CAP pulls PEER's get_quarter_directory.
-    resp = call(PRIMARY, "sync_quarters", text_arg(peer), update=True)
+    resp = call(cap, "sync_quarters", text_arg(peer), update=True)
     assert resp.get("success") is True, f"sync_quarters failed: {resp}"
     assert int(resp.get("added", 0)) >= 1, f"expected to learn >=1 quarter: {resp}"
 
     # The learned quarter is now visible in CAP's directory.
-    directory = call(PRIMARY, "get_quarter_directory")
+    directory = call(cap, "get_quarter_directory")
     ids = [q.get("canister_id") for q in directory.get("quarters", [])]
     assert synthetic_cid in ids or peer in ids, (
         f"peer's quarter not merged into directory: {ids}"
@@ -218,12 +234,12 @@ def main():
     print("Cross-Quarter Addressing — Live Integration Tests")
     print("=" * 60)
 
-    cap = canister_id(PRIMARY)
+    cap = REALM_BACKEND_ID or canister_id(PRIMARY)
     if not cap:
         print("  realm_backend not deployed; skipping suite.")
-        print("Skipped (no realm_backend canister in this dfx project)")
+        print("Skipped (no REALM_BACKEND_ID and no realm_backend canister in this dfx project)")
         sys.exit(0)
-    print(f"  primary realm_backend: {cap}")
+    print(f"  primary realm_backend: {cap}" + (f"  ({REPLICA_URL})" if REPLICA_URL else ""))
 
     # Part A
     run_test("get_quarter_directory lists self", test_quarter_directory_lists_self, cap)

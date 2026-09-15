@@ -8,12 +8,10 @@ A "layered" realm installs its WASM, extensions, and codices from
 `file_registry` at runtime. For that to work, the base WASM must not contain
 any pre-baked extension code. Historically this was achieved by inline shell
 heredocs in `.github/workflows/publish-base-wasm.yml`, which made it
-impossible to reproduce exactly the same build locally and which drifted
-from the equivalent stubs needed by `scripts/deploy.py` for layered local
-deployments.
+impossible to reproduce exactly the same build locally.
 
-This script centralizes that recipe so both CI and `deploy.py` (and any
-operator on a workstation) can produce a byte-identical base WASM.
+This script centralizes that recipe so CI and any operator on a workstation
+produce a byte-identical base WASM.
 
 What the script does
 --------------------
@@ -45,7 +43,7 @@ Usage
     python3 scripts/build_base_wasm.py --gzip
     # → writes .basilisk/realm_backend/realm_backend.wasm[.gz]
 
-    # Keep the stubs in place after build (e.g. for `deploy.py` follow-up):
+    # Keep the stubs in place after build (e.g. for a local follow-up deploy):
     python3 scripts/build_base_wasm.py --keep-stubs
 
     # Build but don't actually run basilisk (for CI debugging):

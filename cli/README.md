@@ -298,22 +298,12 @@ ls extensions/
 - Show subcommand help: `realms realm --help`, `realms mundus --help`, etc.
 - Check project status: `realms status`
 
-### `realms seed`
+### Provisioning is not a CLI command
 
-Deploy the Realms GOS **product** stack (`*.realmsgos.org`: marketplace + file_registry UI) and publish the extension/codex catalog into the fleet `file_registry` backend.
-
-**Default:** adopts existing product canister IDs and the **Realms GOS Casals** conductor (authorize WASM catalog, register ids from `canister_ids.json`, then `casals sheet deploy` of repo-root `casals.json`). Idempotent on a healthy environment.
-
-**`--rebuild`:** destroys Realms GOS Casals + product canisters (keeps `marketplace_frontend` DNS), mints a new conductor, then redeploys. Requires confirmation unless `--yes`.
-
-Conductor is resolved from `environments/<env>.json` (`casals_backend`), or `canister_ids.json`. Needs a local Casals checkout (`CASALS_SRC`, sibling `../Casals`, or `/srv/dev/Casals`).
-
-**One shared `file_registry` backend** — seed never mints a second registry. The product sheet includes the backend so Casals can adopt the existing canister by name. Per-stand batons stay on realm stands and GaaS `infra-baton`, not here.
-
-```bash
-realms seed --env test --identity deployer --yes
-realms seed --env test --identity deployer --rebuild --yes   # destructive
-```
+The Realms product orchestra (marketplace, fleet file registry, token, NFT,
+demo realm) is declared in the repo-root `casals.json` and deployed with
+`casals up` from the Casals repo — see `docs/OPERATIONS.md`. The `realms` CLI
+operates realms that exist; it does not mint or destroy canisters.
 
 ## GUI alternative: the Package Manager extension
 

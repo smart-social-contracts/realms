@@ -12,8 +12,7 @@ from typer.testing import CliRunner
 
 from realms.cli.commands.new import (
     BRANDING_MAX_BYTES,
-    CATALOG_TOKENS,
-    DEFAULT_TOKEN_SYMBOL,
+    DEFAULT_TOKEN_SYMBOLS,
     DEPLOYMENT_COST_CREDITS,
     GAAS_STAGES,
     WIZARD_CHROME_EXTENSIONS,
@@ -21,6 +20,7 @@ from realms.cli.commands.new import (
     StageError,
     catalog_token_draft,
     catalog_token_symbol,
+    default_catalog_symbol,
     _format_installer_job_failure,
     _local_manifest_dependencies,
     _parse_jsonish,
@@ -52,6 +52,15 @@ from realms.cli.main import app
 
 
 runner = CliRunner()
+
+
+# A shared-ledger catalog as get_setup_state().shared_tokens reports it (fixture ids).
+_CATALOG = {
+    "REALMS": {"ledger": "rrrrr-rr", "decimals": 8},
+    "ckBTC": {"ledger": "bbbbb-bb", "indexer": "bbbbb-ix", "decimals": 8},
+    "ckUSDC": {"ledger": "ccccc-cc", "decimals": 6},
+    "ckEURC": {"ledger": "eeeee-ee", "decimals": 6},
+}
 
 
 def _merged(**overrides):
@@ -416,6 +425,8 @@ class TestBrandingReachesTheDraft:
             ),
         ), patch(
             "realms.cli.commands.new._setup_state_has_token", return_value=True
+        ), patch(
+            "realms.cli.commands.new.fetch_shared_token_catalog", return_value={}
         ), patch(
             "realms.cli.commands.new.preinstall_codex_dependencies"
         ), patch(
@@ -898,44 +909,48 @@ class TestFromStage:
         assert "deploy" in catalog
 
     def test_catalog_symbol_does_not_need_canister(self):
+        # Resolved against the realm's own catalog at setup time, not here.
         merged = _merged(token={"symbol": "ckEURC", "canister": ""})
         validate_merged_spec(merged, network="test", identity="alice")
 
-    def test_unknown_symbol_still_needs_canister(self):
-        merged = _merged(token={"symbol": "MYTOKEN", "canister": ""})
-        with pytest.raises(StageError) as exc:
-            validate_merged_spec(merged, network="test", identity="alice")
-        assert "unknown catalog token" in exc.value.message
-
     def test_token_draft_resolves_catalog_ledger(self):
-        assert _token_draft({"symbol": "ckEURC"}, "test") == {
+        assert _token_draft({"symbol": "ckEURC"}, _CATALOG) == {
             "symbol": "ckEURC",
-            "token_canister_id": "pe5t5-diaaa-aaaar-qahwa-cai",
+            "token_canister_id": "eeeee-ee",
             "decimals": 6,
         }
-        assert _token_draft({"canister": "aaaaa-aa", "symbol": "ckEURC"}, "test") == {
+        assert _token_draft({"canister": "aaaaa-aa", "symbol": "ckEURC"}, _CATALOG) == {
             "token_canister_id": "aaaaa-aa",
             "symbol": "ckEURC",
         }
-        assert _token_draft({}, "test") is None
+        assert _token_draft({}, _CATALOG) is None
+        # Not in this realm's catalog and no canister: nothing to invent.
+        assert _token_draft({"symbol": "MYTOKEN"}, _CATALOG) == {"symbol": "MYTOKEN"}
+        assert _token_draft({"symbol": "ckEURC"}, {}) == {"symbol": "ckEURC"}
 
-    def test_token_draft_default_matches_wizard_preselection(self):
-        # setup/+page.svelte preselects REALMS; the CLI default must agree.
-        assert DEFAULT_TOKEN_SYMBOL == "REALMS"
-        assert catalog_token_draft(DEFAULT_TOKEN_SYMBOL, "test") == {
+    def test_default_is_the_mundus_token_whatever_its_symbol(self):
+        # setup/+page.svelte preselects the first catalog card; the CLI prefers
+        # the mundus token (REALMS locally, RLM in production).
+        assert "REALMS" in DEFAULT_TOKEN_SYMBOLS and "RLM" in DEFAULT_TOKEN_SYMBOLS
+        assert default_catalog_symbol(_CATALOG) == "REALMS"
+        assert default_catalog_symbol({"RLM": {"ledger": "rrrrr-rr"}, "ckBTC": {"ledger": "b"}}) == "RLM"
+        assert default_catalog_symbol({"ckBTC": {"ledger": "bbbbb-bb"}}) == "ckBTC"
+        assert default_catalog_symbol({}) is None
+        assert catalog_token_draft("REALMS", _CATALOG) == {
             "symbol": "REALMS",
-            "token_canister_id": "nusyl-jiaaa-aaaae-qj6mq-cai",
+            "token_canister_id": "rrrrr-rr",
             "decimals": 8,
         }
 
     def test_catalog_symbol_is_case_insensitive(self):
-        assert catalog_token_symbol("ckeurc") == "ckEURC"
-        assert catalog_token_symbol("realms") == "REALMS"
-        assert catalog_token_symbol("mytoken") is None
+        assert catalog_token_symbol("ckeurc", _CATALOG) == "ckEURC"
+        assert catalog_token_symbol("realms", _CATALOG) == "REALMS"
+        assert catalog_token_symbol("mytoken", _CATALOG) is None
 
     def test_ckbtc_carries_its_indexer(self):
-        draft = catalog_token_draft("ckBTC", "test")
-        assert draft["indexer_canister_id"] == "n5wcd-faaaa-aaaar-qaaea-cai"
+        draft = catalog_token_draft("ckBTC", _CATALOG)
+        assert draft["indexer_canister_id"] == "bbbbb-ix"
+        assert catalog_token_draft("ckEURC", {"ckEURC": {"ledger": ""}}) is None
 
     def test_unwrap_ok_json(self):
         inner = {"success": True, "backend_canister_id": "abc"}
@@ -996,21 +1011,16 @@ def test_wizard_chrome_matches_sheet_realm_default_set():
     }
 
 
-def test_cli_token_catalog_matches_setup_wizard():
-    """CLI catalog must not drift from src/realm_frontend/.../sharedTokens.ts."""
-    text = (
+def test_cli_and_wizard_carry_no_token_ledger_table():
+    """Both read the catalog from the realm (get_setup_state().shared_tokens)."""
+    wizard = (
         _repo_root() / "src/realm_frontend/src/lib/setup/sharedTokens.ts"
     ).read_text(encoding="utf-8")
-    body = text.split("SHARED_TOKEN_CATALOG", 1)[1].split("];", 1)[0]
-    assert set(re.findall(r"id: '([^']+)'", body)) == set(CATALOG_TOKENS)
-    wizard_principals = set(re.findall(r"'([a-z0-9-]+-cai)'", body))
-    cli_principals = {
-        principal
-        for entry in CATALOG_TOKENS.values()
-        for group in ("ledgers", "indexers")
-        for principal in (entry.get(group) or {}).values()
-    }
-    assert cli_principals == wizard_principals
+    cli = (_repo_root() / "cli/realms/cli/commands/new.py").read_text(encoding="utf-8")
+    for text in (wizard, cli):
+        assert "SHARED_TOKEN_CATALOG" not in text
+        assert "CATALOG_TOKENS" not in text
+        assert not re.search(r"['\"][a-z0-9]{5}(-[a-z0-9]{5}){3}-cai['\"]", text)
 
 
 def test_local_manifest_dependencies_lists_syntropia_extensions():

@@ -46,14 +46,16 @@ jobs:
         # Environment-specific ids live in casals.json and reach a canister at
         # runtime (configure / set_canister_config_json). A table baked into the
         # wasm or a dist points a rebuilt environment at a deleted canister.
-        # Test fixtures (tests/, the test-mode seed identity) are exempt.
+        # Test fixtures (tests/, the test-mode seed identity) are exempt, and so is
+        # scripts/cycleops (the CycleOps service canister and team principals are
+        # not environment ids).
         run: |
           if grep -rnoE '\b[a-z0-9]{5}(-[a-z0-9]{5}){3,10}-[a-z0-9]{3}\b' \
                scripts .github src/realm_backend src/*/static src/realm_frontend/src \
                extensions/extensions/*/frontend-rt/src extensions/dev-server \
                --include='*.py' --include='*.yml' --include='*.sh' --include='*.json' --include='*.ts' --include='*.js' --include='*.svelte' \
                --include='ic-domains' --include='ii-alternative-origins' \
-               --exclude-dir=node_modules --exclude-dir=tests --exclude-dir=__pycache__ --exclude-dir=declarations --exclude-dir=dist \
+               --exclude-dir=node_modules --exclude-dir=tests --exclude-dir=__pycache__ --exclude-dir=declarations --exclude-dir=dist --exclude-dir=cycleops \
                --exclude=test_identity_seed.py --exclude='*.test.ts' --exclude='*.test.js' \
              | grep -v -- '-xxxxx-'; then
             echo "::error::canister/principal ids belong in casals.json (read them with 'casals export')"; exit 1
@@ -159,56 +161,8 @@ jobs:
             echo "::endgroup::"
           done
 
-  layered-e2e:
+  # casals up from an empty replica + the cross-quarter live suite; the job
+  # body is realms-e2e.yml (also runnable by hand via workflow_dispatch).
+  e2e:
     needs: [lint, unit]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dfx
-        run: |
-          DFX_VERSION=0.32.0
-          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
-          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
-          rm /tmp/dfx.tar.gz
-          dfx --version
-
-      - name: Install realms CLI + Python deps
-        run: |
-          pip install -e cli/
-          pip install pyyaml
-
-      - name: Start local replica
-        run: |
-          dfx start --background --clean --host 127.0.0.1:4943
-          sleep 3
-          dfx ping
-
-      - name: Fetch GOS artifacts
-        run: python3 scripts/fetch_gos_artifacts.py --what all
-
-      - name: Run all four stages on the local mundus
-        run: |
-          python3 scripts/ci_install_mundus.py \
-              --file deployment-descriptors/local-mundus.yml \
-              --stages 0,1,2,3
-
-      # Cross-quarter addressing end-to-end: single-canister endpoints plus a
-      # real inter-canister sync_quarters round-trip against a 2nd realm_backend.
-      - name: cross-quarter live integration tests
-        run: python3 tests/integration/test_cross_quarter_live.py
-
-      - name: Stop local replica
-        if: always()
-        run: dfx stop || true
+    uses: ./.github/workflows/realms-e2e.yml

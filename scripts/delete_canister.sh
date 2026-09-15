@@ -3,19 +3,19 @@
 #
 # Usage: ./delete_canister.sh <canister_id> [network]
 #   canister_id  - The canister ID to delete
-#   network      - Network: staging, ic (default: staging)
+#   network      - dfx network name (default: ic)
 #
 # Example:
-#   ./delete_canister.sh tltok-kyaaa-aaaao-qnemq-cai staging
+#   ./delete_canister.sh <canister_id> ic
 
 set -e
 
 CANISTER_ID="${1}"
-NETWORK="${2:-staging}"
+NETWORK="${2:-ic}"
 
 if [ -z "$CANISTER_ID" ]; then
     echo "❌ Usage: $0 <canister_id> [network]"
-    echo "   Example: $0 tltok-kyaaa-aaaao-qnemq-cai staging"
+    echo "   Example: $0 <canister_id> ic"
     exit 1
 fi
 

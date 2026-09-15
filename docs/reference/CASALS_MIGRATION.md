@@ -102,7 +102,6 @@ All in `src/realm_installer/main.py`:
   including the patched `assetstorage.wasm.gz` incremental-sync trick.
 - `scripts/cycleops/` top-up scripts (Casals native cycles; optionally keep CycleOps
   as a secondary controller).
-- Optionally the Mundus direct-dfx fleet path (`scripts/ci_install_mundus.py`).
 
 ### Retained
 - `realm_registry_backend` — unchanged (credits, version catalog, `register_realm`,

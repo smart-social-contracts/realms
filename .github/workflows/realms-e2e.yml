@@ -1,0 +1,156 @@
+name: Realms E2E
+
+# The whole product orchestra is `casals.json`: the Casals e2e harness builds it
+# from an empty replica with `casals up` and grades it (fresh, idempotent), then
+# the cross-quarter live suite runs against the converged demo realm. This
+# replaces the dfx-driven `ci_install_mundus.py` stages.
+
+# Called from ci-pr.yml (after lint + unit) and ci-main.yml.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: realms-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  DFX_VERSION: "0.32.0"
+  CASALS_VERSION: "main"
+  IC_TOKENS_VERSION: "0.1.0"
+  CASALS_HOME: ${{ github.workspace }}/casals-home
+  CASALS_E2E_ENV: local
+  CASALS_E2E_IDENTITY: local-dev
+  REPLICA_URL: http://127.0.0.1:8000
+
+jobs:
+  realms-local-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      # The sheet resolves `local:` sources against its own directory, and the
+      # Casals CLI builds the conductor wasms from its own checkout, so the two
+      # repos must be siblings.
+      - uses: actions/checkout@v4
+        with:
+          path: realms
+          submodules: recursive
+
+      - name: Checkout Casals (conductor + CLI + e2e harness)
+        uses: actions/checkout@v4
+        with:
+          repository: smart-social-contracts/Casals
+          ref: ${{ env.CASALS_VERSION }}
+          path: Casals
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # dfx mints the shared identity and deploys the cross-quarter peer;
+      # the replica and every sheet deploy go through icp.
+      - name: Install dfx
+        run: |
+          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
+          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
+          rm /tmp/dfx.tar.gz
+          dfx --version
+
+      - name: Install icp-cli and ic-wasm
+        run: |
+          npm install -g @icp-sdk/icp-cli @icp-sdk/ic-wasm
+          icp --version
+
+      - name: Install Python toolchain (Casals CLI + Basilisk + realms)
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r Casals/requirements-dev.txt
+          python3 -m pip install -r realms/requirements.txt
+          python3 -m basilisk --version || true
+
+      - name: Create the local-dev identity (dfx + icp)
+        run: |
+          export TERM=xterm
+          export DFX_WARNING=-mainnet_plaintext_identity
+          dfx identity new local-dev --storage-mode plaintext
+          dfx identity export local-dev > /tmp/local-dev.pem
+          icp identity import local-dev --from-pem /tmp/local-dev.pem --storage plaintext
+          test "$(icp identity principal --identity local-dev)" = "$(dfx identity get-principal --identity local-dev)"
+
+      # ── product wasms and dists referenced by casals.json as `local:` ───────
+      - name: Build realm backend and marketplace backend
+        working-directory: realms
+        run: |
+          CANISTER_CANDID_PATH="$PWD/src/realm_backend/realm_backend.did" \
+            python3 scripts/pack_realm_backend.py
+          CANISTER_CANDID_PATH="$PWD/src/marketplace_backend/marketplace_backend.did" \
+            python3 -m basilisk marketplace_backend src/marketplace_backend/main.py
+          ls -l .basilisk/realm_backend/realm_backend.wasm .basilisk/marketplace_backend/marketplace_backend.wasm
+
+      - name: Build realm frontend and marketplace frontend
+        working-directory: realms
+        run: |
+          (cd src/realm_frontend && npm install --legacy-peer-deps && npm run build && test -f dist/index.html)
+          (cd src/marketplace_frontend && npm install --legacy-peer-deps && npm run build && test -f dist/index.html)
+
+      - name: Fetch ic-tokens wasms (realms/.external-wasms)
+        working-directory: realms
+        run: |
+          mkdir -p .external-wasms
+          for w in token_backend nft_backend; do
+            curl -fsSL "https://github.com/smart-social-contracts/ic-tokens/releases/download/v${IC_TOKENS_VERSION}/${w}.wasm" \
+              -o ".external-wasms/${w}.wasm"
+          done
+          ls -l .external-wasms
+
+      # ── the orchestra: casals up from an empty replica, graded ──────────────
+      # run_e2e.py starts the local replica itself, funds `local-dev`, then:
+      #   fresh       — `casals up` converges from nothing, `plan` empty, oracle PASS
+      #   idempotent  — a second `up` changes nothing
+      # KEEP=1 leaves the replica and the orchestra up for the next step.
+      - name: casals up realms sheet + e2e scenarios (Casals harness)
+        working-directory: Casals
+        env:
+          KEEP: "1"
+          SCENARIOS: fresh,idempotent
+        run: |
+          export TERM=xterm
+          python3 tests/e2e/run_e2e.py ../realms/casals.json
+
+      # ── cross-quarter addressing against the converged demo realm ───────────
+      - name: Resolve the demo realm backend from the live bindings
+        working-directory: Casals
+        run: |
+          export TERM=xterm
+          python3 -m casals_cli.main -e local --identity local-dev export ../realms/casals.json > /tmp/export.json
+          REALM_BACKEND_ID=$(python3 -c 'import json; print(json.load(open("/tmp/export.json"))["bindings"]["demo-backend"])')
+          echo "REALM_BACKEND_ID=$REALM_BACKEND_ID" >> "$GITHUB_ENV"
+          echo "demo-backend = $REALM_BACKEND_ID"
+
+      - name: cross-quarter live integration tests
+        working-directory: realms
+        env:
+          DFX_WARNING: -mainnet_plaintext_identity
+        run: python3 tests/integration/test_cross_quarter_live.py
+
+      - name: Show orchestra state on failure
+        if: failure()
+        working-directory: Casals
+        run: |
+          export TERM=xterm
+          python3 -m casals_cli.main -e local --identity local-dev show ../realms/casals.json || true
+          python3 -m casals_cli.main -e local --identity local-dev plan ../realms/casals.json || true
+
+      - name: Stop local replica
+        if: always()
+        working-directory: Casals
+        run: |
+          export TERM=xterm
+          icp network stop -e local || true

@@ -460,7 +460,6 @@ class RealmGenerator:
             metadata=json.dumps({
                 "description": "Automated satoshi transfer every 60 seconds",
                 "codex_name": "satoshi_transfer",
-                "target_principal": "64fpo-jgpms-fpewi-hrskb-f3n6u-3z5fy-bv25f-zxjzg-q5m55-xmfpq-hqe",
                 "amount": 1
             }),
             steps=[step]

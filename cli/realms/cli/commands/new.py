@@ -106,47 +106,13 @@ WIZARD_CHROME_EXTENSIONS: Tuple[str, ...] = (
 # Shared treasury tokens, mirroring the founder setup wizard catalog in
 # src/realm_frontend/src/lib/setup/sharedTokens.ts. That wizard pre-selects
 # REALMS, so a spec with no token gets REALMS here too.
-DEFAULT_TOKEN_SYMBOL = "REALMS"
-CATALOG_TOKENS: Dict[str, Dict[str, Any]] = {
-    "REALMS": {
-        "decimals": 8,
-        "ledgers": {
-            "test": "nusyl-jiaaa-aaaae-qj6mq-cai",
-            "staging": "cj65k-laaaa-aaaac-bfxqq-cai",
-            "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
-        },
-    },
-    "ckBTC": {
-        "decimals": 8,
-        "ledgers": {
-            "test": "mxzaz-hqaaa-aaaar-qaada-cai",
-            "staging": "mxzaz-hqaaa-aaaar-qaada-cai",
-            "demo": "mxzaz-hqaaa-aaaar-qaada-cai",
-        },
-        "indexers": {
-            "test": "n5wcd-faaaa-aaaar-qaaea-cai",
-            "staging": "n5wcd-faaaa-aaaar-qaaea-cai",
-            "demo": "n5wcd-faaaa-aaaar-qaaea-cai",
-        },
-    },
-    "ckUSDC": {
-        "decimals": 6,
-        "ledgers": {
-            "test": "xevnm-gaaaa-aaaar-qafnq-cai",
-            "staging": "xevnm-gaaaa-aaaar-qafnq-cai",
-            "demo": "xevnm-gaaaa-aaaar-qafnq-cai",
-        },
-    },
-    "ckEURC": {
-        "decimals": 6,
-        "ledgers": {
-            "test": "pe5t5-diaaa-aaaar-qahwa-cai",
-            "staging": "pe5t5-diaaa-aaaar-qahwa-cai",
-            "demo": "pe5t5-diaaa-aaaar-qahwa-cai",
-        },
-    },
-}
-CATALOG_TOKEN_SYMBOLS = frozenset(CATALOG_TOKENS)
+# Preferred default treasury token when the spec names none: the mundus token,
+# whichever symbol the environment gives it.
+DEFAULT_TOKEN_SYMBOLS = ("REALMS", "RLM")
+# The shared-ledger catalog ({symbol: {ledger, indexer, decimals}}) is the
+# realm's: get_setup_state().shared_tokens, handed to it by the installer from
+# the environment's casals.json. The CLI carries no per-network table.
+SharedTokenCatalog = Dict[str, Dict[str, Any]]
 
 POLL_INTERVAL_S = 10
 POLL_TIMEOUT_S = 3600
@@ -737,16 +703,8 @@ def validate_merged_spec(
     )
     if ic_err:
         errors.append(ic_err)
-    token = merged.get("token")
-    if isinstance(token, dict) and token.get("symbol") and not token.get("canister"):
-        symbol = str(token.get("symbol") or "").strip()
-        if not catalog_token_symbol(symbol):
-            known = ", ".join(sorted(CATALOG_TOKEN_SYMBOLS))
-            errors.append(
-                f"unknown catalog token {symbol!r}: pass --token-canister for "
-                f"an existing ledger, or use a catalog symbol ({known}). "
-                "v1 cannot provision a new token canister"
-            )
+    # A token given as a bare symbol is resolved against the realm's own
+    # shared-ledger catalog once the realm exists (setup stage).
     if errors:
         raise StageError("validate", "\n".join(errors))
 
@@ -1818,45 +1776,54 @@ def preinstall_codex_dependencies(
             raise
 
 
-def catalog_token_symbol(symbol: str) -> Optional[str]:
-    """Canonical catalog symbol for a case-insensitive match."""
+def catalog_token_symbol(symbol: str, catalog: SharedTokenCatalog) -> Optional[str]:
+    """Canonical catalog symbol for a case-insensitive match, or None."""
     wanted = (symbol or "").strip().upper()
     if not wanted:
         return None
-    for known in CATALOG_TOKENS:
+    for known in catalog or {}:
         if known.upper() == wanted:
             return known
     return None
 
 
-def catalog_token_draft(symbol: str, network: str) -> Optional[Dict[str, Any]]:
-    """Fill ledger / decimals / indexer for a catalog symbol on ``network``."""
-    known = catalog_token_symbol(symbol)
+def default_catalog_symbol(catalog: SharedTokenCatalog) -> Optional[str]:
+    """The mundus token if the catalog has it, else its first entry, else None."""
+    for preferred in DEFAULT_TOKEN_SYMBOLS:
+        known = catalog_token_symbol(preferred, catalog)
+        if known:
+            return known
+    return next(iter(catalog), None) if catalog else None
+
+
+def catalog_token_draft(symbol: str, catalog: SharedTokenCatalog) -> Optional[Dict[str, Any]]:
+    """Fill ledger / decimals / indexer for a symbol from the realm's catalog."""
+    known = catalog_token_symbol(symbol, catalog)
     if not known:
         return None
-    entry = CATALOG_TOKENS[known]
-    ledger = str(entry["ledgers"].get(network) or "").strip()
+    entry = catalog.get(known) or {}
+    ledger = str(entry.get("ledger") or "").strip()
     if not ledger:
         return None
     draft: Dict[str, Any] = {
         "symbol": known,
         "token_canister_id": ledger,
-        "decimals": entry["decimals"],
+        "decimals": int(entry.get("decimals", 8)),
     }
-    indexer = str((entry.get("indexers") or {}).get(network) or "").strip()
+    indexer = str(entry.get("indexer") or "").strip()
     if indexer:
         draft["indexer_canister_id"] = indexer
     return draft
 
 
-def _token_draft(token: Any, network: str) -> Optional[Dict[str, Any]]:
+def _token_draft(token: Any, catalog: SharedTokenCatalog) -> Optional[Dict[str, Any]]:
     """Normalize spec.token for setup_save_draft, resolving catalog symbols."""
     if not isinstance(token, dict):
         return None
     canister = str(token.get("canister") or token.get("token_canister_id") or "").strip()
     symbol = str(token.get("symbol") or "").strip()
     if not canister:
-        resolved = catalog_token_draft(symbol, network)
+        resolved = catalog_token_draft(symbol, catalog)
         if resolved:
             return resolved
     out: Dict[str, Any] = {}
@@ -1867,7 +1834,7 @@ def _token_draft(token: Any, network: str) -> Optional[Dict[str, Any]]:
     return out or None
 
 
-def _setup_state_has_token(backend_id: str, network: str, identity: str) -> bool:
+def _fetch_setup_state(backend_id: str, network: str, identity: str) -> Dict[str, Any]:
     try:
         state = _canister_call(
             backend_id,
@@ -1880,8 +1847,20 @@ def _setup_state_has_token(backend_id: str, network: str, identity: str) -> bool
         )
         if isinstance(state, str):
             state = json.loads(state)
-        if not isinstance(state, dict):
-            return False
+        return state if isinstance(state, dict) else {}
+    except Exception:
+        return {}
+
+
+def fetch_shared_token_catalog(backend_id: str, network: str, identity: str) -> SharedTokenCatalog:
+    """The realm's shared-ledger catalog (get_setup_state().shared_tokens)."""
+    catalog = _fetch_setup_state(backend_id, network, identity).get("shared_tokens")
+    return catalog if isinstance(catalog, dict) else {}
+
+
+def _setup_state_has_token(backend_id: str, network: str, identity: str) -> bool:
+    try:
+        state = _fetch_setup_state(backend_id, network, identity)
         token = state.get("token")
         if isinstance(token, dict) and (
             token.get("token_canister_id")
@@ -1948,17 +1927,28 @@ def run_setup_stage(
     identity: str,
 ) -> None:
     branding = merged.get("branding") or {}
-    token_draft = _token_draft(merged.get("token"), network)
+    catalog = fetch_shared_token_catalog(backend_id, network, identity)
+    spec_token = merged.get("token")
+    token_draft = _token_draft(spec_token, catalog)
+    spec_symbol = str((spec_token or {}).get("symbol") or "").strip() if isinstance(spec_token, dict) else ""
+    if spec_symbol and not token_draft:
+        known = ", ".join(sorted(catalog)) or "none"
+        _fail(
+            "setup",
+            f"token symbol {spec_symbol!r} is not in this realm's shared-ledger catalog "
+            f"({known}). Pass --token-canister for an existing ledger, or a catalog symbol.",
+        )
     if not token_draft and not _setup_state_has_token(backend_id, network, identity):
-        token_draft = catalog_token_draft(DEFAULT_TOKEN_SYMBOL, network)
+        default_symbol = default_catalog_symbol(catalog)
+        token_draft = catalog_token_draft(default_symbol or "", catalog)
         if not token_draft:
             _fail(
                 "setup",
-                f"setup_launch needs a treasury token, and {DEFAULT_TOKEN_SYMBOL} has "
-                f"no known ledger on {network!r}. Pass --token-symbol / --token-canister.",
+                "setup_launch needs a treasury token and this realm's shared-ledger "
+                "catalog is empty. Pass --token-symbol / --token-canister.",
             )
         console.print(
-            f"  no token in spec: defaulting to {DEFAULT_TOKEN_SYMBOL} "
+            f"  no token in spec: defaulting to {default_symbol} "
             f"({token_draft['token_canister_id']}), as the setup wizard does"
         )
     draft: Dict[str, Any] = {
@@ -2513,17 +2503,9 @@ def ensure_conductor_cycles_for_realm(
     and the extensions install, then the baton hand-off dies with IC0504 and the
     realm is never registered.
     """
-    if gaas is None:
-        return
-    conductor = (gaas.canisters.get("casals_backend") or "").strip()
-    if not conductor:
-        return
-    try:
-        from ..casals_product import ensure_conductor_cycles
-
-        ensure_conductor_cycles(conductor, network=network, identity=identity)
-    except Exception as exc:  # noqa: BLE001 - never block a deploy on the preflight
-        console.print(f"[yellow]⚠️  conductor cycles preflight skipped: {exc}[/yellow]")
+    # Casals v2: the conductor keeps itself funded from the sheet's `cycles`
+    # block (min_balance_tc / budget_tc), so there is no CLI-side top-up here.
+    del gaas, network, identity
 
 
 def _file_registry_id_or_empty(network: str) -> str:

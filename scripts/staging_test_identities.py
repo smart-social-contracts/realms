@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Build /canister_ids.js snippets and patch staging realm frontends with test identities."""
+"""Build /canister_ids.js snippets and patch test-mode realm frontends with test identities.
+
+Canister ids are passed on the command line (`--frontend <frontend>:<backend>`,
+`--registry-frontend <id>`), read from `casals export`; nothing is baked in."""
 
 from __future__ import annotations
 
@@ -15,14 +18,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = REPO_ROOT / "config" / "staging-test-identities.json"
 PEM_DIR = REPO_ROOT / "config" / "staging-test-identities"
-
-STAGING_REALM_FRONTENDS = {
-    "dominion": "iocgc-oaaaa-aaaac-beh2q-cai",
-    "agora": "iaalk-vqaaa-aaaac-beh3q-cai",
-    "syntropia": "jkpjq-xaaaa-aaaac-beh4q-cai",
-}
-STAGING_REGISTRY_FRONTEND = "77243-aqaaa-aaaau-aggza-cai"
-
 
 def _load_config(path: Path) -> dict:
     with path.open(encoding="utf-8") as fh:
@@ -165,10 +160,10 @@ def patch_staging_realm(
     frontend_id: str,
     backend_id: str,
     *,
-    network: str = "staging",
+    network: str = "ic",
     identity: str = "deployer",
-    file_registry_id: str = "iebdk-kqaaa-aaaau-agoxq-cai",
-    derivation_origin: str = "https://staging.gos.earth",
+    file_registry_id: str = "",
+    derivation_origin: str = "",
     portal_url: str = "",
 ) -> None:
     js = build_canister_ids_js(
@@ -184,7 +179,7 @@ def patch_staging_realm(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--network", default="staging")
+    parser.add_argument("--network", default="ic", help="dfx network name")
     parser.add_argument("--identity", default=os.environ.get("DFX_IDENTITY", "deployer"))
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--print-js", action="store_true", help="Print JS only, do not store")
@@ -193,8 +188,8 @@ def main(argv: list[str] | None = None) -> int:
         action="append",
         help="frontend_canister_id:backend_id[:name] (repeatable)",
     )
-    parser.add_argument("--all-staging-realms", action="store_true")
-    parser.add_argument("--registry", action="store_true", help="Also patch registry frontend")
+    parser.add_argument("--file-registry", default="", help="file_registry canister id for /canister_ids.js")
+    parser.add_argument("--registry-frontend", default="", help="Also patch this registry frontend canister")
     parser.add_argument(
         "--portal-url",
         default="",
@@ -202,8 +197,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--derivation-origin",
-        default="https://staging.gos.earth",
-        help="II derivationOrigin (default: https://staging.gos.earth on staging)",
+        default="",
+        help="II derivationOrigin (the environment's portal host)",
     )
     args = parser.parse_args(argv)
 
@@ -211,23 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         print(build_test_identity_js(config_path=args.config))
         return 0
 
-    if args.all_staging_realms:
-        backends = {
-            "dominion": "ijdaw-dyaaa-aaaac-beh2a-cai",
-            "agora": "ihbn6-yiaaa-aaaac-beh3a-cai",
-            "syntropia": "jnope-2yaaa-aaaac-beh4a-cai",
-        }
-        for name, frontend_id in STAGING_REALM_FRONTENDS.items():
-            patch_staging_realm(
-                name,
-                frontend_id,
-                backends[name],
-                network=args.network,
-                identity=args.identity,
-                portal_url=args.portal_url,
-                derivation_origin=args.derivation_origin,
-            )
-    elif args.frontend:
+    if args.frontend:
         for spec in args.frontend:
             parts = spec.split(":")
             if len(parts) < 2:
@@ -240,17 +219,18 @@ def main(argv: list[str] | None = None) -> int:
                 backend_id,
                 network=args.network,
                 identity=args.identity,
+                file_registry_id=args.file_registry,
                 portal_url=args.portal_url,
                 derivation_origin=args.derivation_origin,
             )
-    elif not args.registry:
-        parser.error("Specify --all-staging-realms, --frontend, or --registry")
+    elif not args.registry_frontend:
+        parser.error("Specify --frontend and/or --registry-frontend")
 
-    if args.registry:
+    if args.registry_frontend:
         js = build_test_identity_js(config_path=args.config)
         # Registry frontend only needs test identity globals (no realm_backend).
-        store_canister_ids_js(STAGING_REGISTRY_FRONTEND, js, args.network, args.identity)
-        print(f"Patched registry frontend {STAGING_REGISTRY_FRONTEND}")
+        store_canister_ids_js(args.registry_frontend, js, args.network, args.identity)
+        print(f"Patched registry frontend {args.registry_frontend}")
 
     return 0
 

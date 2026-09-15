@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[2]
 CONSUMERS = (
     ROOT / "casals-config" / "_gen_arrangements.py",
     ROOT / "cli" / "realms" / "cli" / "commands" / "mundus.py",
-    ROOT / "scripts" / "ci_install_mundus.py",
 )
 
 # Inline dict literals mapping TEST_MODE_* descriptor params to flag keys.

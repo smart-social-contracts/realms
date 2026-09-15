@@ -58,7 +58,7 @@ def test_resolve_falls_back_to_flat_layout(tmp_path: Path) -> None:
 
 def test_resolve_prefers_nested_when_both_present(tmp_path: Path) -> None:
     """If both layouts somehow exist, the nested one wins (it's the real one
-    inside the realms repo and matches what ci_install_mundus.py walks)."""
+    inside the realms repo)."""
     _make_ext(tmp_path / "extensions" / "extensions" / "real_one")
     _make_ext(tmp_path / "extensions" / "decoy")
     assert pl._resolve_extensions_root(tmp_path) == tmp_path / "extensions" / "extensions"

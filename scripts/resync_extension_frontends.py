@@ -13,8 +13,7 @@ from ic.candid import Types, encode
 from ic.client import Client
 from ic.identity import Identity
 
-DEFAULT_REGISTRY = "iebdk-kqaaa-aaaau-agoxq-cai"
-DEFAULT_FRONTEND = "fcm3z-5qaaa-aaaac-bfq4a-cai"
+# Environment ids come from the caller (`casals export`); nothing is baked in.
 DEFAULT_PEM = "/root/.config/dfx/identity/deployer/identity.pem"
 DEFAULT_HOST = "https://icp0.io"
 
@@ -34,8 +33,8 @@ def _decode_text(raw) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("backend", help="Realm backend canister id")
-    parser.add_argument("--registry", default=DEFAULT_REGISTRY)
-    parser.add_argument("--frontend", default=DEFAULT_FRONTEND)
+    parser.add_argument("--registry", required=True, help="file_registry canister id (casals export)")
+    parser.add_argument("--frontend", required=True, help="Realm frontend canister id (casals export)")
     parser.add_argument("--identity-pem", default=DEFAULT_PEM)
     parser.add_argument("--ext", help="Single extension id (default: all installed)")
     parser.add_argument("--dry-run", action="store_true")

@@ -23,14 +23,8 @@ from .extension import (
 
 console = Console()
 
-_CORE = Path(__file__).resolve().parents[2] / "src" / "realm_backend" / "core"
-if str(_CORE) not in sys.path:
-    sys.path.insert(0, str(_CORE))
-from network_infra import file_registry_id_for  # noqa: E402
-
-
 def _registry_from_canister_ids(network: str) -> str:
-    """Live inventory in canister_ids.json beats the baked NETWORK_INFRA table."""
+    """The file_registry id recorded for ``network`` in canister_ids.json, or ''."""
     path = _find_project_root() / "canister_ids.json"
     if not path.is_file():
         return ""
@@ -41,10 +35,16 @@ def _registry_from_canister_ids(network: str) -> str:
     return ((data.get("file_registry") or {}).get(network) or "").strip()
 
 
+def file_registry_id_for(network: str) -> str:
+    """The fleet file_registry for ``network``: the operator's canister_ids.json
+    inventory (``casals export`` writes it), or '' — there is no baked table."""
+    return _registry_from_canister_ids(network)
+
+
 def _resolve_registry(network: str, registry: Optional[str]) -> str:
     if registry:
         return registry
-    rid = _registry_from_canister_ids(network) or file_registry_id_for(network)
+    rid = file_registry_id_for(network)
     if not rid:
         raise typer.BadParameter(
             f"No file_registry canister ID for network '{network}'. Use --registry."

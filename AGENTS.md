@@ -93,7 +93,7 @@ batches and takes several minutes per realm.
 | **Wizard / portal realm** (`/r/<slug>/` on test/demo/staging) | [Direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer) — never mundus | ~25–90s |
 | **Realm UI or backend change** (Agora, Dominion, Syntropia) | `realms mundus deploy` with `--version build` | ~90s |
 | **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install, **or** [direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer) | ~26s via registry; direct path skips the installer |
-| **Registry / installer / other infra** during dev | fetch GOS artifacts + `dfx deploy` (registry/installer) or `scripts/infra_dev_deploy.sh` (file_registry, …) or `realms env deploy` (full product stack) | ~2–5 min |
+| **Registry / installer / other infra** during dev | fetch GOS artifacts + `dfx deploy` (registry/installer) or `scripts/infra_dev_deploy.sh` (file_registry, …); the full product stack is `casals up` on `casals.json` (`docs/OPERATIONS.md`) | ~2–5 min |
 | **Pre-merge / make Casals authoritative** | `publish-build` → `rollout` | several min |
 
 ### What changed?
@@ -133,10 +133,10 @@ Realms' pin in `scripts/fetch_gos_artifacts.py` (`GOS_RELEASE`).
 The wizard at `staging.gos.earth` is **not** a realm app and **not** upgraded by
 `mundus deploy` or `ci-main` (which only publish/roll out `family=realm`).
 
-**Product sites** at `*.realmsgos.org` (landing + marketplace + file registry for
-each IC environment) are Realms-owned and deployed via
-[`realms env deploy`](#per-environment-product-stack-realmsgosorg) — distinct from the
-`*.gos.earth` GaaS portal in gos-as-a-service.
+**Product sites** at `*.realmsgos.org` (landing + marketplace + file registry)
+are Realms-owned and declared in the repo-root `casals.json`; `casals up` deploys
+them (see `docs/OPERATIONS.md`) — distinct from the `*.gos.earth` GaaS portal in
+gos-as-a-service.
 
 **Publish + roll out a new GOS release on staging (Realms side):**
 
@@ -538,13 +538,13 @@ Deploy the **complete** Realms GOS product surface for one IC environment (file
 registry + registry UI + marketplace backend + marketplace frontend), wired together
 and prepared for a custom domain (`demo.realmsgos.org`, etc.):
 
-```bash
-realms env deploy --env demo --identity deployer
-realms env status --env staging
+```sh
+# from the Casals repo; -e ic with the deployer identity for production
+python -m casals_cli.main -e local --identity local-dev up ../realms/casals.json --yes
 ```
 
-Config: `environments/{demo,staging,test}.json`. See
-`docs/reference/ENVIRONMENTS.md` for schema, DNS/custom-domain steps, and flags.
+Everything environment-specific (principals, DNS, test flags, shared ledgers)
+lives in the sheet's `environments` block; see `docs/OPERATIONS.md`.
 `realms marketplace deploy` remains the lighter-weight marketplace-only path.
 
 **When to use which path** (see also [Choose your path first](#choose-your-path-first) at the top):
@@ -555,7 +555,7 @@ Config: `environments/{demo,staging,test}.json`. See
 | Realm UI/backend change (Agora, Dominion, Syntropia; installer healthy) | `realms mundus deploy` with `--version build` |
 | Registry/wizard/installer change | Develop in **gos-as-a-service** → release → bump `GOS_RELEASE` → fetch + publish + rollout |
 | Iterating on file_registry / marketplace / dashboard | `scripts/infra_dev_deploy.sh` or `publish_build.py` |
-| Full product stack to demo/staging/test (`*.realmsgos.org`) | `realms env deploy --env <name>` |
+| Full product stack (`*.realmsgos.org`) | `casals up casals.json` (`docs/OPERATIONS.md`) |
 | Pre-merge / making Casals authoritative | `publish_build.py` (realm) or GOS fetch + `realms rollout` (registry/installer) |
 
 **Before merge**, align Casals with what you deployed off-chain (realm code):
@@ -1769,7 +1769,7 @@ await target.locator("text=Advanced").first.click()
 - [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — Deployment decision tree (Casals, mundus, extensions, release)
 - `AGENTS.md` — Agent/operator guide (deploy paths, canister IDs, fast iteration)
 - [Cursor Cloud specific instructions](#cursor-cloud-specific-instructions) — named env (Environment2) vs Task `environment: cloud`, plaintext PEM, `icp` replica flags, Playwright Chrome path
-- `docs/reference/ENVIRONMENTS.md` — Per-env product stacks (`realms env deploy`, `*.realmsgos.org`)
+- `docs/OPERATIONS.md` — Product orchestra (`casals up` on `casals.json`, `*.realmsgos.org`)
 - `docs/reference/CASALS_ROLLOUT.md` — On-chain (Casals) deploy & upgrade runbook
 - `docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md` — Layered deploy runbook
 - `docs/reference/EXTENSION_ARCHITECTURE.md` — Extension lifecycle

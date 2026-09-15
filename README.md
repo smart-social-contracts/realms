@@ -569,13 +569,9 @@ extensions: [voting, vault, admin_dashboard, …]
 codices:    [basic_governance, …]
 ```
 
-Then run:
-
-```bash
-python scripts/deploy.py deployments/staging-dominion-layered.yml
-```
-
-`scripts/deploy.py`'s `deploy_layered_backend` will (1) call `realms wasm install`, (2) `realms extension registry-install` for each extension, (3) `realms codex registry-install` for each codex.
+Then install it: `realms wasm install` for the base, `realms extension registry-install`
+for each extension, `realms codex registry-install` for each codex (the
+`package_manager` extension does the same from the realm UI).
 
 ### How `realm_frontend` consumes Layer 2
 
@@ -594,13 +590,12 @@ A standalone asset canister ships a vanilla-JS dashboard for the registry: names
 
 ### CI / GitHub Actions
 
-Three operator workflows under `.github/workflows/` automate the layered flow. All are manual (`workflow_dispatch`).
+Two operator workflows under `.github/workflows/` automate the layered flow. All are manual (`workflow_dispatch`).
 
 | Workflow | Purpose |
 |---|---|
 | `Publish Base WASM` | Builds Layer 1 and uploads it to `file_registry` at `wasm/realm-base-<version>.wasm.gz` (chunked). |
 | `Runtime Extension Deploy` | Tight inner loop: publish + registry-install **one** extension on a chosen realm. Useful while iterating on a single extension. |
-| `Layered Deploy Dominion` | End-to-end: build + publish base WASM, build + publish every extension and codex, then run `scripts/deploy.py` against `deployments/staging-dominion-layered.yml` to reinstall the target realm. |
 
 Required repository configuration:
 

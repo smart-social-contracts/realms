@@ -1,6 +1,6 @@
 # ci-main.yml — main pipeline.
 #
-# E2E tests and staging deploy run in parallel.
+# E2E (realms-e2e.yml) and the staging rollout run in parallel.
 
 name: CI (main)
 
@@ -18,46 +18,9 @@ env:
   NODE_VERSION: "20"
 
 jobs:
-  # ── E2E tests on a local replica ────────────────────────────────────────────
-  layered-e2e-local:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - name: Install dfx
-        run: |
-          DFX_VERSION=0.32.0
-          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
-          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
-          rm /tmp/dfx.tar.gz
-          dfx --version
-      - name: Install realms CLI + Python deps
-        run: |
-          pip install -r requirements.txt
-          pip install -e cli/
-          pip install pyyaml
-      - name: Start local replica
-        run: |
-          dfx start --background --clean --host 127.0.0.1:4943
-          sleep 3
-      - name: Run all four stages on the local mundus
-        run: |
-          python3 scripts/ci_install_mundus.py \
-              --file deployment-descriptors/local-mundus.yml \
-              --stages 0,1,2,3
-      - name: cross-quarter live integration tests
-        run: python3 tests/integration/test_cross_quarter_live.py
-      - name: Stop local replica
-        if: always()
-        run: dfx stop || true
+  # ── E2E on a local replica: casals up + cross-quarter live suite ───────────
+  e2e:
+    uses: ./.github/workflows/realms-e2e.yml
 
   # ── Staging deploy via Casals (runs in parallel with e2e) ───────────────────
   # Publishes the realm artifacts from this checkout into staging's file_registry
