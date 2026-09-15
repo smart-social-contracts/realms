@@ -34,7 +34,7 @@ The #233 approach (registry as `derivationOrigin` + grow the alternative-origins
 
 | Environment | Portal origin (v1) | Future (optional) |
 |---|---|---|
-| Production | `https://registry.realmsgos.org` | `https://gos.world` |
+| Production | `https://realmsgos.org` | `https://gos.world` |
 | Staging | `https://staging.realmsgos.org` | `https://staging.gos.world` |
 | Demo | `https://demo.realmsgos.org` | `https://demo.gos.world` |
 | Test | `https://test.realmsgos.org` | `https://test.gos.world` |

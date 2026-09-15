@@ -702,4 +702,4 @@ See [Casals Rollout](./docs/reference/CASALS_ROLLOUT.md) and `AGENTS.md` for dep
 Decent amount of members (10k) and other objects simulating a production-like environment.
 Runs scheduled tasks for payments, tax claculations etc.
 Voting of new codex and deployment of it.
-Registry in the [Realm Registry](https://registry.realmsgos.org).
+Registry in the [Realm Registry](https://realmsgos.org).

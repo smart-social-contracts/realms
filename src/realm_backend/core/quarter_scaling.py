@@ -24,16 +24,15 @@ def _quarter_casals_args(realm):
     Reads the optional ``casals`` block persisted in ``manifest_data``::
 
         {
-          "stand": "agora",                        # required
-          "backend_wasm_key": "realm-backend@...", # required
-          "casals_canister_id": "jj2e5-...",       # enables the direct path
+          "stand": "agora",                        # required: the capital's Casals stand
+          "casals_canister_id": "jj2e5-...",       # the conductor
           "registry_canister_id": "iebdk-...",     # for codex/extension pull
           "codex": {"codex_id": "...", "version": null},
           "extensions": [{"ext_id": "...", "version": null}, ...],
           "frontend_canister_id": ""               # quarters are backend-only
         }
 
-    Returns None when the required ``stand``/``backend_wasm_key`` are missing.
+    Returns None when the required ``stand`` is missing.
     """
     from api.quarter_provisioning import parse_casals_spec
 
@@ -98,12 +97,16 @@ def _capital_runtime_config(realm) -> dict:
 
 
 def run_quarter_scaling() -> Async[text]:
-    """Core auto-scale provisioning driver (un-gated).
+    """Core auto-scale provisioning driver (un-gated), one step per call.
 
-    Creates a quarter via Casals (direct path), seeds the new quarter's local
-    self-bootstrap, registers it locally, then clears the in-flight guard.
-    Shared by the ``process_quarter_scaling`` endpoint and the recurring
-    autoscale task (``run_autoscale_tick``).
+    The capital is a commander of its Casals stand. Each tick it (1) asks
+    Casals for the next numbered quarter member (idempotent), (2) reads
+    ``get_bindings``; while the conductor has not built the canister yet the
+    result is ``pending`` and the in-flight flag stays set so the next tick
+    retries; (3) once bound, seeds the quarter's self-bootstrap, registers it
+    locally and clears the in-flight guard. Baton hand-off and controllers are
+    the template's business, not the realm's. Shared by the
+    ``process_quarter_scaling`` endpoint and ``run_autoscale_tick``.
     """
     try:
         from ggg import Realm
@@ -130,11 +133,29 @@ def run_quarter_scaling() -> Async[text]:
             return json.dumps({
                 "success": False,
                 "status": "blocked",
-                "error": "manifest_data.casals {stand, backend_wasm_key} required to provision",
+                "error": "manifest_data.casals.stand required to provision",
+            })
+        casals_id = (spec.get("casals_canister_id") or "").strip()
+        if not casals_id:
+            # Intent recorded but no transport wired; keep the flag set so an
+            # operator can finish wiring and retry.
+            return json.dumps({
+                "success": False,
+                "status": "blocked",
+                "error": "no provisioning transport: set manifest_data.casals.casals_canister_id",
             })
 
-        casals_id = (spec.get("casals_canister_id") or "").strip()
-        bootstrap_result = None
+        from api.quarter_provisioning import bootstrap_quarter, lookup_casals_binding, request_casals_member
+
+        member_res = yield from request_casals_member(casals_id, spec["stand"], spec["name"])
+        if not member_res.get("ok"):
+            realm.scale_in_flight = False
+            return json.dumps({"success": False, "status": "failed",
+                               "error": f"Casals create_stand failed: {member_res.get('error')}"})
+        new_canister_id = yield from lookup_casals_binding(casals_id, spec["name"])
+        if not new_canister_id:
+            logger.info(f"Quarter {spec['name']} requested; waiting for the conductor to build it")
+            return json.dumps({"success": True, "status": "pending", "member": spec["name"]})
 
         # Auto-derive the install set from the capital's *own live state* so the
         # new quarter mirrors whatever the capital currently has installed — no
@@ -145,9 +166,7 @@ def run_quarter_scaling() -> Async[text]:
 
         derived = derive_capital_install_set(spec.get("registry_canister_id", ""))
         registry_id = (derived.get("registry_canister_id") or spec.get("registry_canister_id", "")).strip()
-        codices = derived.get("codices") or (
-            [spec["codex"]] if spec.get("codex") else []
-        )
+        codices = derived.get("codices") or ([spec["codex"]] if spec.get("codex") else [])
         extensions = derived.get("extensions") or spec.get("extensions", [])
         # Snapshot the capital's runtime config + branding so the quarter comes
         # up branded and registration-ready (issue #156), not as a bare
@@ -158,71 +177,20 @@ def run_quarter_scaling() -> Async[text]:
             f"{len(codices)} codices, {len(extensions)} extensions, registry={registry_id or 'none'}; "
             f"config name={capital_config.get('name')!r} open_reg={capital_config.get('open_registration')}"
         )
-
-        new_canister_id = ""
-        baton_handed = False
-        if casals_id:
-            # ── Direct path: the capital commands its own Casals stand. ──
-            from api.quarter_provisioning import request_casals_create_canister
-
-            create_res = yield from request_casals_create_canister(casals_id, {
-                "stand": spec["stand"],
-                "name": spec["name"],
-                "kind": "backend",
-                "wasm_key": spec["backend_wasm_key"],
-            })
-            if not create_res.get("ok"):
-                realm.scale_in_flight = False
-                return json.dumps({"success": False, "status": "failed",
-                                   "error": f"Casals create_canister failed: {create_res.get('error')}"})
-            new_canister_id = (create_res.get("canister_id") or "").strip()
-            if not new_canister_id:
-                realm.scale_in_flight = False
-                return json.dumps({"success": False, "status": "failed",
-                                   "error": "Casals create_canister returned no canister_id"})
-
-            # Seed the new quarter's local self-bootstrap (config + codex +
-            # extensions, installed one item per tick by its own TaskManager).
-            from api.quarter_provisioning import bootstrap_quarter
-
-            bootstrap_result = yield from bootstrap_quarter(new_canister_id, {
-                "parent_realm_canister_id": ic.id().to_str(),
-                "registry_canister_id": registry_id,
-                "codices": codices,
-                "extensions": extensions,
-                "frontend_canister_id": spec.get("frontend_canister_id", ""),
-                "config": capital_config,
-            })
-            # Hand-off replaces IC controllers — only safe after bootstrap adds
-            # the capital to the quarter's trusted_principals.
-            if isinstance(bootstrap_result, dict) and bootstrap_result.get("success"):
-                from api.quarter_provisioning import request_casals_hand_to_baton
-
-                hand_res = yield from request_casals_hand_to_baton(casals_id, {
-                    "target": spec["name"],
-                })
-                if hand_res.get("ok") and not hand_res.get("pending"):
-                    baton_handed = True
-                    logger.info(f"Handed quarter canister {spec['name']} to stand baton")
-                elif hand_res.get("ok"):
-                    logger.warning(
-                        f"Baton hand-off for {spec['name']} is queued for governance "
-                        f"approval; the quarter is not baton-managed yet"
-                    )
-                else:
-                    err = (hand_res.get("error") or "").strip()
-                    if "no baton" in err.lower():
-                        logger.info(f"No baton hand-off for {spec['name']}: {err}")
-                    else:
-                        logger.warning(f"Baton hand-off failed for {spec['name']}: {err}")
-        else:
-            # Intent recorded but no transport wired; keep the flag set so an
-            # operator can finish wiring and retry.
-            return json.dumps({
-                "success": False,
-                "status": "blocked",
-                "error": "no provisioning transport: set manifest_data.casals.casals_canister_id",
-            })
+        bootstrap_result = yield from bootstrap_quarter(new_canister_id, {
+            "parent_realm_canister_id": ic.id().to_str(),
+            "registry_canister_id": registry_id,
+            "codices": codices,
+            "extensions": extensions,
+            "frontend_canister_id": spec.get("frontend_canister_id", ""),
+            "config": capital_config,
+        })
+        if not (isinstance(bootstrap_result, dict) and bootstrap_result.get("success")):
+            # Bound but not installed / configured yet: the conductor is still
+            # converging the stand. Retry next tick.
+            logger.info(f"Quarter {spec['name']} ({new_canister_id}) not ready: {bootstrap_result}")
+            return json.dumps({"success": True, "status": "pending", "member": spec["name"],
+                               "canister_id": new_canister_id, "bootstrap": bootstrap_result})
 
         from ggg import Quarter, QuarterStatus
 
@@ -233,7 +201,7 @@ def run_quarter_scaling() -> Async[text]:
             for q in Quarter.instances():
                 new_index = max(new_index, int(q.index or 0) + 1)
             q = Quarter(
-                name=spec.get("name") or new_canister_id[:8],
+                name=spec["name"],
                 canister_id=new_canister_id,
                 index=new_index,
                 status=QuarterStatus.SETUP,
@@ -253,7 +221,6 @@ def run_quarter_scaling() -> Async[text]:
             "canister_id": new_canister_id,
             "index": new_index,
             "bootstrap": bootstrap_result,
-            "baton_handed": baton_handed,
         })
     except Exception as e:
         logger.error(f"Error in process_quarter_scaling: {e}\n{traceback.format_exc()}")

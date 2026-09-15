@@ -43,7 +43,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from ..casals_versions import MAIN_CHANNEL, pick_latest_main_key
+from ..casals_versions import MAIN_CHANNEL, TEST_MAIN_CHANNEL_PREFIX, pick_latest_main_key, pick_latest_test_main_key
 from ..utils import get_project_root
 from .extension import _dfx_call
 from .files import file_registry_id_for, files_publish_release_command
@@ -53,7 +53,7 @@ console = Console()
 # ── Per-environment Casals canister IDs ─────────────────────────────────────
 # Casals instances live on IC mainnet; add staging/demo once deployed there.
 _CASALS_IDS = {
-    "test": "qthgp-3yaaa-aaaae-agveq-cai",
+    "test": "o3mbf-pqaaa-aaaan-q6pyq-cai",
     "demo": "jo3cj-faaaa-aaaac-bffea-cai",
     "staging": "jj2e5-iyaaa-aaaac-bffeq-cai",
 }
@@ -280,6 +280,8 @@ def _resolve_wasm_key(authorized: list, pub_family: str, kind: str, version: str
         return None
     if version in (MAIN_CHANNEL, "latest-main"):
         return pick_latest_main_key(candidates)
+    if version in (TEST_MAIN_CHANNEL_PREFIX, "latest-main-test"):
+        return pick_latest_test_main_key(candidates)
     if version == "latest":
         for w in candidates:
             if w.get("latest"):

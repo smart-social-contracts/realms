@@ -65,8 +65,8 @@ PORTAL_HOSTS = {
     "staging": "https://staging.gos.earth",
     "demo": "https://demo.gos.earth",
     "test": "https://test.gos.earth",
-    "ic": "https://registry.realmsgos.org",
-    "production": "https://registry.realmsgos.org",
+    "ic": "https://realmsgos.org",
+    "production": "https://realmsgos.org",
 }
 
 # Realm SPA II derivation origin (``icp identity link web --app``).

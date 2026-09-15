@@ -1,4 +1,5 @@
-"""Unit tests for core.quarter_scaling direct-path baton hand-off."""
+"""Unit tests for core.quarter_scaling: the capital grows its Casals stand
+by one numbered member per scale (create_stand → get_bindings → bootstrap)."""
 
 import importlib.util
 import json
@@ -45,7 +46,6 @@ def _manifest():
     return json.dumps({
         "casals": {
             "stand": "agora",
-            "backend_wasm_key": "realm-backend@main",
             "casals_canister_id": "casals-cai",
             "registry_canister_id": "registry-cai",
         }
@@ -102,26 +102,26 @@ def capital_realm():
     return _FakeRealm._instance
 
 
-def _stub_provisioning(monkeypatch, *, bootstrap_result, hand_result=None, hand_calls=None):
-    hand_calls = hand_calls if hand_calls is not None else []
+def _stub_provisioning(monkeypatch, *, bootstrap_result, binding="new-quarter-cai", member_calls=None):
+    member_calls = member_calls if member_calls is not None else []
 
-    def create_canister(_casals_id, _args):
-        yield "create"
-        return {"ok": True, "canister_id": "new-quarter-cai"}
+    def request_member(_casals_id, stand, member):
+        member_calls.append((stand, member))
+        yield "create_stand"
+        return {"ok": True, "members": [member], "created": False}
+
+    def lookup_binding(_casals_id, _name):
+        yield "get_bindings"
+        return binding
 
     def bootstrap_quarter(_canister_id, _args):
         yield "bootstrap"
         return bootstrap_result
 
-    def hand_to_baton(_casals_id, args):
-        hand_calls.append(args)
-        yield "hand_to_baton"
-        return hand_result or {"ok": True}
-
     qp = types.ModuleType("api.quarter_provisioning")
-    qp.request_casals_create_canister = create_canister
+    qp.request_casals_member = request_member
+    qp.lookup_casals_binding = lookup_binding
     qp.bootstrap_quarter = bootstrap_quarter
-    qp.request_casals_hand_to_baton = hand_to_baton
     qp.parse_casals_spec = _real_qp.parse_casals_spec
     monkeypatch.setitem(sys.modules, "api", types.ModuleType("api"))
     monkeypatch.setitem(sys.modules, "api.quarter_provisioning", qp)
@@ -135,95 +135,78 @@ def _stub_provisioning(monkeypatch, *, bootstrap_result, hand_result=None, hand_
     monkeypatch.setitem(sys.modules, "core.quarter_bootstrap", qb)
 
 
-class TestRunQuarterScalingBatonHandoff:
-    def test_hands_off_after_successful_bootstrap(self, monkeypatch, capital_realm):
-        hand_calls = []
-        _stub_provisioning(
-            monkeypatch,
-            bootstrap_result={"success": True, "status": "bootstrapping"},
-            hand_calls=hand_calls,
-        )
+class TestRunQuarterScaling:
+    def test_provisions_once_bound_and_bootstrapped(self, monkeypatch, capital_realm):
+        member_calls = []
+        _stub_provisioning(monkeypatch, bootstrap_result={"success": True, "status": "bootstrapping"},
+                           member_calls=member_calls)
 
-        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create", "bootstrap", "hand_to_baton"])
-        out = json.loads(raw)
-
-        assert out["success"] is True
-        assert out["baton_handed"] is True
-        assert hand_calls == [{"target": "agora-1"}]
-        assert capital_realm.scale_in_flight is False
-
-    def test_skips_hand_off_when_bootstrap_fails(self, monkeypatch, capital_realm):
-        hand_calls = []
-        _stub_provisioning(
-            monkeypatch,
-            bootstrap_result={"success": False, "error": "bootstrap failed"},
-            hand_calls=hand_calls,
-        )
-
-        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create", "bootstrap"])
-        out = json.loads(raw)
-
-        assert out["success"] is True
-        assert out["baton_handed"] is False
-        assert hand_calls == []
-        assert capital_realm.scale_in_flight is False
-
-    def test_governance_pending_is_not_reported_as_handed(self, monkeypatch, capital_realm):
-        hand_calls = []
-        _stub_provisioning(
-            monkeypatch,
-            bootstrap_result={"success": True},
-            hand_result={"ok": True, "pending": True, "raw": {"status": "PENDING"}},
-            hand_calls=hand_calls,
-        )
-
-        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create", "bootstrap", "hand_to_baton"])
-        out = json.loads(raw)
-
-        assert out["success"] is True
-        assert out["baton_handed"] is False
-        assert hand_calls == [{"target": "agora-1"}]
-        assert capital_realm.scale_in_flight is False
-
-    def test_hand_off_error_does_not_fail_scaling(self, monkeypatch, capital_realm):
-        hand_calls = []
-        _stub_provisioning(
-            monkeypatch,
-            bootstrap_result={"success": True},
-            hand_result={"ok": False, "error": "controller update rejected"},
-            hand_calls=hand_calls,
-        )
-
-        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create", "bootstrap", "hand_to_baton"])
+        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create_stand", "get_bindings", "bootstrap"])
         out = json.loads(raw)
 
         assert out["success"] is True
         assert out["status"] == "provisioned"
-        assert out["baton_handed"] is False
-        assert hand_calls == [{"target": "agora-1"}]
+        assert out["canister_id"] == "new-quarter-cai"
+        assert member_calls == [("agora", "agora-quarter-1")]
+        assert [q.canister_id for q in _FakeQuarter.rows] == ["new-quarter-cai"]
+        assert capital_realm.scale_in_flight is False
+
+    def test_pending_while_conductor_builds_the_member(self, monkeypatch, capital_realm):
+        _stub_provisioning(monkeypatch, bootstrap_result={"success": True}, binding="")
+
+        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create_stand", "get_bindings"])
+        out = json.loads(raw)
+
+        assert out["status"] == "pending"
+        assert out["member"] == "agora-quarter-1"
+        assert _FakeQuarter.rows == []
+        assert capital_realm.scale_in_flight is True
+
+    def test_pending_while_quarter_not_yet_installed(self, monkeypatch, capital_realm):
+        _stub_provisioning(monkeypatch, bootstrap_result={"success": False, "error": "no wasm"})
+
+        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create_stand", "get_bindings", "bootstrap"])
+        out = json.loads(raw)
+
+        assert out["status"] == "pending"
+        assert _FakeQuarter.rows == []
+        assert capital_realm.scale_in_flight is True
+
+    def test_next_member_number_follows_registered_quarters(self, monkeypatch, capital_realm):
+        _FakeQuarter(canister_id="q1", index=1)
+        _FakeQuarter(canister_id="q2", index=2)
+        member_calls = []
+        _stub_provisioning(monkeypatch, bootstrap_result={"success": True}, member_calls=member_calls)
+
+        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create_stand", "get_bindings", "bootstrap"])
+        out = json.loads(raw)
+
+        assert member_calls == [("agora", "agora-quarter-3")]
+        assert out["index"] == 3
+
+    def test_create_stand_rejection_clears_flag(self, monkeypatch, capital_realm):
+        _stub_provisioning(monkeypatch, bootstrap_result={"success": True})
+
+        def rejected(_casals_id, _stand, _member):
+            yield "create_stand"
+            return {"ok": False, "error": "unauthorized"}
+
+        sys.modules["api.quarter_provisioning"].request_casals_member = rejected
+        raw = _drive(quarter_scaling.run_quarter_scaling(), ["create_stand"])
+        out = json.loads(raw)
+
+        assert out["success"] is False
+        assert out["status"] == "failed"
         assert capital_realm.scale_in_flight is False
 
 
 class TestRunQuarterScalingBlocked:
     def test_blocked_when_no_casals_canister_id(self, monkeypatch, capital_realm):
-        capital_realm.manifest_data = json.dumps({
-            "casals": {
-                "stand": "agora",
-                "backend_wasm_key": "realm-backend@main",
-            }
-        })
+        capital_realm.manifest_data = json.dumps({"casals": {"stand": "agora"}})
         qp = types.ModuleType("api.quarter_provisioning")
         qp.parse_casals_spec = _real_qp.parse_casals_spec
         monkeypatch.setitem(sys.modules, "api", types.ModuleType("api"))
         monkeypatch.setitem(sys.modules, "api.quarter_provisioning", qp)
-
-        qb = types.ModuleType("core.quarter_bootstrap")
-        qb.derive_capital_install_set = lambda _registry: {
-            "registry_canister_id": "",
-            "codices": [],
-            "extensions": [],
-        }
-        monkeypatch.setitem(sys.modules, "core.quarter_bootstrap", qb)
 
         gen = quarter_scaling.run_quarter_scaling()
         try:

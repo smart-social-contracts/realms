@@ -57,7 +57,7 @@ def known_bootstrap_principals() -> frozenset:
     """GOS installer + registry principals that may first-boot a realm.
 
     Casals is not a lasting controller. After canister create, the installer
-    (fltjm / jmgc7 on test, moqmm / tzip5 on demo, …) calls enter_setup /
+    (fltjm on test, moqmm on live demo) calls enter_setup /
     set_canister_config_json. Those callers must be recognizable without an
     IC-controller check.
     """

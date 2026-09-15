@@ -735,6 +735,11 @@ def mundus_deploy(
     codices_filter: str = typer.Option(
         "", "--codices", help="Codices to install: comma-separated IDs, or 'none' to skip (default: all)"
     ),
+    build_variant: str = typer.Option(
+        "",
+        "--variant",
+        help="Realm build variant: production or test (default: test on test network, production otherwise)",
+    ),
 ) -> None:
     """Deploy realm canisters from a mundus descriptor.
 
@@ -777,6 +782,7 @@ def mundus_deploy(
         realm_filter=realm_filter, canister_filter=canister_filter,
         skip_extensions=skip_extensions,
         extension_names=ext_names, codex_names=codex_names,
+        build_variant=build_variant,
     )
 
 

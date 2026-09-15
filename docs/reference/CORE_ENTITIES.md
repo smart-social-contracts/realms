@@ -385,7 +385,7 @@ from ggg import Registry
 registry = Registry(
     name="Central Realm Registry",
     registry_type="realm_registry",
-    url="https://registry.realmsgos.org"
+    url="https://realmsgos.org"
 )
 ```
 

@@ -45,7 +45,10 @@ async function buildActor() {
     }
   }
 
-  return createActor(canisterId, { agent });
+  // /canister_ids.js, written by the orchestrator at deploy time, wins over the
+  // build-time declaration: one dist serves every environment.
+  const runtimeId = (globalThis as any).__CANISTER_IDS?.marketplace_backend;
+  return createActor(runtimeId || canisterId, { agent });
 }
 
 async function getActor() {

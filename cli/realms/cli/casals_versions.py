@@ -17,11 +17,17 @@ from typing import Iterable, Optional
 
 
 MAIN_CHANNEL = "main"
+TEST_MAIN_CHANNEL_PREFIX = "main-test"
 
 
 def is_main_channel(version: str) -> bool:
     v = (version or "").strip()
     return v == MAIN_CHANNEL or v.startswith(f"{MAIN_CHANNEL}.")
+
+
+def is_test_main_channel(version: str) -> bool:
+    v = (version or "").strip()
+    return v == TEST_MAIN_CHANNEL_PREFIX or v.startswith(f"{TEST_MAIN_CHANNEL_PREFIX}.")
 
 
 def ver_tuple(version: str) -> tuple[int, ...]:
@@ -57,3 +63,14 @@ def pick_latest_main_key(candidates: Iterable[dict]) -> Optional[str]:
         return None
     main_only.sort(key=lambda w: ver_tuple(w.get("version") or ""), reverse=True)
     return main_only[0].get("key")
+
+
+def pick_latest_test_main_key(candidates: Iterable[dict]) -> Optional[str]:
+    """Newest authorized WASM whose version is in the main-test channel."""
+    test_only = [
+        w for w in candidates if is_test_main_channel(w.get("version") or "")
+    ]
+    if not test_only:
+        return None
+    test_only.sort(key=lambda w: ver_tuple(w.get("version") or ""), reverse=True)
+    return test_only[0].get("key")

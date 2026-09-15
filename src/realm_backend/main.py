@@ -53,11 +53,6 @@ from api.ggg_entities import (
     list_objects_paginated,
     search_objects,
 )
-from api.quarter_provisioning import (
-    request_casals_create_canister as _request_casals_create_canister,
-    bootstrap_quarter as _bootstrap_quarter,
-    parse_casals_spec as _parse_casals_spec,
-)
 from api.messaging import send_realm_message as _send_realm_message
 from api.nft import (
     force_transfer_nft,
@@ -3700,7 +3695,7 @@ def set_quarter_provisioning_config(args: text) -> text:
     ``casals`` block (pass ``{"casals": {...}}`` or the flat fields directly), so
     a partial update (e.g. just ``casals_canister_id``) leaves the rest intact.
 
-    Recognized keys: ``stand``, ``backend_wasm_key``, ``casals_canister_id``,
+    Recognized keys: ``stand``, ``casals_canister_id``,
     ``registry_canister_id``, ``codex`` ({codex_id, version, run_init}),
     ``extensions`` ([{ext_id, version} | "ext_id", ...]), ``frontend_canister_id``.
 
@@ -3727,7 +3722,7 @@ def set_quarter_provisioning_config(args: text) -> text:
 
         casals = manifest.get("casals") if isinstance(manifest.get("casals"), dict) else {}
         allowed = (
-            "stand", "backend_wasm_key", "casals_canister_id", "registry_canister_id",
+            "stand", "casals_canister_id", "registry_canister_id",
             "codex", "extensions", "frontend_canister_id", "baton_canister_id",
         )
         for k in allowed:

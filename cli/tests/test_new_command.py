@@ -264,7 +264,7 @@ class TestPortalManifest:
             founder="aaaaa-aa",
             subnet={"choice": "automatic"},
         )
-        assert manifest["federation"]["portal_url"] == "https://registry.realmsgos.org/r/acme"
+        assert manifest["federation"]["portal_url"] == "https://realmsgos.org/r/acme"
         assert manifest["deploy_version"] == "main"
         assert "test_flags" not in manifest
 

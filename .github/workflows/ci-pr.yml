@@ -42,6 +42,11 @@ jobs:
         continue-on-error: true
       - name: actionlint
         uses: raven-actions/actionlint@v2
+      - name: No principal / canister-id tables in scripts or workflows
+        run: |
+          if grep -rnoE '\b[a-z0-9]{5}(-[a-z0-9]{5}){3,10}-[a-z0-9]{3}\b' scripts .github --exclude-dir=node_modules; then
+            echo "::error::canister/principal ids belong in casals.json (read them with 'casals export')"; exit 1
+          fi
 
   unit:
     runs-on: ubuntu-latest
