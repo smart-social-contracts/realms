@@ -1,4 +1,4 @@
-"""file_registry resolution prefers canister_ids.json over NETWORK_INFRA."""
+"""file_registry resolution: explicit id, then canister_ids.json; no baked table."""
 
 from pathlib import Path
 from unittest.mock import patch

@@ -259,6 +259,18 @@ def test_runtime_flags_payload_includes_realm_stage(fake_ggg):
     assert payload["realm_stage"] == "beta"
 
 
+def test_runtime_flags_payload_reports_the_build_variant(fake_ggg, monkeypatch):
+    """casals.json asserts build_variant per environment in converged_when, so a
+    test build never converges on production and a production build never
+    converges where the environment expects test flags."""
+    import core.build_variant as build_variant
+
+    _set_realm(status="beta", name="Demo Realm")
+    assert fake_ggg.get_runtime_flags_payload()["build_variant"] == "production"
+    monkeypatch.setattr(build_variant, "BUILD_VARIANT", "test")
+    assert fake_ggg.get_runtime_flags_payload()["build_variant"] == "test"
+
+
 def test_runtime_flags_payload_includes_languages(fake_ggg):
     import json
 

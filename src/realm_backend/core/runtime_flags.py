@@ -238,6 +238,10 @@ def get_runtime_flags_payload() -> dict:
         "logo_url": str(getattr(realm, "logo_url", "") or ""),
         "background_image_url": str(getattr(realm, "background_image_url", "") or ""),
         "network": str(getattr(realm, "network", "") or ""),
+        # Which variant is running, so a sheet's converged_when can refuse a
+        # test build on production (and a production build where the
+        # environment expects test flags) without trusting the deploy log.
+        "build_variant": _build_variant(),
         "test_mode": get_realm_flag("test_mode", False),
         "test_mode_ii_bypass": is_ii_bypass_active(),
         "test_mode_user_self_registration": get_realm_flag(
@@ -254,6 +258,14 @@ def get_runtime_flags_payload() -> dict:
         "primary_color": _setup.get_primary_color(realm),
         **_realm_language_flags(realm),
     }
+
+
+def _build_variant() -> str:
+    try:
+        from core.build_variant import BUILD_VARIANT
+    except Exception:
+        return "unknown"
+    return str(BUILD_VARIANT)
 
 
 def _realm_language_flags(realm) -> dict:

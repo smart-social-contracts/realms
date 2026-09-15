@@ -9,9 +9,10 @@ converged on the local replica (see ``.github/workflows/realms-e2e.yml``):
 
 Without ``REALM_BACKEND_ID`` it falls back to ``dfx canister id realm_backend``
 in the current dfx project (a plain ``dfx deploy realm_backend`` dev loop).
-Two parts:
+``DFX_IDENTITY`` selects the dfx identity for every call (a developer whose
+default identity is a hardware key sets a plaintext one). Two parts:
 
-  Part A — single canister (the installed ``realm_backend``):
+  Part A — single canister:
     * get_quarter_directory returns this canister
     * resolve_ref on a live local entity returns it
     * record_migration -> get_migration round-trip
@@ -20,9 +21,14 @@ Two parts:
 
   Part B — real inter-canister gossip (needs a 2nd canister):
     * spin up a 2nd realm_backend (``cross_quarter_peer``) from the same wasm
-    * register a quarter on the peer so its directory is non-empty
-    * sync_quarters(peer) makes a genuine inter-canister call and merges the
-      peer's coarse directory into ours
+    * sync_quarters makes a genuine inter-canister call and merges the other
+      realm's coarse directory into the puller's
+
+The converged demo realm is controlled by its conductor and multisig, so the
+admin-only verbs (record_migration, sync_quarters) run on the peer we deploy
+and administer; the peer pulls the converged realm's directory. Reads run on
+the converged realm. In the dfx-project fallback we administer both and
+everything runs on the primary as before.
 
 If the base wasm / second canister can't be brought up (e.g. running outside
 CI), Part B skips cleanly without failing the suite.
@@ -43,6 +49,9 @@ CALL_TIMEOUT = 120
 # The converged realm's id and the replica it lives on; empty = local dfx project.
 REALM_BACKEND_ID = os.environ.get("REALM_BACKEND_ID", "").strip()
 REPLICA_URL = os.environ.get("REPLICA_URL", "").strip()
+# dfx identity for the calls; empty = dfx's default (a developer whose default
+# identity is a hardware key sets a plaintext one here, as CI does).
+DFX_IDENTITY = os.environ.get("DFX_IDENTITY", "").strip()
 
 passed = 0
 failed = 0
@@ -60,7 +69,10 @@ def _env():
 
 
 def _network_args():
-    return ["--network", REPLICA_URL] if REPLICA_URL else []
+    args = ["--network", REPLICA_URL] if REPLICA_URL else []
+    if DFX_IDENTITY:
+        args += ["--identity", DFX_IDENTITY]
+    return args
 
 
 def canister_id(name):
@@ -204,24 +216,27 @@ def deploy_peer():
     return canister_id(PEER)
 
 
-def test_sync_quarters_real_icc(cap, peer):
-    # Give the peer something to gossip: a quarter in its directory.
+def test_sync_quarters_real_icc(puller, source):
+    """``puller`` (a realm we administer) pulls ``source``'s get_quarter_directory
+    over a genuine inter-canister call and merges what it learns."""
+    # Give the source something to gossip when we administer it too: a quarter
+    # in its directory. A converged source already lists itself.
     synthetic_cid = "2vxsx-fae"  # anonymous principal text — just an id here
-    reg = call(peer, "register_quarter",
-               "(" + json.dumps("PeerLocalQuarter") + ", " + json.dumps(synthetic_cid) + ")",
-               update=True)
-    assert isinstance(reg, dict) and reg.get("success") is True, f"peer register_quarter failed: {reg}"
+    if source != REALM_BACKEND_ID:
+        reg = call(source, "register_quarter",
+                   "(" + json.dumps("PeerLocalQuarter") + ", " + json.dumps(synthetic_cid) + ")",
+                   update=True)
+        assert isinstance(reg, dict) and reg.get("success") is True, f"register_quarter failed: {reg}"
 
-    # Genuine inter-canister call: CAP pulls PEER's get_quarter_directory.
-    resp = call(cap, "sync_quarters", text_arg(peer), update=True)
+    resp = call(puller, "sync_quarters", text_arg(source), update=True)
     assert resp.get("success") is True, f"sync_quarters failed: {resp}"
     assert int(resp.get("added", 0)) >= 1, f"expected to learn >=1 quarter: {resp}"
 
-    # The learned quarter is now visible in CAP's directory.
-    directory = call(cap, "get_quarter_directory")
+    # The learned quarter is now visible in the puller's directory.
+    directory = call(puller, "get_quarter_directory")
     ids = [q.get("canister_id") for q in directory.get("quarters", [])]
-    assert synthetic_cid in ids or peer in ids, (
-        f"peer's quarter not merged into directory: {ids}"
+    assert synthetic_cid in ids or source in ids, (
+        f"source's quarters not merged into directory: {ids}"
     )
 
 
@@ -241,20 +256,35 @@ def main():
         sys.exit(0)
     print(f"  primary realm_backend: {cap}" + (f"  ({REPLICA_URL})" if REPLICA_URL else ""))
 
-    # Part A
-    run_test("get_quarter_directory lists self", test_quarter_directory_lists_self, cap)
-    run_test("resolve_ref on live local entity", test_resolve_local_entity, cap)
-    run_test("record_migration -> get_migration", test_record_and_get_migration, cap)
-    run_test("resolve_ref follows local forwarding stub", test_resolve_follows_local_stub, cap)
-    run_test("resolve_ref on remote ref returns route", test_resolve_remote_ref_returns_route, cap)
-    run_test("get_objects_by_ref mixed local/remote", test_get_objects_by_ref_mixed, cap)
-
-    # Part B
+    # A converged realm (REALM_BACKEND_ID) is controlled by its conductor and
+    # multisig, not by us: its admin-only verbs (record_migration, sync_quarters)
+    # run on the peer we deploy and therefore administer. Reads run on the
+    # converged realm itself. Without REALM_BACKEND_ID (a dfx project of our
+    # own) we administer the primary too, and everything runs on it.
     peer = deploy_peer()
     if peer:
         print(f"  peer realm_backend:    {peer}")
-        run_test("sync_quarters real inter-canister gossip",
-                 test_sync_quarters_real_icc, cap, peer)
+    admin = peer if REALM_BACKEND_ID else cap
+    if REALM_BACKEND_ID and not peer:
+        print("  (no peer: admin-only cases against the converged realm would be AccessDenied — skipping them)")
+
+    # Part A — reads on the primary, writes on a realm we administer
+    run_test("get_quarter_directory lists self", test_quarter_directory_lists_self, cap)
+    run_test("resolve_ref on live local entity", test_resolve_local_entity, cap)
+    if admin:
+        run_test("record_migration -> get_migration", test_record_and_get_migration, admin)
+        run_test("resolve_ref follows local forwarding stub", test_resolve_follows_local_stub, admin)
+    run_test("resolve_ref on remote ref returns route", test_resolve_remote_ref_returns_route, cap)
+    run_test("get_objects_by_ref mixed local/remote", test_get_objects_by_ref_mixed, cap)
+
+    # Part B — genuine inter-canister gossip between the two realms
+    if peer:
+        if REALM_BACKEND_ID:
+            run_test("sync_quarters real inter-canister gossip (peer pulls the converged realm)",
+                     test_sync_quarters_real_icc, peer, cap)
+        else:
+            run_test("sync_quarters real inter-canister gossip",
+                     test_sync_quarters_real_icc, cap, peer)
 
     print("\n" + "=" * 60)
     total = passed + failed

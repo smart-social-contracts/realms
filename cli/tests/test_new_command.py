@@ -313,8 +313,8 @@ class TestInstallerFailure:
             installer_id="jmgc7-2aaaa-aaaai-ax5qa-cai",
         )
         assert "AccessDenied" in msg
-        assert "extra_controller_principals" in msg
-        assert "NETWORK_INFRA" in msg
+        assert "stand_template controllers" in msg
+        assert "no installer allowlist" in msg
         assert "jmgc7-2aaaa-aaaai-ax5qa-cai" in msg
         assert "CLI bootstrap" in msg
 

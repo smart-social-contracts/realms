@@ -10,6 +10,7 @@
       },
       "portal_url": "http://localhost:8000",
       "marketplace_host": "",
+      "build_variant": "test",
       "test_flags": {
         "test_mode": true,
         "ii_bypass": true,
@@ -36,7 +37,11 @@
       },
       "portal_url": "https://gos.earth",
       "marketplace_host": "realmsgos.org",
-      "test_flags": {},
+      "build_variant": "production",
+      "test_flags": {
+        "test_mode": false,
+        "ii_bypass": false
+      },
       "principals": {
         "operator": "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe",
         "billing_service": "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe",
@@ -326,7 +331,8 @@
                     "query": "get_runtime_flags",
                     "contains": {
                       "network": "$env.network",
-                      "test_mode": true
+                      "build_variant": "$env.build_variant",
+                      "test_mode": "$env.test_flags.test_mode"
                     }
                   }
                 }
@@ -351,7 +357,7 @@
               ],
               "content": "frontend/realm-assets/main",
               "files": {
-                "/canister_ids.js": "globalThis.__CANISTER_IDS = {\"realm_backend\": \"$stand.backend\", \"file_registry\": \"$canister:fleet-file-registry\", \"test_mode_ii_bypass\": true};\n"
+                "/canister_ids.js": "globalThis.__CANISTER_IDS = {\"realm_backend\": \"$stand.backend\", \"file_registry\": \"$canister:fleet-file-registry\", \"test_mode_ii_bypass\": $env.test_flags.ii_bypass};\n"
               },
               "health": [
                 {

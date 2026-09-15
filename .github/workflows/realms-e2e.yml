@@ -85,19 +85,24 @@ jobs:
           test "$(icp identity principal --identity local-dev)" = "$(dfx identity get-principal --identity local-dev)"
 
       # ── product wasms and dists referenced by casals.json as `local:` ───────
-      - name: Build realm backend and marketplace backend
+      # The `local` environment enables test flags (environments.local.test_flags)
+      # and asserts build_variant=test in converged_when, so both halves of the
+      # realm are built as the test variant here. Production builds are the
+      # default everywhere else (see AGENTS.md, "Build variants").
+      - name: Build realm backend (test variant) and marketplace backend
         working-directory: realms
         run: |
           CANISTER_CANDID_PATH="$PWD/src/realm_backend/realm_backend.did" \
-            python3 scripts/pack_realm_backend.py
+            python3 scripts/pack_realm_backend.py --variant test
           CANISTER_CANDID_PATH="$PWD/src/marketplace_backend/marketplace_backend.did" \
             python3 -m basilisk marketplace_backend src/marketplace_backend/main.py
           ls -l .basilisk/realm_backend/realm_backend.wasm .basilisk/marketplace_backend/marketplace_backend.wasm
 
-      - name: Build realm frontend and marketplace frontend
+      - name: Build realm frontend (test variant) and marketplace frontend
         working-directory: realms
         run: |
-          (cd src/realm_frontend && npm install --legacy-peer-deps && npm run build && test -f dist/index.html)
+          (cd src/realm_frontend && npm install --legacy-peer-deps && REALMS_BUILD_VARIANT=test npm run build && test -f dist/index.html)
+          python3 scripts/check_frontend_variant.py src/realm_frontend/dist test
           (cd src/marketplace_frontend && npm install --legacy-peer-deps && npm run build && test -f dist/index.html)
 
       - name: Fetch ic-tokens wasms (realms/.external-wasms)
@@ -125,8 +130,11 @@ jobs:
           python3 tests/e2e/run_e2e.py ../realms/casals.json
 
       # ── cross-quarter addressing against the converged demo realm ───────────
+      # The harness keeps each orchestra's bindings in <CASALS_HOME>/<sheet name>/.
       - name: Resolve the demo realm backend from the live bindings
         working-directory: Casals
+        env:
+          CASALS_HOME: ${{ env.CASALS_HOME }}/realms-product
         run: |
           export TERM=xterm
           python3 -m casals_cli.main -e local --identity local-dev export ../realms/casals.json > /tmp/export.json
@@ -143,6 +151,8 @@ jobs:
       - name: Show orchestra state on failure
         if: failure()
         working-directory: Casals
+        env:
+          CASALS_HOME: ${{ env.CASALS_HOME }}/realms-product
         run: |
           export TERM=xterm
           python3 -m casals_cli.main -e local --identity local-dev show ../realms/casals.json || true

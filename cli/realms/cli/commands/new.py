@@ -1246,9 +1246,9 @@ def _job_fields(info: Any) -> Dict[str, Any]:
 
 INSTALLER_ACCESS_DENIED_HINT = (
     "The live installer must be an IC controller of the new realm canisters "
-    "(Casals extra_controller_principals / provision controllers). Do not "
-    "publish a new realm-backend WASM just to add the installer id to "
-    "NETWORK_INFRA. CLI bootstrap (enter_setup / set_canister_config_json) "
+    "(the stand_template controllers in casals.json). The realm carries no "
+    "installer allowlist, so there is nothing to bake into a new realm-backend "
+    "WASM. CLI bootstrap (enter_setup / set_canister_config_json) "
     "is not used on the GaaS path."
 )
 
