@@ -47,22 +47,16 @@ export interface CanisterStatusResult {
   'module_hash' : [] | [Uint8Array | number[]],
 }
 export interface CasalsConfigView {
-  'create_stand_baton' : boolean,
   'provision_via_casals' : boolean,
   'casals_section' : string,
   'registry_principal' : string,
   'casals_canister_id' : string,
-  'baton_wasm_key' : string,
 }
 export interface CasalsService {
-  'create_canister' : ActorMethod<[string], string>,
   'create_stand' : ActorMethod<[string], string>,
   'destroy_stand' : ActorMethod<[string], string>,
+  'get_cycles_cached' : ActorMethod<[], string>,
   'get_tree' : ActorMethod<[], string>,
-  'orchestration_configure_baton' : ActorMethod<[string], string>,
-  'orchestration_hand_to_baton' : ActorMethod<[string], string>,
-  'set_commander' : ActorMethod<[string], string>,
-  'upgrade_to' : ActorMethod<[string], string>,
 }
 export interface CreateCanisterArgs { 'settings' : [] | [CanisterSettings] }
 export interface CreateCanisterResult { 'canister_id' : Principal }
@@ -169,11 +163,18 @@ export interface GetUtxosResult {
 }
 export type GuardResult = { 'Ok' : null } |
   { 'Err' : string };
+export type Header = [string, string];
 export interface HealthView { 'ok' : boolean, 'canister' : string }
 export interface HttpHeader { 'value' : string, 'name' : string }
 export type HttpMethod = { 'get' : null } |
   { 'head' : null } |
   { 'post' : null };
+export interface HttpRequest {
+  'url' : string,
+  'method' : string,
+  'body' : Uint8Array | number[],
+  'headers' : Array<Header>,
+}
 export interface HttpRequestArgs {
   'url' : string,
   'method' : HttpMethod,
@@ -187,8 +188,15 @@ export interface HttpResponse {
   'body' : Uint8Array | number[],
   'headers' : Array<HttpHeader>,
 }
+export interface HttpResponseIncoming {
+  'body' : Uint8Array | number[],
+  'headers' : Array<Header>,
+  'upgrade' : [] | [boolean],
+  'streaming_strategy' : [] | [string],
+  'status_code' : number,
+}
 export interface HttpTransform {
-  'function' : HttpTransformFunc,
+  'function' : [Principal, string],
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -309,7 +317,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : QueryArchiveFn,
+  'callback' : [Principal, string],
   'start' : bigint,
   'length' : bigint,
 }
@@ -342,6 +350,7 @@ export interface RealmRecord {
   'logo' : string,
   'name' : string,
   'created_at' : number,
+  'listing_status' : string,
   'backend_url' : string,
   'frontend_canister_id' : string,
   'users_count' : bigint,
@@ -358,6 +367,8 @@ export interface RealmRegistryService {
 export interface RealmTargetService {
   'install_codex_from_registry' : ActorMethod<[string], string>,
   'install_extension_from_registry' : ActorMethod<[string], string>,
+  'resync_extension_frontends' : ActorMethod<[string], string>,
+  'run_codex_init' : ActorMethod<[string], string>,
 }
 export type RejectionCode = { 'NoError' : null } |
   { 'CanisterError' : null } |
@@ -505,12 +516,16 @@ export interface VersionInfoRecord {
   'frontend_tar_hash' : string,
 }
 export interface _SERVICE {
+  '__browse__' : ActorMethod<[string], string>,
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
+  '__shell__' : ActorMethod<[string], string>,
   'backfill_job_refs_batch' : ActorMethod<[], string>,
   'cancel_deployment' : ActorMethod<[string], ResultJobCancel>,
+  'configure' : ActorMethod<[string], string>,
   'delete_deployment_job' : ActorMethod<[string], ResultJobCancel>,
   'destroy_realm_job' : ActorMethod<[string], ResultJobCancel>,
   'enqueue_deployment' : ActorMethod<[string], ResultEnqueue>,
+  'finalize_deployment' : ActorMethod<[string], ResultJobCancel>,
   'get_canister_logs' : ActorMethod<
     [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
     Array<PublicLogEntry>
@@ -519,17 +534,20 @@ export interface _SERVICE {
   'get_deploy_task_status' : ActorMethod<[string], ResultDeployTaskStatus>,
   'get_deployment_job_status' : ActorMethod<[string], ResultJobIdStatus>,
   'get_deployment_manifest' : ActorMethod<[string], ResultJobManifest>,
+  'get_installer_config' : ActorMethod<[], string>,
   'get_pending_deployments' : ActorMethod<[], ResultPendingJobs>,
   'health' : ActorMethod<[], HealthView>,
+  'http_request' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
+  'http_request_update' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
   'list_deployment_jobs' : ActorMethod<
     [[] | [number], [] | [number]],
     ResultJobsList
   >,
-  'provision_quarter' : ActorMethod<[string], string>,
   'provision_via_casals' : ActorMethod<[string], ResultProvision>,
   'report_canister_ready' : ActorMethod<[string], ResultReportReady>,
   'report_deployment_failure' : ActorMethod<[string], ResultReportFailure>,
   'report_frontend_verified' : ActorMethod<[string], ResultReportFrontend>,
+  'retry_deployment' : ActorMethod<[string], ResultProvision>,
   'set_casals_config' : ActorMethod<[string], ResultCasalsConfig>,
   'status' : ActorMethod<[], GetStatusResult>,
   'take_pre_upgrade_snapshot' : ActorMethod<[string], ResultTakeSnapshot>,

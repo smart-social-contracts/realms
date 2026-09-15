@@ -35,6 +35,7 @@ export const idlFactory = ({ IDL }) => {
     'logo' : IDL.Text,
     'name' : IDL.Text,
     'created_at' : IDL.Float64,
+    'listing_status' : IDL.Text,
     'backend_url' : IDL.Text,
     'frontend_canister_id' : IDL.Text,
     'users_count' : IDL.Nat64,
@@ -53,6 +54,20 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : IDL.Vec(CreditTransactionRecord),
     'Err' : IDL.Text,
   });
+  const Header = IDL.Tuple(IDL.Text, IDL.Text);
+  const HttpRequest = IDL.Record({
+    'url' : IDL.Text,
+    'method' : IDL.Text,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(Header),
+  });
+  const HttpResponseIncoming = IDL.Record({
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(Header),
+    'upgrade' : IDL.Opt(IDL.Bool),
+    'streaming_strategy' : IDL.Opt(IDL.Text),
+    'status_code' : IDL.Nat16,
+  });
   const AddRealmResult = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
   const StatusRecord = IDL.Record({
     'python_version' : IDL.Text,
@@ -68,7 +83,9 @@ export const idlFactory = ({ IDL }) => {
     'Err' : IDL.Text,
   });
   return IDL.Service({
+    '__browse__' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
+    '__shell__' : IDL.Func([IDL.Text], [IDL.Text], []),
     'add_credits' : IDL.Func(
         [IDL.Text, IDL.Nat64, IDL.Text, IDL.Text],
         [AddCreditsResult],
@@ -90,6 +107,7 @@ export const idlFactory = ({ IDL }) => {
         [GenericResult],
         [],
       ),
+    'configure' : IDL.Func([IDL.Text], [GenericResult], []),
     'create_invitation_codes' : IDL.Func([IDL.Text], [GenericResult], []),
     'deactivate_principal' : IDL.Func([IDL.Text], [GenericResult], []),
     'deduct_credits' : IDL.Func(
@@ -104,6 +122,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'deployment_succeeded' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'get_credits' : IDL.Func([IDL.Text], [GetCreditsResult], ['query']),
+    'get_env_config' : IDL.Func([], [IDL.Text], ['query']),
     'get_invitation_mode' : IDL.Func([], [GenericResult], ['query']),
     'get_latest_version' : IDL.Func([], [UpgradeResult], ['query']),
     'get_realm' : IDL.Func([IDL.Text], [GetRealmResult], ['query']),
@@ -113,6 +132,8 @@ export const idlFactory = ({ IDL }) => {
         [TransactionHistoryResult],
         ['query'],
       ),
+    'http_request' : IDL.Func([HttpRequest], [HttpResponseIncoming], ['query']),
+    'http_request_update' : IDL.Func([HttpRequest], [HttpResponseIncoming], []),
     'is_principal_activated' : IDL.Func([IDL.Text], [GenericResult], ['query']),
     'list_activated_principals' : IDL.Func([], [IDL.Text], ['query']),
     'list_invitation_codes' : IDL.Func([], [IDL.Text], ['query']),
@@ -121,6 +142,7 @@ export const idlFactory = ({ IDL }) => {
     'list_versions' : IDL.Func([], [IDL.Text], ['query']),
     'publish_version' : IDL.Func([IDL.Text], [UpgradeResult], []),
     'realm_count' : IDL.Func([], [IDL.Nat64], ['query']),
+    'realm_setup_completed' : IDL.Func([IDL.Text], [IDL.Text], []),
     'redeem_invitation_code' : IDL.Func([IDL.Text], [GenericResult], []),
     'register_realm' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -143,4 +165,4 @@ export const idlFactory = ({ IDL }) => {
     'status' : IDL.Func([], [GetStatusResult], ['query']),
   });
 };
-export const init = ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return [IDL.Text]; };

@@ -47,22 +47,16 @@ export interface CanisterStatusResult {
   'module_hash' : [] | [Uint8Array | number[]],
 }
 export interface CasalsConfigView {
-  'create_stand_baton' : boolean,
   'provision_via_casals' : boolean,
   'casals_section' : string,
   'registry_principal' : string,
   'casals_canister_id' : string,
-  'baton_wasm_key' : string,
 }
 export interface CasalsService {
-  'create_canister' : ActorMethod<[string], string>,
   'create_stand' : ActorMethod<[string], string>,
   'destroy_stand' : ActorMethod<[string], string>,
+  'get_cycles_cached' : ActorMethod<[], string>,
   'get_tree' : ActorMethod<[], string>,
-  'orchestration_configure_baton' : ActorMethod<[string], string>,
-  'orchestration_hand_to_baton' : ActorMethod<[string], string>,
-  'set_commander' : ActorMethod<[string], string>,
-  'upgrade_to' : ActorMethod<[string], string>,
 }
 export interface CreateCanisterArgs { 'settings' : [] | [CanisterSettings] }
 export interface CreateCanisterResult { 'canister_id' : Principal }
@@ -169,11 +163,18 @@ export interface GetUtxosResult {
 }
 export type GuardResult = { 'Ok' : null } |
   { 'Err' : string };
+export type Header = [string, string];
 export interface HealthView { 'ok' : boolean, 'canister' : string }
 export interface HttpHeader { 'value' : string, 'name' : string }
 export type HttpMethod = { 'get' : null } |
   { 'head' : null } |
   { 'post' : null };
+export interface HttpRequest {
+  'url' : string,
+  'method' : string,
+  'body' : Uint8Array | number[],
+  'headers' : Array<Header>,
+}
 export interface HttpRequestArgs {
   'url' : string,
   'method' : HttpMethod,
@@ -187,8 +188,15 @@ export interface HttpResponse {
   'body' : Uint8Array | number[],
   'headers' : Array<HttpHeader>,
 }
+export interface HttpResponseIncoming {
+  'body' : Uint8Array | number[],
+  'headers' : Array<Header>,
+  'upgrade' : [] | [boolean],
+  'streaming_strategy' : [] | [string],
+  'status_code' : number,
+}
 export interface HttpTransform {
-  'function' : HttpTransformFunc,
+  'function' : [Principal, string],
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -309,7 +317,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : QueryArchiveFn,
+  'callback' : [Principal, string],
   'start' : bigint,
   'length' : bigint,
 }
@@ -342,6 +350,7 @@ export interface RealmRecord {
   'logo' : string,
   'name' : string,
   'created_at' : number,
+  'listing_status' : string,
   'backend_url' : string,
   'frontend_canister_id' : string,
   'users_count' : bigint,
@@ -358,6 +367,8 @@ export interface RealmRegistryService {
 export interface RealmTargetService {
   'install_codex_from_registry' : ActorMethod<[string], string>,
   'install_extension_from_registry' : ActorMethod<[string], string>,
+  'resync_extension_frontends' : ActorMethod<[string], string>,
+  'run_codex_init' : ActorMethod<[string], string>,
 }
 export type RejectionCode = { 'NoError' : null } |
   { 'CanisterError' : null } |
@@ -508,7 +519,9 @@ export interface VersionInfoRecord {
   'frontend_tar_hash' : string,
 }
 export interface _SERVICE {
+  '__browse__' : ActorMethod<[string], string>,
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
+  '__shell__' : ActorMethod<[string], string>,
   'add_credits' : ActorMethod<
     [string, bigint, string, string],
     AddCreditsResult
@@ -528,17 +541,21 @@ export interface _SERVICE {
     ],
     GenericResult
   >,
+  'configure' : ActorMethod<[string], GenericResult>,
   'create_invitation_codes' : ActorMethod<[string], GenericResult>,
   'deactivate_principal' : ActorMethod<[string], GenericResult>,
   'deduct_credits' : ActorMethod<[string, bigint, string], DeductCreditsResult>,
   'deployment_failed' : ActorMethod<[string, string, string], string>,
   'deployment_succeeded' : ActorMethod<[string, string], string>,
   'get_credits' : ActorMethod<[string], GetCreditsResult>,
+  'get_env_config' : ActorMethod<[], string>,
   'get_invitation_mode' : ActorMethod<[], GenericResult>,
   'get_latest_version' : ActorMethod<[], UpgradeResult>,
   'get_realm' : ActorMethod<[string], GetRealmResult>,
   'get_runtime_flags' : ActorMethod<[], string>,
   'get_transactions' : ActorMethod<[string, bigint], TransactionHistoryResult>,
+  'http_request' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
+  'http_request_update' : ActorMethod<[HttpRequest], HttpResponseIncoming>,
   'is_principal_activated' : ActorMethod<[string], GenericResult>,
   'list_activated_principals' : ActorMethod<[], string>,
   'list_invitation_codes' : ActorMethod<[], string>,
@@ -547,6 +564,7 @@ export interface _SERVICE {
   'list_versions' : ActorMethod<[], string>,
   'publish_version' : ActorMethod<[string], UpgradeResult>,
   'realm_count' : ActorMethod<[], bigint>,
+  'realm_setup_completed' : ActorMethod<[string], string>,
   'redeem_invitation_code' : ActorMethod<[string], GenericResult>,
   'register_realm' : ActorMethod<
     [string, string, string, string, string],

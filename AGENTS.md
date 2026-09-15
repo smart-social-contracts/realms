@@ -54,7 +54,7 @@ realms/
 │   └── deploy-files.yml              # Publish extensions/codices into file_registry
 ├── (casals is NOT a submodule — clone smart-social-contracts/casals separately if you need its source/CLI; platform provisioner of gos-as-a-service)
 ├── casals-config/                    # Realms fleet config for Casals conductors (arrangements, sheet)
-├── environments/                     # Per-env product stack config (demo/staging/test → *.realmsgos.org)
+├── casals.json                       # The product orchestra (marketplace, file registry, token, NFT, demo realm) — `casals up`
 ├── scripts/
 │   └── publish_build.py              # Build+publish engine used by publish-build.yml
 ├── deployment-descriptors/           # Network topology (YAML)
@@ -103,9 +103,9 @@ batches and takes several minutes per realm.
 | **Frontend** (`src/realm_frontend/`) | Sheet realm: `mundus deploy --canister frontend --version build`. Wizard `/r/<slug>/`: [direct path](#direct-runtime-install-no-file-registry-no-casals-installer) | `publish-build` (`component=frontend`) → `rollout` (`scope=frontend`) |
 | **Backend** (`src/realm_backend/`) | Sheet realm: `mundus deploy --canister backend --version build`. Wizard `/r/<slug>/`: `dfx canister install --mode upgrade` | `publish-build` (`component=both`) → `rollout` (`scope=backend`) |
 | **Extension** (`extensions/`) | `files publish` → `registry-install` (or `runtime-install` if it has `entry.py`) | `deploy-files` → rollout (or re-install) |
-| **Registry / wizard UI** (GOS platform — live at `staging.gos.earth`) | develop in [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service); Realms pins prebuilt artifacts | fetch → upload → authorize + `realms rollout -t realm-registry` |
+| **Registry / wizard UI** (GOS platform — live at `gos.earth`) | develop in [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service); Realms pins prebuilt artifacts | fetch → upload → authorize + `realms rollout -t realm-registry` |
 
-### Registry / wizard UI (staging)
+### Registry / wizard UI (production portal)
 
 The **create-realm wizard**, **deployment status page**, **realm registry backend**,
 **realm installer**, and the **file_registry backend** (the platform artifact store —
@@ -130,7 +130,7 @@ Realms' pin in `scripts/fetch_gos_artifacts.py` (`GOS_RELEASE`).
   [Fast infra deploy](#fast-infra-deploy-dev-only) and
   [`realms rollout -t realm-registry`](#step-2--rollout)).
 
-The wizard at `staging.gos.earth` is **not** a realm app and **not** upgraded by
+The wizard at `gos.earth` is **not** a realm app and **not** upgraded by
 `mundus deploy` or `ci-main` (which only publish/roll out `family=realm`).
 
 **Product sites** at `*.realmsgos.org` (landing + marketplace + file registry)
@@ -1313,7 +1313,7 @@ This VM has no `icp.yaml` and no working OS keyring.
 
 ### Launching a cloud agent on a **named** environment (Environment2)
 
-Live IC work (deployer PEM, `gaas new`, `realms new`) lives on the named
+Live IC work (deployer PEM, `casals up`, `realms new`) lives on the named
 Cloud Environment **Environment2**
 ([dashboard](https://cursor.com/dashboard/cloud-agents/environments/e/a79bd4f2-a059-11f1-b532-320a589b8025)).
 Its secrets (`IC_IDENTITY_PEM_B64`, optional `DEMO_IDENTITY1_*`) are **not**

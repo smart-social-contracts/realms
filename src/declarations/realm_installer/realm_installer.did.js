@@ -31,12 +31,10 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Nat,
   });
   const CasalsConfigView = IDL.Record({
-    'create_stand_baton' : IDL.Bool,
     'provision_via_casals' : IDL.Bool,
     'casals_section' : IDL.Text,
     'registry_principal' : IDL.Text,
     'casals_canister_id' : IDL.Text,
-    'baton_wasm_key' : IDL.Text,
   });
   const ResultCasalsConfig = IDL.Variant({
     'Ok' : CasalsConfigView,
@@ -101,6 +99,20 @@ export const idlFactory = ({ IDL }) => {
     'Err' : InstallerError,
   });
   const HealthView = IDL.Record({ 'ok' : IDL.Bool, 'canister' : IDL.Text });
+  const Header = IDL.Tuple(IDL.Text, IDL.Text);
+  const HttpRequest = IDL.Record({
+    'url' : IDL.Text,
+    'method' : IDL.Text,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(Header),
+  });
+  const HttpResponseIncoming = IDL.Record({
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(Header),
+    'upgrade' : IDL.Opt(IDL.Bool),
+    'streaming_strategy' : IDL.Opt(IDL.Text),
+    'status_code' : IDL.Nat16,
+  });
   const JobsListOk = IDL.Record({
     'jobs' : IDL.Vec(DeploymentJobView),
     'count' : IDL.Nat32,
@@ -170,12 +182,16 @@ export const idlFactory = ({ IDL }) => {
     'Err' : InstallerError,
   });
   return IDL.Service({
+    '__browse__' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
+    '__shell__' : IDL.Func([IDL.Text], [IDL.Text], []),
     'backfill_job_refs_batch' : IDL.Func([], [IDL.Text], []),
     'cancel_deployment' : IDL.Func([IDL.Text], [ResultJobCancel], []),
+    'configure' : IDL.Func([IDL.Text], [IDL.Text], []),
     'delete_deployment_job' : IDL.Func([IDL.Text], [ResultJobCancel], []),
     'destroy_realm_job' : IDL.Func([IDL.Text], [ResultJobCancel], []),
     'enqueue_deployment' : IDL.Func([IDL.Text], [ResultEnqueue], []),
+    'finalize_deployment' : IDL.Func([IDL.Text], [ResultJobCancel], []),
     'get_canister_logs' : IDL.Func(
         [
           IDL.Opt(IDL.Nat),
@@ -202,14 +218,16 @@ export const idlFactory = ({ IDL }) => {
         [ResultJobManifest],
         ['query'],
       ),
+    'get_installer_config' : IDL.Func([], [IDL.Text], ['query']),
     'get_pending_deployments' : IDL.Func([], [ResultPendingJobs], ['query']),
     'health' : IDL.Func([], [HealthView], ['query']),
+    'http_request' : IDL.Func([HttpRequest], [HttpResponseIncoming], ['query']),
+    'http_request_update' : IDL.Func([HttpRequest], [HttpResponseIncoming], []),
     'list_deployment_jobs' : IDL.Func(
         [IDL.Opt(IDL.Nat32), IDL.Opt(IDL.Nat32)],
         [ResultJobsList],
         ['query'],
       ),
-    'provision_quarter' : IDL.Func([IDL.Text], [IDL.Text], []),
     'provision_via_casals' : IDL.Func([IDL.Text], [ResultProvision], []),
     'report_canister_ready' : IDL.Func([IDL.Text], [ResultReportReady], []),
     'report_deployment_failure' : IDL.Func(
@@ -222,6 +240,7 @@ export const idlFactory = ({ IDL }) => {
         [ResultReportFrontend],
         [],
       ),
+    'retry_deployment' : IDL.Func([IDL.Text], [ResultProvision], []),
     'set_casals_config' : IDL.Func([IDL.Text], [ResultCasalsConfig], []),
     'status' : IDL.Func([], [GetStatusResult], ['query']),
     'take_pre_upgrade_snapshot' : IDL.Func(
@@ -231,4 +250,4 @@ export const idlFactory = ({ IDL }) => {
       ),
   });
 };
-export const init = ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return [IDL.Text]; };
