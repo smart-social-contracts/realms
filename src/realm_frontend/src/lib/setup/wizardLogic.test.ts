@@ -24,7 +24,7 @@ import {
 	urlTokenToStep
 } from './wizardLogic';
 import type { SetupState } from './types';
-import { tokenDraftFromChoice } from './sharedTokens';
+import { sharedTokenOptions, tokenDraftFromChoice } from './sharedTokens';
 
 const installedState: SetupState = {
 	status: 'setup',
@@ -345,38 +345,37 @@ describe('wizardLogic', () => {
 			).toBe(true);
 		});
 
-		it('Launch / Token Continue founder payload writes pe5t5 from draft', () => {
+		const catalogState: SetupState = {
+			...freshState,
+			shared_tokens: { ckEURC: { ledger: 'eeeee-ee', decimals: 6 } }
+		};
+
+		it('Launch / Token Continue founder payload writes the draft ledger', () => {
 			expect(
-				founderConfigureTokenFromSetupState(
-					{
-						...freshState,
-						draft: {
-							token: {
-								symbol: 'ckEURC',
-								token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
-								decimals: 6
-							}
-						}
-					},
-					'staging'
-				)
-			).toEqual({
-				symbol: 'ckEURC',
-				token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
-				decimals: 6
-			});
+				founderConfigureTokenFromSetupState({
+					...catalogState,
+					draft: { token: { symbol: 'ckEURC', token_canister_id: 'eeeee-ee', decimals: 6 } }
+				})
+			).toEqual({ symbol: 'ckEURC', token_canister_id: 'eeeee-ee', decimals: 6 });
 			expect(
-				founderConfigureTokenFromSetupState({ ...freshState, draft: { token: null } }, 'staging')
+				founderConfigureTokenFromSetupState({ ...catalogState, draft: { token: null } })
+			).toBeNull();
+		});
+
+		it('fills a symbol-only draft from the catalog the backend reports', () => {
+			expect(
+				founderConfigureTokenFromSetupState({ ...catalogState, draft: { token: { symbol: 'ckEURC' } } })
+			).toEqual({ symbol: 'ckEURC', token_canister_id: 'eeeee-ee', decimals: 6 });
+			// No catalog from the backend: nothing to fill from, fail closed.
+			expect(
+				founderConfigureTokenFromSetupState({ ...freshState, draft: { token: { symbol: 'ckEURC' } } })
 			).toBeNull();
 		});
 
 		it('maps a catalog ckEURC choice to the ledger configure_token reads', () => {
-			const token = tokenDraftFromChoice('ckEURC', { symbol: '', token_canister_id: '' }, 'staging');
-			expect(token).toEqual({
-				symbol: 'ckEURC',
-				token_canister_id: 'pe5t5-diaaa-aaaar-qahwa-cai',
-				decimals: 6
-			});
+			const options = sharedTokenOptions(catalogState.shared_tokens);
+			const token = tokenDraftFromChoice('ckEURC', { symbol: '', token_canister_id: '' }, options);
+			expect(token).toEqual({ symbol: 'ckEURC', token_canister_id: 'eeeee-ee', decimals: 6 });
 			expect(
 				resolveReviewTokenSymbol({
 					...freshState,

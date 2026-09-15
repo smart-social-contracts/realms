@@ -648,9 +648,18 @@ def get_setup_state_payload() -> dict:
         "realm_manifesto": getattr(realm, "manifesto", None) or "",
         "realm_welcome_message": getattr(realm, "welcome_message", None) or "",
         "realm_token_canister_id": (getattr(realm, "token_canister_id", "") or "").strip() or None,
+        "shared_tokens": _shared_token_catalog(),
         "setup_completed_at": setup.get("setup_completed_at"),
         **_setup_language_fields(realm, identity if isinstance(identity, dict) else None, draft),
     }
+
+
+def _shared_token_catalog() -> dict:
+    try:
+        from api.tokens import shared_token_catalog
+    except ImportError:
+        return {}
+    return shared_token_catalog()
 
 
 def _setup_language_fields(realm, identity: Optional[dict], draft: dict) -> dict:

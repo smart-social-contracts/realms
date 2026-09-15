@@ -49,9 +49,13 @@ jobs:
         # Test fixtures (tests/, the test-mode seed identity) are exempt.
         run: |
           if grep -rnoE '\b[a-z0-9]{5}(-[a-z0-9]{5}){3,10}-[a-z0-9]{3}\b' \
-               scripts .github src/realm_backend src/*/static \
-               --include='*.py' --include='*.yml' --include='*.sh' --include='*.json' --include='ic-domains' --include='ii-alternative-origins' \
-               --exclude-dir=node_modules --exclude-dir=tests --exclude-dir=__pycache__ --exclude=test_identity_seed.py; then
+               scripts .github src/realm_backend src/*/static src/realm_frontend/src \
+               extensions/extensions/*/frontend-rt/src extensions/dev-server \
+               --include='*.py' --include='*.yml' --include='*.sh' --include='*.json' --include='*.ts' --include='*.js' --include='*.svelte' \
+               --include='ic-domains' --include='ii-alternative-origins' \
+               --exclude-dir=node_modules --exclude-dir=tests --exclude-dir=__pycache__ --exclude-dir=declarations --exclude-dir=dist \
+               --exclude=test_identity_seed.py --exclude='*.test.ts' --exclude='*.test.js' \
+             | grep -v -- '-xxxxx-'; then
             echo "::error::canister/principal ids belong in casals.json (read them with 'casals export')"; exit 1
           fi
 

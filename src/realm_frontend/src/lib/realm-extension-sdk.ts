@@ -116,11 +116,14 @@ export interface RealmExtensionContext {
 
 	/** Realm metadata (name, logo, manifesto, quarters, etc.). */
 	realmInfo: Readable<RealmInfo>;
-	/** Static config values (canister IDs for ckBTC, token backend, etc.). */
+	/** Host config. Ledger ids are not here: read `backend.status().canisters` / `.shared_tokens`. */
 	config: {
-		ckbtc_ledger_canister_id: string;
-		ckbtc_indexer_canister_id: string;
-		token_backend_canister_id: string;
+		/** @deprecated never populated; use `backend.status().shared_tokens`. */
+		ckbtc_ledger_canister_id?: string;
+		/** @deprecated never populated; use `backend.status().shared_tokens`. */
+		ckbtc_indexer_canister_id?: string;
+		/** @deprecated never populated; use `backend.status().canisters` (canister_type "token_backend"). */
+		token_backend_canister_id?: string;
 		/** The realm_backend canister ID itself. */
 		canisterId: string;
 		/** File registry canister ID (shared infra, set via set_canister_config). */

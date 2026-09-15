@@ -48,8 +48,11 @@ export function shouldShowJoinNotice(
 	return demoNotice && !skipTerms;
 }
 
+/** The mundus token (REALMS, or RLM in production) is not real money. */
+const NON_MONETARY_TOKEN_IDS = new Set([REALMS_TOKEN_ID, 'RLM']);
+
 export function isMonetaryTokenChoice(choiceId: string): boolean {
-	return (choiceId || '').trim().toUpperCase() !== REALMS_TOKEN_ID;
+	return !NON_MONETARY_TOKEN_IDS.has((choiceId || '').trim().toUpperCase());
 }
 
 export function isTokenChoiceSelectable(

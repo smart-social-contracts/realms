@@ -1,14 +1,13 @@
 <script lang="ts">
-	import {
-		CUSTOM_TOKEN_ID,
-		SHARED_TOKEN_CATALOG
-	} from '$lib/setup/sharedTokens';
+	import { CUSTOM_TOKEN_ID, type SharedTokenOption } from '$lib/setup/sharedTokens';
 	import {
 		isTokenChoiceSelectable,
 		monetaryUnavailableLabel
 	} from '$lib/config/hostTestFlags';
 
 	interface Props {
+		/** The realm's shared-ledger catalog (get_setup_state().shared_tokens). */
+		options: SharedTokenOption[];
 		selectedId: string;
 		monetaryDisabled?: boolean;
 		locale?: string;
@@ -17,6 +16,7 @@
 	}
 
 	let {
+		options,
 		selectedId,
 		monetaryDisabled = false,
 		locale = 'en',
@@ -37,7 +37,7 @@
 </script>
 
 <div class="setup-wizard__codex-list">
-	{#each SHARED_TOKEN_CATALOG as token (token.id)}
+	{#each options as token (token.id)}
 		<label
 			class="setup-wizard__codex-card setup-wizard__codex-card--compact"
 			class:setup-wizard__codex-card--selected={selectedId === token.id}

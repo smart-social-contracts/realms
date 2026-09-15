@@ -33,29 +33,17 @@
 	const SETTINGS_PATH = '/extensions/llm_chat';
 	const modelLabel = CONFIG?.llmModelLabel ?? 'Default';
 
-	function runtimeCanisterIds(): {
-		realm_backend?: string;
-		network?: string;
-		file_registry?: string;
-	} {
+	function runtimeCanisterIds(): { realm_backend?: string; network?: string } {
 		return (globalThis as {
-			__CANISTER_IDS?: { realm_backend?: string; network?: string; file_registry?: string };
+			__CANISTER_IDS?: { realm_backend?: string; network?: string };
 		}).__CANISTER_IDS ?? {};
 	}
 
-	const FILE_REGISTRY_NETWORK: Record<string, string> = {
-		'vi64l-3aaaa-aaaae-qj4va-cai': 'demo',
-		'uq2mu-kaaaa-aaaah-avqcq-cai': 'test',
-		'iebdk-kqaaa-aaaau-agoxq-cai': 'staging',
-	};
-
+	// The realm declares its own network (canister_ids.js / status()); there is
+	// no id→network table here to go stale when an environment is rebuilt.
 	function resolveGeisterNetwork(): string {
 		const ids = runtimeCanisterIds();
 		if (ids.network && ids.network !== 'ic') return ids.network;
-		const fileRegistry = infraConfig.fileRegistryCanisterId || ids.file_registry || '';
-		if (fileRegistry && FILE_REGISTRY_NETWORK[fileRegistry]) {
-			return FILE_REGISTRY_NETWORK[fileRegistry];
-		}
 		if (browser && window.location.hostname.includes('icp0.io')) return 'test';
 		return 'staging';
 	}

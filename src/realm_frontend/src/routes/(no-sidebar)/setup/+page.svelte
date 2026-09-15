@@ -43,6 +43,7 @@
 		configureTokenPayload,
 		matchSharedToken,
 		completeCatalogTokenDraft,
+		sharedTokenOptions,
 		tokenDraftFromChoice
 	} from '$lib/setup/sharedTokens';
 	import { fileToCompressedDataUrl, urlToCompressedDataUrl } from '$lib/utils/imageDataUrl';
@@ -90,6 +91,8 @@
 	let busy = $state(false);
 	let error = $state('');
 	let setupState = $state<SetupState | null>(null);
+	// The shared-ledger catalog is the backend's (from casals.json); nothing is baked in here.
+	const tokenOptions = $derived(sharedTokenOptions(setupState?.shared_tokens));
 	let launchState = $state<SetupLaunchState | null>(null);
 	let codices = $state<AvailableCodex[]>([]);
 	let selectedCodexId = $state('');
@@ -97,7 +100,7 @@
 	let resolvedCodexVersion = $state('');
 	let tokenSymbol = $state('REALMS');
 	let tokenCanisterId = $state('');
-	let tokenChoice = $state('REALMS');
+	let tokenChoice = $state('');
 	let primaryColor = $state('#3b82f6');
 	let logoPreview = $state('');
 	let backgroundPreview = $state('');
@@ -309,11 +312,12 @@
 					tokenSymbol = token.existing;
 				}
 			}
-			const matched = matchSharedToken({
+			const matched = matchSharedToken(tokenOptions, {
 				symbol: tokenSymbol,
 				token_canister_id: tokenCanisterId
 			});
-			tokenChoice = matched?.id ?? (tokenSymbol || tokenCanisterId ? CUSTOM_TOKEN_ID : 'REALMS');
+			tokenChoice =
+				matched?.id ?? (tokenSymbol || tokenCanisterId ? CUSTOM_TOKEN_ID : tokenOptions[0]?.id ?? CUSTOM_TOKEN_ID);
 		}
 
 		const branding = state.draft?.branding ?? state.branding;
@@ -617,12 +621,14 @@
 
 	async function handleTokenSave() {
 		const token = completeCatalogTokenDraft(
-			tokenDraftFromChoice(tokenChoice, {
-				symbol: tokenSymbol,
-				token_canister_id: tokenCanisterId
-			})
+			tokenDraftFromChoice(
+				tokenChoice,
+				{ symbol: tokenSymbol, token_canister_id: tokenCanisterId },
+				tokenOptions
+			),
+			tokenOptions
 		);
-		const payload = configureTokenPayload(token);
+		const payload = configureTokenPayload(token, tokenOptions);
 		if (!payload) {
 			error = 'Choose a token, or enter a custom symbol and ledger canister';
 			return;
@@ -655,7 +661,7 @@
 		if (!isTokenChoiceSelectable(id, $testModeDisableMonetaryTokens)) return;
 		tokenChoice = id;
 		if (id === CUSTOM_TOKEN_ID) return;
-		const token = tokenDraftFromChoice(id, { symbol: '', token_canister_id: '' });
+		const token = tokenDraftFromChoice(id, { symbol: '', token_canister_id: '' }, tokenOptions);
 		if (!token) return;
 		tokenSymbol = String(token.symbol);
 		tokenCanisterId = String(token.token_canister_id || '');
@@ -811,7 +817,8 @@
 				return;
 			}
 			const completedToken = completeCatalogTokenDraft(
-				setupState?.draft?.token ?? setupState?.token
+				setupState?.draft?.token ?? setupState?.token,
+				tokenOptions
 			);
 			if (completedToken) {
 				const saved = await persistDraft({ token: completedToken }, { refresh: false });
@@ -1294,6 +1301,7 @@
 						{$_('setup.wizard.token_help')}
 					</P>
 					<TokenChoiceList
+						options={tokenOptions}
 						selectedId={tokenChoice}
 						monetaryDisabled={$testModeDisableMonetaryTokens}
 						locale={primaryLanguage}

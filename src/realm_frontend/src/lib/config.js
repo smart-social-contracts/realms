@@ -1,4 +1,7 @@
-// Runtime configuration — canister IDs and test mode flags.
+// Runtime configuration — test mode flags.
+//
+// Canister ids are NOT baked in here: the realm backend reports its own
+// (status().canisters) and the shared-ledger catalog (status().shared_tokens).
 //
 // Test mode flags are read from the backend status() response at runtime,
 // NOT baked in at build time. This means self-upgrades and environment changes
@@ -6,11 +9,7 @@
 //
 // The backend enforces a hard gate: test flags cannot be set on mainnet (network=ic).
 
-export const CONFIG = {
-  ckbtc_ledger_canister_id: 'mxzaz-hqaaa-aaaar-qaada-cai',
-  ckbtc_indexer_canister_id: 'n5wcd-faaaa-aaaar-qaaea-cai',
-  token_backend_canister_id: 'cj65k-laaaa-aaaac-bfxqq-cai',
-};
+export const CONFIG = {};
 
 // --- Test mode flags ---
 // These are read from the realmInfo store (populated by backend status()).

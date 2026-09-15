@@ -29,6 +29,17 @@ from ggg import (
 )
 from ic_python_logging import get_logger
 
+
+def _shared_tokens() -> dict:
+    try:
+        from api.tokens import shared_token_catalog
+    except ImportError:
+        return {}
+    try:
+        return shared_token_catalog()
+    except Exception:  # noqa: BLE001 - status() must never fail on the catalog
+        return {}
+
 # Initialize logger
 logger = get_logger("api.status")
 
@@ -389,6 +400,9 @@ def get_status() -> "dict[str, Any]":
         "test_mode_skip_passport_zkproof": test_mode_skip_passport_zkproof,
         "task_manager": task_manager_status,
         "canisters": canisters,
+        # Shared ledgers this realm may adopt (from casals.json via the installer).
+        # Frontends and extensions read it here instead of baking in a table.
+        "shared_tokens": _shared_tokens(),
         "registries": registries,
         "dependencies": dependencies,
         "python_version": sys.version,

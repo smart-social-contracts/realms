@@ -2,7 +2,7 @@ import type { SetupState } from './types';
 import {
 	configureTokenPayload,
 	type CatalogTokenDraftInput,
-	type SetupTokenNetwork
+	sharedTokenOptions
 } from './sharedTokens';
 
 export type WizardStep = 'welcome' | 'codex' | 'token' | 'branding' | 'languages' | 'review';
@@ -293,12 +293,11 @@ export function resolveReviewTokenSymbol(setupState: SetupState | null | undefin
  * An explicit skipped token (null) stays fail-closed.
  */
 export function founderConfigureTokenFromSetupState(
-	setupState: SetupState | null | undefined,
-	network?: SetupTokenNetwork
+	setupState: SetupState | null | undefined
 ): Record<string, string | number> | null {
 	if (setupState?.draft?.token === null) return null;
 	const token = (setupState?.draft?.token ?? setupState?.token ?? null) as CatalogTokenDraftInput;
-	return configureTokenPayload(token, network);
+	return configureTokenPayload(token, sharedTokenOptions(setupState?.shared_tokens));
 }
 
 export function persistedRealmLedger(setupState: SetupState | null | undefined): string {

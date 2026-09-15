@@ -1,4 +1,21 @@
-export type SetupTokenNetwork = 'test' | 'staging' | 'demo';
+/**
+ * Shared treasury tokens a founder may adopt in the setup wizard.
+ *
+ * The catalog — which symbols exist and their ledger / indexer / decimals —
+ * comes from the realm backend (`get_setup_state().shared_tokens`), which got
+ * it from the installer, which got it from the environment's casals.json. This
+ * module holds no canister ids: only the descriptions shown on the cards.
+ */
+
+export interface SharedTokenCatalogEntry {
+	ledger: string;
+	indexer?: string;
+	decimals?: number;
+	name?: string;
+}
+
+/** `{symbol: {ledger, indexer, decimals}}` as the backend reports it. */
+export type SharedTokenCatalog = Record<string, SharedTokenCatalogEntry>;
 
 export interface SharedTokenOption {
 	id: string;
@@ -6,94 +23,65 @@ export interface SharedTokenOption {
 	symbol: string;
 	description: string;
 	decimals: number;
-	ledgers: Record<SetupTokenNetwork, string>;
-	indexers?: Partial<Record<SetupTokenNetwork, string>>;
+	ledger: string;
+	indexer?: string;
 }
 
-export const SHARED_TOKEN_CATALOG: SharedTokenOption[] = [
-	{
-		id: 'REALMS',
-		name: 'REALMS Token',
-		symbol: 'REALMS',
-		description: 'The shared mundus-wide token, common to all realms',
-		decimals: 8,
-		ledgers: {
-			staging: 'cj65k-laaaa-aaaac-bfxqq-cai',
-			demo: 'xbkkh-syaaa-aaaah-qq3ya-cai',
-			test: 'nusyl-jiaaa-aaaae-qj6mq-cai'
-		}
-	},
-	{
-		id: 'ckBTC',
-		name: 'ckBTC',
-		symbol: 'ckBTC',
-		description: 'Chain-Key Bitcoin — IC-native Bitcoin twin',
-		decimals: 8,
-		ledgers: {
-			staging: 'mxzaz-hqaaa-aaaar-qaada-cai',
-			demo: 'mxzaz-hqaaa-aaaar-qaada-cai',
-			test: 'mxzaz-hqaaa-aaaar-qaada-cai'
-		},
-		indexers: {
-			staging: 'n5wcd-faaaa-aaaar-qaaea-cai',
-			demo: 'n5wcd-faaaa-aaaar-qaaea-cai',
-			test: 'n5wcd-faaaa-aaaar-qaaea-cai'
-		}
-	},
-	{
-		id: 'ckUSDC',
-		name: 'ckUSDC',
-		symbol: 'ckUSDC',
-		description: 'Chain-Key USDC — IC-native USD stablecoin',
-		decimals: 6,
-		ledgers: {
-			staging: 'xevnm-gaaaa-aaaar-qafnq-cai',
-			demo: 'xevnm-gaaaa-aaaar-qafnq-cai',
-			test: 'xevnm-gaaaa-aaaar-qafnq-cai'
-		}
-	},
-	{
-		id: 'ckEURC',
+const TOKEN_INFO: Record<string, { name: string; description: string }> = {
+	RLM: { name: 'Realms Token', description: 'The shared mundus-wide token, common to all realms' },
+	REALMS: { name: 'REALMS Token', description: 'The shared mundus-wide token, common to all realms' },
+	CKBTC: { name: 'ckBTC', description: 'Chain-Key Bitcoin — IC-native Bitcoin twin' },
+	CKUSDC: { name: 'ckUSDC', description: 'Chain-Key USDC — IC-native USD stablecoin' },
+	CKEURC: {
 		name: 'ckEURC',
-		symbol: 'ckEURC',
-		description: 'Circle EURC on Ethereum, chain-key — IC-native euro stablecoin',
-		decimals: 6,
-		ledgers: {
-			staging: 'pe5t5-diaaa-aaaar-qahwa-cai',
-			demo: 'pe5t5-diaaa-aaaar-qahwa-cai',
-			test: 'pe5t5-diaaa-aaaar-qahwa-cai'
-		}
+		description: 'Circle EURC on Ethereum, chain-key — IC-native euro stablecoin'
 	}
-];
+};
 
 export const CUSTOM_TOKEN_ID = 'custom';
 
-export function setupTokenNetwork(): SetupTokenNetwork {
-	const ids = (globalThis as { __CANISTER_IDS?: { portal_url?: string } }).__CANISTER_IDS;
-	const portal = ids?.portal_url || '';
-	if (portal.includes('staging.')) return 'staging';
-	if (portal.includes('demo.')) return 'demo';
-	return 'test';
+/** The wizard's catalog cards, in the backend's order. Empty when the realm has none. */
+export function sharedTokenOptions(
+	catalog: SharedTokenCatalog | null | undefined
+): SharedTokenOption[] {
+	const out: SharedTokenOption[] = [];
+	for (const [symbol, entry] of Object.entries(catalog || {})) {
+		const ledger = String(entry?.ledger || '').trim();
+		if (!symbol.trim() || !ledger) continue;
+		const info = TOKEN_INFO[symbol.toUpperCase()];
+		out.push({
+			id: symbol,
+			symbol,
+			name: entry.name || info?.name || symbol,
+			description: info?.description || `Shared ${symbol} ledger`,
+			decimals: entry.decimals ?? 8,
+			ledger,
+			indexer: String(entry.indexer || '').trim() || undefined
+		});
+	}
+	return out;
 }
 
-export function sharedTokenById(id: string): SharedTokenOption | undefined {
-	return SHARED_TOKEN_CATALOG.find((token) => token.id === id);
+export function sharedTokenById(
+	options: SharedTokenOption[],
+	id: string
+): SharedTokenOption | undefined {
+	const wanted = (id || '').trim().toUpperCase();
+	return options.find((token) => token.id.toUpperCase() === wanted);
 }
 
-export function matchSharedToken(input: {
-	symbol?: string;
-	token_canister_id?: string;
-}): SharedTokenOption | undefined {
+export function matchSharedToken(
+	options: SharedTokenOption[],
+	input: { symbol?: string; token_canister_id?: string }
+): SharedTokenOption | undefined {
 	const canister = (input.token_canister_id || '').trim();
 	if (canister) {
-		const byLedger = SHARED_TOKEN_CATALOG.find((token) =>
-			Object.values(token.ledgers).includes(canister)
-		);
+		const byLedger = options.find((token) => token.ledger === canister);
 		if (byLedger) return byLedger;
 	}
 	const symbol = (input.symbol || '').trim().toUpperCase();
 	if (!symbol) return undefined;
-	return SHARED_TOKEN_CATALOG.find(
+	return options.find(
 		(token) => token.id.toUpperCase() === symbol || token.symbol.toUpperCase() === symbol
 	);
 }
@@ -101,7 +89,7 @@ export function matchSharedToken(input: {
 export function tokenDraftFromChoice(
 	choiceId: string,
 	custom: { symbol: string; token_canister_id: string },
-	network: SetupTokenNetwork = setupTokenNetwork()
+	options: SharedTokenOption[]
 ): Record<string, string | number> | null {
 	if (choiceId === CUSTOM_TOKEN_ID) {
 		const symbol = custom.symbol.trim();
@@ -109,17 +97,14 @@ export function tokenDraftFromChoice(
 		if (!symbol || !token_canister_id) return null;
 		return { symbol, token_canister_id };
 	}
-	const token = sharedTokenById(choiceId);
+	const token = sharedTokenById(options, choiceId);
 	if (!token) return null;
-	const token_canister_id = token.ledgers[network] || Object.values(token.ledgers)[0] || '';
-	if (!token_canister_id) return null;
 	const draft: Record<string, string | number> = {
 		symbol: token.symbol,
-		token_canister_id,
+		token_canister_id: token.ledger,
 		decimals: token.decimals
 	};
-	const indexer = token.indexers?.[network] || Object.values(token.indexers || {})[0];
-	if (indexer) draft.indexer_canister_id = indexer;
+	if (token.indexer) draft.indexer_canister_id = token.indexer;
 	return draft;
 }
 
@@ -138,20 +123,19 @@ export type CatalogTokenDraftInput =
 function catalogTokenSymbol(token: CatalogTokenDraftInput): string {
 	if (token == null) return '';
 	if (typeof token === 'string') return token.trim();
-	const symbol = String(token.symbol || token.id || token.existing || '').trim();
-	return symbol;
+	return String(token.symbol || token.id || token.existing || '').trim();
 }
 
 /** Fill ledger/decimals/indexer for every realistic catalog draft shape. */
 export function completeCatalogTokenDraft(
 	token: CatalogTokenDraftInput,
-	network: SetupTokenNetwork = setupTokenNetwork()
+	options: SharedTokenOption[]
 ): Record<string, string | number> | null {
 	if (token == null) return null;
 	if (typeof token === 'string') {
 		const symbol = token.trim();
 		if (!symbol) return null;
-		return completeCatalogTokenDraft({ symbol }, network);
+		return completeCatalogTokenDraft({ symbol }, options);
 	}
 	const canister = String(token.token_canister_id || '').trim();
 	const symbol = catalogTokenSymbol(token);
@@ -162,19 +146,19 @@ export function completeCatalogTokenDraft(
 			token_canister_id: canister
 		};
 	}
-	const matched = matchSharedToken({ symbol });
+	const matched = matchSharedToken(options, { symbol });
 	if (!matched) {
 		return symbol ? { ...token, symbol } : { ...token };
 	}
-	return tokenDraftFromChoice(matched.id, { symbol: '', token_canister_id: '' }, network);
+	return tokenDraftFromChoice(matched.id, { symbol: '', token_canister_id: '' }, options);
 }
 
 /** Payload for founder-auth ``setup_configure_token``. Empty/null stays fail-closed. */
 export function configureTokenPayload(
 	token: CatalogTokenDraftInput,
-	network: SetupTokenNetwork = setupTokenNetwork()
+	options: SharedTokenOption[]
 ): Record<string, string | number> | null {
-	const completed = completeCatalogTokenDraft(token, network);
+	const completed = completeCatalogTokenDraft(token, options);
 	const ledger = String(completed?.token_canister_id || '').trim();
 	if (!completed || !ledger) return null;
 	const payload: Record<string, string | number> = { token_canister_id: ledger };
