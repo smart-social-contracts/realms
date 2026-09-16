@@ -7,11 +7,16 @@
 # environment is casals.json `environments.local`, the replica is icp's local
 # network on port 8000.
 #
-#   scripts/local_up.sh              # build everything, up, grade, print URLs
-#   scripts/local_up.sh --gaas       # ... and the GaaS portal (wizard) orchestra too
+#   scripts/local_up.sh              # realms seed: build everything, up, grade, print URLs
+#   scripts/local_up.sh --gaas       # ... plus gaas new: the GaaS orchestra (portal,
+#                                    #   installer, registry) and one realm born through
+#                                    #   the portal path, the way the wizard does it
 #   scripts/local_up.sh --skip-build # reuse the last build, just up + URLs
 #   scripts/local_up.sh --urls       # only print the URLs of a running stand
 #   scripts/local_up.sh --down       # stop the replica and forget the bindings
+#
+# REALM_NAME (default first-realm) names the realm --gaas mints; a name that
+# already exists is skipped, so re-runs are cheap.
 #
 # Layout: this repo, Casals and gos-as-a-service must be sibling checkouts
 # (the sheets resolve `local:` sources against their own directory). Override
@@ -27,6 +32,7 @@ export CASALS_HOME="${CASALS_HOME:-$HOME/casals-home}"
 IDENTITY="${CASALS_E2E_IDENTITY:-local-dev}"
 IC_TOKENS_VERSION="${IC_TOKENS_VERSION:-0.1.0}"
 SCENARIOS="${SCENARIOS:-fresh,idempotent}"
+REALM_NAME="${REALM_NAME:-first-realm}"
 
 export TERM="${TERM:-xterm}"
 export DFX_WARNING=-mainnet_plaintext_identity
@@ -44,6 +50,11 @@ for arg in "$@"; do
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
+
+# Everything is also appended to $CASALS_HOME/local_up.log (survives reboots,
+# unlike /tmp).
+mkdir -p "$CASALS_HOME"
+exec > >(tee -a "$CASALS_HOME/local_up.log") 2>&1
 
 say()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -77,6 +88,22 @@ for name, cid in rows.items():
 ' "$title" "$CASALS_HOME/$home/$home.local.json"
 }
 
+print_portal_links() { # the wizard, and every realm the installer has minted
+  [ -f "$CASALS_HOME/gaas/gaas.local.json" ] || return 0
+  casals gaas export "$GAAS_DIR/casals.json" | python3 -c '
+import json, sys
+b = json.load(sys.stdin).get("bindings", {})
+portal = b.get("realm-registry-frontend")
+if not portal: sys.exit(0)
+print(f"\n  Portal (gaas new / wizard)           http://{portal}.localhost:8000/")
+realms = sorted(k[:-len("-backend")] for k in b
+                if k.endswith("-backend") and f"{k[:-8]}-frontend" in b and f"{k[:-8]}-baton" in b)
+for r in realms:
+    fe = b[f"{r}-frontend"]
+    print(f"    realm {r:30} http://{fe}.localhost:8000/   (portal page: http://{portal}.localhost:8000/r/{r})")
+'
+}
+
 # ── --down ────────────────────────────────────────────────────────────────────
 if [ "$DOWN" = 1 ]; then
   say "Stopping the local replica and removing $CASALS_HOME"
@@ -88,7 +115,8 @@ fi
 # ── --urls ────────────────────────────────────────────────────────────────────
 if [ "$ONLY_URLS" = 1 ]; then
   print_urls realms-product "$REALMS_DIR/casals.json" "Realms product orchestra"
-  print_urls gaas "$GAAS_DIR/casals.json" "GaaS orchestra (portal + installer)"
+  print_urls gaas "$GAAS_DIR/casals.json" "GaaS orchestra (portal + installer + realms born through it)"
+  print_portal_links
   exit 0
 fi
 
@@ -181,6 +209,28 @@ if [ "$SKIP_BUILD" = 0 ]; then
   fi
 fi
 
+# ── stale bindings ────────────────────────────────────────────────────────────
+# A local replica starts empty after a reboot / `icp network stop`; bindings
+# left from the previous stand then point at canisters that no longer exist.
+# Forget them so `casals up` converges from nothing instead of failing.
+say "Replica"
+if ! (cd "$CASALS_DIR" && icp network status -e local >/dev/null 2>&1); then
+  (cd "$CASALS_DIR" && icp network start -e local --background >/dev/null 2>&1) || true
+  for _ in $(seq 1 60); do (cd "$CASALS_DIR" && icp network status -e local >/dev/null 2>&1) && break; sleep 1; done
+fi
+(cd "$CASALS_DIR" && icp network status -e local >/dev/null 2>&1) || die "local replica did not come up (icp network start -e local)"
+for home in realms-product gaas; do
+  f="$CASALS_HOME/$home/$home.local.json"
+  [ -f "$f" ] || continue
+  backend="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("backend_id") or "")' "$f")"
+  if [ -n "$backend" ] && ! (cd "$CASALS_DIR" && icp canister status "$backend" -e local --identity "$IDENTITY" >/dev/null 2>&1); then
+    echo "  $home: bindings point at $backend, which is not on this replica — forgetting them"
+    rm -rf "$CASALS_HOME/$home"
+  else
+    echo "  $home: bindings present, conductor $backend live"
+  fi
+done
+
 # ── up ────────────────────────────────────────────────────────────────────────
 # The harness starts the replica if needed, funds the identity, then per sheet:
 #   fresh       — `casals up` converges from nothing, `plan` is empty, oracle PASS
@@ -190,14 +240,29 @@ say "casals up — Realms product orchestra (scenarios: $SCENARIOS)"
 (cd "$CASALS_DIR" && KEEP=1 SCENARIOS="$SCENARIOS" python3 tests/e2e/run_e2e.py "$REALMS_DIR/casals.json")
 
 if [ "$WITH_GAAS" = 1 ]; then
-  say "casals up — GaaS orchestra (scenarios: $SCENARIOS,runtime_stand)"
-  (cd "$CASALS_DIR" && KEEP=1 SCENARIOS="$SCENARIOS,runtime_stand" python3 tests/e2e/run_e2e.py "$GAAS_DIR/casals.json")
+  say "casals up — GaaS orchestra (scenarios: $SCENARIOS)"
+  (cd "$CASALS_DIR" && KEEP=1 SCENARIOS="$SCENARIOS" python3 tests/e2e/run_e2e.py "$GAAS_DIR/casals.json")
+
+  # A realm is born the way the portal wizard does it: request_deployment on
+  # the registry → installer create_stand → the conductor builds the stand from
+  # the `Deployments` template → the realm frontend serves /canister_ids.js.
+  if casals gaas export "$GAAS_DIR/casals.json" | python3 -c '
+import json, sys; sys.exit(0 if sys.argv[1] + "-backend" in json.load(sys.stdin).get("bindings", {}) else 1)' "$REALM_NAME"; then
+    say "Realm '$REALM_NAME' already exists on the GaaS orchestra; skipping the portal path"
+  else
+    say "Deploy realm '$REALM_NAME' through the portal path (request_deployment → installer → conductor)"
+    (cd "$GAAS_DIR" && CASALS_HOME="$CASALS_HOME" IDENTITY="$IDENTITY" TIMEOUT_S="${TIMEOUT_S:-1500}" \
+       python3 tests/e2e/deploy_realm.py "$REALM_NAME")
+  fi
 fi
 
 # ── URLs ──────────────────────────────────────────────────────────────────────
 say "Ready. Open in the browser (Chrome/Firefox resolve *.localhost; Safari does not):"
 print_urls realms-product "$REALMS_DIR/casals.json" "Realms product orchestra"
-[ "$WITH_GAAS" = 1 ] && print_urls gaas "$GAAS_DIR/casals.json" "GaaS orchestra (portal + installer)"
+if [ "$WITH_GAAS" = 1 ]; then
+  print_urls gaas "$GAAS_DIR/casals.json" "GaaS orchestra (portal + installer + realms born through it)"
+  print_portal_links
+fi
 cat <<EOF
 
   Also:
