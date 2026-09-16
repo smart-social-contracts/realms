@@ -59,6 +59,14 @@ jobs:
           node-version: '20'
           cache: npm
 
+      # scripts/build_base_wasm.py embeds candid:service metadata with ic-wasm
+      # (scripts/embed_candid_metadata.py); same install as realms-e2e.yml.
+      - name: Install ic-wasm
+        if: ${{ inputs.cli_only != true }}
+        run: |
+          npm install -g @icp-sdk/ic-wasm
+          ic-wasm --version
+
       - name: Install dfx
         if: ${{ inputs.cli_only != true }}
         run: |
