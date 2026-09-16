@@ -179,12 +179,16 @@ jobs:
       - name: Build frontend
         if: ${{ inputs.cli_only != true }}
         run: |
-          cd src/realm_frontend
+          # Workspace install from the repo root (same recipe as realms-e2e.yml):
+          # installing inside src/realm_frontend hoists @sveltejs/kit to the root
+          # while vite stays nested, and kit then cannot resolve vite. The
+          # frontend imports @realmsgos/extension-bridge from its dist/, so build
+          # that workspace package first. No REALMS_BUILD_VARIANT = production.
           npm install --legacy-peer-deps
-          npm run build
-          cd dist
-          tar czf ../../../realm_frontend.tar.gz .
-          cd ../../..
+          npm run build --workspace packages/extension-bridge
+          (cd src/realm_frontend && npm run build && test -f dist/index.html)
+          python3 scripts/check_frontend_variant.py src/realm_frontend/dist production
+          tar czf realm_frontend.tar.gz -C src/realm_frontend/dist .
           echo "✅ Frontend tarball built ($(stat -c%s realm_frontend.tar.gz) bytes)"
 
       - name: Compute release asset checksums
