@@ -195,10 +195,11 @@ def run_quarter_scaling() -> Async[text]:
         from ggg import Quarter, QuarterStatus
 
         # Register the freshly minted backend as a quarter (assign next index).
-        already = any(q.canister_id == new_canister_id for q in Quarter.instances())
+        quarters = Quarter.instances()
+        already = any(q.canister_id == new_canister_id for q in quarters)
         new_index = 1
         if not already:
-            for q in Quarter.instances():
+            for q in quarters:
                 new_index = max(new_index, int(q.index or 0) + 1)
             q = Quarter(
                 name=spec["name"],

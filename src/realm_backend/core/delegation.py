@@ -126,7 +126,6 @@ def _is_active(d: Delegation) -> bool:
 
 
 def find_active_delegation(grantor: str, delegate: str) -> Delegation | None:
-    list(Delegation.instances())
     for d in Delegation.instances():
         if (
             (d.grantor or "").strip() == grantor
@@ -310,7 +309,6 @@ def revoke_delegation(delegation_id: str) -> dict[str, Any]:
 
 def list_delegations_for_caller() -> dict[str, Any]:
     caller = ic.caller().to_str()
-    list(Delegation.instances())
     as_grantor = []
     as_delegate = []
     pending_inbox = []

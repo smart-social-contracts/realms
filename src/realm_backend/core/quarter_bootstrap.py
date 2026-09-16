@@ -851,8 +851,14 @@ def sync_one_peer(peer_canister_id):
         self_id = ic.id().to_str()
         realm = Realm.load("1")
 
+        # One scan of the Quarter table; reused for the directory merge below
+        # instead of re-scanning per merged entry.
+        quarters = Quarter.instances()
+        quarters_by_cid = {}
+        for q in quarters:
+            quarters_by_cid.setdefault(q.canister_id, q)
         local = []
-        for q in Quarter.instances():
+        for q in quarters:
             local.append(
                 {
                     "name": q.name or "",
@@ -871,23 +877,22 @@ def sync_one_peer(peer_canister_id):
 
         from core.quarter_drift import apply_self_report_to_quarter
 
-        existing_ids = {q.canister_id for q in Quarter.instances()}
+        existing_ids = set(quarters_by_cid)
         added = 0
         for entry in merged:
             cid = entry.get("canister_id")
             if not cid or cid == self_id or cid in existing_ids:
                 # Update population and drift report on a known quarter.
-                for q in Quarter.instances():
-                    if q.canister_id == cid:
-                        new_pop = int(entry.get("population", 0) or 0)
-                        if new_pop > int(q.population or 0):
-                            q.population = new_pop
-                        merged_status = entry.get("status")
-                        if merged_status and merged_status != q.status:
-                            q.status = merged_status
-                        if cid == peer_canister_id:
-                            apply_self_report_to_quarter(q, peer_self)
-                        break
+                q = quarters_by_cid.get(cid)
+                if q is not None:
+                    new_pop = int(entry.get("population", 0) or 0)
+                    if new_pop > int(q.population or 0):
+                        q.population = new_pop
+                    merged_status = entry.get("status")
+                    if merged_status and merged_status != q.status:
+                        q.status = merged_status
+                    if cid == peer_canister_id:
+                        apply_self_report_to_quarter(q, peer_self)
                 continue
             new_q = Quarter(
                 name=entry.get("name") or cid[:8],
@@ -898,6 +903,7 @@ def sync_one_peer(peer_canister_id):
             if realm is not None:
                 new_q.federation = realm
             existing_ids.add(cid)
+            quarters_by_cid[cid] = new_q
             added += 1
 
         return {

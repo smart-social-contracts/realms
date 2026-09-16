@@ -17,7 +17,7 @@ from typing import Dict, Optional
 from .utils import get_logger, stderr_console
 
 _BASILISK_REQUIREMENTS = (
-    "ic-basilisk==0.14.2",
+    "ic-basilisk==0.15.1",
     "ic-basilisk-toolkit==0.5.3",
 )
 
