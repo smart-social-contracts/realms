@@ -15,7 +15,7 @@ from realms.cli.basilisk_env import (
 
 class TestBasiliskRequirements:
     def test_pinned_versions_match_gaas(self):
-        assert "ic-basilisk==0.14.2" in _BASILISK_REQUIREMENTS
+        assert "ic-basilisk==0.15.1" in _BASILISK_REQUIREMENTS
         assert "ic-basilisk-toolkit==0.5.3" in _BASILISK_REQUIREMENTS
 
 

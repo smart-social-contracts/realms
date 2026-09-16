@@ -316,7 +316,8 @@ def _get_frontend_canister_id() -> str:
     """Read the frontend canister ID from the Realm entity."""
     try:
         from ggg import Realm
-        realm = list(Realm.instances())[0] if Realm.instances() else None
+        realms = Realm.instances()
+        realm = realms[0] if realms else None
         return str(realm.frontend_canister_id or "") if realm else ""
     except Exception:
         return ""
@@ -2474,7 +2475,8 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
             )
 
         # Check for duplicate canister ID
-        for q in Quarter.instances():
+        quarters = Quarter.instances()
+        for q in quarters:
             if q.canister_id == quarter_canister_id:
                 return RealmResponse(
                     success=False,
@@ -2487,7 +2489,7 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
         # Users can recover their home quarter from this small integer without
         # any central per-user location index.
         next_index = 1
-        for q in Quarter.instances():
+        for q in quarters:
             try:
                 next_index = max(next_index, int(q.index or 0) + 1)
             except Exception:

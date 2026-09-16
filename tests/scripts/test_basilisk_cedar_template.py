@@ -100,7 +100,18 @@ def test_setup_docker_dev_env_downloads_cedar_not_plain():
     text = (REPO_ROOT / "scripts" / "setup_docker_dev_env.sh").read_text()
     assert 'TEMPLATE="cpython_canister_template_cedar.wasm"' in text
     assert 'TEMPLATE="cpython_canister_template.wasm"' not in text
-    assert "cpython-wasm-3.13.0-ic1" in text
+    # Versioned release, not the rolling asset that changes on every basilisk main build.
+    assert "releases/download/v$BASILISK_VER/$TEMPLATE" in text
+    assert "cpython-wasm-3.13.0-ic1" not in text
+
+
+def test_cedar_template_pin_matches_requirements():
+    req = (REPO_ROOT / "requirements.txt").read_text()
+    assert f"ic-basilisk=={bct.CEDAR_TEMPLATE_BASILISK_VERSION}\n" in req
+    assert bct.CEDAR_TEMPLATE_URL.endswith(
+        f"/v{bct.CEDAR_TEMPLATE_BASILISK_VERSION}/{bct.CEDAR_TEMPLATE_NAME}"
+    )
+    assert f"v{bct.CEDAR_TEMPLATE_BASILISK_VERSION}" in str(bct.cedar_template_cache_path())
 
 
 def test_mundus_leftover_free_uses_pack_script():

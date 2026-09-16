@@ -15,7 +15,8 @@ pip install -e cli/
 BASILISK_VER=$(python -c "import basilisk; print(basilisk.__version__)")
 BASILISK_DIR="$HOME/.config/basilisk/$BASILISK_VER"
 TEMPLATE="cpython_canister_template_cedar.wasm"
-TEMPLATE_URL="https://github.com/smart-social-contracts/basilisk/releases/download/cpython-wasm-3.13.0-ic1/$TEMPLATE"
+# Versioned release matching the installed ic-basilisk (Cedar asset attached from v0.15.1 on).
+TEMPLATE_URL="https://github.com/smart-social-contracts/basilisk/releases/download/v$BASILISK_VER/$TEMPLATE"
 mkdir -p "$BASILISK_DIR"
 if [ ! -f "$BASILISK_DIR/$TEMPLATE" ]; then
     echo "Downloading Cedar basilisk template from $TEMPLATE_URL ..."

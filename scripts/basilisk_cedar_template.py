@@ -4,7 +4,8 @@ The plain CPython template (``cpython_canister_template.wasm``) has no
 ``_basilisk_sandbox`` and is not selectable. basilisk honours
 ``BASILISK_TEMPLATE_WASM`` over its default cache file; every leftover-free
 or layered pack must set that variable to the Cedar image
-(``cpython_canister_template_cedar.wasm``, ic-basilisk >= 0.14.2).
+(``cpython_canister_template_cedar.wasm`` from the pinned ic-basilisk release,
+see ``CEDAR_TEMPLATE_BASILISK_VERSION``).
 
 This module does not inspect a finished realm WASM. It only pins the
 template used to pack one.
@@ -20,9 +21,16 @@ PathLike = Union[str, os.PathLike]
 
 CEDAR_TEMPLATE_NAME = "cpython_canister_template_cedar.wasm"
 PLAIN_TEMPLATE_NAME = "cpython_canister_template.wasm"
+
+# ic-basilisk release whose Cedar template realm backends pack with. Keep in
+# sync with the ``ic-basilisk==`` pin in requirements.txt (a test enforces it).
+# Versioned releases carry the Cedar asset from v0.15.1 on; the rolling
+# ``cpython-wasm-3.13.0-ic1`` asset changes under us on every basilisk main
+# build, which is why it is no longer used here.
+CEDAR_TEMPLATE_BASILISK_VERSION = "0.15.1"
 CEDAR_TEMPLATE_URL = (
     "https://github.com/smart-social-contracts/basilisk/releases/download/"
-    f"cpython-wasm-3.13.0-ic1/{CEDAR_TEMPLATE_NAME}"
+    f"v{CEDAR_TEMPLATE_BASILISK_VERSION}/{CEDAR_TEMPLATE_NAME}"
 )
 
 # C symbol for _basilisk_sandbox.sha256 (basilisk_sandbox.c). A cached Cedar
@@ -36,14 +44,24 @@ def is_plain_cpython_template(path: PathLike) -> bool:
 
 
 def cedar_template_cache_path() -> Path:
-    return Path.home() / ".cache" / "realms" / "templates" / CEDAR_TEMPLATE_NAME
+    # Scoped by basilisk version so bumping the pin can never reuse a stale
+    # cached template from an older release.
+    return (
+        Path.home()
+        / ".cache"
+        / "realms"
+        / "templates"
+        / f"v{CEDAR_TEMPLATE_BASILISK_VERSION}"
+        / CEDAR_TEMPLATE_NAME
+    )
 
 
 def _require_cedar_template(template_path: Path) -> None:
     if is_plain_cpython_template(template_path):
         raise SystemExit(
             f"plain CPython template {template_path} is not a realm_backend "
-            f"pack path. Use {CEDAR_TEMPLATE_NAME} (ic-basilisk >= 0.14.2)."
+            f"pack path. Use {CEDAR_TEMPLATE_NAME} "
+            f"(ic-basilisk {CEDAR_TEMPLATE_BASILISK_VERSION})."
         )
     if template_path.name != CEDAR_TEMPLATE_NAME:
         raise SystemExit(
@@ -56,7 +74,8 @@ def _require_cedar_template(template_path: Path) -> None:
         raise SystemExit(
             f"BASILISK template {template_path} predates _basilisk_sandbox.sha256 "
             f"(missing C symbol {_SANDBOX_SHA256_SYMBOL!r}). Delete the cached "
-            f"file so {CEDAR_TEMPLATE_NAME} is fetched from ic-basilisk >= 0.14.2."
+            f"file so {CEDAR_TEMPLATE_NAME} is fetched from "
+            f"ic-basilisk {CEDAR_TEMPLATE_BASILISK_VERSION}."
         )
 
 
