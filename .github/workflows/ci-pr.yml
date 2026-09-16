@@ -48,16 +48,20 @@ jobs:
         # wasm or a dist points a rebuilt environment at a deleted canister.
         # Test fixtures (tests/, the test-mode seed identity) are exempt, and so is
         # scripts/cycleops (the CycleOps service canister and team principals are
-        # not environment ids).
+        # not environment ids). The CLI is covered too: a `--network` default
+        # table there is the same bug one layer up. The only literals allowed
+        # are DFINITY system canisters that are the same on every mainnet alias
+        # (Candid UI, Internet Identity, ckBTC ledger + index).
         run: |
           if grep -rnoE '\b[a-z0-9]{5}(-[a-z0-9]{5}){3,10}-[a-z0-9]{3}\b' \
-               scripts .github src/realm_backend src/*/static src/realm_frontend/src \
+               scripts .github src/realm_backend src/*/static src/realm_frontend/src cli/realms dfx.json \
                extensions/extensions/*/frontend-rt/src extensions/dev-server \
                --include='*.py' --include='*.yml' --include='*.sh' --include='*.json' --include='*.ts' --include='*.js' --include='*.svelte' \
                --include='ic-domains' --include='ii-alternative-origins' \
                --exclude-dir=node_modules --exclude-dir=tests --exclude-dir=__pycache__ --exclude-dir=declarations --exclude-dir=dist --exclude-dir=cycleops \
                --exclude=test_identity_seed.py --exclude='*.test.ts' --exclude='*.test.js' \
-             | grep -v -- '-xxxxx-'; then
+             | grep -v -- '-xxxxx-' \
+             | grep -vE 'rxs6w-5qaaa-aaaah-avp2a-cai|rdmx6-jaaaa-aaaaa-aaadq-cai|mxzaz-hqaaa-aaaar-qaada-cai|n5wcd-faaaa-aaaar-qaaea-cai'; then
             echo "::error::canister/principal ids belong in casals.json (read them with 'casals export')"; exit 1
           fi
 
@@ -122,14 +126,6 @@ jobs:
                     tests/backend/test_build_variant.py \
                     tests/backend/test_descriptor_flag_map.py
           pytest -q tests/backend/test_access_control.py
-      - name: Casals arrangement drift
-        # Arrangements are generated from the deployment descriptors, so a
-        # hand-edit is how a removed flag comes back on a live environment.
-        # The generator was silently broken while the committed JSON still
-        # carried skip_authentication, which is exactly the drift this catches.
-        run: |
-          python3 casals-config/_gen_arrangements.py
-          git diff --exit-code casals-config/arrangements/
       - name: Cedar policy drift
         # The embedded policy text the canister runs must mirror the .cedar
         # source files; a stale copy silently changes what a realm enforces.
@@ -153,13 +149,6 @@ jobs:
             src/lib/stores/sidebar.test.ts \
             src/lib/i18n/resolveLocale.test.ts \
             src/lib/utils/backendError.test.ts
-      - name: Validate descriptors
-        run: |
-          for f in deployment-descriptors/*-mundus*.yml; do
-            echo "::group::$f"
-            python3 -c "import yaml,sys; yaml.safe_load(open('$f'))"
-            echo "::endgroup::"
-          done
 
   # casals up from an empty replica + the cross-quarter live suite; the job
   # body is realms-e2e.yml (also runnable by hand via workflow_dispatch).

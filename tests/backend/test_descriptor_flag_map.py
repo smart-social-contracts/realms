@@ -10,7 +10,6 @@ from realms.cli.descriptor_flags import TEST_PARAM_MAP
 ROOT = Path(__file__).resolve().parents[2]
 
 CONSUMERS = (
-    ROOT / "casals-config" / "_gen_arrangements.py",
     ROOT / "cli" / "realms" / "cli" / "commands" / "mundus.py",
 )
 

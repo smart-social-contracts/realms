@@ -58,7 +58,7 @@ Everything is recorded on the blockchain, visible to all, and executed fairly by
 
 **Technical Users:**
 - Read: [Technical Introduction](./TECHNICAL_INTRO.md)
-- Deploy: [Casals Rollout](./CASALS_ROLLOUT.md) (`AGENTS.md` in repo root)
+- Deploy: [Operations](../OPERATIONS.md) (`AGENTS.md` in repo root)
 - Build: [Extension Guide](../extensions/README.md)
 
 ## Quick FAQ

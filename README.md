@@ -687,7 +687,7 @@ Then create with your custom manifest:
 realms mundus create --manifest examples/demo/manifest.json --deploy
 ```
 
-See [Casals Rollout](./docs/reference/CASALS_ROLLOUT.md) and `AGENTS.md` for deploy workflows.
+See [Operations](./docs/OPERATIONS.md) and `AGENTS.md` for deploy workflows.
 
 ---
 

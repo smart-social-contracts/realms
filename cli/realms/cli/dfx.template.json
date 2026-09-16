@@ -43,13 +43,6 @@
           "name": "candid:service"
         }
       ],
-      "remote": {
-        "id": {
-          "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
-          "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
-          "test": "yhw3g-fyaaa-aaaas-qgorq-cai"
-        }
-      },
       "tech_stack": {
         "cdk": {
           "basilisk": {}
@@ -105,45 +98,21 @@
       "type": "custom",
       "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.did",
       "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.wasm",
-      "remote": {
-        "id": {
-          "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
-          "test": "nusyl-jiaaa-aaaae-qj6mq-cai"
-        }
-      },
       "init_arg": "(record { name = \"Simple Token\"; symbol = \"SMPL\"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt true })"
     },
     "token_frontend": {
       "type": "assets",
-      "source": [],
-      "remote": {
-        "id": {
-          "demo": "xglmt-7aaaa-aaaah-qq3yq-cai",
-          "test": "33mmr-pyaaa-aaaam-ai47q-cai"
-        }
-      }
+      "source": []
     },
     "nft_backend": {
       "type": "custom",
       "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.did",
       "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm",
-      "remote": {
-        "id": {
-          "demo": "6hrip-iiaaa-aaaaf-qdoha-cai",
-          "test": "eelas-yyaaa-aaaao-qps7a-cai"
-        }
-      },
       "init_arg": "(record { name = \"Land NFT\"; symbol = \"LAND\"; description = opt \"Land ownership NFT for realm\"; supply_cap = opt 10000 : opt nat; test = opt true })"
     },
     "nft_frontend": {
       "type": "assets",
-      "source": [],
-      "remote": {
-        "id": {
-          "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai",
-          "test": "ysrkl-eqaaa-aaaas-qgosa-cai"
-        }
-      }
+      "source": []
     },
     "marketplace_backend": {
       "build": "python -m basilisk marketplace_backend src/marketplace_backend/main.py",
@@ -174,10 +143,12 @@
       ],
       "type": "assets",
       "workspace": "marketplace_frontend",
-      "dependencies": ["marketplace_backend"]
+      "dependencies": [
+        "marketplace_backend"
+      ]
     }
   },
-  "defaults": { 
+  "defaults": {
     "build": {
       "args": "",
       "packtool": ""
@@ -189,26 +160,34 @@
       "type": "ephemeral"
     },
     "staging": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     },
     "demo": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     },
     "test": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     },
     "ic": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     }
   },
   "metadata": [
-   {
-     "name": "candid:service"
-   }
+    {
+      "name": "candid:service"
+    }
   ],
   "output_env_file": ".env",
   "version": 1

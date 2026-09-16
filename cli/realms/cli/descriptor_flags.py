@@ -1,8 +1,8 @@
 """Deployment-descriptor parameter names → runtime test-flag keys.
 
-Single source of truth for TEST_MODE_* YAML parameters used in
-deployment-descriptors/*-mundus-layered.yml and consumed by mundus deploy,
-CI install, and Casals arrangement generation.
+Single source of truth for the TEST_MODE_* ``parameters`` of a mundus
+descriptor (``realms mundus deploy``). Fleet environments declare their flags
+directly in casals.json (``environments.<env>.test_flags``).
 """
 
 TEST_PARAM_MAP: dict[str, str] = {

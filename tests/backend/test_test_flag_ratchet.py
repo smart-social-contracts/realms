@@ -94,41 +94,20 @@ def test_network_gate_is_an_allowlist_that_fails_closed():
         )
 
 
-@pytest.mark.parametrize(
-    "descriptor", sorted((REPO_ROOT / "deployment-descriptors").glob("*mundus*.yml"))
-)
-def test_descriptors_do_not_enable_the_removed_flag(descriptor):
-    assert "SKIP_AUTHENTICATION" not in descriptor.read_text(), (
-        f"{descriptor.name} still sets the removed authentication bypass"
-    )
-
-
-@pytest.mark.parametrize(
-    "arrangement", sorted((REPO_ROOT / "casals-config" / "arrangements").glob("*.json"))
-)
-def test_arrangements_do_not_enable_the_removed_flag(arrangement):
-    raw = arrangement.read_text()
-    assert "skip_authentication" not in raw, (
-        f"{arrangement.name} still sets the removed authentication bypass"
-    )
-    # Guard the escalation path too: an arrangement must not hand a realm the
-    # production override through the test_flags blob.
-    doc = json.loads(raw)
-
-    def _walk(node):
-        if isinstance(node, dict):
-            flags = node.get("test_flags")
-            if isinstance(flags, dict):
-                assert "can_test_mode" not in flags, (
-                    f"{arrangement.name} sets can_test_mode via test_flags"
-                )
-            for value in node.values():
-                _walk(value)
-        elif isinstance(node, list):
-            for value in node:
-                _walk(value)
-
-    _walk(doc)
+def test_sheet_environments_do_not_enable_the_removed_flag():
+    """casals.json is the only per-environment declaration left: no environment
+    may re-enable the removed authentication bypass, and none may hand a realm
+    the production override (can_test_mode) through its test_flags."""
+    sheet = json.loads((REPO_ROOT / "casals.json").read_text())
+    environments = sheet.get("environments") or {}
+    assert environments, "casals.json declares no environments"
+    for name, env in environments.items():
+        flags = env.get("test_flags") or {}
+        assert "skip_authentication" not in flags, f"{name} sets the removed authentication bypass"
+        assert "can_test_mode" not in flags, f"{name} sets can_test_mode via test_flags"
+        if name == "production":
+            assert not any(bool(v) for v in flags.values()), f"production enables test flags: {flags}"
+            assert env.get("build_variant", "production") == "production"
 
 
 def test_test_mode_is_gated_on_the_build_variant():

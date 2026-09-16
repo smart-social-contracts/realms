@@ -27,17 +27,23 @@ DEPLOYER_URL = os.environ.get("DEPLOYER_URL", "https://deploy.realmsgos.dev")
 POLL_INTERVAL_S = 10
 POLL_TIMEOUT_S = 3600
 
-_REGISTRY_IDS = {
-    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
-    "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
-    "test": "yhw3g-fyaaa-aaaas-qgorq-cai",
-}
+# Which GOS queue a descriptor deploys through is the descriptor's business:
+# its ``infra`` block names ``registry_canister_id`` and ``installer_canister_id``
+# (the realm-registry / realm-installer of the environment, as `casals export`
+# lists them). There is no per-network table in the CLI.
+_QUEUE_KEYS = ("registry_canister_id", "installer_canister_id")
 
-_INSTALLER_IDS = {
-    "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
-    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
-    "test": "fltjm-tyaaa-aaaap-qunhq-cai",
-}
+
+def _queue_ids(infra: dict | None) -> tuple[str, str]:
+    """(registry_id, installer_id) from a descriptor's ``infra`` block; fails loud."""
+    infra = infra or {}
+    missing = [k for k in _QUEUE_KEYS if not str(infra.get(k, "")).strip()]
+    if missing:
+        raise typer.BadParameter(
+            "descriptor infra block must name " + ", ".join(missing)
+            + " (the environment's realm-registry / realm-installer ids, see `casals export`)"
+        )
+    return str(infra["registry_canister_id"]).strip(), str(infra["installer_canister_id"]).strip()
 
 
 def _dfx_call(canister_id: str, method: str, arg: str, network: str, *, query: bool = False) -> str:
@@ -316,6 +322,7 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
     extension_names: if provided, only include these extension IDs (empty list = none).
     codex_names: if provided, only include these codex IDs (empty list = none).
     """
+    registry_id, installer_id = _queue_ids(infra)
     project_root = get_project_root()
     manifest_path = realm_entry.get("manifest", "")
     realm_manifest = {}
@@ -389,8 +396,8 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
         "artifacts": artifacts,
         "canister_ids": canister_ids,
         "realm": realm_data,
-        "registry_canister_id": _REGISTRY_IDS.get(network, ""),
-        "installer_canister_id": _INSTALLER_IDS.get(network, ""),
+        "registry_canister_id": registry_id,
+        "installer_canister_id": installer_id,
     }
     if branding:
         result["branding"] = branding
@@ -527,10 +534,13 @@ def _upload_branding_to_canister(frontend_id: str, manifest_dir: Path, network: 
 
 
 def _staging_test_identity_js(network: str, infra: dict | None = None) -> str:
-    """Append staging roster globals for II-bypass picker (optional PEMs at deploy)."""
-    if network != "staging":
+    """Append test-identity roster globals for the II-bypass picker.
+
+    Only when the descriptor's ``infra.test_identities_config`` names a roster;
+    no environment gets one by network name."""
+    config_rel = (infra or {}).get("test_identities_config") or ""
+    if not config_rel:
         return ""
-    config_rel = (infra or {}).get("test_identities_config") or "config/staging-test-identities.json"
     config_path = get_project_root() / config_rel
     if not config_path.is_file():
         return ""
@@ -562,7 +572,7 @@ def _normalize_slug(raw: str) -> str:
     return "".join(out).strip("-")[:48]
 
 
-def _resolve_portal_url(realm: dict, network: str, derivation_origin: str) -> str:
+def _resolve_portal_url(realm: dict, network: str, derivation_origin: str, registry_id: str = "") -> str:
     """Canonical portal page for this realm (drives the raw-origin → portal redirect).
 
     Asks the registry to resolve the realm's slug; falls back to
@@ -572,7 +582,6 @@ def _resolve_portal_url(realm: dict, network: str, derivation_origin: str) -> st
     slug = _normalize_slug(realm.get("display_name") or realm.get("name") or "")
     if not slug or not derivation_origin:
         return ""
-    registry_id = _REGISTRY_IDS.get(network, "")
     if registry_id:
         try:
             raw = _dfx_call(registry_id, "resolve_slug", f'("{slug}")', network)
@@ -588,12 +597,9 @@ def _resolve_portal_url(realm: dict, network: str, derivation_origin: str) -> st
 def _canister_ids_bool_fields(network: str, parameters: dict | None = None) -> dict[str, bool]:
     """Sync hints written into /canister_ids.js for portal iframe boot."""
     fields: dict[str, bool] = {}
-    if network == "staging":
-        # Staging realms use II bypass unless explicitly disabled in the descriptor.
-        fields["test_mode_ii_bypass"] = bool((parameters or {}).get("TEST_MODE_II_BYPASS", True))
-    elif parameters:
-        if "TEST_MODE_II_BYPASS" in parameters:
-            fields["test_mode_ii_bypass"] = bool(parameters["TEST_MODE_II_BYPASS"])
+    if parameters and "TEST_MODE_II_BYPASS" in parameters:
+        # Only what the descriptor declares; no environment gets a bypass by name.
+        fields["test_mode_ii_bypass"] = bool(parameters["TEST_MODE_II_BYPASS"])
     return fields
 
 
@@ -782,17 +788,11 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
         # backend id, even though the asset bundle commit doesn't carry it.
         fr_id = (infra or {}).get("file_registry_canister_id", "")
         # Pin the canonical II derivationOrigin so this realm shares one principal
-        # with the registry + other realms (issue #233). Descriptor `infra` may set
-        # `ii_derivation_origin`; otherwise fall back to the registry's public origin
-        # for the target network. Empty string keeps legacy per-origin principals.
-        deriv = (infra or {}).get("ii_derivation_origin")
-        if deriv is None:
-            deriv = {
-                "staging": "https://staging.gos.earth",
-                "demo": "https://demo.gos.earth",
-                "test": "https://test.gos.earth",
-            }.get(network, "")
-        portal_url = _resolve_portal_url(realm, network, deriv)
+        # with the registry + other realms (issue #233). The descriptor's `infra`
+        # sets `ii_derivation_origin` (the environment's portal origin); empty
+        # keeps legacy per-origin principals. No host table lives in the CLI.
+        deriv = str((infra or {}).get("ii_derivation_origin") or "")
+        portal_url = _resolve_portal_url(realm, network, deriv, (infra or {}).get("registry_canister_id", ""))
         _store_canister_ids(frontend_id, backend_id, network,
                             file_registry_id=fr_id, derivation_origin=deriv,
                             portal_url=portal_url,
@@ -806,9 +806,9 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
 def _submit_and_poll(manifest: dict, network: str) -> bool:
     """Submit deployment request and poll for completion."""
     realm_name = manifest.get("name", "unknown")
-    registry_id = _REGISTRY_IDS.get(network, "")
+    registry_id = manifest.get("registry_canister_id", "")
     if not registry_id:
-        console.print(f"[red]  No registry ID for network '{network}'[/red]")
+        console.print("[red]  manifest names no registry_canister_id[/red]")
         return False
 
     manifest_json = json.dumps(manifest)
@@ -829,9 +829,9 @@ def _submit_and_poll(manifest: dict, network: str) -> bool:
     job_id = result.get("job_id", "")
     console.print(f"  Job enqueued: [bold]{job_id}[/bold]")
 
-    installer_id = _INSTALLER_IDS.get(network, "")
+    installer_id = manifest.get("installer_canister_id", "")
     if not installer_id:
-        console.print(f"[yellow]  No installer ID — cannot poll[/yellow]")
+        console.print("[yellow]  manifest names no installer_canister_id — cannot poll[/yellow]")
         return True
 
     console.print(f"  Polling installer ({installer_id})...\n")
@@ -959,51 +959,6 @@ def _submit_and_poll(manifest: dict, network: str) -> bool:
     console.print(f"[red]  Job ID: {job_id}[/red]")
     return False
 
-
-def mundus_deploy_new_command(
-    name: str,
-    network: str,
-    artifact_version: str = "latest",
-    display_name: str = "",
-    manifesto: str = "",
-    cleanup: bool = False,
-) -> None:
-    """Deploy a new realm (no existing canister IDs -- creates new ones)."""
-    backend_url, backend_hash = _resolve_artifact(artifact_version, "realm_backend", network)
-    frontend_url, frontend_hash = _resolve_artifact(artifact_version, "realm_frontend", network)
-
-    console.print(f"Artifacts resolved:")
-    console.print(f"  backend:  {backend_url} (sha256={backend_hash[:16]}...)")
-    console.print(f"  frontend: {frontend_url} (sha256={frontend_hash[:16]}...)\n")
-
-    manifest = {
-        "name": display_name or name,
-        "network": network,
-        "deploy_mode": "install",
-        "artifacts": {"realm_backend": backend_url, "realm_frontend": frontend_url},
-        "expected_hashes": {
-            "backend_wasm": backend_hash,
-        },
-        "realm": {
-            "name": display_name or name,
-            "display_name": display_name or name,
-            "manifesto": manifesto or f"Realm {name}",
-        },
-        "registry_canister_id": _REGISTRY_IDS.get(network, ""),
-        "installer_canister_id": _INSTALLER_IDS.get(network, ""),
-    }
-
-    console.print(f"--- {display_name or name} (new realm) ---")
-    ok = _submit_and_poll(manifest, network)
-
-    if ok and cleanup:
-        installer_id = _INSTALLER_IDS.get(network, "")
-        job_id = manifest.get("_job_id", "")
-        console.print("[yellow]Cleanup requested but not yet implemented[/yellow]")
-
-    if not ok:
-        raise typer.Exit(1)
-    
 
 def mundus_deploy_descriptor_command(
     descriptor: str,

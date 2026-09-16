@@ -13,10 +13,10 @@ on:
           - minor
           - major
       publish_to_registry:
-        description: 'Also publish artifacts to file_registry on all environments'
+        description: 'Also publish the realm artifacts to the production file_registry (canister_ids.json; the CI key must be a registry publisher)'
         required: false
         type: boolean
-        default: true
+        default: false
       skip_version_bump:
         description: 'Use version.txt as-is instead of bumping (for a pre-set semver such as 0.4.1)'
         required: false
@@ -254,32 +254,14 @@ jobs:
             echo "✅ Version changes committed and pushed"
           fi
 
-      # Publish artifacts to all three environments
-      - name: Publish to file_registry — test
+      # Publish the release artifacts to the production file_registry (the
+      # installer serves realms from it). The registry id is the operator
+      # inventory's (canister_ids.json, written by `casals export`).
+      - name: Publish to file_registry — production
         if: ${{ inputs.publish_to_registry == true && inputs.cli_only != true }}
         run: |
           python3 scripts/publish_build.py \
-            --environment test \
-            --family realm \
-            --component both \
-            --version ${{ steps.bump_version.outputs.NEW_VERSION }} \
-            --identity ci
-
-      - name: Publish to file_registry — demo
-        if: ${{ inputs.publish_to_registry == true && inputs.cli_only != true }}
-        run: |
-          python3 scripts/publish_build.py \
-            --environment demo \
-            --family realm \
-            --component both \
-            --version ${{ steps.bump_version.outputs.NEW_VERSION }} \
-            --identity ci
-
-      - name: Publish to file_registry — staging
-        if: ${{ inputs.publish_to_registry == true && inputs.cli_only != true }}
-        run: |
-          python3 scripts/publish_build.py \
-            --environment staging \
+            --environment production \
             --family realm \
             --component both \
             --version ${{ steps.bump_version.outputs.NEW_VERSION }} \
@@ -294,6 +276,6 @@ jobs:
           if [ "${{ inputs.cli_only }}" = "true" ]; then
             echo " scope: CLI / PyPI only"
           elif [ "${{ inputs.publish_to_registry }}" = "true" ]; then
-            echo " file_registry: published to test / demo / staging"
+            echo " file_registry: published to production"
           fi
           echo "═══════════════════════════════════════════════════════"

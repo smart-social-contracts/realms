@@ -47,17 +47,16 @@ realms/
 ├── src/realm_frontend/               # Main SvelteKit frontend
 ├── src/realm_backend/                # Python canister backend
 ├── .github/workflows/
-│   ├── publish-build.yml            # Build + publish artifacts into file_registry + Casals
-│   ├── rollout.yml                   # Upgrade/reinstall realm+infra canisters via Casals
-│   ├── deploy-mundus.yml             # Sheet-realm mundus deploy (still queues realm_installer)
-│   ├── casals-upgrade.yml            # Upgrade the Casals orchestrator itself
+│   ├── ci-pr.yml / ci-main.yml       # Lint, unit, `casals up` e2e on a local replica (realms-e2e.yml)
+│   ├── release.yml                   # Version bump, GitHub release, PyPI; optional publish to the production file_registry
+│   ├── publish-build.yml             # Build + publish realm artifacts into an environment's file_registry
 │   └── deploy-files.yml              # Publish extensions/codices into file_registry
-├── (casals is NOT a submodule — clone smart-social-contracts/casals separately if you need its source/CLI; platform provisioner of gos-as-a-service)
-├── casals-config/                    # Realms fleet config for Casals conductors (arrangements, sheet)
+├── (casals is NOT a submodule — clone smart-social-contracts/casals separately for its CLI; platform provisioner of gos-as-a-service)
 ├── casals.json                       # The product orchestra (marketplace, file registry, token, NFT, demo realm) — `casals up`
+├── canister_ids.json                 # Operator inventory of live ids, written by `casals export` (never a source of truth in code)
 ├── scripts/
-│   └── publish_build.py              # Build+publish engine used by publish-build.yml
-├── deployment-descriptors/           # Network topology (YAML)
+│   └── publish_build.py              # Build+publish engine used by publish-build.yml / release.yml
+├── docs/OPERATIONS.md                # How to build and converge the orchestra
 └── docs/reference/
 ```
 
@@ -67,694 +66,33 @@ realms/
 
 ## Deploying Code Changes
 
-Visual overview (decision tree): [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — paths **P1**–**P6** (see diagram footer).
+Every environment is declared in [`casals.json`](casals.json) and converged by
+`casals up` (see [`docs/OPERATIONS.md`](docs/OPERATIONS.md)). There is no
+per-network table anywhere in this repo: canister ids, controllers, hosts and
+test flags live in the sheet's `environments` block, and the running canisters
+read theirs at runtime (`set_canister_config_json`, `get_setup_state().shared_tokens`).
+CI (`ci-pr.yml`) refuses a principal/canister-id literal in `src/`, `scripts/`,
+`cli/realms` or the workflows; read live ids with `casals export`.
 
-### Choose your path first
-
-**"Fast off-chain" is two different things.** Do not treat them as synonyms:
-
-| Phrase | What it actually does | Use when |
-|---|---|---|
-| **`realms mundus deploy`** | Builds locally, then **queues the registry installer** and polls | Agora / Dominion / Syntropia **and** the installer is healthy (~90s) |
-| **Direct dfx / `runtime-install` / `registry-install`** | Talks to the realm canisters only — **no installer job** | A wizard realm (`https://*.gos.earth/r/<slug>/`), the installer is slow/stuck, or the user said **fast off-chain** / **skip the installer** |
-
-If the target is a portal slug that is **not** in `deployment-descriptors/*-mundus-layered.yml`,
-**do not invent a one-off mundus YAML.** Resolve the canister IDs and use the
-[direct path](#direct-runtime-install-no-file-registry-no-casals-installer). A pending
-mundus frontend job can later wipe `/ext/` and 404 every extension.
-
-**Default for sheet realms only** (Agora, Dominion, Syntropia): `realms mundus deploy`
-(~90s) when the installer is healthy. Do **not** start with Casals for routine
-UI/backend iteration — the Casals frontend rollout copies ~109 asset files in small
-batches and takes several minutes per realm.
-
-| Goal | Path | Typical time |
-|---|---|---|
-| **Wizard / portal realm** (`/r/<slug>/` on test/demo/staging) | [Direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer) — never mundus | ~25–90s |
-| **Realm UI or backend change** (Agora, Dominion, Syntropia) | `realms mundus deploy` with `--version build` | ~90s |
-| **Runtime extension bundle** (`extensions/*/frontend-rt/`) | `deploy-files` → install, **or** [direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer) | ~26s via registry; direct path skips the installer |
-| **Registry / installer / other infra** during dev | fetch GOS artifacts + `dfx deploy` (registry/installer) or `scripts/infra_dev_deploy.sh` (file_registry, …); the full product stack is `casals up` on `casals.json` (`docs/OPERATIONS.md`) | ~2–5 min |
-| **Pre-merge / make Casals authoritative** | `publish-build` → `rollout` | several min |
-
-### What changed?
-
-| What changed | Dev iteration (use this) | Authoritative (pre-merge only) |
-|---|---|---|
-| **Frontend** (`src/realm_frontend/`) | Sheet realm: `mundus deploy --canister frontend --version build`. Wizard `/r/<slug>/`: [direct path](#direct-runtime-install-no-file-registry-no-casals-installer) | `publish-build` (`component=frontend`) → `rollout` (`scope=frontend`) |
-| **Backend** (`src/realm_backend/`) | Sheet realm: `mundus deploy --canister backend --version build`. Wizard `/r/<slug>/`: `dfx canister install --mode upgrade` | `publish-build` (`component=both`) → `rollout` (`scope=backend`) |
-| **Extension** (`extensions/`) | `files publish` → `registry-install` (or `runtime-install` if it has `entry.py`) | `deploy-files` → rollout (or re-install) |
-| **Registry / wizard UI** (GOS platform — live at `gos.earth`) | develop in [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service); Realms pins prebuilt artifacts | fetch → upload → authorize + `realms rollout -t realm-registry` |
-
-### Registry / wizard UI (production portal)
-
-The **create-realm wizard**, **deployment status page**, **realm registry backend**,
-**realm installer**, and the **file_registry backend** (the platform artifact store —
-GOS wasms, frontends, branding) all live in
-[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
-Realms **no longer builds** `realm_registry_*`, `realm_installer`, or `file_registry`
-from source — those directories were removed from this repo; the prebuilt wasms are
-fetched from gos-as-a-service releases (vendored candid under `src/gos-vendor/`).
-Realms still *uses* the file_registry canister (publishing realm artifacts, branding).
-The `file_registry_frontend` admin UI is built and released from gos-as-a-service;
-realms fetches `file_registry_frontend.tar.gz` via `scripts/fetch_gos_artifacts.py`.
-
-**Develop registry/wizard changes in gos-as-a-service**, cut a release there, then bump
-Realms' pin in `scripts/fetch_gos_artifacts.py` (`GOS_RELEASE`).
-
-**What Realms agents still do here:**
-
-- Interact with the **live staging registry** (list realms, credits, enqueue deploys).
-- Top up registry credits via [`deploy-mundus`](#fast-realm-deploy-mundus--sheet-realms-only) /
-  `realms mundus deploy` when testing realm provisioning.
-- **Publish + roll out** prebuilt GOS artifacts into test/demo/staging Casals (see
-  [Fast infra deploy](#fast-infra-deploy-dev-only) and
-  [`realms rollout -t realm-registry`](#step-2--rollout)).
-
-The wizard at `gos.earth` is **not** a realm app and **not** upgraded by
-`mundus deploy` or `ci-main` (which only publish/roll out `family=realm`).
-
-**Product sites** at `*.realmsgos.org` (landing + marketplace + file registry)
-are Realms-owned and declared in the repo-root `casals.json`; `casals up` deploys
-them (see `docs/OPERATIONS.md`) — distinct from the `*.gos.earth` GaaS portal in
-gos-as-a-service.
-
-**Publish + roll out a new GOS release on staging (Realms side):**
-
-```bash
-export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
-dfx identity use deployer
-
-# 1. Fetch prebuilt WASM + frontend from the pinned GOS release
-python3 scripts/fetch_gos_artifacts.py --what all
-# optional: python3 scripts/fetch_gos_artifacts.py --release v0.1.0 --what wasms|frontend|all
-
-# 2. Upload into file_registry and authorize in Casals (registry family)
-realms files publish-release --network staging --family registry --version 0.1.0 \
-  --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
-  --frontend-dist .external-assets/realm_registry_frontend/dist \
-  --assets-wasm /tmp/realms-assetstorage.wasm.gz \
-  --identity deployer
-
-# 3. Upgrade the live wizard (Casals path — publish step above fetches from GOS, never builds)
-realms rollout -e staging -t realm-registry -s both -m upgrade -v 0.1.0 \
-  --identity deployer --execute --yes
-```
-
-`realms rollout -t realm-registry` **never builds from source** — when authorized WASM
-is missing it runs the fetch → upload → authorize flow via
-`scripts/fetch_gos_artifacts.py` automatically (with `--execute`).
-
-**Hard-refresh** the browser (Ctrl+Shift+R) after deploy — asset canisters cache aggressively.
-
-**After any frontend deploy, verify the UI actually looks correct** — don't stop at
-`canister_ids.js` or a successful mundus job. Open the target realm in a browser (portal
-URL when available), hard-refresh, and confirm layout, sidebar, and the changed page render
-as expected. Technical checks alone miss visual regressions (e.g. sidebar overlapping main
-content, wrong active highlight, clipped headings).
-
-### Fast realm deploy (mundus) — sheet realms only
-
-Builds from your **local checkout**, uploads artifacts, and upgrades the target realm
-canister(s) **via the registry installer** (not a direct canister install). No git push
-required. The CLI calls `request_deployment` on the **realm registry**, then polls
-`get_deployment_job_status` on the **realm installer** (`fltjm-…` on test) — not
-Casals, and not a direct `canister install`.
-
-If the job stays `pending` for ~2 minutes, **cancel it** and switch to the
-[direct path](#direct-runtime-install-no-file-registry-no-casals-installer). Do not
-leave a pending job — a later frontend install wipes `/ext/` and extensions 404.
-
-```bash
-# test installer
-dfx canister call fltjm-tyaaa-aaaap-qunhq-cai cancel_deployment \
-  '("<job_id>")' --network test
-```
-
-| Env | Realm installer (cancel / poll) |
+| What changed | Path |
 |---|---|
-| Test | `fltjm-tyaaa-aaaap-qunhq-cai` |
-| Demo | `2s4td-daaaa-aaaao-bazmq-cai` |
-| Staging | `lusjm-wqaaa-aaaau-ago7q-cai` |
+| Product canister code (realm backend/frontend, marketplace, token, NFT) | Build (recipes: `release.yml`), then `casals up -e production` from the Casals repo |
+| The conductor / file registry / multisig themselves | Same `casals up`; the sheet's `registry.wasms` pins them |
+| Extensions / codices bundles | `realms files publish --network ic --registry <file-registry>` or `deploy-files.yml` |
+| A realm artifact the installer serves to new portal realms | `publish-build.yml` / `scripts/publish_build.py --environment production` (the release workflow can do this too) |
+| Existing portal-created realms | `realms mundus deploy <descriptor>` — the descriptor's `infra` block names the environment's registry / installer / file registry ids (`realms mundus deploy --help`) |
+| A new realm on a live GOS | `realms new spec.json --gaas-config <gaas new --output-file>` |
+| Registry / wizard UI (`gos.earth`) | [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service): its own `casals.json` + `casals up` |
 
-Mundus descriptors list **only** Agora, Dominion, and Syntropia. **Never** add a
-temp YAML for a wizard realm such as `realmtest6`.
-
-```bash
-export TERM=xterm
-export DFX_WARNING=-mainnet_plaintext_identity
-
-# Frontend-only, staging Agora (~90s)
-realms mundus deploy deployment-descriptors/staging-mundus-layered.yml \
-  --realm agora --canister frontend \
-  --skip-extensions --codices none \
-  --version build
-
-# Same for test
-realms mundus deploy deployment-descriptors/test-mundus-layered.yml \
-  --realm agora --canister frontend \
-  --skip-extensions --codices none \
-  --version build
-```
-
-| Flag | Notes |
-|---|---|
-| `--version build` | **Required for local/un-pushed realm changes** — compiles from the repo checkout |
-| `--version latest` | Pulls **realm** artifacts from the latest **Realms** GitHub release — **will not include your local edits** and **does not** update registry/installer (those use `GOS_RELEASE` in `scripts/fetch_gos_artifacts.py`) |
-| `--canister frontend` / `backend` | Scope to what changed; omit both flags to redeploy both |
-| `--skip-extensions` | Skip extension/codex install when you only changed realm frontend/backend |
-| `--realm agora` | One realm instead of all three in the descriptor |
-
-Descriptors: `deployment-descriptors/test-mundus-layered.yml`, `staging-mundus-layered.yml`,
-`demo-mundus-layered.yml` (each sets the network).
-
-#### Avoid breaking login after a frontend deploy
-
-The SPA resolves its **realm backend canister id** from `/canister_ids.js` on the frontend
-asset canister (`globalThis.__CANISTER_IDS.realm_backend`). That file is **not** part of
-the Vite build — `realms mundus deploy` injects it as the **final post-deploy step**
-(`_store_canister_ids` in `cli/commands/mundus.py`).
-
-| Do | Don't |
-|---|---|
-| Use **`realms mundus deploy`** for realm frontend/backend iteration | Run raw **`dfx deploy frontend`** on a wizard-provisioned realm without restoring config |
-| Use the realm's **own manifest** from the registry / descriptor | Point mundus at **`examples/demo/realm3/manifest.json`** for a custom staging realm (overwrites `/custom/` branding) |
-| After any manual asset upload, **re-store `/canister_ids.js`** | Rely on `.env` / build-time `CANISTER_ID_REALM_BACKEND` — wrong id → II delegation errors and login fails |
-
-If login breaks with *"Canister '…' is not one of the delegation targets"*, the frontend is
-talking to the wrong backend. Fix by restoring `/canister_ids.js` with the realm's actual
-backend + `derivation_origin` + `portal_url`:
-
-```bash
-export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
-dfx identity use deployer  # or the frontend controller identity
-
-python3 scripts/staging_test_identities.py \
-  --frontend ul3la-6iaaa-aaaac-bfula-cai:ucya4-iaaaa-aaaac-bfukq-cai \
-  --portal-url https://staging.gos.earth/r/testsyntropiaweekendstaging1 \
-  --network staging
-```
-
-(`--frontend` is `frontend_canister_id:backend_canister_id` — repeat for multiple realms.
-Optional `--portal-url` and `--derivation-origin` set II + portal redirect fields.)
-
-**Verify after deploy:** open DevTools → Network → confirm `/canister_ids.js` loads and
-`realm_backend` matches the realm's backend canister (not a demo/test default from `.env`).
-Then **load the realm in a browser** and eyeball the affected screens (sidebar, layout,
-navigation) — a green deploy log does not prove the UI is right.
-
-### Casals rollout (pre-merge / authoritative)
-
-Use Casals when you need the environment's **authorized-WASM catalog** updated — e.g.
-before merge, or to roll the same artifact to all realms at once. See "Casals — On-Chain
-Deploy & Upgrade" below for the full reference.
-
-```bash
-git add . && git commit -m "fix: describe change" && git push origin main
-
-# 1. Publish the current main checkout as a snapshot into test's registry + catalog
-gh workflow run publish-build.yml \
-  -f environment=test -f family=realm -f component=both \
-  -f from_main=true -f update_catalog=true
-
-# 2. Roll it out (scope to what changed; upgrade preserves state)
-gh workflow run rollout.yml \
-  -f environments=test -f targets=all-realms -f scope=both \
-  -f mode=upgrade -f version=main
-```
-
-Scope as narrowly as possible: `scope=frontend` skips the backend; `targets=dominion`
-does one realm instead of all three.
-
-**Before merge**, align Casals with what you deployed off-chain via mundus:
-
-```bash
-python3 scripts/publish_build.py --environment staging --family realm \
-  --component frontend --from-main --identity deployer
-realms rollout -e staging -t agora -s frontend -v main \
-  --identity deployer --execute --yes
-```
+`realms deploy --folder <realm>` is the dfx path for a generated realm on a local
+replica only.
 
 ### Environments
 
-| Environment | Domain |
-|---|---|
-| Test | `<canister_id>.icp0.io` |
-| Demo | `<canister_id>.icp0.io` |
-| Staging | `<canister_id>.icp0.io` |
-
----
-
-## Deploying Extension Changes
-
-Extensions/codices are published into the `file_registry` (via `deploy-files.yml` or
-`realms files`), then installed by the realm backend pulling them from the registry.
-
-```bash
-# 1. Build
-cd extensions/extensions/<ext_id>/frontend-rt && npm run build && cd -
-
-# 2. Push submodule
-cd extensions && git add -A && git commit -m "feat(<ext_id>): change" && git push origin main && cd ..
-
-# 3. Update submodule ref
-git add extensions && git commit -m "chore: bump extensions" && git push origin main
-
-# 4. Publish to file_registry (specific extension, or omit --extensions for all)
-gh workflow run deploy-files.yml -f scope=extensions-only -f environment=test -f extensions=<ext_id>
-
-# 5. Install it on the realm (see "Fast Remote Extension Deploy" below for the direct call),
-#    or for a fresh full realm, the rollout's active arrangement reinstalls every extension.
-```
-
-### `deploy-files.yml` Parameters
-
-| Parameter | Options | Default | Notes |
-|---|---|---|---|
-| `environment` | `test`, `staging`, `demo` | `staging` | |
-| `scope` | `all`, `extensions-only`, `codices-only`, `branding-only` | `all` | `branding-only` publishes the demo realms' logo/background (see Branding below) |
-| `extensions` | comma-separated IDs or blank | blank (all) | e.g. `voting,vault` |
-| `codices` | comma-separated IDs or blank | blank (all) | e.g. `dominion` |
-| `reinstall` | `true`/`false` | `false` | Destructive if true |
-
----
-
-## Creating a Release
-
-Bump the version and produce release artifacts (WASM, frontend tarball, CLI on PyPI, GitHub release):
-
-```bash
-gh workflow run release.yml -f release_type=patch   # or minor, major
-```
-
-This will:
-1. Bump `version.txt` (e.g. 0.3.4 → 0.3.5)
-2. Build `realm_backend.wasm.gz` and `realm_frontend.tar.gz`
-3. Publish the CLI to PyPI
-4. Create a GitHub release `v0.3.5` with all artifacts + checksums
-5. Commit and push the version bump
-
-Takes ~5 minutes. The version file determines the current version; the workflow computes the next one automatically.
-
-### `release.yml` Parameters
-
-| Parameter | Options | Default | Notes |
-|---|---|---|---|
-| `release_type` | `patch`, `minor`, `major` | `patch` | Follows semver |
-
----
-
-## Casals — On-Chain Deploy & Upgrade (preferred path)
-
-> **Three deploy paths on non-production:**
-> 1. **Direct canister install** — `dfx canister install` /
->    `registry-install` / `runtime-install`. No installer job. Use for wizard
->    `/r/<slug>/` realms and whenever someone says **fast off-chain**.
-> 2. **Mundus** (`deploy-mundus.yml` / `realms mundus deploy`) — local build, then
->    a **realm_installer** job. Sheet realms (Agora/Dominion/Syntropia) only.
-> 3. **Casals** (`publish-build.yml` + `rollout.yml`) — authoritative / pre-merge.
-> `deploy-files.yml` publishes extension/codex bundles into `file_registry`.
-
-[Casals](https://github.com/smart-social-contracts/casals) is the **GaaS platform
-provisioner** — an on-chain canister lifecycle orchestrator from its own repo,
-serving the [gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service) platform.
-**Realms operates** one conductor instance per network (`test`, `demo`, `staging`)
-and keeps fleet config in `casals-config/`; rollouts are driven via `realms rollout`.
-On each environment, Casals owns the orchestra canisters it manages and upgrades
-them for us. Instead of an off-chain CI job installing WASMs, Casals pulls the
-artifacts from `file_registry` and installs them itself, with **automatic
-snapshot → install → verify-hash → rollback-on-failure** built in.
-
-There are exactly **two steps**:
-
-1. **Publish Build** — build the artifacts, upload them into `file_registry`, and
-   register ("authorize") them in Casals. Nothing is deployed yet.
-2. **Rollout** — tell Casals to upgrade (or reinstall) the chosen canisters to a
-   published version.
-
-**Realms runs Casals conductor instances on all three environments** (`test`, `demo`, `staging`; conductor IDs in `canister_ids.json`):
-each one's realm and infra canisters are registered in its Casals instance. Orchestra canisters are
-controlled by **Casals + CycleOps**; on **test/staging**, the **`deployer`** identity
-remains a co-controller so you can use the [fast infra deploy](#fast-infra-deploy-dev-only)
-path during development. Publishing builds and authoritative rollouts still go through
-Casals. New-realm *provisioning* still has a dormant off-chain code path in the
-installer (gated by `provision_via_casals`, default off), but it is not wired to any
-active workflow.
-
-### How Casals organizes things
-
-```
-Section "Deployments"  → one Stand per realm (agora, dominion, syntropia, …)
-Section "Infra"        → one Stand per infra piece (installer, realm-registry, …)
-each Stand             → backend + frontend Canister(s)
-```
-
-Artifacts are named `<family>-backend@<version>` (backend WASM) and
-`<family>-assets@<version>` (frontend bundle). Realms use the family `realm`;
-infra stands map to families `installer`, `registry`, `file-registry`,
-`dashboard`, `marketplace`. (`token`/`nft` are external canisters — managed in
-Casals but not built here.)
-
-### What each deploy path upgrades
-
-After an off-chain redeploy, demo/staging can still show an old **Realm Registry**
-footer (e.g. `0.3.7`) while test shows `0.4.0` — even though the three realms were
-upgraded. That is expected: the footer is the **GOS registry frontend** (released from
-[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service)),
-not the realm apps. Bump Realms' `GOS_RELEASE` pin when a new gos-as-a-service release
-lands; realm semver releases and GOS releases are versioned independently.
-
-Mundus below is the **sheet-realm** off-chain path (still a realm_installer job). Wizard `/r/<slug>/` realms use the [direct path](#direct-runtime-install-no-file-registry-no-casals-installer), not this table.
-
-| Component | Off-chain mundus (`deploy-mundus` / `realms mundus deploy`) | Casals (`publish-build` → `rollout`) |
-|---|---|---|
-| Realm backends + frontends (Dominion, Agora, Syntropia) | Yes | Yes |
-| Extensions/codices on realms | Yes (manifest + `file_registry`) | Yes (arrangement) |
-| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.gos.earth) | **No** (mundus) — **Yes** via [fetch GOS artifacts + `dfx deploy`](#fast-infra-deploy-dev-only) | Yes (`realms rollout -t realm-registry`; publish fetches from gos-as-a-service) |
-| Installer, `file_registry`, marketplace, dashboard | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) for file_registry et al.; installer via GOS fetch + publish | Yes (`all-infra` or per-family; installer uses GOS fetch) |
-
-Notes:
-
-- Mundus descriptors only list `type: realm` entries. The registry backend is used
-  to *enqueue* deploy jobs; it is **not** upgraded by mundus deploy.
-- **`latest` is overloaded — never mix:** `realms mundus deploy --version latest` and
-  mundus `artifact_version=latest` mean the latest **Realms** release (realm WASM/assets).
-  Registry and installer artifacts are pinned separately to `GOS_RELEASE` in
-  `scripts/fetch_gos_artifacts.py` (currently `v0.1.0`). Do not assume one `latest`
-  updates both stacks.
-- `artifact_version=latest` in mundus deploy refers to **realm** GitHub-release
-  artifacts, not registry/infra.
-- The registry footer version ≠ individual realm WASM version. Realm cards’
-  “updated X ago” is catalog metadata, not proof of realm code version.
-- To align demo/staging registry UI with test after a mundus realm deploy, fetch the
-  pinned GOS release, publish + authorize (`realms files publish-release` or
-  `realms rollout --execute`, which auto-fetches), then roll out **`realm-registry`**
-  with `-v 0.1.0` (GOS semver, not `-v main`).
-
-```bash
-# Per environment (example: staging) — registry/installer: fetch GOS, then publish + rollout
-python3 scripts/fetch_gos_artifacts.py --what all
-realms files publish-release --network staging --family registry --version 0.1.0 \
-  --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
-  --frontend-dist .external-assets/realm_registry_frontend/dist \
-  --assets-wasm /tmp/realms-assetstorage.wasm.gz --identity deployer
-
-realms rollout -e staging -t realm-registry -s both -m upgrade -v 0.1.0 \
-  --identity deployer --execute --yes
-```
-
-Repeat for `demo`. `realms rollout -t realm-registry` runs the fetch step automatically
-when `--execute` and authorized WASM is missing.
-
-For **realm** artifacts (built in this repo), use `publish_build.py` / `publish-build.yml`
-with `family=realm` as before:
-
-```bash
-gh workflow run publish-build.yml \
-  -f environment=staging -f family=realm -f component=both -f from_main=true
-realms rollout -e staging -t all-realms -s both -v main --identity deployer --execute --yes
-```
-
-### Fast infra deploy (dev only)
-
-While developing **file_registry**, marketplace, dashboard, or other Realms-owned infra,
-skip Casals publish + rollout and **deploy directly with dfx**
-from the repo root
-(~2–5 min per component). This updates the live canister code immediately but does
-**not** update the Casals authorized-WASM catalog — run the full Casals path before merge.
-
-**Registry and installer** no longer have source in this repo. For those stands, the dev
-path is: **fetch prebuilt WASM from the pinned gos-as-a-service release** via
-`scripts/fetch_gos_artifacts.py`, then either `dfx deploy` (direct canister upgrade) or
-`realms files publish-release` + `realms rollout` (Casals-authoritative). Develop
-registry/wizard/installer code in
-[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service).
-
-**Setup (once per shell):**
-
-```bash
-export TERM=xterm
-export DFX_WARNING=-mainnet_plaintext_identity
-dfx identity use deployer
-```
-
-**Registry / installer (prebuilt GOS artifacts):**
-
-```bash
-# Fetch realm_registry_backend.wasm.gz, realm_installer.wasm.gz, registry frontend dist
-python3 scripts/fetch_gos_artifacts.py --what all
-
-# Direct dfx upgrade — registry backend on staging (canister id still valid)
-export DFX_NETWORK=staging
-dfx canister install 7wzxh-wyaaa-aaaau-aggyq-cai --network staging --mode upgrade \
-  --wasm .external-wasms/realm_registry_backend.wasm.gz
-
-# Registry frontend (asset canister)
-dfx deploy realm_registry_frontend --network staging --yes
-# (dfx.json points source at .external-assets/realm_registry_frontend/dist)
-
-# Installer backend only
-dfx canister install lusjm-wqaaa-aaaau-ago7q-cai --network staging --mode upgrade \
-  --wasm .external-wasms/realm_installer.wasm.gz
-
-# Casals-authoritative (upload + authorize + rollout)
-realms rollout -e staging -t realm-registry -s both -v 0.1.0 --execute --yes
-realms rollout -e staging -t installer -s backend -v 0.1.0 --execute --yes
-```
-
-> **Canister IDs:** staging registry backend `7wzxh-wyaaa-aaaau-aggyq-cai` and installer
-> `lusjm-wqaaa-aaaau-ago7q-cai` remain valid here. The authoritative ID table for the
-> GOS stack is owned by gos-as-a-service (`AGENTS.md` / `canister_ids.json` there).
-
-**Other infra families (still built from Realms source):**
-
-```bash
-scripts/infra_dev_deploy.sh -e test -f file-registry -c backend
-scripts/infra_dev_deploy.sh -e test -f marketplace -c both
-```
-
-### Per-environment product stack (`*.realmsgos.org`)
-
-Deploy the **complete** Realms GOS product surface for one IC environment (file
-registry + registry UI + marketplace backend + marketplace frontend), wired together
-and prepared for a custom domain (`demo.realmsgos.org`, etc.):
-
-```sh
-# from the Casals repo; -e ic with the deployer identity for production
-python -m casals_cli.main -e local --identity local-dev up ../realms/casals.json --yes
-```
-
-Everything environment-specific (principals, DNS, test flags, shared ledgers)
-lives in the sheet's `environments` block; see `docs/OPERATIONS.md`.
-`realms marketplace deploy` remains the lighter-weight marketplace-only path.
-
-**When to use which path** (see also [Choose your path first](#choose-your-path-first) at the top):
-
-| Situation | Path |
-|---|---|
-| Wizard / portal realm (`/r/<slug>/`) or **fast off-chain** | [Direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer) |
-| Realm UI/backend change (Agora, Dominion, Syntropia; installer healthy) | `realms mundus deploy` with `--version build` |
-| Registry/wizard/installer change | Develop in **gos-as-a-service** → release → bump `GOS_RELEASE` → fetch + publish + rollout |
-| Iterating on file_registry / marketplace / dashboard | `scripts/infra_dev_deploy.sh` or `publish_build.py` |
-| Full product stack (`*.realmsgos.org`) | `casals up casals.json` (`docs/OPERATIONS.md`) |
-| Pre-merge / making Casals authoritative | `publish_build.py` (realm) or GOS fetch + `realms rollout` (registry/installer) |
-
-**Before merge**, align Casals with what you deployed off-chain (realm code):
-
-```bash
-python3 scripts/publish_build.py --environment staging --family realm \
-  --component frontend --from-main --identity deployer
-realms rollout -e staging -t agora -s frontend -v main \
-  --identity deployer --execute --yes
-```
-
-To sync **registry** UI after a mundus deploy (footer version, wizard, deployment status):
-
-```bash
-python3 scripts/fetch_gos_artifacts.py --what all
-realms rollout -e staging -t realm-registry -s both -m upgrade -v 0.1.0 \
-  --identity deployer --execute --yes
-```
-
-(`realms rollout` fetches from the GOS release when authorized WASM is missing — it
-never builds registry from Realms source.)
-
-### Step 1 — Publish Build
-
-Builds the WASM/bundle, uploads to `file_registry`, authorizes in Casals.
-
-```bash
-# Manual workflow (preferred)
-gh workflow run publish-build.yml \
-  -f environment=test -f family=realm -f component=both -f version=0.4.0
-
-# Or locally (same engine the workflow runs)
-python3 scripts/publish_build.py \
-  --environment test --family realm --component both \
-  --version 0.4.0 --identity deployer
-```
-
-| `publish-build.yml` param | Options | Default | Notes |
-|---|---|---|---|
-| `environment` | `test`, `staging`, `demo` | `test` | |
-| `family` | `realm`, `file-registry`, `dashboard`, `marketplace` | `realm` | `installer` / `registry` removed — use GOS fetch + `realms files publish-release` |
-| `component` | `both`, `backend`, `frontend` | `both` | |
-| `version` | semver, e.g. `0.4.0` | — | required unless `from_main` |
-| `from_main` | `true`/`false` | `false` | Publish as `main.<ts>.<sha>` instead of semver |
-| `update_catalog` | `true`/`false` | `false` | Only for Casals-only envs (see Coexistence) |
-
-### Main-branch snapshots (no release)
-
-For day-to-day work on `main`, you do **not** need to cut a semver release. Publish
-the current checkout and roll out with `-v main`:
-
-```bash
-# Trigger manually (same workflow as a release, with from_main):
-gh workflow run publish-build.yml -f environment=test -f family=realm \
-  -f component=both -f from_main=true
-
-# Locally
-python3 scripts/publish_build.py --environment test --family realm \
-  --component both --from-main --identity deployer
-
-# Roll out the newest main snapshot
-realms rollout -e test -t all-realms -s both -v main --identity deployer --execute --yes
-```
-
-Version label format: `main.<unix_timestamp>.<git_sha>` (e.g. `main.1749254400.a1b2c3d`).
-`-v main` always picks the newest one in that channel. `-v latest` still means the
-newest **semver** release (Casals `latest` flag), not main.
-
-### Step 2 — Rollout
-
-Upgrades/reinstalls any mix of environments × realms/infra × backend/frontend.
-```bash
-# Apply: one realm, backend only
-realms rollout -e test -t agora -s backend -v 0.4.0 --identity deployer --execute --yes
-
-# Apply: all realms, backend + frontend
-realms rollout -e test -t all-realms -s both -v 0.4.0 --identity deployer --execute --yes
-
-# Reinstall all infra (state-wiping infra needs an explicit opt-in)
-realms rollout -e test -t all-infra -m reinstall --include-infra-reinstall --execute --yes
-```
-
-Same inputs are available as a manual workflow:
-
-```bash
-gh workflow run rollout.yml \
-  -f environments=test -f targets=all-realms -f scope=both \
-  -f mode=upgrade -f version=0.4.0
-```
-
-| `rollout` flag / `rollout.yml` input | Options | Default | Notes |
-|---|---|---|---|
-| `-e` / `environments` | comma list or `all` | `test` | Skips envs with no Casals |
-| `-t` / `targets` | stand names, `all-realms`, `all-infra`, `all` | — | required |
-| `-s` / `scope` | `backend`, `frontend`, `both` | `both` | |
-| `-m` / `mode` | `upgrade`, `reinstall` | `upgrade` | `reinstall` **wipes state** |
-| `-v` / `version` | `main`, `latest`, or semver | `latest` | `main` = newest main snapshot |
-| `--execute` / `execute` | flag / bool | on | Always executes — no dry-run mode |
-| `--include-infra-reinstall` | flag / bool | off | Required to reinstall `file-registry`/`realm-registry` |
-| `--yes` / (always in CI) | flag | off | Skip confirmation prompts |
-
-### Upgrading Casals itself (the orchestrator canisters)
-
-Realms upgrades its per-network **conductor canisters** from the upstream
-[Casals](https://github.com/smart-social-contracts/casals) repo (platform provisioner).
-
-> **Different from rollout.** `rollout.yml` upgrades the realm/infra canisters
-> Casals *manages*. `casals-upgrade.yml` upgrades the **Casals orchestrator
-> canisters themselves** (`casals_backend` / `casals_frontend`) — i.e. when a new
-> version of the Casals project ships and Realms should bring that environment's
-> conductor up to it.
-
-`casals-upgrade.yml` checks out the Casals repo at a chosen ref, builds it from
-source (`make build`), points the deploy at this environment's Casals canister IDs
-(from `canister_ids.json`), and runs `icp deploy --mode upgrade` with the
-`CASALS_CI_PEM` identity (a controller of all three Casals). `upgrade` preserves
-Casals' on-chain state (orchestra tree, pool, sheet, authorized-WASM catalog).
-
-```bash
-gh workflow run casals-upgrade.yml \
-  -f environment=test -f casals_ref=main -f components=backend,frontend
-```
-
-| `casals-upgrade.yml` param | Options | Default | Notes |
-|---|---|---|---|
-| `environment` | `test`, `demo`, `staging` | `test` | Which env's Casals to upgrade |
-| `casals_ref` | git ref/tag/sha | blank (`main`) | Casals version to build |
-| `components` | `backend`, `frontend`, `file-registry` (comma list) | `backend,frontend` | See file-registry note |
-| `mode` | `upgrade`, `reinstall` | `upgrade` | `reinstall` **wipes Casals state** |
-| `i_understand_reinstall_wipes_casals` | `true`/`false` | `false` | Required to allow `reinstall` |
-
-- **`file-registry` is special here.** This project's Casals instances **reuse the
-  realms `file_registry`** (there is no separate `ic_file_registry`); that canister
-  is realms-managed infra with its own upgrade path (`publish-build.yml`
-  `family=file-registry` + `rollout.yml`). Prefer that path. Only add
-  `file-registry` to `components` if you deliberately want to push the Casals-repo
-  file_registry WASM onto it.
-- Needs the `CASALS_CI_PEM` secret (the only secret required — the Casals repo is public).
-
-### Casals canister IDs
-
-| Env | Casals backend | Casals frontend | file_registry |
-|---|---|---|---|
-| Test | `qthgp-3yaaa-aaaae-agveq-cai` | `qic2k-baaaa-aaaae-agvga-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
-| Demo | `jo3cj-faaaa-aaaac-bffea-cai` | `hvwpv-aiaaa-aaaam-ajddq-cai` | `vi64l-3aaaa-aaaae-qj4va-cai` |
-| Staging | `jj2e5-iyaaa-aaaac-bffeq-cai` | `mcqbx-hyaaa-aaaaj-qsarq-cai` | `iebdk-kqaaa-aaaau-agoxq-cai` |
-
-These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
-`canister_ids.json` (`casals_backend`/`casals_frontend`). Add new env IDs there.
-
-### Who controls what
-
-- **Orchestra canisters** (every realm + infra canister Casals manages): controlled
-  by **Casals** plus **CycleOps** (`cpbhu-5iaaa-aaaad-aalta-cai`, for cycle top-ups).
-  On **test/staging**, **`deployer`** (`ah6ac-cc73l-...`) is also a co-controller so
-  direct `dfx canister install` with fetched GOS WASM can upgrade registry/installer
-  during development. Casals remains the authoritative upgrade path before merge.
-- **Casals canisters**: controlled by `ah6ac-cc73l-...` (the `my_dev_identity_1` /
-  `deployer` key), the dedicated CI key, and a conductor Internet Identity.
-- **CI identity**: workflows use the **`CASALS_CI_PEM`** secret (a controller of all
-  three Casals), falling back to `IC_IDENTITY_PEM` if it is unset. To change a
-  controller list, call Casals' admin-only `set_canister_controllers` (it refuses to
-  drop Casals from the list unless you pass `force`).
-
-### Catalog / self-service upgrade interaction
-
-- Rollout **never** touches the realm version catalog, so it can't interfere with
-  the in-realm self-service upgrade path.
-- Publish Build only updates the catalog when `--update-catalog` is set, so by
-  default it won't feed an env a `fileregistry://` URL it can't use.
-- `release.yml` (semver release artifacts) is independent of rollout.
-
-### Casals gotchas
-
-1. **Local backend builds need a clean venv.** `basilisk` refuses to build if the
-   active Python has native (`.so`) packages. Build in an isolated venv with only
-   `ic-basilisk`, `ic-basilisk-toolkit`, `ic-python-db`, `ic-python-logging`
-   (CI runners are already clean). Set `CANISTER_CANDID_PATH=src/<canister>/<canister>.did`.
-2. **Frontend rollout is the slow part.** Casals copies the ~109-file bundle into
-   each asset canister in small batches (6 files/call, with retry) to stay inside
-   the ~5 min ingress window. Expect several minutes per realm; this is normal.
-3. **`reinstall` wipes canister state** on success (the protective snapshot is
-   dropped after a verified reinstall). Use `upgrade` unless you mean it.
-4. **Frontend builds need candid declarations** (realm/marketplace/dashboard frontends
-   built in this repo). `publish_build.py` copies the committed `src/declarations/*`
-   into each frontend's `src/lib/declarations/` before `vite build`. The GOS registry
-   frontend is prebuilt in gos-as-a-service — Realms only fetches its `dist/`.
-5. **Large files use incremental finalize.** Uploads over ~200 KB are chunked, and
-   the CLI finalizes them with `finalize_chunked_file_step` (batched, on-chain
-   hashing skipped, local sha256 passed in). The one-shot `finalize_chunked_file`
-   blows the 40 B-instruction limit (`IC0522`) on multi-MB WASMs — don't switch back.
-6. **Cycle autopilot is not guaranteed on.** Casals can auto-top-up from its treasury,
-   but autopilot may be disabled on an env, and it never *restarts* a canister that
-   already stopped from cycle starvation. A `reinstall` won't start a stopped frontend
-   either (you'll see HTTP 503 "Response Verification Error"). Fix: top up + call
-   `start_canister`, then re-`provision_assets`. Check balances with `casals cycles -e test`.
-
-See `docs/reference/CASALS_ROLLOUT.md` for the full runbook (migrating a realm,
-authorization model, cycle budget).
+`local` (a fresh replica, `build_variant: test`, test flags on) and `production`
+(`build_variant: production`, test flags off) — both in `casals.json`. The demo
+stand's `converged_when` asserts the build variant, so a wrong-variant deploy
+never converges.
 
 ---
 
@@ -815,122 +153,14 @@ CI and for demo environments that need deterministic identities.
 
 ---
 
-## Realm config via Casals arrangements (branding, registration, runtime flags)
+## Realm config (branding, registration, runtime flags)
 
-A sheet rollout stands up the canisters (code); a Casals **arrangement** configures
-them afterwards (state). As fleet operator, Realms keeps generated arrangements in
-`casals-config/arrangements/` and are **generated** — edit deployment-descriptors
-`parameters` and realm manifests, then re-run `python3 casals-config/_gen_arrangements.py`
-(never hand-edit the JSON). One arrangement per environment (`test`, `staging`, `demo`);
-`realms rollout` upserts `casals-config/arrangements/<env>.json` before applying it.
-JSON. Variants:
-
-| Arrangement | Scope | Use |
-|---|---|---|
-| `test` | all 3 realms, **full** extension set | full-fidelity test env |
-| `test-lite` | **Dominion only**, core extensions | fast single-realm iteration |
-| `test-lite-all` | **all 3 realms**, core extensions | proves a full sheet reinstall end-to-end, fast |
-
-Each realm gets an ordered set of steps (all `(text)->(text)` calls on the realm
-backend): `set_canister_config_json` (runtime flags + file-registry / frontend /
-marketplace ids) → `update_realm_config` (name / manifesto / welcome message) →
-`register_realm_from_registry` (registry canister — **external** service contract;
-registry backend is owned and released from gos-as-a-service) → `install_branding_from_registry` →
-`install_codex_from_registry` → `install_extension_from_registry` (per extension).
-Seed/activate an arrangement via `casals-upgrade.yml -f seed_arrangement=<name>`; only
-one is active at a time (seeding deactivates the others).
-
-> The **welcome message** is rendered by the `welcome` extension — it's in the full
-> `test` set but **not** in the lite extension set, so on `test-lite`/`test-lite-all`
-> the message is stored in config but has no UI. Add `welcome` to `LITE_EXTENSIONS`
-> (or use `test`) if you need it shown.
-
-### Branding (decentralized)
-
-Branding is **fully decentralized** — no central server. The create-realm wizard
-uploads the user's logo/background straight from the browser to the `file_registry`
-canister (`file-registry-client.js`), and the deploy manifest references those
-registry paths. The realm backend then pulls them and writes them to its own frontend
-asset canister via `install_branding_from_registry` (served same-origin at
-`/custom/logo.png`, `/custom/background.png`). This survives a frontend `reinstall`
-because Casals re-grants the backend `Commit` on the (wiped) asset canister during
-provisioning.
-
-The **frontend asset bundle must not include** `/custom/logo.png` or
-`/custom/background.png`. After a fresh frontend install those paths 404 until
-the founder uploads (or a sheet-realm arrangement installs branding). Host
-chrome under `/images/` is unrelated and may stay.
-
-For the demo realms, publish their source images into the registry first:
-
-```bash
-realms files publish-branding --network test          # or: deploy-files.yml -f scope=branding-only
-```
-
-Optimize source PNGs before publishing (logos ~25 KB, backgrounds <1 MB) so they stay
-under the file_registry per-file instruction limit.
-
-### Registration in the realm registry
-
-Realms must register with the **GOS realm-registry** stand to appear on its frontend
-(otherwise “No Realms”). The registry canister is owned by
-[smart-social-contracts/gos-as-a-service](https://github.com/smart-social-contracts/gos-as-a-service);
-Realms arrangements call into it via an **external service contract**
-(`register_realm_from_registry` on each realm backend → inter-canister call to
-`realm_registry_backend`). The registry keys each realm on `ic.caller()` (the realm
-backend's id), so registration is idempotent.
-
-- **User / wizard realms** register automatically — the `realm_installer` calls
-  `registry.register_realm(...)` at finalization.
-- **Demo / sheet realms** are deployed directly by Casals (bypassing the installer),
-  so the **arrangement** registers them via the backend's
-  `register_realm_from_registry(text)` step. To register an already-deployed realm
-  out-of-band, call `register_realm_with_registry` on its backend directly.
-
-## Full Platform Re-deployment (clean reinstall via Casals)
-
-Reinstalling the whole orchestra is three stages. Each stage completes before the next.
-
-```bash
-# Stage 1: Publish realm artifacts from main; registry/installer from GOS release
-gh workflow run publish-build.yml -f environment=test -f family=realm -f component=both -f from_main=true -f update_catalog=true
-python3 scripts/fetch_gos_artifacts.py --what all
-realms files publish-release --network test --family registry --version 0.1.0 \
-  --backend-wasm .external-wasms/realm_registry_backend.wasm.gz \
-  --frontend-dist .external-assets/realm_registry_frontend/dist --identity deployer
-realms files publish-release --network test --family installer --version 0.1.0 \
-  --backend-wasm .external-wasms/realm_installer.wasm.gz --identity deployer
-# repeat per Realms-built family: dashboard, marketplace, file-registry
-
-# Stage 2: Publish extension/codex bundles into file_registry
-gh workflow run deploy-files.yml -f environment=test -f scope=all
-
-# Stage 3: Reinstall via Casals, then the seeded arrangement reinstalls extensions/codices
-#          and applies runtime config. (reinstall WIPES state — intentional for a clean slate.)
-gh workflow run rollout.yml \
-  -f environments=test -f targets=all -f scope=both \
-  -f mode=reinstall -f version=main -f include_infra_reinstall=true
-```
-
-The active arrangement (seeded via `casals-upgrade.yml` `-f seed_arrangement=...` from
-`casals-config/arrangements/`) is what reinstalls extensions/codices and applies runtime
-flags after the canisters come up. See "Realm config via Casals arrangements" below for
-the arrangement variants (`test`, `staging`, `demo`, plus `test-lite` / `test-lite-all`
-for fast test iteration) and per-realm steps.
-
----
-
-## Known Canister IDs
-
-| Canister | Test | Demo | Staging |
-|---|---|---|---|
-| file_registry | `uq2mu-kaaaa-aaaah-avqcq-cai` | `vi64l-3aaaa-aaaae-qj4va-cai` | `iebdk-kqaaa-aaaau-agoxq-cai` |
-| Agora backend | `rnghe-haaaa-aaaak-qyxyq-cai` | `3bohd-2yaaa-aaaac-qcyla-cai` | `—` |
-| Agora frontend | `pqwsi-vyaaa-aaaau-agrbq-cai` | `3gpbx-xaaaa-aaaac-qcylq-cai` | `—` |
-| Dominion backend | `ku6cv-2iaaa-aaaab-agrpa-cai` | `h5vpp-qyaaa-aaaac-qai3a-cai` | `—` |
-| Dominion frontend | `2enu3-byaaa-aaaad-qlxfa-cai` | `gzya5-jyaaa-aaaac-qai5a-cai` | `—` |
-| Syntropia backend | `m2wv3-uaaaa-aaaah-quoiq-cai` | `2lbfz-yiaaa-aaaac-qcyma-cai` | `4ilhs-2iaaa-aaaac-bfsaq-cai` |
-| Syntropia frontend | `2dmsp-maaaa-aaaad-qlxfq-cai` | `2madn-vqaaa-aaaac-qcymq-cai` | `4bimo-maaaa-aaaac-bfsba-cai` |
+Canisters converge from the sheet; their *state* is configured at runtime. The
+sheet's `config_call` items (see the demo stand in `casals.json`) drive
+`set_canister_config_json` / `set_test_flags`; a portal realm gets the same
+through the installer (`configure` on the gaas side). Branding is uploaded by the
+founder from the setup wizard (or `realms files publish-branding`). Registration
+in the realm registry is done by the installer when it finishes a job.
 
 ---
 
@@ -1003,63 +233,51 @@ dfx identity use my_dev_identity_1
 
 ```bash
 realms files build --extensions <ext_id> \
-  && realms files publish --network test --extensions-only --extensions <ext_id> \
+  && realms files publish --network ic --extensions-only --extensions <ext_id> \
   && dfx canister call <backend_canister_id> install_extension_from_registry \
      '("{\"registry_canister_id\": \"<file_registry_id>\", \"ext_id\": \"<ext_id>\", \"version\": \"<version>\"}")' \
-     --network test
+     --network ic
 ```
 
 | Step | Command | Time | What it does |
 |------|---------|------|-------------|
 | Build | `realms files build --extensions <ext_id>` | ~4s | Runs `npm install && npm run build` in `frontend-rt/` |
-| Publish | `realms files publish --network test ...` | ~8s | Uploads bundle to the file_registry canister |
+| Publish | `realms files publish --network ic ...` | ~8s | Uploads bundle to the file_registry canister |
 | Install | `dfx canister call ... install_extension_from_registry` | ~14s | Backend pulls bundle from registry and installs it |
 
 **Concrete example** — `public_dashboard` on Agora (test):
 
 ```bash
 realms files build --extensions public_dashboard \
-  && realms files publish --network test --extensions-only --extensions public_dashboard \
-  && dfx canister call rnghe-haaaa-aaaak-qyxyq-cai install_extension_from_registry \
-     '("{\"registry_canister_id\": \"uq2mu-kaaaa-aaaah-avqcq-cai\", \"ext_id\": \"public_dashboard\", \"version\": \"1.3.0\"}")' \
-     --network test
+  && realms files publish --network ic --extensions-only --extensions public_dashboard \
+  && dfx canister call <realm-backend> install_extension_from_registry \
+     '("{\"registry_canister_id\": \"<file-registry>\", \"ext_id\": \"public_dashboard\", \"version\": \"1.3.0\"}")' \
+     --network ic
 ```
 
 The `install_extension_from_registry` call goes directly to the realm backend, bypassing the installer service. It fetches the bundle from the file_registry and copies the frontend files to the asset canister in one call.
 
-Same thing via CLI: `realms extension registry-install --canister <backend> --registry <file_registry> --extension-id <ext_id> --version <ver> --network test`.
+Same thing via CLI: `realms extension registry-install --canister <backend> --registry <file_registry> --extension-id <ext_id> --version <ver> --network ic`.
 Use this (not `runtime-install`) for **frontend-only** extensions such as `public_dashboard` — they have no `entry.py`.
 
 For a wizard realm, look up IDs first (do not use the Agora/Dominion/Syntropia rows below):
 
 ```bash
 # test registry backend — resolve_slug is an UPDATE (do not pass --query)
-dfx canister call yhw3g-fyaaa-aaaas-qgorq-cai resolve_slug '("<slug>")' --network test --output json
+dfx canister call <realm-registry> resolve_slug '("<slug>")' --network ic --output json
 ```
 
 **Canister IDs for the install call** (from the Known Canister IDs table and the descriptor):
 
-| Realm | Backend canister (call target) | File registry (test) |
-|-------|-------------------------------|---------------------|
-| Agora | `rnghe-haaaa-aaaak-qyxyq-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
-| Dominion | `ku6cv-2iaaa-aaaab-agrpa-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
-| Syntropia | `m2wv3-uaaaa-aaaah-quoiq-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
+Resolve the call target and the environment's file registry with `casals export`
+(the realm's ids) and `resolve_slug` on the realm registry (a portal realm's ids).
 
 **Realm frontend/backend redeploy** (changes to `src/realm_frontend/` or
-`src/realm_backend/`, not just a runtime extension bundle): sheet realms use
-[`mundus deploy`](#fast-realm-deploy-mundus--sheet-realms-only) with `--version build`
-(~90s). Wizard `/r/<slug>/` realms use the [direct path](#direct-runtime-install-no-file-registry-no-casals-installer).
-Do not default to Casals for iteration.
-
-```bash
-realms mundus deploy deployment-descriptors/staging-mundus-layered.yml \
-  --realm agora --canister frontend \
-  --skip-extensions --codices none --version build
-```
-
-This handles frontend WASM + branding; add `--extensions <ext_id>` when you also need
-to reinstall extensions. Use `--version latest` only when deploying a tagged release
-artifact, not local edits.
+`src/realm_backend/`, not just a runtime extension bundle): the demo stand
+converges from `casals up` after a rebuild; a portal realm uses the
+[direct path](#direct-runtime-install-no-file-registry-no-casals-installer) or
+`realms mundus deploy <descriptor> --version build` with the environment's ids in
+the descriptor's `infra` block.
 
 **Constraints:**
 - The extension bundle must stay under ~200KB for `files publish` to succeed (file_registry instruction limit). Keep heavy libraries (leaflet, h3-js) loaded at runtime via `fetch()` + `eval()` instead of bundling them.
@@ -1099,23 +317,23 @@ dfx identity use deployer   # or my_dev_identity_1 on test
 ```bash
 # 1. Resolve canister IDs (test registry)
 # resolve_slug is an UPDATE — do not pass --query
-dfx canister call yhw3g-fyaaa-aaaas-qgorq-cai resolve_slug \
-  '("realmtest6")' --network test --output json
+dfx canister call <realm-registry> resolve_slug \
+  '("realmtest6")' --network ic --output json
 # → backend_canister_id, frontend_canister_id
 
 # 2. Backend WASM — leftover-free pack with Cedar template only (~25s)
 python3 scripts/pack_realm_backend.py
 gzip -c .basilisk/realm_backend/realm_backend.wasm > /tmp/realm_backend.wasm.gz
 dfx canister install <backend-id> \
-  --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network test
+  --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network ic
 
 # 3. Extensions (one at a time; full resync-frontends can IC0506)
 realms files build --extensions <ext_id>
-realms files publish --network test --extensions-only --extensions <ext_id>
+realms files publish --network ic --extensions-only --extensions <ext_id>
 realms extension registry-install \
   --canister <backend-id> \
-  --registry uq2mu-kaaaa-aaaah-avqcq-cai \
-  --extension-id <ext_id> --version <ver> --network test
+  --registry <file-registry> \
+  --extension-id <ext_id> --version <ver> --network ic
 ```
 
 Do **not** wrap those IDs in a homemade mundus YAML.
@@ -1149,16 +367,10 @@ asked to redeploy a `/r/<slug>/` realm, not just the backend):
 
 **Staging canister IDs:**
 
-> Capital Agora/Dominion/Syntropia staging realms were decommissioned (IC0301); the
-> Casals-managed stands below are the current staging targets (not in `realms-staging.json`).
+> Live ids are not written down here: `casals export` (sheet stands) or the realm
+> registry's `resolve_slug` (portal realms) give the current ones.
 
-| Stand | Backend | Frontend |
-|---|---|---|
-| TestSyntropia001 | `4ilhs-2iaaa-aaaac-bfsaq-cai` | `4bimo-maaaa-aaaac-bfsba-cai` |
-| TestSyntropia1 | `icuo5-5aaaa-aaaac-bfrxa-cai` | `ifvij-qyaaa-aaaac-bfrxq-cai` |
-| DemoSyntropia1 | `ritsw-2yaaa-aaaac-bftlq-cai` | `qf5wy-vqaaa-aaaac-bftma-cai` |
-
-**Full example — justice courts on staging TestSyntropia001 (verified Aug 2026):**
+**Full example — justice courts on a portal realm (verified Aug 2026):**
 
 ```bash
 cd /path/to/realms
@@ -1166,22 +378,22 @@ cd /path/to/realms
 # 1. Backend WASM — leftover-free pack with Cedar template only (~25s)
 python3 scripts/pack_realm_backend.py
 gzip -c .basilisk/realm_backend/realm_backend.wasm > /tmp/realm_backend.wasm.gz
-dfx canister install 4ilhs-2iaaa-aaaac-bfsaq-cai \
-  --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network staging
+dfx canister install <realm-backend> \
+  --wasm /tmp/realm_backend.wasm.gz --mode upgrade --network ic
 
 # 2. Codex (seeds court hierarchy via init → seed_justice)
 realms codex runtime-install \
-  --canister 4ilhs-2iaaa-aaaac-bfsaq-cai \
+  --canister <realm-backend> \
   --source-dir codices/codices/syntropia \
-  --network staging --run-init
+  --network ic --run-init
 
 # 3. Extension (backend + frontend bundle + initialize hook)
 realms files build --extensions justice_litigation   # build frontend-rt/dist first
 realms extension runtime-install \
-  --canister 4ilhs-2iaaa-aaaac-bfsaq-cai \
+  --canister <realm-backend> \
   --source-dir extensions/extensions/justice_litigation \
-  --frontend-canister 4bimo-maaaa-aaaac-bfsba-cai \
-  --network staging
+  --frontend-canister <realm-frontend> \
+  --network ic
 ```
 
 Repeat steps 2–3 on TestSyntropia1 or DemoSyntropia1 using the backend/frontend IDs
@@ -1200,9 +412,9 @@ from the table above (same `--source-dir codices/codices/syntropia`).
 |---|---|
 | Wizard / portal realm (`/r/<slug>/`), or user said **fast off-chain** | **Direct runtime install** (this section) — look up IDs with `resolve_slug` |
 | Single-realm dev iteration, registry or installer down | **Direct runtime install** (this section) |
-| Sheet realm (Agora/Dominion/Syntropia) and installer is healthy | [`mundus deploy`](#fast-realm-deploy-mundus--sheet-realms-only) (~90s) |
+| The demo stand of `casals.json` | rebuild, then `casals up` (docs/OPERATIONS.md) |
 | Extension-only change, registry healthy | [Fast Remote Extension Deploy](#fast-remote-extension-deploy-26s) above |
-| Quarters / multi-realm / pre-merge authoritative deploy | `deploy-files` → registry install → Casals rollout |
+| Quarters / multi-realm / pre-merge authoritative deploy | `deploy-files` → registry install → `casals up` |
 
 `realms extension resync-frontends` can hit `IC0506` (no reply) when many bundles copy at once. Restore the missing extension with `registry-install` instead.
 
@@ -1219,8 +431,8 @@ quarter bootstrap can pull the new packages.
 
    ```bash
    # Staging realm_registry_backend canister (authoritative ID table: gos-as-a-service)
-   dfx canister call 7wzxh-wyaaa-aaaau-aggyq-cai list_realms '()' \
-     --network staging --query | grep -i manualtest
+   dfx canister call <realm-registry> list_realms '()' \
+     --network ic --query | grep -i manualtest
    ```
 
    Then pass those IDs to `--canister` / `--frontend-canister`.
@@ -1240,12 +452,12 @@ quarter bootstrap can pull the new packages.
    ```bash
    # Verify what the loader will use:
    dfx canister call <backend-id> get_extension_frontend_info \
-     '("{\"extension_id\": \"justice_litigation\"}")' --network staging --query
+     '("{\"extension_id\": \"justice_litigation\"}")' --network ic --query
 
    # Should return the new version. If not, patch _source.json:
    dfx canister call <backend-id> install_extension \
-     '("{\"extension_id\":\"justice_litigation\",\"files\":{\"_source.json\":\"{\\\"registry_canister_id\\\":\\\"iebdk-kqaaa-aaaau-agoxq-cai\\\",\\\"version\\\":\\\"0.4.0\\\"}\"}}")' \
-     --network staging
+     '("{\"extension_id\":\"justice_litigation\",\"files\":{\"_source.json\":\"{\\\"registry_canister_id\\\":\\\"<file-registry>\\\",\\\"version\\\":\\\"0.4.0\\\"}\"}}")' \
+     --network ic
    ```
 
    Hard-refresh the browser (Ctrl+Shift+R). In DevTools → Network, confirm the
@@ -1299,7 +511,7 @@ panics on the conflict. **Unset both** and use a color-capable TERM:
 
 ```bash
 env -u NO_COLOR -u FORCE_COLOR TERM=xterm-256color DFX_WARNING=-mainnet_plaintext_identity \
-  realms files publish --network staging --extensions-only --extensions <ext_id>
+  realms files publish --network ic --extensions-only --extensions <ext_id>
 ```
 
 Counter-intuitively, `NO_COLOR=1` / `TERM=dumb` does **not** reliably avoid the panic
@@ -1432,7 +644,7 @@ if [ -n "${DEMO_IDENTITY1_PEM_B64:-}" ]; then
     --storage plaintext -f "${extra[@]}"
 fi
 # then, from the realms checkout that has `realms new`:
-# realms new spec.json --identity demo_identity1 --network demo --yes
+# realms new spec.json --identity demo_identity1 --network ic --yes
 ```
 
 PEM without the delegation JSON is a **different principal** than II. The
@@ -1628,13 +840,11 @@ until updated manually or re-provisioned.
 
 ## Rules
 
-- **Default deploy path for sheet realms** (Agora, Dominion, Syntropia): `realms
-  mundus deploy` with `--version build` (~90s) **only if the installer is healthy**.
+- **Default deploy path**: the sheet. Rebuild, then `casals up` (docs/OPERATIONS.md);
+  never an imperative `dfx canister install` on a canister the conductor controls.
   For a wizard/portal realm (`/r/<slug>/`) or when the user says **fast off-chain**,
   use [direct runtime install](#direct-runtime-install-no-file-registry-no-casals-installer)
-  — never a homemade mundus YAML. Casals (`publish-build.yml` + `rollout.yml`) is for
-  **pre-merge / authoritative** rollouts only — frontend rollout there is slow
-  (several minutes per realm). **Registry/installer:** fetch prebuilt artifacts from
+  — never a homemade mundus YAML. **Registry/installer:** fetch prebuilt artifacts from
   gos-as-a-service (`scripts/fetch_gos_artifacts.py`) — **building registry from
   source in this repo is no longer possible**. **Other infra:** `scripts/infra_dev_deploy.sh`
   or `publish_build.py` for file_registry, marketplace, dashboard. **Extensions:**
@@ -1645,9 +855,6 @@ until updated manually or re-provisioned.
   current checkout. Docs or code edits wait for an explicit “commit / branch /
   PR” instruction. A Cloud agent’s default git policy does **not** override this.
 - Always use `mode=upgrade` for production/test deploys (`reinstall` wipes state).
-- Always scope rollouts as narrowly as possible:
-  - **Target:** `-f targets=agora` — roll out one realm, not `all-realms`.
-  - **Scope:** `-f scope=frontend` or `-f scope=backend` — skip the half you didn't change.
 - Prefer **`icp identity default <name>`** for identity selection. Realms still has
   unmigrated dfx paths: use **`dfx identity use <name>`** there. The
   deployer identity is `deployer`.
@@ -1668,7 +875,7 @@ The `@Browser` tool (Cursor IDE browser tab) works with ICP canister frontends. 
 **Gotcha — test mode identity is stateful**: the test environment uses `TEST_MODE_II_BYPASS=true`, which auto-logs-in with a deterministic hardcoded identity (seed `0xED, 0x57` → principal `2eqns-rmzes-...`). This identity is the **same across all browser sessions**. If a previous test activated, modified, or consumed resources for that principal, subsequent sessions will see the post-modification state. Before concluding a feature is broken, check whether the test identity's on-chain state already reflects a previous test run:
 
 ```bash
-dfx canister call <canister_id> is_principal_activated '("2eqns-rmzes-7npxw-dxpw2-qdy2s-mw6ix-svdo2-oya7o-a6ldc-sqgwh-bqe")' --network test
+dfx canister call <canister_id> is_principal_activated '("<principal>")' --network ic
 ```
 
 **Gotcha — extension UIs live in an iframe**: runtime extensions render inside
@@ -1767,10 +974,9 @@ await target.locator("text=Advanced").first.click()
 ## Further Reading
 
 - [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — Deployment decision tree (Casals, mundus, extensions, release)
-- `AGENTS.md` — Agent/operator guide (deploy paths, canister IDs, fast iteration)
+- `AGENTS.md` — Agent/operator guide (deploy paths, fast iteration)
 - [Cursor Cloud specific instructions](#cursor-cloud-specific-instructions) — named env (Environment2) vs Task `environment: cloud`, plaintext PEM, `icp` replica flags, Playwright Chrome path
 - `docs/OPERATIONS.md` — Product orchestra (`casals up` on `casals.json`, `*.realmsgos.org`)
-- `docs/reference/CASALS_ROLLOUT.md` — On-chain (Casals) deploy & upgrade runbook
 - `docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md` — Layered deploy runbook
 - `docs/reference/EXTENSION_ARCHITECTURE.md` — Extension lifecycle
 - `docs/reference/PRIVATE_DATA_SHARING.md` — End-to-end encrypted, consent-based data sharing for extensions (own entity + scope kind + `ctx.crypto`)

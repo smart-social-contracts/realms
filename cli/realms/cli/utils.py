@@ -22,6 +22,10 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 from rich.table import Table
 from rich.text import Text
 
+# The IC's public Candid UI (a DFINITY-run system canister, identical on every
+# mainnet alias). Not an environment id: our ids come from casals.json.
+IC_CANDID_UI = "rxs6w-5qaaa-aaaah-avp2a-cai"
+
 console = Console()
 stderr_console = Console(stderr=True)  # For warnings/errors that shouldn't pollute JSON output
 
@@ -1385,7 +1389,7 @@ def get_canister_urls(
                             canister_info["url"] = f"https://{canister_id}.icp0.io/"
                         else:
                             # For backends on IC, use Candid UI
-                            canister_info["url"] = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={canister_id}"
+                            canister_info["url"] = f"https://{IC_CANDID_UI}.icp0.io/?id={canister_id}"
                     
                     canisters[canister_name] = canister_info
                     
@@ -1471,7 +1475,7 @@ def display_canister_urls_json(
             if network == "local" and candid_ui_id:
                 url = f"http://127.0.0.1:{port}/?canisterId={candid_ui_id}&id={canister_id}"
             elif network in ["staging", "ic", "mainnet"]:
-                url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={canister_id}"
+                url = f"https://{IC_CANDID_UI}.icp0.io/?id={canister_id}"
             else:
                 url = info.get("url", "")
         
@@ -1523,7 +1527,7 @@ def is_canister_id(value: str) -> bool:
     """Check if a string looks like a canister ID (principal).
     
     Canister IDs are typically 27 characters with dashes, like:
-    2lbfz-yiaaa-aaaac-qcyma-cai
+    xxxxx-xxxxx-xxxxx-xxxxx-cai
     
     Args:
         value: String to check
@@ -1552,7 +1556,7 @@ def resolve_realm_ref_to_canister_id(
     Otherwise, queries the registry to find a realm by name.
     
     Args:
-        realm_ref: Realm canister ID or name (e.g., "Dominion" or "2lbfz-yiaaa-aaaac-qcyma-cai")
+        realm_ref: Realm canister ID or name (e.g., "Dominion" or "xxxxx-xxxxx-xxxxx-xxxxx-cai")
         network: Network to query the registry on
         registry_canister_id: Optional override for registry canister ID
         

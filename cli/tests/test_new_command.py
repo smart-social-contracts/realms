@@ -1,6 +1,5 @@
 """Unit tests for ``realms new`` (issue #389). No replica / live IC."""
 
-import ast
 import json
 import re
 from pathlib import Path
@@ -982,33 +981,12 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _lite_extensions() -> list:
-    """LITE_EXTENSIONS from the Casals arrangement generator, without importing it."""
-    source = (_repo_root() / "casals-config" / "_gen_arrangements.py").read_text(
-        encoding="utf-8"
-    )
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Assign) and any(
-            getattr(t, "id", "") == "LITE_EXTENSIONS" for t in node.targets
-        ):
-            return ast.literal_eval(node.value)
-    raise AssertionError("LITE_EXTENSIONS not found in _gen_arrangements.py")
-
-
 def test_wizard_chrome_is_the_shell_not_a_codex():
     agora_deps = _local_manifest_dependencies("agora")
     for chrome in WIZARD_CHROME_EXTENSIONS:
         assert chrome not in agora_deps
     # The realm shell needs its own settings page; no codex declares it.
     assert "realm_settings" in WIZARD_CHROME_EXTENSIONS
-
-
-def test_wizard_chrome_matches_sheet_realm_default_set():
-    """Wizard realms get what Casals gives sheet realms, minus demo-only toys."""
-    assert set(WIZARD_CHROME_EXTENSIONS) == set(_lite_extensions()) - {
-        "demo_simulator",
-        "hello_world",
-    }
 
 
 def test_cli_and_wizard_carry_no_token_ledger_table():

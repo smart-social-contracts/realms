@@ -112,7 +112,6 @@ Options:
   --identity TEXT           Identity PEM file or dfx identity name
   -m, --mode TEXT           Deploy mode: 'auto', 'upgrade' or 'reinstall'
   --plain-logs              Show full verbose output instead of progress UI
-  --descriptor TEXT         Deploy from a YAML descriptor (see deployments/)
 ```
 
 **Examples:**
@@ -122,9 +121,6 @@ realms realm deploy
 
 # Deploy to IC mainnet with a specific identity
 realms realm deploy --network ic --identity ~/.config/dfx/identity/production/identity.pem
-
-# Deploy from a descriptor file (layered architecture)
-realms realm deploy --descriptor deployments/staging-mundus-layered.yml
 ```
 
 ### `realms registry create`
@@ -185,8 +181,8 @@ Each generated realm folder contains a `manifest.json` describing the realm:
 }
 ```
 
-For multi-realm (mundus) deployments, see the manifests under
-`examples/demo/` and the YAML descriptors under `deployments/`.
+For the fleet itself (marketplace, file registry, token, NFT, demo realm) see
+`casals.json` and `docs/OPERATIONS.md`; realm manifests live under `examples/demo/`.
 
 ### Configuration Schema
 

@@ -3,15 +3,15 @@ name: Publish Files to File Registry
 on:
   workflow_dispatch:
     inputs:
+      # The file_registry id is the operator inventory's
+      # (canister_ids.json[file_registry][environment], written by `casals export`).
       environment:
-        description: "Target environment"
+        description: "Environment / dfx network"
         required: true
         type: choice
-        default: staging
+        default: production
         options:
-          - test
-          - staging
-          - demo
+          - production
 
       scope:
         description: "What to publish"
@@ -33,12 +33,6 @@ on:
         description: "Specific codices to publish, comma-separated (leave blank for all)"
         required: false
         default: ""
-
-      reinstall:
-        description: "Wipe file registry first (reinstall canister)"
-        required: false
-        type: boolean
-        default: false
 
       ref:
         description: "Branch/commit (defaults to main)"
@@ -63,7 +57,6 @@ jobs:
           echo "Scope:       ${{ inputs.scope }}"
           echo "Extensions:  ${{ inputs.extensions || '(all)' }}"
           echo "Codices:     ${{ inputs.codices || '(all)' }}"
-          echo "Reinstall:   ${{ inputs.reinstall }}"
           echo "Ref:         ${{ inputs.ref || github.ref }}"
 
       - uses: actions/checkout@v4
@@ -115,13 +108,6 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
-      - name: Reset file registry canister
-        if: inputs.reinstall
-        run: |
-          realms files reset \
-            --network "${{ inputs.environment }}" \
-            --identity ci
-
       - name: Publish to file registry
         if: ${{ inputs.scope != 'branding-only' }}
         run: |
@@ -171,5 +157,4 @@ jobs:
           echo " Scope:       ${{ inputs.scope }}"
           echo " Extensions:  ${{ inputs.extensions || '(all)' }}"
           echo " Codices:     ${{ inputs.codices || '(all)' }}"
-          echo " Reinstall:   ${{ inputs.reinstall }}"
           echo "═══════════════════════════════════════"

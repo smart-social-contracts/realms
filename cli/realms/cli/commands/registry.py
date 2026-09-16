@@ -137,7 +137,7 @@ def registry_list_command(
 
 
 def _is_canister_id(value: str) -> bool:
-    """Check if a string looks like a canister ID (e.g., h5vpp-qyaaa-aaaac-qai3a-cai)."""
+    """Check if a string looks like a canister ID (e.g., xxxxx-xxxxx-xxxxx-xxxxx-cai)."""
     import re
     # Canister IDs are typically 27 chars with dashes, ending in -cai
     return bool(re.match(r'^[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{3}$', value))
@@ -826,16 +826,8 @@ def billing_redeem_voucher_command(
 
 # ============== Queue-based realm deployment (registry + installer) ==============
 
-_REGISTRY_QUEUE_IDS = {
-    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
-    "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
-    "test": "yhw3g-fyaaa-aaaas-qgorq-cai",
-}
-_INSTALLER_QUEUE_IDS = {
-    "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
-    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
-    "test": "fltjm-tyaaa-aaaap-qunhq-cai",
-}
+# The queue canisters (realm-registry + realm-installer) are named by the caller:
+# `casals export` lists them per environment. No per-network table lives here.
 
 
 def _dfx_canister_call_text(
@@ -884,11 +876,11 @@ def realm_deploy_realm_command(
     registry_canister: Optional[str] = None,
 ) -> None:
     """Enqueue realm deployment via realm_registry_backend.request_deployment (dfx caller = payer)."""
-    registry_id = registry_canister or _REGISTRY_QUEUE_IDS.get(network)
+    registry_id = (registry_canister or "").strip()
     if not registry_id:
         console.print(
-            f"[red]❌ No default registry canister for network '{network}'. "
-            f"Use --registry-canister.[/red]"
+            "[red]❌ --registry-canister is required: the realm-registry id of the "
+            f"environment on '{network}' (see `casals export`).[/red]"
         )
         raise typer.Exit(1)
 
@@ -944,11 +936,11 @@ def realm_deploy_status_command(
     max_wait: int = 900,
 ) -> None:
     """Poll realm_installer.get_deployment_job_status for a queue job_id."""
-    installer_id = installer_canister or _INSTALLER_QUEUE_IDS.get(network)
+    installer_id = (installer_canister or "").strip()
     if not installer_id:
         console.print(
-            f"[red]❌ No default installer for network '{network}'. "
-            f"Use --installer-canister.[/red]"
+            "[red]❌ --installer-canister is required: the realm-installer id of the "
+            f"environment on '{network}' (see `casals export`).[/red]"
         )
         raise typer.Exit(1)
 

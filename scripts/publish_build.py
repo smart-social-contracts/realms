@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
-"""Build and publish a realm/infra artifact into one environment.
+"""Build and publish a realm/infra artifact into an environment's file_registry.
+
+The installer serves realms from the file_registry (``realm-backend@<version>``,
+``realm-assets@<version>``), so a release publishes there. Which registry is the
+caller's business: ``--file-registry <id>`` or the operator inventory
+(``canister_ids.json``, written by ``casals export``) keyed by ``--environment``.
+No per-network table lives here.
 
 Two version modes:
 
   **Release** — explicit semver (``0.4.0``), for tagged releases::
 
-      python3 scripts/publish_build.py --environment test --family realm \\
+      python3 scripts/publish_build.py --environment production --family realm \\
           --component both --version 0.4.0 --identity deployer
 
   **Main snapshot** — current git checkout, no release bump::
 
-      python3 scripts/publish_build.py --environment test --family realm \\
+      python3 scripts/publish_build.py --environment production --family realm \\
           --component both --from-main --identity deployer
 
-Main snapshots are published as ``main.<unix_ts>.<git_sha>`` and rolled out with
-``realms rollout -v main``.
-
-Coexistence: catalog update is off by default (``--update-catalog`` only for
-Casals-only envs).
+Main snapshots are published as ``main.<unix_ts>.<git_sha>``.
 """
 
 import argparse
@@ -37,10 +39,8 @@ _CERTIFIED_ASSETS_WASM_URL = (
 )
 _CERTIFIED_ASSETS_WASM_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
 
-# Per-environment canister IDs (imported from the installed CLI to stay in sync).
 from realms.cli.casals_versions import git_short_sha, main_build_version  # noqa: E402
-from realms.cli.commands.files import _registry_from_canister_ids, file_registry_id_for  # noqa: E402
-from realms.cli.commands.rollout import _CASALS_IDS  # noqa: E402
+from realms.cli.commands.files import file_registry_id_for  # noqa: E402
 
 # Keep test-variant labels out of the production ``main.*`` channel (``-v main``).
 TEST_MAIN_CHANNEL_PREFIX = "main-test"
@@ -301,7 +301,17 @@ def parse_build_variant_label(labeled: str) -> tuple[str, str]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--environment", required=True, help="test | staging | demo")
+    ap.add_argument(
+        "--environment",
+        required=True,
+        help="environment / dfx network name (e.g. production, local); also the "
+        "canister_ids.json key used when --file-registry is not given",
+    )
+    ap.add_argument(
+        "--file-registry",
+        default=None,
+        help="file_registry canister id (default: canister_ids.json[file_registry][<environment>])",
+    )
     ap.add_argument("--family", required=True, help=f"one of: {', '.join(FAMILIES)}")
     ap.add_argument(
         "--component", default="both", choices=["backend", "frontend", "both"]
@@ -317,11 +327,6 @@ def main():
     ap.add_argument("--identity", default=None)
     ap.add_argument(
         "--assets-wasm", default=None, help="override certified-assets WASM path"
-    )
-    ap.add_argument(
-        "--update-catalog",
-        action="store_true",
-        help="also record the version in the realm catalog (Casals-only envs)",
     )
     ap.add_argument(
         "--variant",
@@ -341,12 +346,12 @@ def main():
     build_variant = args.variant
 
     env = args.environment
-    casals = _CASALS_IDS.get(env)
-    file_registry = _registry_from_canister_ids(env) or file_registry_id_for(env)
-    if not casals:
-        sys.exit(f"no Casals instance configured for '{env}'")
+    file_registry = (args.file_registry or "").strip() or file_registry_id_for(env)
     if not file_registry:
-        sys.exit(f"no file_registry configured for '{env}'")
+        sys.exit(
+            f"no file_registry for '{env}': pass --file-registry <id> or add it to "
+            "canister_ids.json (casals export)"
+        )
 
     spec = FAMILIES[args.family]
     want_backend = args.component in ("backend", "both") and spec["backend"]
@@ -399,8 +404,6 @@ def main():
         version,
         "--registry",
         file_registry,
-        "--casals",
-        casals,
     ]
     if backend_wasm:
         cmd += ["--backend-wasm", str(backend_wasm)]
@@ -412,10 +415,7 @@ def main():
         cmd += ["--identity", args.identity]
 
     _run(cmd, cwd=root)
-    print(f"\npublish_build complete (version={version}).")
-    print(
-        f"  rollout: realms rollout -e {env} -t <targets> -s {args.component} -v main --execute"
-    )
+    print(f"\npublish_build complete (version={version}, file_registry={file_registry}).")
 
 
 if __name__ == "__main__":

@@ -123,49 +123,21 @@
       "type": "custom",
       "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.did",
       "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.wasm",
-      "remote": {
-        "id": {
-          "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
-          "test": "d4lwa-ciaaa-aaaas-amxkq-cai",
-          "staging": "cweu2-ayaaa-aaaas-amxnq-cai"
-        }
-      },
       "init_arg": "(record { name = \"Simple Token\"; symbol = \"SMPL\"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt true })"
     },
     "token_frontend": {
       "type": "assets",
-      "source": [],
-      "remote": {
-        "id": {
-          "demo": "xglmt-7aaaa-aaaah-qq3yq-cai",
-          "test": "b5scz-gaaaa-aaaas-amxha-cai",
-          "staging": "cddfx-bqaaa-aaaas-amxoa-cai"
-        }
-      }
+      "source": []
     },
     "nft_backend": {
       "type": "custom",
       "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.did",
       "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm",
-      "remote": {
-        "id": {
-          "demo": "6hrip-iiaaa-aaaaf-qdoha-cai",
-          "test": "dvi54-uaaaa-aaaas-amxla-cai",
-          "staging": "cecdd-miaaa-aaaas-amxoq-cai"
-        }
-      },
       "init_arg": "(record { name = \"Land NFT\"; symbol = \"LAND\"; description = opt \"Land ownership NFT for realm\"; supply_cap = opt 10000 : opt nat; test = opt true })"
     },
     "nft_frontend": {
       "type": "assets",
-      "source": [],
-      "remote": {
-        "id": {
-          "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai",
-          "test": "dhokf-yqaaa-aaaas-amxia-cai",
-          "staging": "cnbi7-2aaaa-aaaas-amxpa-cai"
-        }
-      }
+      "source": []
     },
     "marketplace_backend": {
       "build": "python -m basilisk marketplace_backend src/marketplace_backend/main.py",
@@ -202,14 +174,7 @@
         "src/platform_dashboard_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "platform_dashboard_frontend",
-      "remote": {
-        "id": {
-          "demo": "rxtxq-kyaaa-aaaac-qgora-cai",
-          "staging": "dpgu3-wqaaa-aaaau-agqoa-cai",
-          "test": "em2mz-rqaaa-aaaag-ayt7q-cai"
-        }
-      }
+      "workspace": "platform_dashboard_frontend"
     },
     "mock_cycleops": {
       "candid": "scripts/cycleops/mock_cycleops/mock_cycleops.did",

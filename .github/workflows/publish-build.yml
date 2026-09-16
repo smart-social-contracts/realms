@@ -1,8 +1,10 @@
-# publish-build.yml — build and publish a realm/infra release into one
-# environment's file_registry + Casals (manually triggered).
+# publish-build.yml — build and publish a realm/infra release into an
+# environment's file_registry (manually triggered).
 #
-# This does NOT deploy to any realm. It only publishes + authorizes artifacts;
-# use the "Rollout" workflow (rollout.yml) afterwards to upgrade canisters.
+# This does NOT deploy to any canister: the installer serves new realms from
+# the file_registry, and existing canisters converge via `casals up` from
+# casals.json (docs/OPERATIONS.md). The registry id comes from the operator
+# inventory (canister_ids.json) unless file_registry is given.
 
 name: Publish Build
 
@@ -10,14 +12,16 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment"
+        description: "Environment / dfx network (also the canister_ids.json key)"
         required: true
         type: choice
-        default: test
+        default: production
         options:
-          - test
-          - staging
-          - demo
+          - production
+      file_registry:
+        description: "file_registry canister id (blank = canister_ids.json[file_registry][environment])"
+        required: false
+        default: ""
       family:
         description: "Artifact family"
         required: true
@@ -43,11 +47,6 @@ on:
         default: ""
       from_main:
         description: "Publish current checkout as main.<ts>.<sha> instead of a semver"
-        required: false
-        type: boolean
-        default: false
-      update_catalog:
-        description: "Also record the version in the realm catalog (Casals-only envs)"
         required: false
         type: boolean
         default: false
@@ -94,10 +93,9 @@ jobs:
 
       - name: Configure dfx identity (Casals CI key)
         env:
-          # Publishing uploads artifacts to file_registry (auto-grants the
-          # caller as publisher on a new namespace) and authorizes WASMs in
-          # Casals (controller-only). The dedicated Casals CI key is a Casals
-          # controller, so it can do both. Falls back to IC_IDENTITY_PEM.
+          # Publishing uploads artifacts to the file_registry; the key must be
+          # a registry publisher there (Casals grant_registry_publisher).
+          # Falls back to IC_IDENTITY_PEM.
           CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
           IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
         run: |
@@ -131,7 +129,7 @@ jobs:
             fi
             ARGS+=(--version "${{ inputs.version }}")
           fi
-          if [ "${{ inputs.update_catalog }}" = "true" ]; then
-            ARGS+=(--update-catalog)
+          if [ -n "${{ inputs.file_registry }}" ]; then
+            ARGS+=(--file-registry "${{ inputs.file_registry }}")
           fi
           python3 scripts/publish_build.py "${ARGS[@]}"

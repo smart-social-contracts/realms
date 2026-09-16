@@ -648,6 +648,6 @@ dfx canister logs realm_backend
 
 ## See Also
 
-- [Casals Rollout](./CASALS_ROLLOUT.md) — Deployment process (`AGENTS.md` in repo root)
+- [Operations](../OPERATIONS.md) — Deployment process (`AGENTS.md` in repo root)
 - [API Reference](./API_REFERENCE.md) - API documentation
 - [CLI Reference](./CLI_REFERENCE.md) - Command reference

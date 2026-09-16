@@ -10,7 +10,7 @@ from rich.table import Table
 
 from .commands.create import create_command
 from .commands.db import db_command, db_find_command, db_get_command, db_schema_command
-from .commands.deploy import deploy_command, deploy_from_descriptor
+from .commands.deploy import deploy_command
 from .commands.import_data import import_data_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command, codex_command
@@ -21,7 +21,7 @@ from .commands.marketplace import (
     marketplace_deploy_command,
     marketplace_status_command,
 )
-from .commands.mundus import mundus_deploy_descriptor_command, mundus_deploy_new_command
+from .commands.mundus import mundus_deploy_descriptor_command
 from .commands.files import (
     files_build_command,
     files_publish_assistant_command,
@@ -30,7 +30,6 @@ from .commands.files import (
     files_publish_release_command,
     files_reset_command,
 )
-from .commands.rollout import rollout_command
 from .commands.quarter import (
     quarter_create_command,
     quarter_list_command,
@@ -60,6 +59,7 @@ from .commands.new import new_command
 from .constants import MAX_BATCH_SIZE, REALM_FOLDER
 from .runlog import print_log_path, start_run_log, stop_run_log
 from .utils import (
+    IC_CANDID_UI,
     check_dependencies,
     display_info_panel,
     get_current_network,
@@ -499,106 +499,46 @@ def new(
 
 @app.command("deploy", rich_help_panel="Lifecycle")
 def deploy(
-    descriptor: Optional[str] = typer.Argument(
-        None,
-        help="Path to deployment descriptor YAML file (e.g. deployments/staging-mundus.yml)",
-    ),
-    subtypes: Optional[str] = typer.Option(
-        None, "--subtypes", "-s",
-        help="Override subtypes: backend, frontend, all, token, nft, marketplace",
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n",
+        help="dfx network (default: local)",
     ),
     mode: Optional[str] = typer.Option(
         None, "--mode", "-m",
-        help="Override deploy mode: upgrade, reinstall",
-    ),
-    network: Optional[str] = typer.Option(
-        None, "--network", "-n",
-        help="Override target network: local, staging, demo, test, ic",
+        help="Deploy mode: auto, upgrade, reinstall",
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", "-i",
         help="Identity name or PEM file path for deployment",
     ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run",
-        help="Print deployment plan without executing",
-    ),
     folder: Optional[str] = typer.Option(
         None, "--folder", "-f",
-        help="[Classic mode] Path to realm folder (used when no descriptor given)",
+        help="Path to a generated realm folder (auto-detected under the realms folder)",
     ),
     clean: bool = typer.Option(
         False, "--clean",
-        help="[Classic mode] Clean deployment (wipes state)",
+        help="Clean deployment (wipes state)",
     ),
     plain_logs: bool = typer.Option(
         False, "--plain-logs",
-        help="[Classic mode] Show full verbose output instead of progress UI",
+        help="Show full verbose output instead of progress UI",
     ),
     registry: Optional[str] = typer.Option(
         None, "--registry",
-        help="[Classic mode] Registry canister ID for realm registration",
+        help="Registry canister ID for realm registration",
     ),
 ) -> None:
-    """Deploy realms using a deployment descriptor or classic folder-based deploy.
+    """dfx-deploy a generated realm folder to a local replica.
 
     \b
-    DESCRIPTOR MODE (recommended):
-      realms deploy <descriptor.yml> [--subtypes X] [--mode X] [--identity X]
+      realms deploy --folder ./my_realms/realm_dominion
+      realms deploy --folder ./my_realms/realm_dominion --mode reinstall
+
     \b
-    CLASSIC MODE (legacy):
-      realms deploy --folder <path> --network <net> [--mode X] [--identity X]
-    \b
-    EXAMPLES:
-    \b
-      # Full mundus deploy to staging
-      realms deploy deployments/staging-mundus.yml
-    \b
-      # Backend-only hotfix for Agora
-      realms deploy deployments/staging-realm2-backend.yml
-    \b
-      # Frontend-only redeploy for Dominion
-      realms deploy deployments/staging-realm1-frontend.yml
-    \b
-      # Override subtypes at deploy time
-      realms deploy deployments/staging-mundus.yml --subtypes backend
-    \b
-      # Dry run (print plan without executing)
-      realms deploy deployments/staging-mundus.yml --dry-run
-    \b
-      # Force reinstall instead of upgrade
-      realms deploy deployments/staging-realm1-backend.yml --mode reinstall
-    \b
-      # Classic folder-based deploy (legacy)
-      realms deploy --folder ./my_realms/realm_dominion --network staging
-    \b
-    DESCRIPTORS:
-      YAML files in deployments/ define what to deploy declaratively.
-      See deployment_file_example.yml for the full schema.
-      Create new descriptors by copying an existing one and adjusting fields.
-    \b
-    AVAILABLE DESCRIPTORS:
-      staging-mundus.yml            Full mundus (all realms + registry) to staging
-      demo-mundus.yml               Full mundus to demo
-      staging-realm1-backend.yml    Backend hotfix for Dominion (realm1) on staging
-      staging-realm2-backend.yml    Backend hotfix for Agora (realm2) on staging
-      staging-realm3-backend.yml    Backend hotfix for Syntropia (realm3) on staging
-      staging-realm1-frontend.yml   Frontend fix for Dominion (realm1) on staging
-      staging-registry.yml          Registry deployment to staging
-    \b
-    See: https://github.com/smart-social-contracts/realms/issues/160
+    Fleet environments are converged by `casals up` from casals.json
+    (docs/OPERATIONS.md); new realms on a live GOS go through
+    `realms new --gaas-config`.
     """
-    if descriptor:
-        deploy_from_descriptor(
-            descriptor_path=descriptor,
-            subtypes_override=subtypes,
-            network_override=network,
-            mode_override=mode,
-            identity=identity,
-            dry_run=dry_run,
-        )
-        return
-    # Classic mode fallback
     deploy_command(
         config_file=None,
         folder=folder,
@@ -707,7 +647,7 @@ app.add_typer(mundus_app, name="mundus", rich_help_panel="Lifecycle")
 @mundus_app.command("deploy")
 def mundus_deploy(
     descriptor: str = typer.Argument(
-        ..., help="Path to mundus descriptor YAML (e.g. deployment-descriptors/staging-mundus-layered.yml)"
+        ..., help="Path to a mundus descriptor YAML (network, infra ids, parameters, realms)"
     ),
     network: str = typer.Option(
         "", "--network", "-n", help="Override network from descriptor"
@@ -739,27 +679,30 @@ def mundus_deploy(
         help="Realm build variant: production or test (default: test on test network, production otherwise)",
     ),
 ) -> None:
-    """Deploy realm canisters from a mundus descriptor.
+    """Redeploy existing realms through the GOS queue from a mundus descriptor.
+
+    \b
+    The descriptor carries everything environment-specific — the CLI holds no
+    per-network table:
+      network: ic
+      infra:
+        registry_canister_id: <realm-registry>     # from `casals export`
+        installer_canister_id: <realm-installer>
+        file_registry_canister_id: <file-registry>
+        ii_derivation_origin: https://gos.earth    # optional
+      parameters: {TEST_MODE: false}               # optional test flags
+      mundus:
+        - name: agora
+          canister_id: <backend>
+          frontend_canister_id: <frontend>
+          manifest: realms/agora/manifest.json
 
     \b
     Examples:
-      # Deploy all realms (full mundus)
-      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml
-
-      # Deploy only the Dominion realm
-      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --realm dominion
-
-      # Deploy only the backend canister of Agora
-      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --realm agora --canister backend
-
-      # Frontend-only redeploy, skip extensions
-      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --canister frontend --skip-extensions
-
-      # Deploy only specific extensions
-      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --extensions voting,vault,admin_dashboard
-
-      # Deploy without codices
-      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --codices none
+      realms mundus deploy mundus.yml
+      realms mundus deploy mundus.yml --realm agora --canister backend
+      realms mundus deploy mundus.yml --canister frontend --skip-extensions
+      realms mundus deploy mundus.yml --extensions voting,vault --codices none
     """
     ext_names = None
     codex_names = None
@@ -784,107 +727,6 @@ def mundus_deploy(
     )
 
 
-@mundus_app.command("deploy-new")
-def mundus_deploy_new(
-    name: str = typer.Argument(..., help="Realm name identifier"),
-    network: str = typer.Option(
-        "test", "--network", "-n", help="Target network"
-    ),
-    artifact_version: str = typer.Option(
-        "latest", "--version", "-v", help="Artifact version: 'latest' or semver"
-    ),
-    display_name: str = typer.Option(
-        "", "--display-name", help="Display name (defaults to name)"
-    ),
-    manifesto: str = typer.Option(
-        "", "--manifesto", help="Realm manifesto"
-    ),
-    cleanup: bool = typer.Option(
-        False, "--cleanup", help="Delete test canisters after deployment"
-    ),
-) -> None:
-    """Deploy a new realm with no existing canister IDs."""
-    mundus_deploy_new_command(name, network, artifact_version, display_name, manifesto, cleanup)
-
-
-@app.command("rollout", rich_help_panel="Lifecycle")
-def rollout(
-    environments: str = typer.Option(
-        "test", "--environments", "-e",
-        help="Comma-separated environments (test,staging,demo) or 'all'",
-    ),
-    targets: str = typer.Option(
-        ..., "--targets", "-t",
-        help="Comma-separated stand names, or 'all-realms', 'all-infra', 'all'",
-    ),
-    scope: str = typer.Option(
-        "both", "--scope", "-s",
-        help="Which canisters: backend, frontend, or both",
-    ),
-    mode: str = typer.Option(
-        "upgrade", "--mode", "-m",
-        help="upgrade (preserves state) or reinstall (wipes state on success)",
-    ),
-    version: str = typer.Option(
-        "latest", "--version", "-v",
-        help="Version: 'main' (latest main snapshot), 'latest' (semver), or e.g. 0.4.0",
-    ),
-    realm_family: str = typer.Option(
-        "realm", "--realm-family",
-        help="Artifact family for realm (Deployments) stands (default: realm)",
-    ),
-    execute: bool = typer.Option(
-        False, "--execute",
-        help="Apply changes. Without this flag, only the plan is printed (dry run).",
-    ),
-    include_infra_reinstall: bool = typer.Option(
-        False, "--include-infra-reinstall",
-        help="Allow reinstalling state-wiping infra (file-registry, realm-registry)",
-    ),
-    yes: bool = typer.Option(
-        False, "--yes", "-y", help="Skip confirmation prompts",
-    ),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="dfx identity to use for Casals calls",
-    ),
-    apply_arrangement: bool = typer.Option(
-        True, "--apply-arrangement/--no-apply-arrangement",
-        help="After the canister actions, apply each environment's active "
-             "arrangement on its Casals (its post-deploy config: params + "
-             "extension/codex installs). On by default.",
-    ),
-) -> None:
-    """Upgrade/reinstall realm + infra canisters across environments via Casals.
-
-    \b
-    Drives each environment's Casals directly (snapshot -> install -> verify ->
-    rollback-on-failure built in). Dry-run by default; pass --execute to apply.
-
-    \b
-    EXAMPLES:
-      # Preview upgrading all realms' backends in test
-      realms rollout -e test -t all-realms -s backend
-
-      # Roll out the latest main-branch snapshot (after publish-build --from-main)
-      realms rollout -e test -t all-realms -s both -v main --execute
-
-      # Upgrade just Agora's backend in test (upgrade mode)
-      realms rollout -e test -t agora -s backend --execute
-
-      # Upgrade every realm + infra canister across all environments
-      realms rollout -e all -t all -s both --execute
-
-      # Reinstall all infra in test (requires explicit opt-in for wipes)
-      realms rollout -e test -t all-infra -m reinstall --include-infra-reinstall --execute
-    """
-    rollout_command(
-        environments=environments, targets=targets, scope=scope, mode=mode,
-        version=version, realm_family=realm_family, execute=execute,
-        include_infra_reinstall=include_infra_reinstall, yes=yes, identity=identity,
-        apply_arrangement=apply_arrangement,
-    )
-
-
 # Create files subcommand group
 files_app = typer.Typer(name="files", help="File registry operations")
 app.add_typer(files_app, name="files", rich_help_panel="Lifecycle")
@@ -893,7 +735,7 @@ app.add_typer(files_app, name="files", rich_help_panel="Lifecycle")
 @files_app.command("publish")
 def files_publish(
     network: str = typer.Option(
-        "staging", "--network", "-n", help="Target network: staging, demo, test"
+        "ic", "--network", "-n", help="dfx network the file registry lives on (ic, local)"
     ),
     registry: Optional[str] = typer.Option(
         None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
@@ -927,7 +769,7 @@ def files_publish_assistant(
         ..., "--source-dir", help="Path to assistant package (manifest.json + prompts/)"
     ),
     network: str = typer.Option(
-        "staging", "--network", "-n", help="Target network: staging, demo, test"
+        "ic", "--network", "-n", help="dfx network the file registry lives on (ic, local)"
     ),
     registry: Optional[str] = typer.Option(
         None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
@@ -946,7 +788,7 @@ def files_publish_assistant(
 @files_app.command("publish-branding")
 def files_publish_branding(
     network: str = typer.Option(
-        "staging", "--network", "-n", help="Target network: staging, demo, test"
+        "ic", "--network", "-n", help="dfx network the file registry lives on (ic, local)"
     ),
     registry: Optional[str] = typer.Option(
         None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
@@ -966,7 +808,7 @@ def files_publish_branding(
 @files_app.command("publish-release")
 def files_publish_release(
     network: str = typer.Option(
-        "staging", "--network", "-n", help="Target network: staging, demo, test"
+        "ic", "--network", "-n", help="dfx network the file registry lives on (ic, local)"
     ),
     family: str = typer.Option(
         "realm", "--family", help="Artifact family base name (default: realm)"
@@ -1010,7 +852,7 @@ def files_publish_release(
 @files_app.command("reset")
 def files_reset(
     network: str = typer.Option(
-        "staging", "--network", "-n", help="Target network: staging, demo, test"
+        "ic", "--network", "-n", help="dfx network the file registry lives on (ic, local)"
     ),
     registry: Optional[str] = typer.Option(
         None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
@@ -1141,43 +983,14 @@ def realm_deploy(
     registry: Optional[str] = typer.Option(
         None, "--registry", help="Registry canister ID for realm registration"
     ),
-    descriptor: Optional[str] = typer.Option(
-        None, "--descriptor", "-d",
-        help="Path to deployment descriptor YAML (see issue #160)"
-    ),
-    subtypes: Optional[str] = typer.Option(
-        None, "--subtypes",
-        help="Override subtypes from descriptor (e.g. 'backend', 'frontend', 'all')"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run",
-        help="Print deployment plan without executing (descriptor mode only)"
-    ),
 ) -> None:
-    """Deploy a realm to the specified network.
-    
-    Two modes:
-      1. Classic: realms realm deploy --folder <path> --network <net>
-      2. Descriptor: realms realm deploy --descriptor deployments/staging-realm2-backend.yml
-    
-    See: https://github.com/smart-social-contracts/realms/issues/160
-    """
-    if descriptor:
-        deploy_from_descriptor(
-            descriptor_path=descriptor,
-            subtypes_override=subtypes,
-            network_override=network if network != "local" else None,
-            mode_override=mode if mode != "auto" else None,
-            identity=identity,
-            dry_run=dry_run,
-        )
-        return
+    """dfx-deploy a generated realm folder: realms realm deploy --folder <path> --network <net>."""
     deploy_command(config_file, folder, network, clean, identity, mode, plain_logs, registry=registry)
 
 
 @realm_app.command("call")
 def realm_call(
-    realm_ref: str = typer.Argument(help="Realm canister ID or name (e.g., 'Dominion' or '2lbfz-yiaaa-aaaac-qcyma-cai')"),
+    realm_ref: str = typer.Argument(help="Realm canister ID or name (e.g., 'Dominion' or 'xxxxx-xxxxx-xxxxx-xxxxx-cai')"),
     method: str = typer.Argument(help="Method name or 'extension' for extension calls"),
     args: str = typer.Argument("()", help="Candid arguments (e.g., '(\"admin\")') or extension name for extension calls"),
     function_name: Optional[str] = typer.Argument(None, help="Function name (only for extension calls)"),
@@ -1204,7 +1017,7 @@ def realm_call(
         realms realm call Dominion join_realm '("admin")' --network staging
         
         # Call backend method on a realm by canister ID
-        realms realm call 2lbfz-yiaaa-aaaac-qcyma-cai status --network staging
+        realms realm call xxxxx-xxxxx-xxxxx-xxxxx-cai status --network staging
         
         # Call extension function
         realms realm call Dominion extension member_dashboard check_invoice_payment '{"invoice_id": "x"}' --network staging
@@ -1862,14 +1675,14 @@ def billing_redeem_voucher(
 def registry_deploy_realm(
     realm_name: str = typer.Option(..., "--name", "-n", help="Name for the new realm"),
     network: str = typer.Option(
-        "staging",
+        "ic",
         "--network",
-        help="IC network (staging, demo, test, local, ic, …)",
+        help="dfx network the registry lives on (ic, local, …)",
     ),
     registry_canister: Optional[str] = typer.Option(
         None,
         "--registry-canister",
-        help="realm_registry_backend canister id (defaults per --network)",
+        help="realm_registry_backend canister id (required; see `casals export`)",
     ),
 ) -> None:
     """Enqueue a realm deploy via realm_registry_backend.request_deployment (uses dfx identity)."""
@@ -1880,14 +1693,14 @@ def registry_deploy_realm(
 def registry_deploy_status(
     job_id: str = typer.Option(..., "--job-id", "-j", help="Queue job id from deploy-realm"),
     network: str = typer.Option(
-        "staging",
+        "ic",
         "--network",
-        help="IC network (staging, demo, test, …)",
+        help="dfx network the installer lives on (ic, local, …)",
     ),
     installer_canister: Optional[str] = typer.Option(
         None,
         "--installer-canister",
-        help="realm_installer canister id (defaults per --network)",
+        help="realm_installer canister id (required; see `casals export`)",
     ),
     wait: bool = typer.Option(False, "--wait", "-w", help="Wait until job completes (polls periodically)"),
     poll_interval: int = typer.Option(10, "--poll-interval", help="Seconds between polls (with --wait)"),
@@ -2071,7 +1884,7 @@ def realm_unset() -> None:
 @realm_app.command("status")
 def realm_status(
     realm_ref: Optional[str] = typer.Argument(
-        None, help="Realm canister ID or name (e.g., 'Dominion' or '2lbfz-yiaaa-aaaac-qcyma-cai')"
+        None, help="Realm canister ID or name (e.g., 'Dominion' or 'xxxxx-xxxxx-xxxxx-xxxxx-cai')"
     ),
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"
@@ -2081,7 +1894,7 @@ def realm_status(
     
     Examples:
         realms realm status Dominion --network staging
-        realms realm status 2lbfz-yiaaa-aaaac-qcyma-cai --network staging
+        realms realm status xxxxx-xxxxx-xxxxx-xxxxx-cai --network staging
         realms realm status  # Uses local folder context
     """
     console.print("[bold blue]🏛️  Realm Status[/bold blue]\n")
@@ -2247,13 +2060,7 @@ def realm_status(
                 # Construct URL based on network and canister type
                 if is_backend:
                     # Backend canisters use Candid UI
-                    if effective_network == "ic":
-                        candid_ui = "rxs6w-5qaaa-aaaah-avp2a-cai"
-                        url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.ic0.app/?id={canister_id}"
-                    elif effective_network in ("staging", "demo", "test"):
-                        candid_ui = "rxs6w-5qaaa-aaaah-avp2a-cai"
-                        url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={canister_id}"
-                    elif effective_network == "local":
+                    if effective_network == "local":
                         # For local, use dynamically fetched Candid UI and port
                         if candid_ui_id:
                             url = f"http://127.0.0.1:{local_port}/?canisterId={candid_ui_id}&id={canister_id}"
@@ -2261,15 +2068,11 @@ def realm_status(
                             # Fallback if Candid UI not found
                             url = f"http://127.0.0.1:{local_port}/?canisterId=<candid-ui>&id={canister_id}"
                     else:
-                        # Other networks, use staging format
-                        url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={canister_id}"
+                        # Every other network alias is mainnet
+                        url = f"https://{IC_CANDID_UI}.icp0.io/?id={canister_id}"
                 else:
                     # Frontend canisters use direct URLs
-                    if effective_network == "ic":
-                        url = f"https://{canister_id}.ic0.app"
-                    elif effective_network in ("staging", "demo", "test"):
-                        url = f"https://{canister_id}.icp0.io"
-                    elif effective_network == "local":
+                    if effective_network == "local":
                         # Use recommended format for local
                         url = f"http://{canister_id}.localhost:{local_port}/"
                     else:
@@ -2297,12 +2100,9 @@ def _show_remote_realm_status(backend_canister_id: str, realm_name: str, network
     import subprocess
     
     # Construct URLs based on network
-    if network == "ic":
-        frontend_url = f"https://{backend_canister_id}.ic0.app"  # Actually need frontend ID
-        backend_url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.ic0.app/?id={backend_canister_id}"
-    elif network in ("staging", "demo", "test"):
+    if network != "local":
         frontend_url = f"https://{backend_canister_id}.icp0.io"  # Actually need frontend ID
-        backend_url = f"https://rxs6w-5qaaa-aaaah-avp2a-cai.icp0.io/?id={backend_canister_id}"
+        backend_url = f"https://{IC_CANDID_UI}.icp0.io/?id={backend_canister_id}"
     else:
         frontend_url = f"http://{backend_canister_id}.localhost:8000/"
         backend_url = f"http://127.0.0.1:8000/?canisterId=<candid-ui>&id={backend_canister_id}"

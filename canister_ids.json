@@ -1,106 +1,40 @@
 {
   "casals_backend": {
-    "demo": "jo3cj-faaaa-aaaac-bffea-cai",
-    "production": "irfdo-ziaaa-aaaai-raswa-cai",
-    "staging": "hudjn-jyaaa-aaaac-qhd6q-cai",
-    "test": "o3mbf-pqaaa-aaaan-q6pyq-cai"
+    "production": "irfdo-ziaaa-aaaai-raswa-cai"
   },
   "casals_file_registry": {
-    "production": "iwef2-uqaaa-aaaai-raswq-cai",
-    "staging": "h5acr-7qaaa-aaaac-qhd7a-cai",
-    "test": "ospkz-zyaaa-aaaan-q6pza-cai"
+    "production": "iwef2-uqaaa-aaaai-raswq-cai"
   },
   "casals_file_registry_frontend": {
-    "production": "iddux-vyaaa-aaaai-rasva-cai",
-    "staging": "h2bef-siaaa-aaaac-qhd7q-cai",
-    "test": "mbqjz-raaaa-aaaan-q6pxq-cai"
+    "production": "iddux-vyaaa-aaaai-rasva-cai"
   },
   "casals_frontend": {
-    "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
-    "production": "iecsd-yaaaa-aaaai-rasvq-cai",
-    "staging": "htcpz-eaaaa-aaaac-qhd6a-cai",
-    "test": "o4nhr-ciaaa-aaaan-q6pya-cai"
-  },
-  "ckbtc_indexer": {
-    "demo": "n5wcd-faaaa-aaaar-qaaea-cai"
-  },
-  "ckbtc_ledger": {
-    "demo": "mxzaz-hqaaa-aaaar-qaada-cai"
+    "production": "iecsd-yaaaa-aaaai-rasvq-cai"
   },
   "file_registry": {
-    "demo": "krch6-ryaaa-aaaas-amw3q-cai",
-    "production": "fzan7-diaaa-aaaas-amx4q-cai",
-    "staging": "dsj3i-zyaaa-aaaas-amxlq-cai",
-    "test": "dapmr-viaaa-aaaas-amxiq-cai"
+    "production": "fzan7-diaaa-aaaas-amx4q-cai"
   },
   "file_registry_frontend": {
-    "demo": "l4mdq-6qaaa-aaaas-amw4a-cai",
     "ic": "rbex3-xyaaa-aaaah-qumma-cai",
-    "production": "fqdgd-vaaaa-aaaas-amx5a-cai",
-    "staging": "c7h7g-wqaaa-aaaas-amxma-cai",
-    "test": "djmhn-daaaa-aaaas-amxja-cai"
+    "production": "fqdgd-vaaaa-aaaas-amx5a-cai"
   },
   "marketplace_backend": {
-    "demo": "l3nfe-tiaaa-aaaas-amw4q-cai",
-    "production": "fxcax-yyaaa-aaaas-amx5q-cai",
-    "staging": "cygzs-3iaaa-aaaas-amxmq-cai",
-    "test": "donbz-oyaaa-aaaas-amxjq-cai"
+    "production": "fxcax-yyaaa-aaaas-amx5q-cai"
   },
   "marketplace_frontend": {
-    "demo": "hyzzg-haaaa-aaaas-amxra-cai",
-    "production": "fcfr2-zqaaa-aaaas-amx6a-cai",
-    "staging": "crfso-naaaa-aaaas-amxna-cai",
-    "test": "d3kqu-pqaaa-aaaas-amxka-cai"
+    "production": "fcfr2-zqaaa-aaaas-amx6a-cai"
   },
   "nft_backend": {
-    "demo": "6hrip-iiaaa-aaaaf-qdoha-cai",
-    "production": "flg2g-pyaaa-aaaas-amx7q-cai",
-    "staging": "cecdd-miaaa-aaaas-amxoq-cai",
-    "test": "dvi54-uaaaa-aaaas-amxla-cai"
+    "production": "flg2g-pyaaa-aaaas-amx7q-cai"
   },
   "nft_frontend": {
-    "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai",
-    "production": "q3qdq-paaaa-aaaas-amyaa-cai",
-    "staging": "cnbi7-2aaaa-aaaas-amxpa-cai",
-    "test": "dhokf-yqaaa-aaaas-amxia-cai"
-  },
-  "platform_dashboard_frontend": {
-    "demo": "rxtxq-kyaaa-aaaac-qgora-cai",
-    "staging": "cs3bp-ryaaa-aaaac-bfxsa-cai"
-  },
-  "realm_backend": {
-    "demo": "h5vpp-qyaaa-aaaac-qai3a-cai",
-    "staging": "egxaj-cqaaa-aaaac-bfp7q-cai"
-  },
-  "realm_frontend": {
-    "demo": "gzya5-jyaaa-aaaac-qai5a-cai",
-    "staging": "qf5wy-vqaaa-aaaac-bftma-cai"
-  },
-  "realm_installer": {
-    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
-    "staging": "lusjm-wqaaa-aaaau-ago7q-cai"
-  },
-  "realm_registry_backend": {
-    "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
-    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
-    "test": "yhw3g-fyaaa-aaaas-qgorq-cai"
-  },
-  "realm_registry_frontend": {
-    "demo": "2zaor-5yaaa-aaaac-qbxaa-cai",
-    "staging": "77243-aqaaa-aaaau-aggza-cai",
-    "test": "qtank-3qaaa-aaaaa-qhb6q-cai"
+    "production": "q3qdq-paaaa-aaaas-amyaa-cai"
   },
   "token_backend": {
-    "demo": "xbkkh-syaaa-aaaah-qq3ya-cai",
-    "production": "ffexo-uiaaa-aaaas-amx6q-cai",
-    "staging": "cweu2-ayaaa-aaaas-amxnq-cai",
-    "test": "d4lwa-ciaaa-aaaas-amxkq-cai"
+    "production": "ffexo-uiaaa-aaaas-amx6q-cai"
   },
   "token_frontend": {
-    "demo": "xglmt-7aaaa-aaaah-qq3yq-cai",
-    "production": "fmh4s-caaaa-aaaas-amx7a-cai",
-    "staging": "cddfx-bqaaa-aaaas-amxoa-cai",
-    "test": "b5scz-gaaaa-aaaas-amxha-cai"
+    "production": "fmh4s-caaaa-aaaas-amx7a-cai"
   },
   "website": {
     "ic": "6kdvx-3yaaa-aaaah-qqo5a-cai"
