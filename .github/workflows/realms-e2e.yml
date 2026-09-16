@@ -101,9 +101,15 @@ jobs:
       - name: Build realm frontend (test variant) and marketplace frontend
         working-directory: realms
         run: |
-          (cd src/realm_frontend && npm install --legacy-peer-deps && REALMS_BUILD_VARIANT=test npm run build && test -f dist/index.html)
+          # Workspace install from the repo root: installing inside a workspace
+          # hoists @sveltejs/kit to the root while vite stays nested, and kit
+          # then cannot resolve vite. The frontends import the workspace
+          # package @realmsgos/extension-bridge from its dist/, so build it first.
+          npm install --legacy-peer-deps
+          npm run build --workspace packages/extension-bridge
+          (cd src/realm_frontend && REALMS_BUILD_VARIANT=test npm run build && test -f dist/index.html)
           python3 scripts/check_frontend_variant.py src/realm_frontend/dist test
-          (cd src/marketplace_frontend && npm install --legacy-peer-deps && npm run build && test -f dist/index.html)
+          (cd src/marketplace_frontend && npm run build && test -f dist/index.html)
 
       - name: Fetch ic-tokens wasms (realms/.external-wasms)
         working-directory: realms

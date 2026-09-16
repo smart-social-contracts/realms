@@ -27,12 +27,18 @@ mkdirSync(target, { recursive: true });
 
 for (const entry of readdirSync(source, { withFileTypes: true })) {
 	if (!entry.isDirectory()) continue;
-	// index.js carries canister IDs injected by the deploy scripts; only the
-	// candid interface itself is safe to overwrite.
+	mkdirSync(join(target, entry.name), { recursive: true });
 	for (const file of readdirSync(join(source, entry.name))) {
-		if (!file.includes('.did')) continue;
-		mkdirSync(join(target, entry.name), { recursive: true });
-		cpSync(join(source, entry.name, file), join(target, entry.name, file));
+		const dest = join(target, entry.name, file);
+		if (file.includes('.did')) {
+			// The candid interface is always safe to overwrite.
+			cpSync(join(source, entry.name, file), dest);
+		} else if (!existsSync(dest)) {
+			// index.js / index.d.ts are gitignored under $lib (deploy scripts may
+			// inject ids into them); a fresh checkout has none, so seed them from
+			// the generated stock copy (which reads process.env.CANISTER_ID_*).
+			cpSync(join(source, entry.name, file), dest);
+		}
 	}
 }
 
