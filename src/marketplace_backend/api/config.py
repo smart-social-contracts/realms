@@ -17,8 +17,10 @@ logger = get_logger("api.config")
 
 CONFIG_ID = "config"
 
-DEFAULT_LICENSE_PRICE_USD_CENTS = 9900             # $99.00 / year
-DEFAULT_LICENSE_DURATION_SECONDS = 365 * 24 * 3600  # 1 year
+DEFAULT_LICENSE_PRICE_USD_CENTS = 2000              # $20 / month
+DEFAULT_LICENSE_DURATION_SECONDS = 30 * 24 * 3600   # 1 month
+_LEGACY_YEARLY_PRICE_USD_CENTS = 9900
+_LEGACY_YEARLY_DURATION_SECONDS = 365 * 24 * 3600
 
 
 def _is_controller() -> bool:
@@ -45,6 +47,14 @@ def _ensure_config() -> MarketplaceConfigEntity:
             license_price_usd_cents=DEFAULT_LICENSE_PRICE_USD_CENTS,
             license_duration_seconds=DEFAULT_LICENSE_DURATION_SECONDS,
         )
+        return cfg
+    if (
+        int(cfg.license_price_usd_cents or 0) == _LEGACY_YEARLY_PRICE_USD_CENTS
+        and int(cfg.license_duration_seconds or 0) == _LEGACY_YEARLY_DURATION_SECONDS
+    ):
+        cfg.license_price_usd_cents = DEFAULT_LICENSE_PRICE_USD_CENTS
+        cfg.license_duration_seconds = DEFAULT_LICENSE_DURATION_SECONDS
+        logger.info("migrated license pricing $99/year -> $20/month")
     return cfg
 
 

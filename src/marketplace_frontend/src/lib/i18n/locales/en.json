@@ -264,7 +264,7 @@
     "benefit_1": "Get audited and approved by Smart Social Contracts",
     "benefit_2": "Show a \"Verified\" badge on your listings",
     "benefit_3": "Surface in the verified-only filters and rankings",
-    "per_year": "{price} / year",
+    "per_month": "{price} / month",
     "pay_card": "Pay with credit card →",
     "redirecting": "Redirecting…",
     "billing_note": "Powered by the off-chain billing service at {url}. Local dev tip: ask a controller to call grant_manual_license.",

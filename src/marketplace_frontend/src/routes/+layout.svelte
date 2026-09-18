@@ -85,9 +85,8 @@ $: routeIsActive = (path) => {
     {:else}
       <button class="hero-chrome-btn hero-chrome-icon" on:click={handleLogin} aria-label={$_('nav.sign_in')} title={$_('nav.sign_in')}>
         <svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-          <path d="M10 17l5-5-5-5" />
-          <path d="M15 12H3" />
+          <circle cx="12" cy="8" r="4" />
+          <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
         </svg>
       </button>
     {/if}
@@ -197,9 +196,8 @@ $: routeIsActive = (path) => {
       {:else}
         <button class="icon-btn" on:click={handleLogin} aria-label={$_('nav.sign_in')} title={$_('nav.sign_in')}>
           <svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-            <path d="M10 17l5-5-5-5" />
-            <path d="M15 12H3" />
+            <circle cx="12" cy="8" r="4" />
+            <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
           </svg>
         </button>
       {/if}

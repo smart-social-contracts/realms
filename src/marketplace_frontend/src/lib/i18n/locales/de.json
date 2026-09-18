@@ -264,7 +264,7 @@
     "benefit_1": "Von Smart Social Contracts geprüft und genehmigt werden",
     "benefit_2": "Ein \"Verifiziert\"-Abzeichen auf deinen Einträgen anzeigen",
     "benefit_3": "In den Nur-verifiziert-Filtern und Rankings erscheinen",
-    "per_year": "{price} / Jahr",
+    "per_month": "{price} / Monat",
     "pay_card": "Mit Kreditkarte zahlen →",
     "redirecting": "Weiterleitung…",
     "billing_note": "Bereitgestellt vom Off-Chain-Abrechnungsdienst unter {url}. Tipp für lokale Entwicklung: Bitte einen Controller, grant_manual_license aufzurufen.",

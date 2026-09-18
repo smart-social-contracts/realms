@@ -8,7 +8,8 @@ export function formatPrice(priceE8s: number): string {
 
 export function formatPriceUsd(usdCents: number): string {
   if (!usdCents) return '$0';
-  return `$${(usdCents / 100).toFixed(2)}`;
+  const dollars = usdCents / 100;
+  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
 }
 
 export function formatCount(n: number): string {

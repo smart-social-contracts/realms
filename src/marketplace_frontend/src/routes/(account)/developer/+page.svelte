@@ -116,7 +116,7 @@ async function delist(kind, id) {
         <li>{$_('developer.benefit_3')}</li>
       </ul>
       <p class="price">
-        {$_('developer.per_year', { values: { price: formatPriceUsd(pricing.license_price_usd_cents) } })}
+        {$_('developer.per_month', { values: { price: formatPriceUsd(pricing.license_price_usd_cents) } })}
       </p>
       <button class="btn primary" disabled={buyingLicense} on:click={buyLicense}>
         {buyingLicense ? $_('developer.redirecting') : $_('developer.pay_card')}

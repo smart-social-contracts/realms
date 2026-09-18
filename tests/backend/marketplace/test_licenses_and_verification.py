@@ -64,6 +64,16 @@ def test_default_license_pricing():
     p = cfg_api.get_license_pricing()["pricing"]
     assert p["license_price_usd_cents"] == cfg_api.DEFAULT_LICENSE_PRICE_USD_CENTS
     assert p["license_duration_seconds"] == cfg_api.DEFAULT_LICENSE_DURATION_SECONDS
+    assert p["license_price_usd_cents"] == 2000
+    assert p["license_duration_seconds"] == 30 * 24 * 3600
+
+
+def test_migrates_legacy_yearly_license_pricing(as_caller):
+    as_caller("admin", controller=True)
+    cfg_api.set_license_pricing(9900, 365 * 24 * 3600)
+    p = cfg_api.get_license_pricing()["pricing"]
+    assert p["license_price_usd_cents"] == 2000
+    assert p["license_duration_seconds"] == 30 * 24 * 3600
 
 
 # ---------------------------------------------------------------------------
@@ -96,14 +106,14 @@ def test_record_license_payment_works_for_billing_principal(as_caller):
         principal="dev-1",
         stripe_session_id="cs_xyz",
         duration_seconds=86400,
-        amount_usd_cents=9900,
+        amount_usd_cents=2000,
     )
     assert r["success"] is True
     assert lic_api.has_active_license("dev-1") is True
     # amount_usd_cents persisted for audit trail.
     chk = lic_api.check_license("dev-1")
     assert chk["success"] is True
-    assert chk["license"]["last_payment_amount_usd_cents"] == 9900
+    assert chk["license"]["last_payment_amount_usd_cents"] == 2000
     assert chk["license"]["last_payment_id"] == "cs_xyz"
 
 

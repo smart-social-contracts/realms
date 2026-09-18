@@ -264,7 +264,7 @@
     "benefit_1": "Recibe auditoría y aprobación de Smart Social Contracts",
     "benefit_2": "Muestra una insignia \"Verificado\" en tus publicaciones",
     "benefit_3": "Aparece en los filtros y rankings de solo verificados",
-    "per_year": "{price} / año",
+    "per_month": "{price} / mes",
     "pay_card": "Pagar con tarjeta de crédito →",
     "redirecting": "Redirigiendo…",
     "billing_note": "Con tecnología del servicio de facturación fuera de cadena en {url}. Consejo para desarrollo local: pide a un controlador que llame a grant_manual_license.",

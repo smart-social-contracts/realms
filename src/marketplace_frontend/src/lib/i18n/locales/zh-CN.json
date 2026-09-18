@@ -264,7 +264,7 @@
     "benefit_1": "获得 Smart Social Contracts 的审计和批准",
     "benefit_2": "在你的条目上显示“已验证”徽章",
     "benefit_3": "出现在“仅已验证”筛选和排名中",
-    "per_year": "{price} / 年",
+    "per_month": "{price} / 月",
     "pay_card": "用信用卡支付 →",
     "redirecting": "正在跳转…",
     "billing_note": "由位于 {url} 的链下计费服务提供支持。本地开发提示：请控制者调用 grant_manual_license。",

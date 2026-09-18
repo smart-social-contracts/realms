@@ -84,7 +84,7 @@ records the pointer.
 
 ### Paid developer license + audit/verification
 
-Anyone can publish, but **getting verified** requires a paid annual
+Anyone can publish, but **getting verified** requires a paid monthly
 developer license. The flow:
 
 1. Developer page POSTs to

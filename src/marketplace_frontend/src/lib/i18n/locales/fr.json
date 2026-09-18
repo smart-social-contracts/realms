@@ -264,7 +264,7 @@
     "benefit_1": "Être audité et approuvé par Smart Social Contracts",
     "benefit_2": "Afficher un badge « Vérifié » sur vos annonces",
     "benefit_3": "Apparaître dans les filtres et classements « vérifiés uniquement »",
-    "per_year": "{price} / an",
+    "per_month": "{price} / mois",
     "pay_card": "Payer par carte bancaire →",
     "redirecting": "Redirection…",
     "billing_note": "Propulsé par le service de facturation hors chaîne à {url}. Astuce pour le développement local : demandez à un contrôleur d’appeler grant_manual_license.",
