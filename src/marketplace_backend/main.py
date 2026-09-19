@@ -297,7 +297,9 @@ from api.extensions import (
 )
 from api.licenses import (
     check_license as check_license_impl,
+    grant_publisher_from_json as grant_publisher_from_json_impl,
     grant_manual_license as grant_manual_license_impl,
+    publishing_status as publishing_status_impl,
     record_license_payment as record_license_payment_impl,
     revoke_license as revoke_license_impl,
 )
@@ -1474,6 +1476,27 @@ def grant_manual_license(principal: text, duration_seconds: nat64, note: text) -
         return {"Ok": r.get("action", "ok")} if r["success"] else {"Err": r["error"]}
     except Exception as e:
         return {"Err": str(e)}
+
+
+@update
+def admin_grant_publisher(args: text) -> text:
+    """License (and optionally appoint as reviewer) a principal, from a JSON
+    argument, so a Casals sheet config row can do it through the conductor
+    (the controller; a human is not). Args (JSON): {"principal",
+    "duration_seconds", "note", "reviewer"}. Controller only."""
+    try:
+        return json.dumps(grant_publisher_from_json_impl(args))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def admin_status() -> text:
+    """{"reviewers": [...], "licensed": [...]} as JSON, for a sheet's `converged_when`."""
+    try:
+        return json.dumps(publishing_status_impl())
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 
 @update

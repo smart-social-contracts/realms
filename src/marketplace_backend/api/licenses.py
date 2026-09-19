@@ -17,10 +17,11 @@ Payment flow (off-chain → canister):
 local development.
 """
 
+import json
 from typing import Any, Dict
 
 from _cdk import ic
-from api.config import get_billing_service_principal
+from api.config import add_reviewer, get_billing_service_principal, get_reviewers
 from core.models import DeveloperLicenseEntity
 from ic_python_logging import get_logger
 
@@ -136,6 +137,50 @@ def grant_manual_license(*, principal: str, duration_seconds: int, note: str = "
         payment_method="manual",
         note=note or "manual grant",
     )
+
+
+def grant_publisher_from_json(args: str) -> Dict:
+    """Make a principal a first-party publisher, from one JSON argument — the
+    shape a Casals sheet config row sends through the conductor (the
+    controller): {"principal": str, "duration_seconds": int, "note": str,
+    "reviewer": bool}. Grants the developer license (publishing is
+    license-gated) and, with "reviewer", the right to approve listings."""
+    try:
+        params = json.loads(args or "{}")
+    except (TypeError, ValueError) as exc:
+        return {"success": False, "error": f"args must be JSON: {exc}"}
+    if not isinstance(params, dict):
+        return {"success": False, "error": "args must be a JSON object"}
+    principal = str(params.get("principal") or "").strip()
+    if not principal:
+        return {"success": False, "error": "principal is required"}
+    try:
+        duration = int(params.get("duration_seconds") or 0)
+    except (TypeError, ValueError):
+        return {"success": False, "error": "duration_seconds must be an integer"}
+    if duration <= 0:
+        return {"success": False, "error": "duration_seconds must be positive"}
+    granted = grant_manual_license(
+        principal=principal, duration_seconds=duration, note=str(params.get("note") or "sheet grant"),
+    )
+    if not granted.get("success"):
+        return granted
+    if params.get("reviewer"):
+        added = add_reviewer(principal)
+        if not added.get("success"):
+            return added
+    return {"success": True, "action": granted.get("action", "ok"), "reviewer": bool(params.get("reviewer"))}
+
+
+def publishing_status() -> Dict:
+    """Who may publish and review: {"reviewers": [...], "licensed": [...]},
+    both sorted, so a sheet's `converged_when.contains` can read it back."""
+    licensed = sorted(
+        str(lic.principal)
+        for lic in DeveloperLicenseEntity.instances()
+        if has_active_license(str(lic.principal))
+    )
+    return {"reviewers": sorted(get_reviewers()), "licensed": licensed}
 
 
 def revoke_license(principal: str) -> Dict:

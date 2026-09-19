@@ -728,6 +728,43 @@ def _parse_candid_string(raw: str) -> str:
 _ICP_NETWORK_ALIASES = {"test": "ic", "staging": "ic", "demo": "ic", "production": "ic"}
 _ICP_IDENTITY_ALIASES = {"deployer": "my_dev_identity_1"}
 
+_PIN_FILES: list = []
+
+
+def _hsm_pin_file():
+    """PIN file for a hardware-key identity, or None.
+
+    icp ignores ``DFX_HSM_PIN`` and cannot prompt while we capture its output.
+    ``ICP_IDENTITY_PASSWORD_FILE`` is used as-is; otherwise a 0600 tempfile is
+    written from ``DFX_HSM_PIN`` once per process (same convention as Casals)."""
+    import atexit
+    import tempfile as _tempfile
+
+    explicit = (os.environ.get("ICP_IDENTITY_PASSWORD_FILE") or "").strip()
+    if explicit:
+        return explicit
+    pin = os.environ.get("DFX_HSM_PIN") or ""
+    if not pin:
+        return None
+    if _PIN_FILES:
+        return _PIN_FILES[0]
+    tmp = _tempfile.NamedTemporaryFile("w", prefix="realms-hsm-pin-", delete=False)
+    os.chmod(tmp.name, 0o600)
+    tmp.write(pin)
+    tmp.close()
+    _PIN_FILES.append(tmp.name)
+    atexit.register(_cleanup_pin_files)
+    return tmp.name
+
+
+def _cleanup_pin_files():
+    for path in _PIN_FILES:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    _PIN_FILES.clear()
+
 
 def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=120, raise_on_error=True):
     """Run a canister call (via icp when available, else dfx) and return parsed output.
@@ -745,6 +782,9 @@ def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=
         icp_identity = _ICP_IDENTITY_ALIASES.get(identity, identity)
         if icp_identity:
             cmd.extend(["--identity", icp_identity])
+            pin_file = _hsm_pin_file()
+            if pin_file:
+                cmd.extend(["--identity-password-file", pin_file])
         cmd.extend(["--network", _ICP_NETWORK_ALIASES.get(network, network or "ic")])
         if is_query:
             cmd.append("--query")

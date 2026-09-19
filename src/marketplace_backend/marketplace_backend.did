@@ -253,6 +253,8 @@ service : (opt MarketplaceInitArg) -> {
   "get_license_status" : () -> (LicenseResult) query;
   "record_license_payment" : (LicensePaymentInput) -> (GenericResult);
   "grant_manual_license" : (text, nat64, text) -> (GenericResult);
+  "admin_grant_publisher" : (text) -> (text);
+  "admin_status" : () -> (text) query;
   "revoke_license" : (text) -> (GenericResult);
   "request_audit" : (text, text) -> (GenericResult);
   "set_verification_status" : (text, text, text, text) -> (GenericResult);

@@ -1607,6 +1607,28 @@ def marketplace_status(
     marketplace_status_command(network=network)
 
 
+@marketplace_app.command("publish")
+def marketplace_publish(
+    marketplace: str = typer.Option(..., "--marketplace", "-m", help="marketplace_backend canister id"),
+    registry: str = typer.Option(..., "--registry", "-r", help="File registry the packages were published to (`realms files publish --registry`)"),
+    network: str = typer.Option("ic", "--network", "-n", help="Network (ic, local)"),
+    identity: Optional[str] = typer.Option(None, "--identity", help="Identity licensed + reviewer on the marketplace (the sheet's operator)"),
+    extensions_only: bool = typer.Option(False, "--extensions-only"),
+    codices_only: bool = typer.Option(False, "--codices-only"),
+    extensions_filter: str = typer.Option("", "--extensions", help="Comma-separated extension ids (default: all)"),
+    codices_filter: str = typer.Option("", "--codices", help="Comma-separated codex ids (default: all)"),
+    approve: bool = typer.Option(True, "--approve/--no-approve", help="Review-approve each listing after creating it"),
+) -> None:
+    """Create/update and approve a marketplace listing for every first-party extension and codex."""
+    from .commands.marketplace_publish import marketplace_publish_command
+
+    marketplace_publish_command(
+        marketplace=marketplace, registry=registry, network=network, identity=identity,
+        extensions_only=extensions_only, codices_only=codices_only,
+        extensions_filter=extensions_filter, codices_filter=codices_filter, approve=approve,
+    )
+
+
 # ============== Billing Commands ==============
 
 @registry_billing_app.command("balance")

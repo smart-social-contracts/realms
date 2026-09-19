@@ -226,3 +226,51 @@ def test_list_pending_audits_reviewers_only(as_caller):
     as_caller("reviewer-1", controller=False)
     rows = ver_api.list_pending_audits()
     assert {row["item_id"] for row in rows} == {"voting", "treasury"}
+
+
+# ── sheet-driven grants (admin_grant_license / admin_status) ─────────────────
+
+
+def test_json_grant_is_controller_only(as_caller):
+    as_caller("op-1", controller=False)
+    r = lic_api.grant_publisher_from_json('{"principal": "op-1", "duration_seconds": 3600}')
+    assert r["success"] is False and "controller" in r["error"]
+    assert lic_api.has_active_license("op-1") is False
+
+
+def test_json_grant_licenses_the_principal_and_reads_back_in_status(as_caller):
+    as_caller("conductor", controller=True)
+    r = lic_api.grant_publisher_from_json('{"principal": "op-1", "duration_seconds": 315360000, "note": "sheet", "reviewer": true}')
+    assert r["success"] is True and r["reviewer"] is True
+    assert lic_api.has_active_license("op-1") is True
+    assert lic_api.publishing_status() == {"reviewers": ["op-1"], "licensed": ["op-1"]}
+
+
+def test_json_grant_is_idempotent_for_the_same_principal(as_caller):
+    as_caller("conductor", controller=True)
+    lic_api.grant_publisher_from_json('{"principal": "op-1", "duration_seconds": 3600, "reviewer": true}')
+    lic_api.grant_publisher_from_json('{"principal": "op-1", "duration_seconds": 3600, "reviewer": true}')
+    assert lic_api.publishing_status() == {"reviewers": ["op-1"], "licensed": ["op-1"]}
+
+
+def test_json_grant_without_reviewer_flag_only_licenses(as_caller):
+    as_caller("conductor", controller=True)
+    lic_api.grant_publisher_from_json('{"principal": "op-1", "duration_seconds": 3600}')
+    assert lic_api.publishing_status() == {"reviewers": [], "licensed": ["op-1"]}
+
+
+def test_json_grant_rejects_bad_input(as_caller):
+    as_caller("conductor", controller=True)
+    assert lic_api.grant_publisher_from_json("not json")["success"] is False
+    assert lic_api.grant_publisher_from_json('{"duration_seconds": 5}')["success"] is False
+    assert lic_api.grant_publisher_from_json('{"principal": "x", "duration_seconds": 0}')["success"] is False
+    assert lic_api.grant_publisher_from_json('{"principal": "x", "duration_seconds": "soon"}')["success"] is False
+
+
+def test_status_omits_expired_licenses(as_caller):
+    as_caller("conductor", controller=True)
+    lic_api.grant_publisher_from_json('{"principal": "old", "duration_seconds": 1}')
+    lic_api.grant_publisher_from_json('{"principal": "new", "duration_seconds": 3600}')
+    from .conftest import mock_ic
+    mock_ic.time.return_value += 10 * 1_000_000_000
+    assert lic_api.publishing_status()["licensed"] == ["new"]

@@ -130,7 +130,7 @@
         "family": "file-registry",
         "version": "main",
         "source": "local:../file-registry/.basilisk/ic_file_registry/ic_file_registry.wasm",
-        "sha256": "fe216683b8d229f32ca0b1788637c56368aa4d8b462e2c5d52e63d21b62ed782"
+        "sha256": "c87daf02e0427bd6ea8231216184e7b4959978f5f421dfb93886d940268da211"
       },
       {
         "family": "orchestration-multisig",
@@ -148,7 +148,7 @@
         "family": "marketplace-backend",
         "version": "main",
         "source": "local:.basilisk/marketplace_backend/marketplace_backend.wasm",
-        "sha256": "28f07a68eb1ce965806f2125e4719c8e1489cc37171b68f653fca0758c05e5f5"
+        "sha256": "a599ac12bc70fd01889a00644b091834cb7414cb05290f3829e396bdc9ab41d6"
       },
       {
         "family": "realm-backend",
@@ -221,6 +221,27 @@
                     "query": "get_billing_service_principal_q",
                     "equals": "$principal:billing_service"
                   }
+                },
+                {
+                  "$comment": "First-party listings: `realms marketplace publish` needs a developer license to submit and the reviewer right to approve. 10 years.",
+                  "method": "admin_grant_publisher",
+                  "args": {
+                    "principal": "$principal:operator",
+                    "duration_seconds": 315360000,
+                    "note": "operator (sheet)",
+                    "reviewer": true
+                  },
+                  "converged_when": {
+                    "query": "admin_status",
+                    "contains": {
+                      "licensed": [
+                        "$principal:operator"
+                      ],
+                      "reviewers": [
+                        "$principal:operator"
+                      ]
+                    }
+                  }
                 }
               ]
             },
@@ -258,6 +279,40 @@
               "controllers": [
                 "$self",
                 "$multisig"
+              ],
+              "config": [
+                {
+                  "$comment": "The operator runs `realms files publish` here; controllers (conductor, multisig) cannot upload. `*` = every namespace.",
+                  "method": "grant_publish",
+                  "args": {
+                    "namespace": "*",
+                    "principal": "$principal:operator"
+                  },
+                  "converged_when": {
+                    "query": "get_acl",
+                    "contains": {
+                      "*": [
+                        "$principal:operator"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$comment": "review_listing stamps its decision on the listing's registry (set_namespace_approval); the marketplace must be an _approvers publisher there.",
+                  "method": "grant_publish",
+                  "args": {
+                    "namespace": "_approvers",
+                    "principal": "$canister:marketplace-backend"
+                  },
+                  "converged_when": {
+                    "query": "get_acl",
+                    "contains": {
+                      "_approvers": [
+                        "$canister:marketplace-backend"
+                      ]
+                    }
+                  }
+                }
               ]
             },
             {
