@@ -27,6 +27,30 @@
         "budget_tc": 300
       }
     },
+    "staging": {
+      "network": "ic",
+      "dns": {
+        "provider": "none"
+      },
+      "portal_url": "https://${canister:marketplace-frontend}.icp0.io",
+      "marketplace_host": "${canister:marketplace-frontend}.icp0.io",
+      "build_variant": "production",
+      "test_flags": {
+        "test_mode": false,
+        "ii_bypass": false
+      },
+      "principals": {
+        "operator": "755e2-cbcwn-7m7cb-k37ax-yez2m-q2p5p-rr3ug-neqbx-lxjmi-awsk3-uqe",
+        "billing_service": "755e2-cbcwn-7m7cb-k37ax-yez2m-q2p5p-rr3ug-neqbx-lxjmi-awsk3-uqe",
+        "signer_2": "7mx7e-iesva-6xdkj-yrrrb-bwfyl-qmwmm-unfhg-zi74g-q3oyl-lz42d-dqe",
+        "signer_3": "55alf-xclhd-rtshz-lk4lo-wav4q-q3a5e-sktkm-zlshq-vvhjs-re6os-wae"
+      },
+      "cycles": {
+        "min_balance_tc": 1.0,
+        "budget_tc": 20
+      },
+      "$comment": "Rehearsal of the production deploy on the IC: same sheet, no DNS, canister URLs only; the deploy identity is the multisig operator so every step (proposals, hand-over, retirement) can be driven end to end. Torn down after the rehearsal."
+    },
     "production": {
       "network": "ic",
       "dns": {
