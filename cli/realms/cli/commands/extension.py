@@ -785,7 +785,12 @@ def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=
             pin_file = _hsm_pin_file()
             if pin_file:
                 cmd.extend(["--identity-password-file", pin_file])
-        cmd.extend(["--network", _ICP_NETWORK_ALIASES.get(network, network or "ic")])
+        icp_network = _ICP_NETWORK_ALIASES.get(network, network or "ic")
+        cmd.extend(["--network", icp_network])
+        if icp_network.startswith(("http://", "https://")):
+            # A replica by URL (the Casals e2e harness's local network): icp
+            # needs to be told where the root key comes from.
+            cmd.extend(["--root-key", "fetch"])
         if is_query:
             cmd.append("--query")
     else:

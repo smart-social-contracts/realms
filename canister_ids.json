@@ -1,45 +1,42 @@
 {
   "casals_backend": {
-    "production": "irfdo-ziaaa-aaaai-raswa-cai"
-  },
-  "casals_file_registry": {
-    "production": "iwef2-uqaaa-aaaai-raswq-cai"
-  },
-  "casals_file_registry_frontend": {
-    "production": "iddux-vyaaa-aaaai-rasva-cai"
+    "production": "gih4j-uaaaa-aaaap-quzya-cai"
   },
   "casals_frontend": {
-    "production": "iecsd-yaaaa-aaaai-rasvq-cai"
+    "production": "5kxvc-viaaa-aaaaf-qg3xq-cai"
   },
   "file_registry": {
-    "production": "fzan7-diaaa-aaaas-amx4q-cai"
+    "production": "g2blq-yqaaa-aaaap-quz3a-cai"
   },
   "file_registry_frontend": {
     "ic": "rbex3-xyaaa-aaaah-qumma-cai",
-    "production": "fqdgd-vaaaa-aaaas-amx5a-cai"
+    "production": "g5ane-viaaa-aaaap-quz3q-cai"
   },
   "marketplace_backend": {
-    "production": "fxcax-yyaaa-aaaas-amx5q-cai"
+    "production": "gudgy-daaaa-aaaap-quz2a-cai"
   },
   "marketplace_frontend": {
-    "production": "fcfr2-zqaaa-aaaas-amx6a-cai"
+    "production": "gtcam-oyaaa-aaaap-quz2q-cai"
   },
   "nft_backend": {
-    "production": "flg2g-pyaaa-aaaas-amx7q-cai"
-  },
-  "nft_frontend": {
-    "production": "q3qdq-paaaa-aaaas-amyaa-cai"
+    "production": "hxpp6-xyaaa-aaaap-quz4q-cai"
   },
   "token_backend": {
-    "production": "ffexo-uiaaa-aaaas-amx6q-cai"
-  },
-  "token_frontend": {
-    "production": "fmh4s-caaaa-aaaas-amx7a-cai"
+    "production": "hqojk-2aaaa-aaaap-quz4a-cai"
   },
   "website": {
     "ic": "6kdvx-3yaaa-aaaah-qqo5a-cai"
   },
   "multisig": {
-    "production": "i7hog-cyaaa-aaaai-rasxa-cai"
+    "production": "gbexv-ciaaa-aaaap-quzzq-cai"
+  },
+  "casals_wasms": {
+    "production": "pwurj-gyaaa-aaaan-q6q2q-cai"
+  },
+  "demo_backend": {
+    "production": "h6mec-bqaaa-aaaap-quz5a-cai"
+  },
+  "demo_frontend": {
+    "production": "hzncw-miaaa-aaaap-quz5q-cai"
   }
 }

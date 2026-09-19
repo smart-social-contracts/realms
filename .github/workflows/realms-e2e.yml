@@ -171,6 +171,32 @@ jobs:
           DFX_WARNING: -mainnet_plaintext_identity
         run: python3 tests/integration/test_cross_quarter_live.py
 
+      # ── content: publish a package and list it on the marketplace ───────────
+      # `casals up` provisions canisters, not content. The sheet granted the
+      # operator (`local-dev`) publish rights on the fleet registry and a
+      # developer license + reviewer seat on the marketplace; the product CLI
+      # does the rest. A listing ends `verified` only if the whole chain works:
+      # registry ACL → create_extension (license) → review_listing (reviewer)
+      # → set_namespace_approval on the registry (marketplace is _approvers).
+      - name: Publish a package and its marketplace listing
+        working-directory: realms
+        env:
+          CASALS_HOME: ${{ env.CASALS_HOME }}/realms-product
+        run: |
+          export TERM=xterm
+          FILE_REGISTRY=$(python3 -c 'import json; print(json.load(open("/tmp/export.json"))["bindings"]["fleet-file-registry"])')
+          MARKETPLACE=$(python3 -c 'import json; print(json.load(open("/tmp/export.json"))["bindings"]["marketplace-backend"])')
+          NETWORK_URL=$(python3 -c "import json; print(json.load(open('$CASALS_HOME/realms-product.local.json'))['network_url'])")
+          echo "fleet-file-registry = $FILE_REGISTRY, marketplace = $MARKETPLACE on $NETWORK_URL"
+          pip install -e cli >/dev/null
+          realms files publish --network "$NETWORK_URL" --registry "$FILE_REGISTRY" --identity local-dev \
+            --extensions-only --extensions hello_world
+          realms marketplace publish --network "$NETWORK_URL" --marketplace "$MARKETPLACE" --registry "$FILE_REGISTRY" \
+            --identity local-dev --extensions-only --extensions hello_world
+          icp canister call "$MARKETPLACE" get_extension_details '("hello_world")' --query \
+            --network "$NETWORK_URL" --root-key fetch --identity local-dev | tee /tmp/listing.txt
+          grep -q 'verification_status = "verified"' /tmp/listing.txt
+
       - name: Show orchestra state on failure
         if: failure()
         working-directory: Casals
