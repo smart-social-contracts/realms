@@ -154,7 +154,7 @@
         "family": "realm-backend",
         "version": "main",
         "source": "local:.basilisk/realm_backend/realm_backend.wasm",
-        "sha256": "299fb2cadca0e923d20cf02716a1c83e0f5aee627f33b964236f83175e900402"
+        "sha256": "14a55a15b3a2a84a522227f1128547d4c630a385f86979ae08307e4a8f7b3e3d"
       },
       {
         "family": "token-backend",
