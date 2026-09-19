@@ -34,6 +34,27 @@ in the sheet's `environments` block.
 Realm *instances* that users deploy through the GaaS portal are stands of the
 **GaaS** orchestra, not this one. See `gos-as-a-service/docs/OPERATIONS.md`.
 
+## Custom domain, after `up`
+
+`casals up` does not touch DNS (`domains` reports `unverifiable`). The sheet's
+`domains` block (`realmsgos.org` → `marketplace-frontend`) is applied by the
+product CLI, which reads the canister id from the conductor:
+
+```sh
+# from realms/, with CASALS_HOME pointing at the bindings `casals up` wrote
+realms domains check casals.json -e production            # read-only, exit 1 on drift
+export CLOUDFLARE_API_TOKEN=…                             # Zone:Read + DNS:Edit on the zone; never commit it
+realms domains apply casals.json -e production            # Cloudflare records → IC gateway registration → HTTP 200
+```
+
+`apply` is idempotent and is what a re-minted frontend needs: it rewrites the
+`_canister-id` TXT record and re-points (`PATCH`) the existing gateway
+registration, then waits until `https://<host>/` answers. Run it **before**
+destroying the previous frontend — the gateway validates the new canister's
+`/.well-known/ic-domains`, and the old canister's disappearance is what takes
+the site down. The same command serves the GaaS sheet
+(`realms domains apply ../gos-as-a-service/casals.json -e production`).
+
 ## Checks
 
 ```sh

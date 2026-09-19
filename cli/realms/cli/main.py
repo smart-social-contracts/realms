@@ -11,6 +11,7 @@ from rich.table import Table
 from .commands.create import create_command
 from .commands.db import db_command, db_find_command, db_get_command, db_schema_command
 from .commands.deploy import deploy_command
+from .commands.domains import domains_app
 from .commands.import_data import import_data_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command, codex_command
@@ -730,6 +731,7 @@ def mundus_deploy(
 # Create files subcommand group
 files_app = typer.Typer(name="files", help="File registry operations")
 app.add_typer(files_app, name="files", rich_help_panel="Lifecycle")
+app.add_typer(domains_app, name="domains", rich_help_panel="Lifecycle")
 
 
 @files_app.command("publish")
