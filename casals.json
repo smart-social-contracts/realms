@@ -71,23 +71,14 @@
         "$multisig"
       ]
     },
-    "file_registry": {
-      "wasm": "file-registry",
-      "kind": "backend",
-      "mode": "managed",
-      "controllers": [
-        "$self"
-      ],
-      "cycles": {
-        "min_balance_tc": 30
-      }
-    },
-    "file_registry_frontend": {
-      "wasm": "file-registry-frontend",
+    "wasms": {
+      "$comment": "WASM store (casals-wasms): the certified-assets canister every artifact Casals installs is served from (Casals issue #48). The operator stays a controller so `casals up` can upload into it — the deployer locally, prod-identity in production. The conductor's own file registry it replaced is pooled on the first `casals up`; the fleet file registry below is a product canister and stays.",
+      "wasm": "certified-assets@0.3.0",
       "kind": "frontend",
       "mode": "managed",
       "controllers": [
-        "$self"
+        "$self",
+        "$principal:operator"
       ]
     },
     "commanders": [
@@ -102,7 +93,7 @@
   },
   "governance": {
     "multisig": {
-      "wasm": "orchestration-multisig@1.5.0",
+      "wasm": "orchestration-multisig@1.6.0",
       "kind": "backend",
       "mode": "managed",
       "signers": [
@@ -121,47 +112,61 @@
     }
   ],
   "registry": {
-    "$comment": "Product wasms are built in this repo before `casals up` (local:; recipes: .github/workflows/release.yml build steps); conductor wasms by the Casals CLI (build:); ic-tokens wasms are the v0.1.0 release copies in .external-wasms.",
+    "$comment": "Product wasms are built in this repo and ../file-registry before `casals up` (local:; recipes in .github/workflows/realms-e2e.yml); the conductor wasm by the Casals CLI (build:). Production requires a sha256 pin on every row: run `casals pin casals.json` after building and commit the result.",
     "wasms": [
       {
         "family": "casals-backend",
         "version": "main",
-        "source": "build:casals_backend"
+        "source": "build:casals_backend",
+        "sha256": "659f9c0d0a863a3ff839e572efd5e7ebe1e7bcec0999875662af08b97397abe9"
+      },
+      {
+        "family": "certified-assets",
+        "version": "0.3.0",
+        "source": "local:seed/templates/certified-assets@0.3.0.wasm.gz",
+        "sha256": "75df75f39763077fd0333b4ac46ba03b2b23ec313fa85f79a2097bd98bb363d1"
       },
       {
         "family": "file-registry",
         "version": "main",
-        "source": "build:ic_file_registry"
+        "source": "local:../file-registry/.basilisk/ic_file_registry/ic_file_registry.wasm",
+        "sha256": "fe216683b8d229f32ca0b1788637c56368aa4d8b462e2c5d52e63d21b62ed782"
       },
       {
         "family": "orchestration-multisig",
-        "version": "1.5.0",
-        "source": "local:seed/templates/orchestration-multisig@1.5.0.wasm.gz"
+        "version": "1.6.0",
+        "source": "local:seed/templates/orchestration-multisig@1.6.0.wasm.gz",
+        "sha256": "c8d3adecf9bea8d9e7811cfa5d9eda8f61723c770f85132b91c8b2cffb37974f"
       },
       {
         "family": "certified-assets",
         "version": "1.0.0",
-        "source": "local:seed/templates/hello-world-frontend.wasm.gz"
+        "source": "local:seed/templates/hello-world-frontend.wasm.gz",
+        "sha256": "63d122d0149a29f4e48603efdd7d2bce656a6a83bac1e3207897c68e8e225bb6"
       },
       {
         "family": "marketplace-backend",
         "version": "main",
-        "source": "local:.basilisk/marketplace_backend/marketplace_backend.wasm"
+        "source": "local:.basilisk/marketplace_backend/marketplace_backend.wasm",
+        "sha256": "28f07a68eb1ce965806f2125e4719c8e1489cc37171b68f653fca0758c05e5f5"
       },
       {
         "family": "realm-backend",
         "version": "main",
-        "source": "local:.basilisk/realm_backend/realm_backend.wasm"
+        "source": "local:.basilisk/realm_backend/realm_backend.wasm",
+        "sha256": "299fb2cadca0e923d20cf02716a1c83e0f5aee627f33b964236f83175e900402"
       },
       {
         "family": "token-backend",
         "version": "0.1.0",
-        "source": "local:.external-wasms/token_backend.wasm"
+        "source": "local:.external-wasms/token_backend.wasm",
+        "sha256": "b3f1db3a3f6b928bdb00d49c9396c87004690e5a23a487384ba0c308ae7e685f"
       },
       {
         "family": "nft-backend",
         "version": "0.1.0",
-        "source": "local:.external-wasms/nft_backend.wasm"
+        "source": "local:.external-wasms/nft_backend.wasm",
+        "sha256": "497af917df8190c039d9c0c888c36a6c626c612847c31e43231cf4634f07aad6"
       }
     ],
     "publish": [

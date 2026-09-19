@@ -19,6 +19,7 @@ env:
   NODE_VERSION: "20"
   DFX_VERSION: "0.32.0"
   CASALS_VERSION: "main"
+  FILE_REGISTRY_VERSION: "main"
   IC_TOKENS_VERSION: "0.1.0"
   CASALS_HOME: ${{ github.workspace }}/casals-home
   CASALS_E2E_ENV: local
@@ -45,6 +46,16 @@ jobs:
           ref: ${{ env.CASALS_VERSION }}
           path: Casals
           submodules: recursive
+
+      # The fleet file registry (realm branding, extensions, catalogs) is the
+      # standalone file-registry canister; casals.json reads its wasm from
+      # ../file-registry/.basilisk (sibling checkout).
+      - name: Checkout file-registry (fleet file registry wasm)
+        uses: actions/checkout@v4
+        with:
+          repository: smart-social-contracts/file-registry
+          ref: ${{ env.FILE_REGISTRY_VERSION }}
+          path: file-registry
 
       - uses: actions/setup-python@v5
         with:
@@ -89,6 +100,12 @@ jobs:
       # and asserts build_variant=test in converged_when, so both halves of the
       # realm are built as the test variant here. Production builds are the
       # default everywhere else (see AGENTS.md, "Build variants").
+      - name: Build fleet file registry (file-registry/.basilisk/ic_file_registry)
+        working-directory: file-registry
+        run: |
+          make build
+          ls -l .basilisk/ic_file_registry/ic_file_registry.wasm
+
       - name: Build realm backend (test variant) and marketplace backend
         working-directory: realms
         run: |
