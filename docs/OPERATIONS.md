@@ -55,6 +55,44 @@ destroying the previous frontend — the gateway validates the new canister's
 the site down. The same command serves the GaaS sheet
 (`realms domains apply ../gos-as-a-service/casals.json -e production`).
 
+## Content, after `up`
+
+`casals up` provisions canisters; it does not put packages in them. The
+controllers of every product canister are the conductor and the multisig,
+so the sheet grants the **operator** (`environments.<env>.principals.operator`)
+what the product CLI needs, through config rows the conductor applies:
+
+| canister | row | gives the operator |
+|---|---|---|
+| `fleet-file-registry` | `grant_publish {namespace: "*"}` | upload to every namespace (`realms files publish`) |
+| `fleet-file-registry` | `grant_publish {namespace: "_approvers"}` → marketplace | lets `review_listing` stamp approvals on the registry |
+| `marketplace-backend` | `admin_grant_publisher {reviewer: true}` | developer license (to submit) + reviewer seat (to approve) |
+
+Then, with the operator identity (a hardware key: `export DFX_HSM_PIN=…`
+first; the CLI passes it to every `icp` call):
+
+```sh
+# ids from the live conductor, never from a table in the repo
+casals -e production export casals.json          # bindings: fleet-file-registry, marketplace-backend
+
+# packages the marketplace lists (its listings name this registry)
+realms files publish -n ic --registry <fleet-file-registry> --identity prod-identity
+realms marketplace publish -n ic --marketplace <marketplace-backend> --registry <fleet-file-registry> --identity prod-identity
+```
+
+`marketplace publish` creates or updates a listing for every first-party
+extension and codex (the same set `files publish` uploads) and approves it as
+reviewer; a listing ends `verified` only when the registry accepted the
+approval stamp. Re-running either command is idempotent (unchanged files are
+skipped, listings are upserted).
+
+Packages that realms **install** through the GaaS portal are fetched from the
+GaaS orchestra's own `file-registry` (its installer's `file_registry_id`), so
+they are published there too — see `gos-as-a-service/docs/OPERATIONS.md`.
+
+CI (`realms-e2e.yml`) runs this chain on the converged local orchestra and
+fails when a listing does not come back `verified`.
+
 ## Checks
 
 ```sh
