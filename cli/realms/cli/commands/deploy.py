@@ -518,9 +518,9 @@ def deploy_command(
 ) -> None:
     """dfx-deploy a generated realm folder (local development).
 
-    Fleet environments are not deployed from here: `casals up` converges the
-    sheet (docs/OPERATIONS.md) and `realms new --gaas-config` creates realms
-    through the GOS queue.
+    Fleet environments are not deployed from here: `casals up` builds the
+    sheet, `casals upgrade` ships a new build (docs/OPERATIONS.md) and
+    `realms new --gaas-config` creates realms through the GOS queue.
     """
     # Auto-detect folder and deploy
     if not folder:
