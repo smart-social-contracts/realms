@@ -12,6 +12,19 @@ export const NOTICE_LOCALE_SLOTS = [
 	'ca-valencia'
 ] as const;
 
+export function noticeTranslationSlots(
+	slots: readonly string[] = NOTICE_LOCALE_SLOTS
+): string[] {
+	return slots.filter((loc) => loc !== 'en');
+}
+
+export function filledNoticeTranslationCount(
+	bodies: DemoNoticeBodies | null | undefined
+): number {
+	const map = bodies && typeof bodies === 'object' ? bodies : {};
+	return noticeTranslationSlots().filter((loc) => String(map[loc] || '').trim()).length;
+}
+
 export const REALMS_TOKEN_ID = 'REALMS';
 
 export function defaultDisableMonetaryTokens(network?: string | null): boolean {

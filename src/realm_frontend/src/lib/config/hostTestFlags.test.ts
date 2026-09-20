@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+	filledNoticeTranslationCount,
 	isTokenChoiceSelectable,
 	monetaryUnavailableLabel,
+	NOTICE_LOCALE_SLOTS,
+	noticeTranslationSlots,
 	resolveDemoNoticeEnabled,
 	resolveDemoNoticeView,
 	resolveDisableMonetaryTokens,
@@ -61,5 +64,26 @@ describe('hostTestFlags', () => {
 		expect(view.showPrimary).toBe(false);
 		expect(view.primary).toBe('');
 		expect(view.english).toBe('English notice.');
+	});
+
+	it('treats every notice locale except English as a translation slot', () => {
+		expect(noticeTranslationSlots()).toEqual(['es', 'de', 'fr', 'it', 'zh-CN', 'ca-valencia']);
+		expect(noticeTranslationSlots(NOTICE_LOCALE_SLOTS)).not.toContain('en');
+	});
+
+	it('counts only non-empty translation slots', () => {
+		expect(filledNoticeTranslationCount(undefined)).toBe(0);
+		expect(filledNoticeTranslationCount({ en: 'English notice.', es: '  ', de: 'Hinweis' })).toBe(1);
+		expect(
+			filledNoticeTranslationCount({
+				en: 'English notice.',
+				es: 'Aviso',
+				de: 'Hinweis',
+				fr: '',
+				it: '',
+				'zh-CN': '',
+				'ca-valencia': ''
+			})
+		).toBe(2);
 	});
 });

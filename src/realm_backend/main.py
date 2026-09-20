@@ -2431,22 +2431,17 @@ def set_test_flags_json(args: text) -> text:
         flags = params.get("test_flags")
         if not isinstance(flags, dict):
             flags = params if isinstance(params, dict) else {}
+        # Drop product/unknown keys rather than 400. The footer editor still
+        # sends the full form (demo notice, monetary tokens, …); those stay
+        # behind set_canister_config. Rejecting them made Save fail after the
+        # taxonomy split even when the caller only meant to flip ii_bypass.
+        flags = {
+            k: v
+            for k, v in flags.items()
+            if is_test_only_flag(normalize_flag_key(k))
+        }
         if not flags:
             return json.dumps({"success": False, "error": "No test_flags provided"})
-
-        rejected = [k for k in flags if not is_test_only_flag(normalize_flag_key(k))]
-        if rejected:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": (
-                        "Not editable without admin rights: "
-                        + ", ".join(sorted(rejected))
-                        + ". This endpoint only accepts test-only flags; use "
-                        "set_canister_config for realm configuration."
-                    ),
-                }
-            )
         resp = _set_canister_config_impl(test_flags_json=json.dumps(flags))
         return json.dumps(_realm_response_to_json_dict(resp))
     except Exception as e:
