@@ -188,8 +188,14 @@ jobs:
           npm run build --workspace packages/extension-bridge
           (cd src/realm_frontend && npm run build && test -f dist/index.html)
           python3 scripts/check_frontend_variant.py src/realm_frontend/dist production
-          tar czf realm_frontend.tar.gz -C src/realm_frontend/dist .
-          echo "✅ Frontend tarball built ($(stat -c%s realm_frontend.tar.gz) bytes)"
+          # A Casals asset bundle (Casals/docs/BUNDLES.md): canonical tarball with
+          # manifest.json inside; its *bundle hash* is what a sheet pins in
+          # registry.publish[].sha256 and what /files → Upload bundle verifies.
+          # casals_cli.bundle is stdlib-only, so a bare clone is enough.
+          git clone --depth 1 https://github.com/smart-social-contracts/Casals /tmp/casals
+          (cd /tmp/casals && python3 -m casals_cli.bundle "$GITHUB_WORKSPACE/src/realm_frontend/dist" \
+             -o "$GITHUB_WORKSPACE/realm_frontend.tar.gz" --manifest "$GITHUB_WORKSPACE/realm_frontend.manifest.json")
+          echo "✅ Frontend bundle built ($(stat -c%s realm_frontend.tar.gz) bytes)"
 
       - name: Compute release asset checksums
         if: ${{ inputs.cli_only != true }}
@@ -199,10 +205,14 @@ jobs:
             [ -f "$f" ] && sha256sum "$f" >> checksums.txt
           done
           cat checksums.txt
+          BUNDLE_HASH=$(python3 -c "import json; print(json.load(open('realm_frontend.manifest.json'))['bundle_sha256'])")
+          echo "# bundle hash of realm_frontend.tar.gz (pin as registry.publish[].sha256)" >> checksums.txt
+          echo "${BUNDLE_HASH}  realm_frontend.tar.gz (bundle)" >> checksums.txt
           BACKEND_HASH=$(awk '/realm_backend\.wasm\.gz/ {print $1}' checksums.txt)
-          FRONTEND_HASH=$(awk '/realm_frontend\.tar\.gz/ {print $1}' checksums.txt)
+          FRONTEND_HASH=$(awk '/realm_frontend\.tar\.gz$/ {print $1}' checksums.txt)
           echo "Backend checksum: ${BACKEND_HASH}"
-          echo "Frontend checksum: ${FRONTEND_HASH}"
+          echo "Frontend tarball checksum: ${FRONTEND_HASH}"
+          echo "Frontend bundle hash: ${BUNDLE_HASH}"
 
       - name: Build and publish CLI to PyPI
         env:
@@ -235,6 +245,7 @@ jobs:
             realm_backend.wasm.gz
             realm_backend.did
             realm_frontend.tar.gz
+            realm_frontend.manifest.json
             checksums.txt
 
       - name: Create GitHub Release (CLI / PyPI only)

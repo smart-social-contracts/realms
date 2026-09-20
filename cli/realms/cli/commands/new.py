@@ -2436,6 +2436,9 @@ def _extract_frontend_archive(archive: Path, dest: Path) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive, "r:gz") as tar:
         tar.extractall(dest)
+    # Release tarballs are Casals asset bundles (Casals/docs/BUNDLES.md): the
+    # metadata file inside is for the bundle hash, not for the asset canister.
+    (dest / ".casals-bundle.json").unlink(missing_ok=True)
     nested = dest / "dist"
     if nested.is_dir() and any(nested.iterdir()):
         return nested

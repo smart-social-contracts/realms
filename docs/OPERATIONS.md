@@ -27,9 +27,49 @@ flags. Then, from the Casals repo:
 python -m casals_cli.main -e local --identity local-dev up ../realms/casals.json --yes
 ```
 
-The same command with `-e ic` and the environment's deployer identity is the
-production procedure. Environment differences (principals, DNS, flags) live
-in the sheet's `environments` block.
+The same command with `-e production` and the environment's deployer identity
+is the production procedure. Environment differences (principals, DNS, flags)
+live in the sheet's `environments` block. Two things production needs on top:
+
+- **Pins.** `up -e production` requires a `sha256` on every `registry.wasms`
+  row *and* every `registry.publish` row (the frontend bundles: their hash is
+  the *bundle hash* of `Casals/docs/BUNDLES.md`). After building, `casals pin
+  casals.json` writes both; `casals pin --check` in CI catches drift.
+- **Bindings and the key.** Every command after the first `up` reads the
+  conductor id from `$CASALS_HOME/<orchestra>.production.json`; point
+  `CASALS_HOME` at the directory that holds it, or `up` will think there is no
+  conductor and stop (it refuses to bootstrap a second production conductor
+  without `--bootstrap`). With a touch-policy hardware key as `--identity`,
+  add `--upload-identity <plaintext identity>` so the hundreds of store
+  uploads of step 4 do not each ask for a touch; the key still signs
+  bootstrap, `set_sheet` and every apply. The CLI prints `signing <method> as
+  <identity>` before each HSM call so you know when to touch.
+
+## Updating a frontend (marketplace, demo realm)
+
+A frontend canister serves exactly the bundle its `content` names, so a new
+build is a new bundle, not a new canister:
+
+```sh
+# realms/: build, then pack the dist into a canonical hashed bundle
+casals bundle src/marketplace_frontend/dist -o marketplace-<version>.tgz   # prints the bundle sha256
+```
+
+Then either edit the sheet (`registry.publish` row → `local:marketplace-<version>.tgz`
++ its `sha256`, or a release asset URL) and `up` — or, without the CLI or the
+deployer key at all, as a commander with `wasm.upload` + `sheet.apply`: Casals
+frontend → **Files → Upload bundle** (pick the `dist/` folder or the `.tgz`;
+hashing, diff against the store and the one-batch upload happen in the
+browser) → **Pin in sheet** → **Plan / Drift → Apply** the `sync_assets`
+item. The same page shows, per bundle, whether the store matches the pin and
+which canisters serve it.
+
+`Realms/demo` (the demo realm: real realm wasm + realm frontend bundle) is
+the stand you usually do *not* want dragged along by a marketplace fix. Mark
+it `"sync": "manual"` in the sheet: `plan`/`up` then report its drift under
+*manual* and leave it alone, and you deploy it on purpose with
+`casals up casals.json --stand demo` (its `content` must be pinned — the guard
+for a stand nothing reconciles routinely).
 
 Realm *instances* that users deploy through the GaaS portal are stands of the
 **GaaS** orchestra, not this one. See `gos-as-a-service/docs/OPERATIONS.md`.
