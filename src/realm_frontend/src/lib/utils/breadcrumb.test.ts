@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SidebarConfig } from '../config/sidebar';
 import { bootI18n } from '../i18n/boot';
-import { extensionLoadingMessage, resolveBreadcrumb, resolveExtensionLabel, shouldShowPageBreadcrumb } from './breadcrumb';
+import { extensionLoadingMessage, isNavItemActive, resolveBreadcrumb, resolveExtensionLabel, shouldShowPageBreadcrumb } from './breadcrumb';
 
 bootI18n('en');
 
@@ -32,6 +32,20 @@ const config: SidebarConfig = {
 	defaultPath: '/extensions/member_dashboard',
 };
 
+describe('isNavItemActive', () => {
+	it('highlights Justice on the extension path and portal host path', () => {
+		expect(isNavItemActive('/extensions/justice_litigation', '/extensions/justice_litigation')).toBe(
+			true,
+		);
+		expect(
+			isNavItemActive(
+				'/extensions/justice_litigation',
+				'/r/agorastaging/extensions/justice_litigation',
+			),
+		).toBe(true);
+	});
+});
+
 describe('resolveBreadcrumb', () => {
 	it('maps utility routes', () => {
 		expect(resolveBreadcrumb('/settings', config)).toEqual([{ label: 'Settings' }]);
@@ -45,6 +59,13 @@ describe('resolveBreadcrumb', () => {
 
 	it('maps category extension items', () => {
 		expect(resolveBreadcrumb('/extensions/voting', config)).toEqual([
+			{ label: 'Governance' },
+			{ label: 'Voting' },
+		]);
+	});
+
+	it('maps portal-prefixed extension paths the same as iframe paths', () => {
+		expect(resolveBreadcrumb('/r/agorastaging/extensions/voting', config)).toEqual([
 			{ label: 'Governance' },
 			{ label: 'Voting' },
 		]);

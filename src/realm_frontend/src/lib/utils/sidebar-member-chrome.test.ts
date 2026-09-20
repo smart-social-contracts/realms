@@ -96,7 +96,8 @@ describe('Sidebar.svelte membership gate', () => {
 
 	it('re-expands folds after membership profiles arrive so Import & Export can highlight', () => {
 		expect(sidebar).toContain("isRealmMember($userProfiles) ? 'member' : 'guest'");
-		expect(sidebar).toContain('`${path}${search}|${membership}`');
+		expect(sidebar).toContain('sidebarFoldExpandKey');
+		expect(sidebar).toContain('activeSidebarFoldIds');
 	});
 
 	it('reloads sidebar config when the UI locale changes', () => {

@@ -63,7 +63,7 @@ export function resolveExtensionRepoUrl(
 }
 
 export function parseExtensionIdFromPath(pathname: string): string | null {
-	const match = pathname.match(/^\/extensions\/([^/]+)/);
+	const match = pathname.match(/\/extensions\/([^/]+)/);
 	return match?.[1] ?? null;
 }
 

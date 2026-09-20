@@ -30,11 +30,6 @@ describe('MY MUNDUS super-category styling', () => {
 		const mundusDesktop = sidebar.lastIndexOf('<!-- MY MUNDUS section (super-category) -->');
 		const realmDesktopClose = sidebar.lastIndexOf("setFoldOpen('__section_realm__'");
 		expect(mundusDesktop).toBeGreaterThan(realmDesktopClose);
-
-		const inRealmBlock = sidebar.slice(
-			sidebar.indexOf('const inRealm ='),
-			sidebar.indexOf('if (inRealm)'),
-		);
-		expect(inRealmBlock).not.toContain('mundusItems');
+		expect(sidebar).toContain('activeSidebarFoldIds');
 	});
 });

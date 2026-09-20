@@ -14,7 +14,7 @@
 	import { shouldShowMeSection, visibleSidebarCategories, isRealmMember } from '$lib/utils/sidebar-member-chrome';
 	import { unreadCount } from '$lib/stores/notifications';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
-	import { isNavItemActive } from '$lib/utils/breadcrumb';
+	import { activeSidebarFoldIds, sidebarFoldExpandKey, sidebarItemIsActive } from '$lib/utils/sidebar-active';
 	import { IconLogin, IconLayoutDashboard } from '@tabler/icons-svelte';
 	import SidebarFold from './SidebarFold.svelte';
 	// @ts-ignore
@@ -36,25 +36,21 @@
 	$: showMeSection = shouldShowMeSection($isAuthenticated, $userProfiles);
 	$: sidebarCategories = visibleSidebarCategories($sidebarConfig?.categories, $userProfiles);
 
-	function navIsActive(href: string, pathname = navPathname, search = navSearch): boolean {
-		return isNavItemActive(href, pathname, search);
-	}
-
 	function isActive(href: string, pathname = navPathname, search = navSearch): boolean {
-		return navIsActive(href, pathname, search);
+		return sidebarItemIsActive({ href }, pathname, search);
 	}
 
 	function itemClasses(href: string, pathname: string, search: string): string {
 		return cn(
 			styles.sidebar.item(),
-			navIsActive(href, pathname, search) ? cn(ACTIVE_ITEM_CLASSES, styles.sidebar.itemActive()) : '',
+			isActive(href, pathname, search) ? cn(ACTIVE_ITEM_CLASSES, styles.sidebar.itemActive()) : '',
 		);
 	}
 
 	function iconClasses(href: string, extra = '', pathname = navPathname, search = navSearch): string {
 		return cn(
 			extra,
-			navIsActive(href, pathname, search) ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-900',
+			isActive(href, pathname, search) ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-900',
 		);
 	}
 
@@ -181,31 +177,9 @@
 		// contain the current route. Avoids stale expanded categories from prior
 		// navigation or old localStorage entries.
 		const next = defaultFoldOpen(config);
-
-		if (topUtilityItems.some((item) => navIsActive(item.href, pathname, search))) {
-			next.__section_me__ = true;
+		for (const id of activeSidebarFoldIds(config, pathname, search, get(userProfiles))) {
+			next[id] = true;
 		}
-
-		const categories = visibleSidebarCategories(config.categories, get(userProfiles));
-		const activeCategory = categories.find((category) =>
-			category.items.some((item) => navIsActive(item.href, pathname, search)),
-		);
-		const inRealm =
-			config.welcomeItems.some((item) => navIsActive(item.href, pathname, search)) ||
-			activeCategory;
-
-		if (inRealm) {
-			next.__section_realm__ = true;
-		}
-
-		if (activeCategory) {
-			next[activeCategory.id] = true;
-		}
-
-		if (config.mundusItems.some((item) => navIsActive(item.href, pathname, search))) {
-			next.__section_mundus__ = true;
-		}
-
 		foldOpen = next;
 	}
 
@@ -233,21 +207,17 @@
 		initFoldOpen($sidebarConfig);
 	}
 
-	// Expand the section that contains the current page, but only when the
-	// route changes. Re-running on every sidebarConfig refresh (cache, then
-	// live fetch) would snap user-toggled folds back open.
+	// Expand folds for the current page. Key includes the resolved fold ids so
+	// a stale sidebar cache (no Justice yet) re-expands when get_sidebar lands.
+	// userHasToggledFolds still blocks snapping a manual collapse back open.
 	let lastFoldExpandKey = '';
 	$: if ($sidebarConfig && $isAuthenticated && $page.url.pathname && !userHasToggledFolds) {
 		const path = $page.url.pathname;
 		const search = $page.url.search;
 		const membership = isRealmMember($userProfiles) ? 'member' : 'guest';
-		const hasItems =
-			($sidebarConfig.welcomeItems?.length || 0) +
-				($sidebarConfig.categories?.length || 0) +
-				($sidebarConfig.mundusItems?.length || 0) >
-			0;
-		const key = `${path}${search}|${membership}`;
-		if (hasItems && lastFoldExpandKey !== key) {
+		const foldIds = activeSidebarFoldIds($sidebarConfig, path, search, $userProfiles);
+		const key = sidebarFoldExpandKey(path, search, membership, foldIds);
+		if (lastFoldExpandKey !== key) {
 			expandForActivePage($sidebarConfig, path, search);
 			lastFoldExpandKey = key;
 			void tick().then(() => scrollActiveIntoView());

@@ -17,8 +17,15 @@ export interface BreadcrumbSegment {
 }
 
 export function normalizePath(pathname: string): string {
-	const path = pathname.split('?')[0].replace(/\/$/, '');
-	return path || '/';
+	const path = pathname.split('?')[0].replace(/\/$/, '') || '/';
+	// Portal host bar is `/r/<slug>/extensions/justice_litigation`; the iframe
+	// path is `/extensions/justice_litigation`. Accept both so sidebar highlight
+	// and breadcrumbs stay in sync if the page store ever sees the host path.
+	const realmPrefixed = path.match(/^\/r\/[^/]+(\/.*)?$/);
+	if (!realmPrefixed) return path;
+	const rest = realmPrefixed[1];
+	if (!rest) return '/';
+	return rest.replace(/\/$/, '') || '/';
 }
 
 export function pathMatches(href: string, path: string): boolean {

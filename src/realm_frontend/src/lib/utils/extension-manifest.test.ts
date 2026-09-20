@@ -86,6 +86,9 @@ describe('parseExtensionIdFromPath', () => {
 	it('extracts extension id from extension routes', () => {
 		expect(parseExtensionIdFromPath('/extensions/voting')).toBe('voting');
 		expect(parseExtensionIdFromPath('/extensions/voting/settings')).toBe('voting');
+		expect(parseExtensionIdFromPath('/r/agorastaging/extensions/justice_litigation')).toBe(
+			'justice_litigation',
+		);
 	});
 
 	it('returns null for non-extension routes', () => {
