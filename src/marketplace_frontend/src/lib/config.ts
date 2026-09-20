@@ -23,12 +23,28 @@ function pick(...keys: string[]): string {
 }
 
 /**
+ * Canister id written at deploy time into ``/canister_ids.js``
+ * (``globalThis.__CANISTER_IDS``, loaded synchronously by app.html before the
+ * bundle). One dist serves every environment, so this wins over whatever the
+ * build had in its env — which, under Casals, is nothing.
+ */
+export function runtimeCanisterId(key: string, ids: unknown = (globalThis as any).__CANISTER_IDS): string {
+  const v = ids && typeof ids === 'object' ? (ids as Record<string, unknown>)[key] : undefined;
+  return typeof v === 'string' && v.trim() !== '' ? v.trim() : '';
+}
+
+function canisterId(runtimeKey: string, ...envKeys: string[]): string {
+  return runtimeCanisterId(runtimeKey) || pick(...envKeys);
+}
+
+/**
  * Query the marketplace backend for the Realms GOS Casals frontend principal.
- * Written by ``realms seed`` after ``casals new`` — not baked into this SPA.
+ * Set by the sheet's ``set_casals_frontend_canister_id`` config row — not baked into this SPA.
  * Empty string if unset or fetch fails.
  */
 export async function resolveCasalsUrlLive(): Promise<string> {
-  const marketplace = pick(
+  const marketplace = canisterId(
+    'marketplace_backend',
     'VITE_CANISTER_ID_MARKETPLACE_BACKEND',
     'CANISTER_ID_MARKETPLACE_BACKEND'
   );
@@ -63,8 +79,8 @@ export const CONFIG = {
   // Marketplace + file_registry canister ids — primarily resolved via the
   // generated declarations module (declarations/marketplace_backend), but
   // exposed here for convenience (e.g. constructing file URLs).
-  marketplace_canister_id: pick('VITE_CANISTER_ID_MARKETPLACE_BACKEND', 'CANISTER_ID_MARKETPLACE_BACKEND'),
-  file_registry_canister_id: pick('VITE_CANISTER_ID_FILE_REGISTRY', 'CANISTER_ID_FILE_REGISTRY'),
+  marketplace_canister_id: canisterId('marketplace_backend', 'VITE_CANISTER_ID_MARKETPLACE_BACKEND', 'CANISTER_ID_MARKETPLACE_BACKEND'),
+  file_registry_canister_id: canisterId('file_registry', 'VITE_CANISTER_ID_FILE_REGISTRY', 'CANISTER_ID_FILE_REGISTRY'),
   internet_identity_canister_id: pick('VITE_CANISTER_ID_INTERNET_IDENTITY', 'CANISTER_ID_INTERNET_IDENTITY'),
 
   // Off-chain billing service that handles credit-card → Stripe → license payment.
