@@ -47,11 +47,24 @@ class TestDiscovery:
         assert ext.fields["download_url"] == "https://example.org/doc"
         assert mp.namespace_for(ext) == "ext/llm_chat/1.0.22"
 
-    def test_codex_fields_and_namespace(self, tmp_path):
+    def test_legacy_codex_fields_and_namespace(self, tmp_path):
+        # No backend/ dir: the legacy loose-files layout, still under the deprecated codex/ prefix
         cdx = [l for l in mp.discover(_tree(tmp_path)) if l.kind == "codex"][0]
         assert cdx.fields["realm_type"] == "municipality"
         assert cdx.fields["name"] == "Agora"
         assert mp.namespace_for(cdx) == "codex/agora/0.9.6"
+        assert mp.item_kind_for(cdx) == "codex"
+
+    def test_unified_codex_is_listed_where_files_publish_put_it(self, tmp_path):
+        # kind: codex + backend/ (every first-party codex): `realms files publish`
+        # uploads it through the extension pipeline to ext/<id>/<version>, so the
+        # listing must name that namespace or review_listing finds "no files".
+        root = _tree(tmp_path)
+        (root / "codices" / "codices" / "agora" / "backend").mkdir()
+        cdx = [l for l in mp.discover(root) if l.kind == "codex"][0]
+        assert mp.namespace_for(cdx) == "ext/agora/0.9.6"
+        assert mp.item_kind_for(cdx) == "codex"   # still reviewed as a codex
+        assert 'file_registry_namespace = "ext/agora/0.9.6"' in mp.listing_input(cdx, "reg")
 
     def test_missing_version_is_refused(self):
         with pytest.raises(ValueError, match="no version"):
@@ -80,6 +93,12 @@ class TestResults:
         ok, msg = mp.parse_generic_result('(variant { Err = "An active developer license is required" })')
         assert ok is False and "license" in msg
 
+    def test_generic_result_with_hashed_variant_tags(self):
+        # icp prints candid field-id hashes when it cannot fetch the .did: 17_724 = Ok, 3_456_837 = Err
+        assert mp.parse_generic_result('(variant { 17_724 = "updated:hello_world" })') == (True, "updated:hello_world")
+        ok, msg = mp.parse_generic_result('(variant { 3_456_837 = "nope" })')
+        assert ok is False and msg == "nope"
+
     def test_review_result(self):
         assert mp.parse_review_result(json.dumps({"success": True, "verification_status": "verified"})) == (True, "verified")
         assert mp.parse_review_result(json.dumps({"success": False, "error": "reviewers only"})) == (False, "reviewers only")
@@ -100,6 +119,8 @@ class TestPublish:
         assert (ok, failed) == (2, 0)
         assert [m for m, _ in calls] == ["create_codex", "review_listing", "create_extension", "review_listing"]
         assert calls[1][1] == '("codex", "agora", true, "first-party package")'
+        # review_listing speaks the marketplace's item_kind vocabulary: ext, not extension
+        assert calls[3][1] == '("ext", "llm_chat", true, "first-party package")'
 
     def test_failed_create_skips_review_and_counts(self, tmp_path):
         def fake_call(canister, method, arg, network, identity, **kw):

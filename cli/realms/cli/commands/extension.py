@@ -1543,8 +1543,17 @@ def _publish_namespace(
     payload = json.dumps({"namespace": namespace})
     candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
     raw = _dfx_call(
-        registry, "publish_namespace", candid_arg, network, identity, timeout=120
+        registry, "publish_namespace", candid_arg, network, identity, timeout=120,
+        raise_on_error=False,
     )
+    # The standalone file-registry canister (smart-social-contracts/file-registry)
+    # has no staging step: a stored file is live. Only the retired conductor-owned
+    # registry exposed publish_namespace, so its absence is success, not failure.
+    if "no update method" in str(raw).lower() or "ic0536" in str(raw).lower():
+        console.print(
+            f"  [dim]{registry} has no publish_namespace; stored files are live[/dim]"
+        )
+        return True
     try:
         res = json.loads(raw)
     except json.JSONDecodeError:

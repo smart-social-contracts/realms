@@ -96,61 +96,35 @@ jobs:
           test "$(icp identity principal --identity local-dev)" = "$(dfx identity get-principal --identity local-dev)"
 
       # ── product wasms and dists referenced by casals.json as `local:` ───────
-      # The `local` environment enables test flags (environments.local.test_flags)
-      # and asserts build_variant=test in converged_when, so both halves of the
-      # realm are built as the test variant here. Production builds are the
-      # default everywhere else (see AGENTS.md, "Build variants").
-      - name: Build fleet file registry (file-registry/.basilisk/ic_file_registry)
-        working-directory: file-registry
-        run: |
-          make build
-          ls -l .basilisk/ic_file_registry/ic_file_registry.wasm
-
-      - name: Build realm backend (test variant) and marketplace backend
+      # scripts/up.sh owns the build recipes (fleet file registry wasm + UI,
+      # realm backend/frontend as the variant environments.local.build_variant
+      # declares, marketplace, ic-tokens wasms) so that CI, local_up.sh and a
+      # production deploy build the same way. The `local` environment enables
+      # test flags and asserts build_variant=test in converged_when, so the
+      # realm halves are built as the test variant here (see AGENTS.md).
+      - name: Build everything the sheet references (scripts/up.sh --build-only)
         working-directory: realms
         run: |
-          CANISTER_CANDID_PATH="$PWD/src/realm_backend/realm_backend.did" \
-            python3 scripts/pack_realm_backend.py --variant test
-          CANISTER_CANDID_PATH="$PWD/src/marketplace_backend/marketplace_backend.did" \
-            python3 -m basilisk marketplace_backend src/marketplace_backend/main.py
-          ls -l .basilisk/realm_backend/realm_backend.wasm .basilisk/marketplace_backend/marketplace_backend.wasm
+          export TERM=xterm
+          scripts/up.sh -e local --build-only
 
-      - name: Build realm frontend (test variant) and marketplace frontend
+      # ── the orchestra: casals up from an empty replica, graded, populated ───
+      # The same script, remaining phases: the Casals harness starts the local
+      # replica, funds `local-dev`, then grades the sheet (fresh: converges from
+      # nothing, plan empty, oracle PASS; idempotent: a second up changes
+      # nothing) and leaves it up; the product CLI then publishes one package to
+      # the fleet registry and lists it on the marketplace, and the script
+      # asserts the listing ends `verified` — which only happens if the whole
+      # chain works: registry ACL → create_extension (license) → review_listing
+      # (reviewer) → set_namespace_approval on the registry (marketplace is
+      # _approvers). One extension keeps the step short; production publishes all.
+      - name: casals up + publish + verify (scripts/up.sh)
         working-directory: realms
-        run: |
-          # Workspace install from the repo root: installing inside a workspace
-          # hoists @sveltejs/kit to the root while vite stays nested, and kit
-          # then cannot resolve vite. The frontends import the workspace
-          # package @realmsgos/extension-bridge from its dist/, so build it first.
-          npm install --legacy-peer-deps
-          npm run build --workspace packages/extension-bridge
-          (cd src/realm_frontend && REALMS_BUILD_VARIANT=test npm run build && test -f dist/index.html)
-          python3 scripts/check_frontend_variant.py src/realm_frontend/dist test
-          (cd src/marketplace_frontend && npm run build && test -f dist/index.html)
-
-      - name: Fetch ic-tokens wasms (realms/.external-wasms)
-        working-directory: realms
-        run: |
-          mkdir -p .external-wasms
-          for w in token_backend nft_backend; do
-            curl -fsSL "https://github.com/smart-social-contracts/ic-tokens/releases/download/v${IC_TOKENS_VERSION}/${w}.wasm" \
-              -o ".external-wasms/${w}.wasm"
-          done
-          ls -l .external-wasms
-
-      # ── the orchestra: casals up from an empty replica, graded ──────────────
-      # run_e2e.py starts the local replica itself, funds `local-dev`, then:
-      #   fresh       — `casals up` converges from nothing, `plan` empty, oracle PASS
-      #   idempotent  — a second `up` changes nothing
-      # KEEP=1 leaves the replica and the orchestra up for the next step.
-      - name: casals up realms sheet + e2e scenarios (Casals harness)
-        working-directory: Casals
         env:
-          KEEP: "1"
           SCENARIOS: fresh,idempotent
         run: |
           export TERM=xterm
-          python3 tests/e2e/run_e2e.py ../realms/casals.json
+          scripts/up.sh -e local --skip-build --yes --extensions-only --extensions hello_world
 
       # ── cross-quarter addressing against the converged demo realm ───────────
       # The harness keeps each orchestra's bindings in <CASALS_HOME>/<sheet name>/.
@@ -170,32 +144,6 @@ jobs:
         env:
           DFX_WARNING: -mainnet_plaintext_identity
         run: python3 tests/integration/test_cross_quarter_live.py
-
-      # ── content: publish a package and list it on the marketplace ───────────
-      # `casals up` provisions canisters, not content. The sheet granted the
-      # operator (`local-dev`) publish rights on the fleet registry and a
-      # developer license + reviewer seat on the marketplace; the product CLI
-      # does the rest. A listing ends `verified` only if the whole chain works:
-      # registry ACL → create_extension (license) → review_listing (reviewer)
-      # → set_namespace_approval on the registry (marketplace is _approvers).
-      - name: Publish a package and its marketplace listing
-        working-directory: realms
-        env:
-          CASALS_HOME: ${{ env.CASALS_HOME }}/realms-product
-        run: |
-          export TERM=xterm
-          FILE_REGISTRY=$(python3 -c 'import json; print(json.load(open("/tmp/export.json"))["bindings"]["fleet-file-registry"])')
-          MARKETPLACE=$(python3 -c 'import json; print(json.load(open("/tmp/export.json"))["bindings"]["marketplace-backend"])')
-          NETWORK_URL=$(python3 -c "import json; print(json.load(open('$CASALS_HOME/realms-product.local.json'))['network_url'])")
-          echo "fleet-file-registry = $FILE_REGISTRY, marketplace = $MARKETPLACE on $NETWORK_URL"
-          pip install -e cli >/dev/null
-          realms files publish --network "$NETWORK_URL" --registry "$FILE_REGISTRY" --identity local-dev \
-            --extensions-only --extensions hello_world
-          realms marketplace publish --network "$NETWORK_URL" --marketplace "$MARKETPLACE" --registry "$FILE_REGISTRY" \
-            --identity local-dev --extensions-only --extensions hello_world
-          icp canister call "$MARKETPLACE" get_extension_details '("hello_world")' --query \
-            --network "$NETWORK_URL" --root-key fetch --identity local-dev | tee /tmp/listing.txt
-          grep -q 'verification_status = "verified"' /tmp/listing.txt
 
       - name: Show orchestra state on failure
         if: failure()

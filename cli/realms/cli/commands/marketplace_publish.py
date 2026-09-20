@@ -57,6 +57,11 @@ class Listing:
     kind: str  # extension | codex
     item_id: str
     fields: dict  # ExtensionInput / CodexInput minus the registry columns
+    # Registry namespace prefix the package was published under. `realms files
+    # publish` uploads every extension, and every unified codex (manifest
+    # `kind: codex` with a backend/ dir — issue #244), to `ext/<id>/<version>`;
+    # only a legacy loose-files codex still lands under the deprecated `codex/`.
+    namespace_prefix: str = "ext"
 
 
 def _display_name(manifest: dict, fallback: str) -> str:
@@ -99,7 +104,7 @@ def extension_listing(manifest: dict, dir_name: str) -> Listing:
     })
 
 
-def codex_listing(manifest: dict, dir_name: str) -> Listing:
+def codex_listing(manifest: dict, dir_name: str, *, unified: bool = True) -> Listing:
     codex_id = str(manifest.get("id") or manifest.get("name") or dir_name).strip()
     version = str(manifest.get("version") or "").strip()
     if not version:
@@ -113,7 +118,12 @@ def codex_listing(manifest: dict, dir_name: str) -> Listing:
         "price_e8s": 0,
         "icon": _text(manifest.get("icon")),
         "categories": _categories(manifest),
-    })
+    }, namespace_prefix="ext" if unified else "codex")
+
+
+def _is_unified_codex(manifest: dict, source_dir: Path) -> bool:
+    """Same test as ``publish_codex_command``: kind codex + a backend/ dir."""
+    return manifest.get("kind") == "codex" and (source_dir / "backend").is_dir()
 
 
 def discover(root: Path, *, extensions: Optional[set[str]] = None, codices: Optional[set[str]] = None,
@@ -128,7 +138,8 @@ def discover(root: Path, *, extensions: Optional[set[str]] = None, codices: Opti
                     continue
                 if codices is not None and d.name not in codices:
                     continue
-                out.append(codex_listing(json.loads((d / "manifest.json").read_text(encoding="utf-8")), d.name))
+                manifest = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
+                out.append(codex_listing(manifest, d.name, unified=_is_unified_codex(manifest, d)))
     if not codices_only:
         ext_root = root / "extensions" / "extensions"
         if ext_root.is_dir():
@@ -141,9 +152,17 @@ def discover(root: Path, *, extensions: Optional[set[str]] = None, codices: Opti
     return out
 
 
+def item_kind_for(listing: Listing) -> str:
+    """The marketplace's ``item_kind`` vocabulary (``review_listing``,
+    approval APIs): ``ext`` / ``codex`` — the listing's kind, not the
+    registry namespace prefix (a unified codex is listed as a codex but
+    stored under ``ext/``)."""
+    return "ext" if listing.kind == "extension" else "codex"
+
+
 def namespace_for(listing: Listing) -> str:
-    prefix = "ext" if listing.kind == "extension" else "codex"
-    return f"{prefix}/{listing.item_id}/{listing.fields['version']}"
+    """The registry namespace ``realms files publish`` uploaded the package to."""
+    return f"{listing.namespace_prefix}/{listing.item_id}/{listing.fields['version']}"
 
 
 def listing_input(listing: Listing, registry: str) -> str:
@@ -156,10 +175,17 @@ def listing_input(listing: Listing, registry: str) -> str:
 # ── result parsing ───────────────────────────────────────────────────────────
 
 
+# Candid field-id hashes of the Result variant tags: icp prints them instead of
+# the names when it cannot fetch the canister's candid interface.
+_OK_TAGS = ("Ok", "17_724", "17724")
+_ERR_TAGS = ("Err", "3_456_837", "3456837")
+
+
 def parse_generic_result(raw: str) -> tuple[bool, str]:
     """``(variant { Ok = "…" })`` / ``(variant { Err = "…" })`` → (ok, message)."""
     text = (raw or "").strip()
-    ok = "Ok" in text.split("=")[0] if "=" in text else "Ok" in text
+    head = text.split("=")[0] if "=" in text else text
+    ok = any(tag in head for tag in _OK_TAGS) and not any(tag in head for tag in _ERR_TAGS)
     msg = text
     if "=" in text:
         msg = text.split("=", 1)[1].strip().rstrip("})").strip().strip('"')
@@ -204,7 +230,7 @@ def publish_listings(
         created, msg = parse_generic_result(str(raw))
         review = "-"
         if created and approve:
-            args = f'({candid_text(lst.kind)}, {candid_text(lst.item_id)}, true, {candid_text("first-party package")})'
+            args = f'({candid_text(item_kind_for(lst))}, {candid_text(lst.item_id)}, true, {candid_text("first-party package")})'
             raw2 = call(marketplace, "review_listing", args, network, identity, raise_on_error=False)
             approved, detail = parse_review_result(str(raw2))
             review = f"[green]{detail or 'verified'}[/green]" if approved else f"[red]{detail}[/red]"

@@ -74,11 +74,20 @@ read theirs at runtime (`set_canister_config_json`, `get_setup_state().shared_to
 CI (`ci-pr.yml`) refuses a principal/canister-id literal in `src/`, `scripts/`,
 `cli/realms` or the workflows; read live ids with `casals export`.
 
+**One command:** `scripts/up.sh -e <env>` = build → `casals pin` → `casals up`
+→ `casals export` → `realms domains apply` → `realms files publish` +
+`realms marketplace publish` → verify. Locally `scripts/local_up.sh` wraps it
+(replica, identity, URLs; `--gaas` adds the GaaS orchestra). Production:
+`scripts/up.sh -e production --identity prod-identity --upload-identity <plain> --yes`
+with `DFX_HSM_PIN`, `CLOUDFLARE_API_TOKEN` and `CASALS_HOME` set. The table
+below is what the phases do, for a single step.
+
 | What changed | Path |
 |---|---|
-| Product canister code (realm backend/frontend, marketplace, token, NFT) | Build (recipes: `release.yml`), then `casals up -e production` from the Casals repo |
+| Anything in the orchestra (code, sheet, packages) | `scripts/up.sh -e production …` (docs/OPERATIONS.md, "One command") |
+| Product canister code (realm backend/frontend, marketplace, token, NFT) | Build (`scripts/up.sh --build-only`; recipes also in `release.yml`), `casals pin`, then `casals up -e production` from the Casals repo |
 | The conductor / file registry / multisig themselves | Same `casals up`; the sheet's `registry.wasms` pins them |
-| Extensions / codices bundles | `realms files publish --network ic --registry <file-registry>` or `deploy-files.yml` |
+| Extensions / codices bundles only | `scripts/up.sh -e production --identity prod-identity --publish-only`, or `realms files publish --network ic --registry <fleet-file-registry>` + `realms marketplace publish`, or `deploy-files.yml` |
 | A realm artifact the installer serves to new portal realms | `publish-build.yml` / `scripts/publish_build.py --environment production` (the release workflow can do this too) |
 | Existing portal-created realms | `realms mundus deploy <descriptor>` — the descriptor's `infra` block names the environment's registry / installer / file registry ids (`realms mundus deploy --help`) |
 | A new realm on a live GOS | `realms new spec.json --gaas-config <gaas new --output-file>` |

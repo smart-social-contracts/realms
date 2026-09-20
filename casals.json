@@ -177,6 +177,11 @@
       {
         "path": "frontend/realm-assets/main",
         "source": "local:src/realm_frontend/dist"
+      },
+      {
+        "$comment": "Browser UI for the fleet file registry (namespaces, files, II uploads), built from the sibling checkout (`make -C ../file-registry build-frontend`; scripts/up.sh does it). It finds its backend through /canister_ids.js below.",
+        "path": "frontend/file-registry-assets/main",
+        "source": "local:../file-registry/frontend/dist"
       }
     ]
   },
@@ -323,6 +328,16 @@
               "controllers": [
                 "$self",
                 "$multisig"
+              ],
+              "content": "frontend/file-registry-assets/main",
+              "files": {
+                "/canister_ids.js": "globalThis.__CANISTER_IDS = {\"file_registry\": \"$canister:fleet-file-registry\"};\n"
+              },
+              "health": [
+                {
+                  "http": "/index.html",
+                  "status": 200
+                }
               ]
             }
           ]
