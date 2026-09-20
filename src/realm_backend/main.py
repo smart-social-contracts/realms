@@ -6876,6 +6876,10 @@ def update_realm_config(config_json: str) -> Async[text]:
     Update the realm configuration (name, manifesto, welcome_message,
     branding, registration, and infrastructure settings).
 
+    Branding-only fields (logo, background, primary color, and staged
+    image uploads) may be sent by a caller who holds
+    ``realm.configure.branding`` without full ``realm.configure``.
+
     Infrastructure fields (file_registry_canister_id, marketplace_canister_id)
     require the stronger ``realm.configure.infrastructure`` permission.
 
@@ -6890,50 +6894,38 @@ def update_realm_config(config_json: str) -> Async[text]:
         import json
 
         caller = ic.caller().to_str()
-        if not _check_access(caller, Operations.REALM_CONFIGURE):
-            return json.dumps({
-                "success": False,
-                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE}'",
-                "denied_operation": Operations.REALM_CONFIGURE,
-            })
-
-        from ggg import Realm
+        from core.realm_config_admin import required_realm_config_operations
 
         config = json.loads(config_json)
         logger.info(f"📋 Config received: {list(config.keys())}")
 
-        infra_keys = {"file_registry_canister_id", "marketplace_canister_id"}
-        has_infra_change = bool(infra_keys & set(config.keys()))
-        if has_infra_change and not _check_access(caller, Operations.REALM_CONFIGURE_INFRASTRUCTURE):
-            return json.dumps({
-                "success": False,
-                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE_INFRASTRUCTURE}'",
-                "denied_operation": Operations.REALM_CONFIGURE_INFRASTRUCTURE,
-            })
-
-        token_keys = {
-            "token_canister_id",
-            "token_indexer_canister_id",
-            "nft_canister_id",
-        }
-        has_token_change = bool(token_keys & set(config.keys()))
-        if has_token_change and not _check_access(caller, Operations.REALM_CONFIGURE_TOKENS):
-            return json.dumps({
-                "success": False,
-                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE_TOKENS}'",
-                "denied_operation": Operations.REALM_CONFIGURE_TOKENS,
-            })
-
-        # Marketplace trust policy (issue #267): relaxing it lets unreviewed
-        # code into the realm, so it needs more than realm.configure.
-        trust_keys = {"require_marketplace_approval", "trusted_approvers"}
-        has_trust_change = bool(trust_keys & set(config.keys()))
-        if has_trust_change and not _check_access(caller, Operations.REALM_CONFIGURE_TRUST_POLICY):
-            return json.dumps({
-                "success": False,
-                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE_TRUST_POLICY}'",
-                "denied_operation": Operations.REALM_CONFIGURE_TRUST_POLICY,
-            })
+        required_ops = required_realm_config_operations(config)
+        has_configure = _check_access(caller, Operations.REALM_CONFIGURE)
+        has_branding = has_configure or _check_access(
+            caller, Operations.REALM_CONFIGURE_BRANDING
+        )
+        for op in required_ops:
+            if op == Operations.REALM_CONFIGURE and not has_configure:
+                return json.dumps({
+                    "success": False,
+                    "error": f"Access denied: you lack permission '{op}'",
+                    "denied_operation": op,
+                })
+            if op == Operations.REALM_CONFIGURE_BRANDING and not has_branding:
+                return json.dumps({
+                    "success": False,
+                    "error": f"Access denied: you lack permission '{op}'",
+                    "denied_operation": op,
+                })
+            if op not in (
+                Operations.REALM_CONFIGURE,
+                Operations.REALM_CONFIGURE_BRANDING,
+            ) and not _check_access(caller, op):
+                return json.dumps({
+                    "success": False,
+                    "error": f"Access denied: you lack permission '{op}'",
+                    "denied_operation": op,
+                })
 
         config.pop("accounting_currency", None)
         config.pop("accounting_currency_decimals", None)
@@ -6959,18 +6951,39 @@ def update_realm_config(config_json: str) -> Async[text]:
                     "indexer_canister_id"
                 )
 
+        from api.setup import stage_live_branding_asset
+
+        staged = []
+        for kind, key in (("logo", "logo_data_url"), ("background", "background_data_url")):
+            if key not in config:
+                continue
+            data_url = config.pop(key)
+            if not data_url:
+                continue
+            stage_err = stage_live_branding_asset(kind, data_url)
+            if stage_err:
+                return json.dumps({"success": False, "error": stage_err})
+            staged.append(kind)
+        if staged:
+            config["apply_staged_branding"] = staged
+
         # Layer 2 — org policy (issue #262). Realm configuration is a
         # constitutional change: when the root policy is not 1/1, it must go
         # through a root-scoped proposal that replays apply_realm_config.
         from core.governed_action import build_backend_replay_code, gate as governed_gate
-        from core.realm_config_admin import apply_realm_config, describe_realm_config
+        from core.realm_config_admin import (
+            apply_realm_config_with_assets,
+            describe_realm_config,
+        )
 
         confirm = bool(config.pop("confirm", False))
         verdict = governed_gate(
             caller=caller,
             summary=describe_realm_config(config),
             replay_code=build_backend_replay_code(
-                "core.realm_config_admin", "apply_realm_config", json.dumps(config)
+                "core.realm_config_admin",
+                "apply_realm_config_with_assets",
+                json.dumps(config),
             ),
             confirm=confirm,
             metadata_extra={"realm_config": config},
@@ -6978,7 +6991,10 @@ def update_realm_config(config_json: str) -> Async[text]:
         if verdict is not None:
             return json.dumps(verdict)
 
-        return json.dumps(apply_realm_config(config))
+        applied = apply_realm_config_with_assets(config)
+        if hasattr(applied, "send"):
+            applied = yield from applied
+        return json.dumps(applied)
     except Exception as e:
         logger.error(f"❌ update_realm_config failed: {e}")
         return json.dumps({"success": False, "error": str(e)})

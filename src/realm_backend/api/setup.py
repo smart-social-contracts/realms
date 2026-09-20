@@ -50,7 +50,12 @@ _SETUP_CATALOG_CACHE_KEY = "catalog"
 _SETUP_DRAFT_ASSETS = StableBTreeMap[str, str](
     memory_id=3, max_key_size=32, max_value_size=BRANDING_DATA_URL_MAX_BYTES
 )
-_DRAFT_ASSET_KEYS = frozenset({"logo", "background"})
+_DRAFT_ASSET_KEYS = frozenset({"logo", "background", "live_logo", "live_background"})
+_LIVE_ASSET_KEYS = {"logo": "live_logo", "background": "live_background"}
+_LIVE_ASSET_PATHS = {
+    "logo": "/custom/logo.png",
+    "background": "/custom/background.png",
+}
 _SETUP_HIDDEN_CODICES = frozenset({"common", "westminster", "_common"})
 
 
@@ -124,13 +129,94 @@ def _get_draft_asset(kind: str) -> Optional[str]:
     return _SETUP_DRAFT_ASSETS.get(kind)
 
 
+def stage_live_branding_asset(kind: str, data_url: str) -> Optional[str]:
+    """Validate and stage a logo/background for a later ``/custom/*`` upload.
+
+    Returns an error string, or None on success. Does not write the public
+    asset yet — ``upload_live_branding_assets`` does that on apply/replay.
+    """
+    kind = (kind or "").strip()
+    if kind not in _LIVE_ASSET_KEYS:
+        return "kind must be logo or background"
+    payload = {f"{kind}_data_url": data_url}
+    branding_err = validate_branding_payload(payload)
+    if branding_err:
+        return branding_err
+    try:
+        content, _content_type = _decode_data_url(data_url)
+    except Exception as exc:
+        return f"invalid data URL: {exc}"
+    if not content:
+        return "empty file"
+    _store_draft_asset(_LIVE_ASSET_KEYS[kind], data_url)
+    return None
+
+
+def upload_live_branding_assets(kinds) -> Async[dict]:
+    """Write staged live logo/background bytes onto the frontend asset canister."""
+    from ggg import Realm
+
+    realm = Realm.load("1")
+    frontend_id = (getattr(realm, "frontend_canister_id", "") or "").strip() if realm else ""
+    if not frontend_id:
+        return {"success": False, "error": "frontend_canister_id not configured"}
+
+    asset = AssetCanisterService(Principal.from_str(frontend_id))
+    uploaded = []
+    errors: Dict[str, str] = {}
+    for kind in kinds:
+        store_key = _LIVE_ASSET_KEYS.get(kind)
+        asset_path = _LIVE_ASSET_PATHS.get(kind)
+        if not store_key or not asset_path:
+            continue
+        data_url = _get_draft_asset(store_key)
+        if not data_url:
+            errors[kind] = "staged asset missing"
+            continue
+        try:
+            content, content_type = _decode_data_url(data_url)
+        except Exception as exc:
+            errors[kind] = f"decode failed: {exc}"
+            continue
+        if not content:
+            errors[kind] = "empty file"
+            continue
+        try:
+            store_res: CallResult = yield asset.store(
+                {
+                    "key": asset_path,
+                    "content_type": content_type,
+                    "content_encoding": "identity",
+                    "content": content,
+                    "sha256": None,
+                }
+            )
+            if isinstance(store_res, dict) and "Err" in store_res:
+                errors[kind] = f"store failed: {store_res['Err']}"
+            else:
+                uploaded.append(kind)
+        except Exception as exc:
+            errors[kind] = f"store exception: {exc}"
+
+    if errors and not uploaded:
+        return {"success": False, "error": "; ".join(f"{k}: {v}" for k, v in errors.items())}
+
+    version = str(ic.time() // 1_000_000_000)
+    return {
+        "success": len(errors) == 0,
+        "uploaded": uploaded,
+        "errors": errors or None,
+        "version": version,
+    }
+
+
 def get_setup_draft_asset(kind: str) -> str:
     auth_err = require_setup_authorized()
     if auth_err:
         return json.dumps(auth_err)
 
     kind = (kind or "").strip()
-    if kind not in _DRAFT_ASSET_KEYS:
+    if kind not in ("logo", "background"):
         return json.dumps({"success": False, "error": "kind must be logo or background"})
 
     data_url = _get_draft_asset(kind)

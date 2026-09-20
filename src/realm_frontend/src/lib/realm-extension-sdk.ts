@@ -38,6 +38,9 @@ export interface RealmInfo {
 	quarters: { name: string; canister_id: string; population: number; status: string }[];
 	isQuarter: boolean;
 	parentRealmCanisterId: string;
+	logoUrl?: string;
+	backgroundImageUrl?: string;
+	primaryColor?: string;
 	loading: boolean;
 	error: string | null;
 }

@@ -24,6 +24,8 @@ export interface HostRealmInfo {
 	isQuarter: boolean;
 	parentRealmCanisterId: string;
 	logoUrl?: string;
+	backgroundImageUrl?: string;
+	primaryColor?: string;
 }
 
 /** Host-pushed identity and chrome state. */

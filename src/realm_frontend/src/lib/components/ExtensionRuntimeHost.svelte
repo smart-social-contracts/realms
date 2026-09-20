@@ -72,7 +72,9 @@
 			manifesto: info.manifesto,
 			isQuarter: info.isQuarter,
 			parentRealmCanisterId: info.parentRealmCanisterId,
-			logoUrl: info.logoUrl || undefined
+			logoUrl: info.logoUrl || undefined,
+			backgroundImageUrl: info.backgroundImageUrl || undefined,
+			primaryColor: info.primaryColor || undefined
 		};
 	}
 

@@ -162,6 +162,7 @@ class TestProfilesConsistency:
     def test_operator_has_realm_admin(self):
         assert Operations.REALM_ADMIN in Profiles.OPERATOR["allowed_to"]
         assert Operations.REALM_CONFIGURE in Profiles.OPERATOR["allowed_to"]
+        assert Operations.REALM_CONFIGURE_BRANDING in Profiles.OPERATOR["allowed_to"]
         assert Operations.REALM_CONFIGURE_CODEX in Profiles.OPERATOR["allowed_to"]
 
     def test_developer_has_shell(self):
@@ -377,6 +378,8 @@ class TestEndpointOperationMapping:
         assert Operations.REALM_ADMIN != Operations.REALM_CONFIGURE
         assert Operations.REALM_CONFIGURE != Operations.REALM_CONFIGURE_CODEX
         assert Operations.REALM_ADMIN != Operations.REALM_CONFIGURE_CODEX
+        assert Operations.REALM_CONFIGURE_BRANDING == "realm.configure.branding"
+        assert Operations.REALM_CONFIGURE_BRANDING != Operations.REALM_CONFIGURE
 
     def test_self_invoice_refresh_is_self_service(self):
         assert Operations.SELF_INVOICE_REFRESH.startswith("self.")

@@ -13,6 +13,45 @@ from ic_python_logging import get_logger
 
 logger = get_logger("core.realm_config_admin")
 
+BRANDING_KEYS = frozenset(
+    {
+        "primary_color",
+        "logo_url",
+        "background_image_url",
+        "logo_data_url",
+        "background_data_url",
+        "apply_staged_branding",
+    }
+)
+INFRA_KEYS = frozenset({"file_registry_canister_id", "marketplace_canister_id"})
+TOKEN_KEYS = frozenset(
+    {"token_canister_id", "token_indexer_canister_id", "nft_canister_id"}
+)
+TRUST_KEYS = frozenset({"require_marketplace_approval", "trusted_approvers"})
+META_KEYS = frozenset({"confirm"})
+
+
+def required_realm_config_operations(config: dict) -> list:
+    """Operations the caller must hold for this payload.
+
+    Branding-only edits need ``realm.configure.branding`` (or full
+    ``realm.configure``). Any other field still requires ``realm.configure``,
+    plus the extra infra / token / trust ops when those keys are present.
+    """
+    keys = set(config) - META_KEYS
+    ops = []
+    if keys - BRANDING_KEYS:
+        ops.append("realm.configure")
+    elif keys & BRANDING_KEYS:
+        ops.append("realm.configure.branding")
+    if keys & INFRA_KEYS:
+        ops.append("realm.configure.infrastructure")
+    if keys & TOKEN_KEYS:
+        ops.append("realm.configure.tokens")
+    if keys & TRUST_KEYS:
+        ops.append("realm.configure.trust_policy")
+    return ops
+
 
 def describe_realm_config(config: dict) -> str:
     """One-line human summary for proposal titles and audit logs."""
@@ -327,3 +366,33 @@ def apply_realm_config(config: dict) -> dict:
 
     logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
     return {"success": True, "updated_fields": updated_fields}
+
+
+def apply_realm_config_with_assets(config: dict):
+    """Apply config, uploading any staged logo/background to ``/custom/*`` first.
+
+    A generator when uploads run so proposal replay can yield the inter-canister
+    store. Branding bytes stay in the live-asset stage (not in the proposal).
+    """
+    kinds = [
+        kind
+        for kind in (config.get("apply_staged_branding") or [])
+        if kind in ("logo", "background")
+    ]
+    if kinds:
+        from api.setup import upload_live_branding_assets
+
+        upload = yield from upload_live_branding_assets(kinds)
+        if not upload.get("success"):
+            return {
+                "success": False,
+                "error": upload.get("error") or "branding upload failed",
+                "upload": upload,
+            }
+        version = str(upload.get("version") or "")
+        suffix = f"?v={version}" if version else ""
+        if "logo" in kinds:
+            config["logo_url"] = f"/custom/logo.png{suffix}"
+        if "background" in kinds:
+            config["background_image_url"] = f"/custom/background.png{suffix}"
+    return apply_realm_config(config)

@@ -59,6 +59,7 @@ class Operations:
     REALM_ADMIN = "realm.admin"
     REALM_UPGRADE = "realm.upgrade"
     REALM_CONFIGURE = "realm.configure"
+    REALM_CONFIGURE_BRANDING = "realm.configure.branding"
     REALM_CONFIGURE_CODEX = "realm.configure.codex"
     REALM_CONFIGURE_INFRASTRUCTURE = "realm.configure.infrastructure"
     REALM_CONFIGURE_TOKENS = "realm.configure.tokens"
@@ -233,6 +234,7 @@ OPERATIONS_CATALOG = {
     "realm.admin": {"category": "Realm Administration", "description": "Full realm administrative access"},
     "realm.upgrade": {"category": "Realm Administration", "description": "Upgrade the realm canister to a new version"},
     "realm.configure": {"category": "Realm Administration", "description": "Change realm configuration settings"},
+    "realm.configure.branding": {"category": "Realm Administration", "description": "Change realm logo, background image, and primary color"},
     "realm.configure.codex": {"category": "Realm Administration", "description": "Configure the governance codex"},
     "realm.configure.infrastructure": {"category": "Realm Administration", "description": "Configure infrastructure settings (registries, etc.)"},
     "realm.configure.tokens": {"category": "Realm Administration", "description": "Configure realm token settings"},
@@ -444,6 +446,7 @@ class Profiles:
             Operations.REALM_ADMIN,
             Operations.REALM_UPGRADE,
             Operations.REALM_CONFIGURE,
+            Operations.REALM_CONFIGURE_BRANDING,
             Operations.REALM_CONFIGURE_CODEX,
             Operations.REALM_CONFIGURE_INFRASTRUCTURE,
             Operations.REALM_CONFIGURE_TOKENS,

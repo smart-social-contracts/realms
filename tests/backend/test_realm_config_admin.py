@@ -157,3 +157,33 @@ def test_apply_primary_color_merges_existing_branding(fake_ggg):
     assert colors["primary"] == "#654321"
     assert colors["accent"] == "#abcdef"
     assert manifest["setup"]["branding"]["background"] is True
+
+
+def test_required_ops_branding_only():
+    assert rca.required_realm_config_operations(
+        {"primary_color": "#ff0000", "logo_url": "/custom/logo.png"}
+    ) == ["realm.configure.branding"]
+    assert rca.required_realm_config_operations(
+        {"background_data_url": "data:image/png;base64,aa", "confirm": True}
+    ) == ["realm.configure.branding"]
+
+
+def test_apply_realm_config_with_assets_without_upload(fake_ggg):
+    gen = rca.apply_realm_config_with_assets({"name": "Named"})
+    try:
+        gen.send(None)
+        raise AssertionError("expected generator to finish")
+    except StopIteration as done:
+        result = done.value
+    assert result["success"] is True
+    assert FakeRealm._rows[0].name == "Named"
+
+
+def test_required_ops_full_configure_when_non_branding_present():
+    assert rca.required_realm_config_operations(
+        {"name": "Agora", "primary_color": "#ff0000"}
+    ) == ["realm.configure"]
+    assert rca.required_realm_config_operations(
+        {"token_canister_id": "aaaaa-aa"}
+    ) == ["realm.configure", "realm.configure.tokens"]
+    assert rca.required_realm_config_operations({"confirm": True}) == []
