@@ -4,15 +4,15 @@
 #   preflight → build → pin → casals up → export → domains → publish → verify
 #
 #   scripts/up.sh -e local --yes                       # laptop / CI: everything, test variant
-#   scripts/up.sh -e production --identity prod-identity --upload-identity <plain> --yes
+#   scripts/up.sh -e production --identity prod-session --yes   # prod-session: icp delegation from the HSM
 #   scripts/up.sh -e production --publish-only          # only the content phases (catalog changed)
 #   scripts/up.sh -e local --build-only                 # just the artifacts the sheet references
 #
 # Options
 #   -e, --env ENV               local | production (environments.<env> of the sheet)  [required]
-#   --identity NAME             deploy identity; default local-dev for local, required otherwise
-#   --upload-identity NAME      plaintext identity for the store uploads (forwarded to casals up);
-#                               with a touch-policy YubiKey this avoids a touch per upload
+#   --identity NAME             deploy identity; default local-dev for local, required otherwise.
+#                               With a touch-policy YubiKey pass a session identity made with
+#                               `icp identity delegation` (Casals/docs/OPERATIONS.md, "Hardware keys")
 #   --skip-build                reuse the artifacts already on disk
 #   --build-only                stop after the build phase
 #   --skip-publish              stop after up + domains (provision only)
@@ -56,7 +56,7 @@ export TERM="${TERM:-xterm}"
 export DFX_WARNING=-mainnet_plaintext_identity
 export PYTHONUNBUFFERED=1
 
-ENV="" IDENTITY="" UPLOAD_IDENTITY=""
+ENV="" IDENTITY=""
 SKIP_BUILD=0 BUILD_ONLY=0 SKIP_PUBLISH=0 PUBLISH_ONLY=0 NO_DOMAINS=0 BRANDING=0 YES=0 BOOTSTRAP=0
 EXTENSIONS="" CODICES="" PUBLISH_FILTER=()
 usage() { sed -n '2,41p' "$0"; }
@@ -66,8 +66,6 @@ while [ $# -gt 0 ]; do
     --env=*) ENV="${1#*=}"; shift ;;
     --identity) IDENTITY="$2"; shift 2 ;;
     --identity=*) IDENTITY="${1#*=}"; shift ;;
-    --upload-identity) UPLOAD_IDENTITY="$2"; shift 2 ;;
-    --upload-identity=*) UPLOAD_IDENTITY="${1#*=}"; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --build-only) BUILD_ONLY=1; shift ;;
     --skip-publish) SKIP_PUBLISH=1; shift ;;
@@ -151,7 +149,7 @@ note "realms:        $REALMS_DIR"
 note "Casals:        $CASALS_DIR"
 note "file-registry: $FILE_REGISTRY_DIR"
 note "bindings:      $BINDINGS_FILE"
-note "identity:      $IDENTITY${UPLOAD_IDENTITY:+ (uploads: $UPLOAD_IDENTITY)}"
+note "identity:      $IDENTITY"
 
 if [ "$ENV" = local ]; then
   # Plaintext key, local replica only. local_up.sh mirrors it into dfx for the live tests.
@@ -258,7 +256,6 @@ if [ "$PUBLISH_ONLY" = 0 ]; then
     [ "$YES" = 1 ] && up_args+=(--yes)
     [ "$BOOTSTRAP" = 1 ] && up_args+=(--bootstrap)
     global_args=()
-    [ -n "$UPLOAD_IDENTITY" ] && global_args+=(--upload-identity "$UPLOAD_IDENTITY")
     if [ "$ENV" = local ]; then
       eval "$(cd "$CASALS_DIR" && python3 -m casals_cli.replica start)"   # idempotent
     elif [ "$YES" = 0 ] && [ -f "$BINDINGS_FILE" ]; then

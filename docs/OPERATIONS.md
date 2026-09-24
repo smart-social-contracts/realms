@@ -12,10 +12,12 @@ populated, DNS-mapped orchestra and is safe to re-run:
 
 ```sh
 # production, from realms/ with Casals and file-registry as sibling checkouts
-export DFX_HSM_PIN=…                 # the hardware key behind --identity
+export DFX_HSM_PIN=…                 # the hardware key (needed for the one delegation signature)
 export CLOUDFLARE_API_TOKEN=…        # Zone:Read + DNS:Edit on realmsgos.org; never commit it
 export CASALS_HOME=…                 # where the first `up` wrote realms-product.production.json (default ~/.casals)
-scripts/up.sh -e production --identity prod-identity --upload-identity <plaintext identity> --yes
+# prod-session: a short-lived `icp identity delegation` from prod-identity — one touch for the run
+# (recipe: Casals/docs/OPERATIONS.md, "Hardware keys")
+scripts/up.sh -e production --identity prod-session --yes
 
 scripts/up.sh -e local --yes         # a laptop: same phases on a local replica (scripts/local_up.sh wraps this)
 scripts/up.sh -e production --identity prod-identity --publish-only   # only the catalog changed
@@ -71,18 +73,20 @@ is the production procedure. Environment differences (principals, DNS, flags)
 live in the sheet's `environments` block. Two things production needs on top:
 
 - **Pins.** `up -e production` requires a `sha256` on every `registry.wasms`
-  row *and* every `registry.publish` row (the frontend bundles: their hash is
+  row *and* every `registry.bundles` row (the frontend bundles: their hash is
   the *bundle hash* of `Casals/docs/BUNDLES.md`). After building, `casals pin
   casals.json` writes both; `casals pin --check` in CI catches drift.
 - **Bindings and the key.** Every command after the first `up` reads the
   conductor id from `$CASALS_HOME/<orchestra>.production.json`; point
   `CASALS_HOME` at the directory that holds it, or `up` will think there is no
   conductor and stop (it refuses to bootstrap a second production conductor
-  without `--bootstrap`). With a touch-policy hardware key as `--identity`,
-  add `--upload-identity <plaintext identity>` so the hundreds of store
-  uploads of step 4 do not each ask for a touch; the key still signs
-  bootstrap, `set_sheet` and every apply. The CLI prints `signing <method> as
-  <identity>` before each HSM call so you know when to touch.
+  without `--bootstrap`). With a touch-policy hardware key, do not run the
+  hundreds of calls of an `up` against the key itself: make a short-lived
+  session identity with `icp identity delegation` (one touch), and pass that
+  as `--identity` — the IC still sees the hardware key's principal. Recipe in
+  `Casals/docs/OPERATIONS.md`, "Hardware keys". The CLI prints `signing
+  <method> as <identity>` before each call it signs with a PIN-backed
+  identity, so with the key itself as `--identity` you know when to touch.
 
 ## Updating a frontend (marketplace, demo realm)
 
@@ -94,7 +98,7 @@ build is a new bundle, not a new canister:
 casals bundle src/marketplace_frontend/dist -o marketplace-<version>.tgz   # prints the bundle sha256
 ```
 
-Then point the sheet's `registry.publish` row at it (`local:marketplace-<version>.tgz`,
+Then point the sheet's `registry.bundles` row at it (`local:marketplace-<version>.tgz`,
 or a release asset URL), `casals pin casals.json`, commit, and ship it:
 
 ```sh

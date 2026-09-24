@@ -78,8 +78,10 @@ CI (`ci-pr.yml`) refuses a principal/canister-id literal in `src/`, `scripts/`,
 → `casals export` → `realms domains apply` → `realms files publish` +
 `realms marketplace publish` → verify. Locally `scripts/local_up.sh` wraps it
 (replica, identity, URLs; `--gaas` adds the GaaS orchestra). Production:
-`scripts/up.sh -e production --identity prod-identity --upload-identity <plain> --yes`
-with `DFX_HSM_PIN`, `CLOUDFLARE_API_TOKEN` and `CASALS_HOME` set. The table
+`scripts/up.sh -e production --identity <session> --yes` where `<session>` is
+a short-lived `icp identity delegation` from `prod-identity` (one HSM touch;
+`Casals/docs/OPERATIONS.md`, "Hardware keys"), with `DFX_HSM_PIN`,
+`CLOUDFLARE_API_TOKEN` and `CASALS_HOME` set. The table
 below is what the phases do, for a single step.
 
 | What changed | Path |
