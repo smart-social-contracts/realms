@@ -465,6 +465,14 @@ def _is_controller_or_trusted(caller_principal: str) -> bool:
     return False
 
 
+def may_register_founder(caller: str, realm) -> bool:
+    """Founder registration: an IC controller, a trusted principal, or the
+    installer recorded at init (issue #404)."""
+    if _is_controller_or_trusted(caller):
+        return True
+    return is_bootstrap_admin_caller(caller, realm)
+
+
 def require_controller(fn):
     """Decorator that restricts an endpoint to IC controllers and trusted principals.
 

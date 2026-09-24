@@ -121,6 +121,25 @@ def can_enter_setup(caller: str, is_controller: bool = False) -> bool:
     return caller in trusted
 
 
+def record_installer_principal(installer_id: str) -> None:
+    """Store the GaaS installer named in the realm's init argument.
+
+    Sole hand-off leaves the stand baton as the only IC controller. The
+    installer id is recorded here so later admin calls from that canister
+    still pass. It is not added to trusted_principals.
+    """
+    from ggg import Realm
+
+    installer_id = (installer_id or "").strip()
+    if not installer_id:
+        return
+    realm = Realm.load("1")
+    if not realm:
+        return
+    if not str(getattr(realm, "installer_canister_id", "") or "").strip():
+        realm.installer_canister_id = installer_id
+
+
 def record_bootstrap_caller(realm, caller: str) -> None:
     """Remember the first-boot installer so later @require(realm.admin) passes."""
     caller = (caller or "").strip()

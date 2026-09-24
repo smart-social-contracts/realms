@@ -337,6 +337,19 @@ class TestCheckAccess:
 
     @patch("ggg.Realm")
     @patch("ggg.User")
+    def test_recorded_installer_may_register_founder(self, MockUser, MockRealm):
+        realm = MagicMock()
+        realm.trusted_principals = ""
+        realm.installer_canister_id = "fltjm-tyaaa-aaaap-qunhq-cai"
+        MockRealm.load.return_value = realm
+        MockUser.__getitem__ = MagicMock(return_value=None)
+
+        from core.access import may_register_founder
+        assert may_register_founder("fltjm-tyaaa-aaaap-qunhq-cai", realm) is True
+        assert may_register_founder("random-attacker", realm) is False
+
+    @patch("ggg.Realm")
+    @patch("ggg.User")
     def test_multiple_profiles_combined(self, MockUser, MockRealm):
         """A user with both member and treasurer profiles should have combined permissions."""
         MockRealm.load.return_value = None

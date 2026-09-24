@@ -1692,14 +1692,23 @@ def join_realm(
 
 
 @update
-@require_controller
 def register_founder(principal: text) -> RealmResponse:
     """Register the deploying user as the realm's founding admin.
 
-    Called by the realm_installer (an IC controller of this canister) right
-    after provisioning, with the principal of the user who requested the
-    deployment. Idempotent — an existing user simply gains the admin profile.
+    Called by the realm installer after provisioning, with the principal of
+    the user who requested the deployment. The installer is not an IC
+    controller once the stand baton has sole control; it is the principal
+    recorded at init (issue #404). Idempotent — an existing user simply
+    gains the admin profile.
     """
+    from core.access import AccessDenied, may_register_founder
+    from ggg import Realm
+
+    caller = ic.caller().to_str()
+    if not may_register_founder(caller, Realm.load("1")):
+        raise AccessDenied(
+            f"Access denied: {caller} is not a controller or the realm installer"
+        )
     try:
         from core.admin_users import register_admin_user
 
@@ -5664,10 +5673,13 @@ def _kick_off_proposal_index_backfill() -> void:
 
 
 @init
-def init_() -> void:
+def init_(installer_id: text) -> void:
     logger.info("Initializing Realm canister")
     set_controller(ic.caller().to_str())
     initialize()
+    from core.setup import record_installer_principal
+
+    record_installer_principal(installer_id)
     logger.info("Realm canister initialized")
 
 
