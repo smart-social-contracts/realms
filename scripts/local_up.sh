@@ -4,8 +4,9 @@
 # the portal) on a local replica, built, converged, populated, URLs printed.
 #
 # It is a wrapper: the identity, the replica and the URLs are handled here;
-# build → casals up → publish → verify is `scripts/up.sh -e local` of each
-# repo (the same script that deploys production with -e production). Nothing
+# Realms still converges through `scripts/up.sh -e local`. GaaS (`--gaas`)
+# converges through the Casals e2e harness, then `realms files publish`.
+# Nothing
 # here touches mainnet or a YubiKey: the identity is the plaintext `local-dev`
 # key, the environment is casals.json `environments.local`. The replica
 # defaults to icp's implicit `local` network on port 8000. To run beside
@@ -176,7 +177,7 @@ say "Preflight"
 [ -f "$CASALS_DIR/casals_cli/main.py" ] || die "Casals checkout not found at $CASALS_DIR (set CASALS_DIR)"
 [ -x "$REALMS_DIR/scripts/up.sh" ] || die "realms scripts/up.sh not found at $REALMS_DIR"
 if [ "$WITH_GAAS" = 1 ]; then
-  [ -x "$GAAS_DIR/scripts/up.sh" ] || die "gos-as-a-service checkout (with scripts/up.sh) not found at $GAAS_DIR (set GAAS_DIR)"
+  [ -f "$GAAS_DIR/casals.json" ] || die "gos-as-a-service checkout not found at $GAAS_DIR (set GAAS_DIR)"
 fi
 need icp     "npm install -g @icp-sdk/icp-cli"
 need ic-wasm "npm install -g @icp-sdk/ic-wasm"
@@ -238,11 +239,8 @@ for home in realms-product gaas; do
 done
 
 # ── build → up → publish → verify, per orchestra ──────────────────────────────
-# scripts/up.sh -e local of each repo: the same phases production runs with
-# -e production. Locally `up` goes through the Casals e2e harness (starts the
-# replica if needed, funds the identity, grades fresh + idempotent, KEEP=1), then
-# the product CLI publishes the catalog: fleet registry + marketplace listings
-# here, the GaaS platform registry (what the installer fetches at mint) there.
+# Realms: scripts/up.sh -e local (the Casals harness, then the fleet catalog).
+# GaaS: the Casals harness, then realms files publish into the platform registry.
 up_flags=(--identity "$IDENTITY" --yes)
 [ "$SKIP_BUILD" = 1 ] && up_flags+=(--skip-build)
 [ "$SKIP_PUBLISH" = 1 ] && up_flags+=(--skip-publish)
@@ -251,8 +249,21 @@ say "Realms product orchestra: scripts/up.sh -e local ${up_flags[*]}"
 CASALS_DIR="$CASALS_DIR" "$REALMS_DIR/scripts/up.sh" -e local "${up_flags[@]}"
 
 if [ "$WITH_GAAS" = 1 ]; then
-  say "GaaS orchestra: scripts/up.sh -e local ${up_flags[*]}"
-  CASALS_DIR="$CASALS_DIR" REALMS_DIR="$REALMS_DIR" "$GAAS_DIR/scripts/up.sh" -e local "${up_flags[@]}"
+  say "GaaS orchestra: Casals e2e harness"
+  (cd "$CASALS_DIR" && CASALS_HOME="$CASALS_HOME" KEEP=1 \
+     SCENARIOS="${SCENARIOS:-fresh,idempotent,runtime_stand}" \
+     python3 tests/e2e/run_e2e.py "$GAAS_DIR/casals.json")
+
+  if [ "$SKIP_PUBLISH" = 0 ]; then
+    say "Publish: packages → GaaS file registry"
+    command -v realms >/dev/null 2>&1 || python3 -m pip install -q -e "$REALMS_DIR/cli"
+    EXPORT_JSON="$CASALS_HOME/gaas/gaas.local.export.json"
+    (cd "$CASALS_DIR" && CASALS_HOME="$CASALS_HOME/gaas" python3 -m casals_cli.main -e local --identity "$IDENTITY" export "$GAAS_DIR/casals.json") > "$EXPORT_JSON"
+    FILE_REGISTRY="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("bindings",{}).get("file-registry",""))' "$EXPORT_JSON")"
+    NETWORK_URL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("network_url",""))' "$CASALS_HOME/gaas/gaas.local.json")"
+    [ -n "$FILE_REGISTRY" ] || die "export has no file-registry binding"
+    (cd "$REALMS_DIR" && realms files publish --network "$NETWORK_URL" --registry "$FILE_REGISTRY" --identity "$IDENTITY")
+  fi
 
   # A realm is born the way the portal wizard does it: request_deployment on
   # the registry → installer create_stand → the conductor builds the stand from
