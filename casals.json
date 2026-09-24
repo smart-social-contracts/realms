@@ -1,55 +1,37 @@
 {
   "version": 2,
   "name": "realms-product",
-  "description": "Realms product surface on its own conductor (Realms GOS Casals): marketplace, fleet file registry, token and NFT canisters, plus a demo realm stand running the real realm wasm. `casals up casals.json -e <env>` builds and reconciles all of it.",
+  "description": "Realms product orchestra: the marketplace, the fleet file registry (extensions, codices, catalogs), and the RLM token and NFT canisters.",
   "environments": {
     "local": {
       "network": "local",
       "dns": {
         "provider": "none"
       },
-      "portal_url": "http://localhost:8000",
       "marketplace_host": "",
-      "build_variant": "test",
-      "test_flags": {
-        "test_mode": true,
-        "ii_bypass": true,
-        "user_self_registration": true,
-        "demo_data": false,
-        "skip_terms": true
-      },
       "principals": {
-        "operator": "$deployer",
-        "billing_service": "$deployer"
+        "operator": "$deployer"
       },
       "cycles": {
-        "min_balance_tc": 0.5,
         "budget_tc": 300
       }
     },
     "production": {
       "network": "ic",
+      "$comment": "operator is prod-identity (YubiKey). Deploy through an icp delegation from it. DNS lives in the Cloudflare zone realmsgos.org; the API token is read from $CLOUDFLARE_API_TOKEN, never written here.",
       "dns": {
         "provider": "cloudflare",
         "zone": "realmsgos.org",
         "token_env": "CLOUDFLARE_API_TOKEN",
         "ttl": 60
       },
-      "portal_url": "https://gos.earth",
       "marketplace_host": "realmsgos.org",
-      "build_variant": "production",
-      "test_flags": {
-        "test_mode": false,
-        "ii_bypass": false
-      },
       "principals": {
         "operator": "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe",
-        "billing_service": "rd4en-sizpv-vnamr-6vbfc-uljz5-vvz7c-g4nzy-uflq2-zbj3x-mrwjs-gqe",
-        "signer_2": "g53u4-3liee-2f7qe-m2b6g-p3bpg-6aatl-cnhs3-drrzi-fllp4-qxfgh-hqe",
-        "signer_3": "55alf-xclhd-rtshz-lk4lo-wav4q-q3a5e-sktkm-zlshq-vvhjs-re6os-wae"
+        "$comment_deployer": "The identity that ran casals up. It is a controller of the governance multisig only.",
+        "deployer": "$deployer"
       },
       "cycles": {
-        "min_balance_tc": 2.0,
         "budget_tc": 20
       }
     }
@@ -67,18 +49,19 @@
       "wasm": "casals-frontend",
       "kind": "frontend",
       "mode": "managed",
+      "content": "frontend/casals-ui/main",
       "controllers": [
+        "$self",
         "$multisig"
       ]
     },
-    "wasms": {
-      "$comment": "WASM store (casals-wasms): the certified-assets canister every artifact Casals installs is served from (Casals issue #48). The operator stays a controller so `casals up` can upload into it — the deployer locally, prod-identity in production. The conductor's own file registry it replaced is pooled on the first `casals up`; the fleet file registry below is a product canister and stays.",
+    "store": {
       "wasm": "certified-assets@0.3.0",
       "kind": "frontend",
       "mode": "managed",
       "controllers": [
         "$self",
-        "$principal:operator"
+        "$multisig"
       ]
     },
     "commanders": [
@@ -101,7 +84,8 @@
       ],
       "threshold": 1,
       "controllers": [
-        "$multisig"
+        "$multisig",
+        "$deployer"
       ]
     }
   },
@@ -112,55 +96,47 @@
     }
   ],
   "registry": {
-    "$comment": "Product wasms are built in this repo and ../file-registry before `casals up` (local:; recipes in .github/workflows/realms-e2e.yml); the conductor wasm by the Casals CLI (build:). Production requires a sha256 pin on every row: run `casals pin casals.json` after building and commit the result.",
     "wasms": [
       {
         "family": "casals-backend",
         "version": "main",
-        "source": "build:casals_backend",
-        "sha256": "659f9c0d0a863a3ff839e572efd5e7ebe1e7bcec0999875662af08b97397abe9"
+        "source": "release:smart-social-contracts/Casals@v0.3.3:casals_backend.wasm.gz",
+        "sha256": "1dce5edb5766123b64b820b6d2c1d38417c68601b6bf46daf4edc4b907f4748b"
       },
       {
         "family": "certified-assets",
         "version": "0.3.0",
-        "source": "local:seed/templates/certified-assets@0.3.0.wasm.gz",
+        "source": "release:smart-social-contracts/Casals@v0.3.2:certified-assets@0.3.0.wasm.gz",
         "sha256": "75df75f39763077fd0333b4ac46ba03b2b23ec313fa85f79a2097bd98bb363d1"
-      },
-      {
-        "family": "file-registry",
-        "version": "main",
-        "source": "local:../file-registry/.basilisk/ic_file_registry/ic_file_registry.wasm",
-        "sha256": "9f46abefddbaaa596c0a6849b82cc84c89b9458e7c3ed6fe7a6a7cb8c58d0792"
-      },
-      {
-        "family": "orchestration-multisig",
-        "version": "1.6.0",
-        "source": "local:seed/templates/orchestration-multisig@1.6.0.wasm.gz",
-        "sha256": "c8d3adecf9bea8d9e7811cfa5d9eda8f61723c770f85132b91c8b2cffb37974f"
       },
       {
         "family": "certified-assets",
         "version": "1.0.0",
-        "source": "local:seed/templates/hello-world-frontend.wasm.gz",
+        "source": "release:smart-social-contracts/Casals@v0.3.2:certified-assets@1.0.0.wasm.gz",
         "sha256": "63d122d0149a29f4e48603efdd7d2bce656a6a83bac1e3207897c68e8e225bb6"
+      },
+      {
+        "family": "orchestration-multisig",
+        "version": "1.6.0",
+        "source": "release:smart-social-contracts/Casals@v0.3.2:orchestration-multisig@1.6.0.wasm.gz",
+        "sha256": "c8d3adecf9bea8d9e7811cfa5d9eda8f61723c770f85132b91c8b2cffb37974f"
+      },
+      {
+        "family": "file-registry",
+        "version": "main",
+        "source": "release:smart-social-contracts/gos-as-a-service@v0.3.4:file_registry.wasm.gz",
+        "sha256": "2cd95df0c9200480a3094fc8985e402708ff8712f727ebd5204f6e93d7762153"
       },
       {
         "family": "marketplace-backend",
         "version": "main",
-        "source": "local:.basilisk/marketplace_backend/marketplace_backend.wasm",
-        "sha256": "a599ac12bc70fd01889a00644b091834cb7414cb05290f3829e396bdc9ab41d6"
-      },
-      {
-        "family": "realm-backend",
-        "version": "main",
-        "source": "local:.basilisk/realm_backend/realm_backend.wasm",
-        "sha256": "14a55a15b3a2a84a522227f1128547d4c630a385f86979ae08307e4a8f7b3e3d"
+        "source": "local:.basilisk/marketplace_backend/marketplace_backend.wasm"
       },
       {
         "family": "token-backend",
         "version": "0.1.0",
-        "source": "local:.external-wasms/token_backend.wasm",
-        "sha256": "b3f1db3a3f6b928bdb00d49c9396c87004690e5a23a487384ba0c308ae7e685f"
+        "source": "release:smart-social-contracts/realms@v0.5.1:token_backend.wasm.gz",
+        "sha256": "a1734ad2ec260ce85e541f860dbcaf8c846423709177587c7e5f70adc47e461a"
       },
       {
         "family": "nft-backend",
@@ -169,26 +145,26 @@
         "sha256": "497af917df8190c039d9c0c888c36a6c626c612847c31e43231cf4634f07aad6"
       }
     ],
-    "publish": [
+    "bundles": [
       {
         "path": "frontend/marketplace-assets/main",
         "source": "local:src/marketplace_frontend/dist"
       },
       {
-        "path": "frontend/realm-assets/main",
-        "source": "local:src/realm_frontend/dist"
-      },
-      {
-        "$comment": "Browser UI for the fleet file registry (namespaces, files, II uploads), built from the sibling checkout (`make -C ../file-registry build-frontend`; scripts/up.sh does it). It finds its backend through /canister_ids.js below.",
         "path": "frontend/file-registry-assets/main",
         "source": "local:../file-registry/frontend/dist"
+      },
+      {
+        "path": "frontend/casals-ui/main",
+        "source": "release:smart-social-contracts/Casals@v0.3.3:casals_frontend.tar.gz",
+        "sha256": "ddcbbcf11cefb2560cb8226f35f282b7f8652b70ef698173c910022342f25cdb"
       }
     ]
   },
   "sections": [
     {
       "name": "Product",
-      "description": "Marketplace, fleet file registry, token and NFT canisters.",
+      "description": "Marketplace (realmsgos.org), the fleet file registry, and the RLM token and NFT canisters. Realm stands are minted by GaaS, not by this orchestra.",
       "stands": [
         {
           "name": "marketplace",
@@ -220,15 +196,6 @@
                   }
                 },
                 {
-                  "method": "set_billing_service_principal",
-                  "args": "$principal:billing_service",
-                  "converged_when": {
-                    "query": "get_billing_service_principal_q",
-                    "equals": "$principal:billing_service"
-                  }
-                },
-                {
-                  "$comment": "First-party listings: `realms marketplace publish` needs a developer license to submit and the reviewer right to approve. 10 years.",
                   "method": "admin_grant_publisher",
                   "args": {
                     "principal": "$principal:operator",
@@ -274,7 +241,7 @@
         },
         {
           "name": "file-registry",
-          "description": "Fleet file registry (realm branding, extensions, catalogs) — not the conductor's own.",
+          "description": "Fleet registry: extension packages, codices, catalogs, and the approvals the marketplace stamps.",
           "canisters": [
             {
               "name": "fleet-file-registry",
@@ -287,7 +254,6 @@
               ],
               "config": [
                 {
-                  "$comment": "The operator runs `realms files publish` here; controllers (conductor, multisig) cannot upload. `*` = every namespace.",
                   "method": "grant_publish",
                   "args": {
                     "namespace": "*",
@@ -303,7 +269,6 @@
                   }
                 },
                 {
-                  "$comment": "review_listing stamps its decision on the listing's registry (set_namespace_approval); the marketplace must be an _approvers publisher there.",
                   "method": "grant_publish",
                   "args": {
                     "namespace": "_approvers",
@@ -354,7 +319,7 @@
                 "$self",
                 "$multisig"
               ],
-              "install_arg": "(record { name = \"Realms Token\"; symbol = \"RLM\"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt true })"
+              "install_arg": "(record { name = \"Realms Token\"; symbol = \"RLM\"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt false })"
             }
           ]
         },
@@ -370,76 +335,7 @@
                 "$self",
                 "$multisig"
               ],
-              "install_arg": "(record { name = \"Realms NFT\"; symbol = \"RNFT\"; description = opt \"Realms NFT collection\"; supply_cap = null; test = opt true })"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Realms",
-      "description": "Demo realm running the real realm wasm and frontend, configured against the fleet file registry and the marketplace.",
-      "stands": [
-        {
-          "name": "demo",
-          "canisters": [
-            {
-              "name": "demo-backend",
-              "kind": "backend",
-              "mode": "managed",
-              "wasm": "realm-backend@main",
-              "controllers": [
-                "$self",
-                "$multisig"
-              ],
-              "config": [
-                {
-                  "method": "set_canister_config_json",
-                  "args": {
-                    "frontend_canister_id": "$stand.frontend",
-                    "file_registry_canister_id": "$canister:fleet-file-registry",
-                    "marketplace_canister_id": "$canister:marketplace-backend",
-                    "network": "$env.network",
-                    "test_flags": "$env.test_flags"
-                  },
-                  "converged_when": {
-                    "query": "get_runtime_flags",
-                    "contains": {
-                      "network": "$env.network",
-                      "build_variant": "$env.build_variant",
-                      "test_mode": "$env.test_flags.test_mode"
-                    }
-                  }
-                }
-              ],
-              "health": [
-                {
-                  "query": "get_runtime_flags",
-                  "expect": {
-                    "success": true
-                  }
-                }
-              ]
-            },
-            {
-              "name": "demo-frontend",
-              "kind": "frontend",
-              "mode": "managed",
-              "wasm": "certified-assets@1.0.0",
-              "controllers": [
-                "$self",
-                "$multisig"
-              ],
-              "content": "frontend/realm-assets/main",
-              "files": {
-                "/canister_ids.js": "globalThis.__CANISTER_IDS = {\"realm_backend\": \"$stand.backend\", \"file_registry\": \"$canister:fleet-file-registry\", \"test_mode_ii_bypass\": $env.test_flags.ii_bypass};\n"
-              },
-              "health": [
-                {
-                  "http": "/index.html",
-                  "status": 200
-                }
-              ]
+              "install_arg": "(record { name = \"Realms NFT\"; symbol = \"RNFT\"; description = opt \"Realms NFT collection\"; supply_cap = null; test = opt false })"
             }
           ]
         }

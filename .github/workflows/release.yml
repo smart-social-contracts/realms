@@ -167,6 +167,11 @@ jobs:
           python3 scripts/build_base_wasm.py --gzip
           mv .basilisk/realm_backend/realm_backend.wasm.gz ./realm_backend.wasm.gz
           echo "✅ Backend WASM built ($(stat -c%s realm_backend.wasm.gz) bytes)"
+          CANISTER_CANDID_PATH="$(pwd)/src/marketplace_backend/marketplace_backend.did" \
+            python3 -m basilisk marketplace_backend src/marketplace_backend/main.py
+          gzip -kf .basilisk/marketplace_backend/marketplace_backend.wasm
+          cp .basilisk/marketplace_backend/marketplace_backend.wasm.gz ./marketplace_backend.wasm.gz
+          echo "✅ Marketplace WASM built ($(stat -c%s marketplace_backend.wasm.gz) bytes)"
 
       - name: Generate Candid declarations
         if: ${{ inputs.cli_only != true }}
@@ -196,6 +201,10 @@ jobs:
           (cd /tmp/casals && python3 -m casals_cli.bundle "$GITHUB_WORKSPACE/src/realm_frontend/dist" \
              -o "$GITHUB_WORKSPACE/realm_frontend.tar.gz" --manifest "$GITHUB_WORKSPACE/realm_frontend.manifest.json")
           echo "✅ Frontend bundle built ($(stat -c%s realm_frontend.tar.gz) bytes)"
+          (cd src/marketplace_frontend && npm run build && test -f dist/index.html)
+          (cd /tmp/casals && python3 -m casals_cli.bundle "$GITHUB_WORKSPACE/src/marketplace_frontend/dist" \
+             -o "$GITHUB_WORKSPACE/marketplace_frontend.tar.gz" --manifest "$GITHUB_WORKSPACE/marketplace_frontend.manifest.json")
+          echo "✅ Marketplace bundle built ($(stat -c%s marketplace_frontend.tar.gz) bytes)"
 
       - name: Fetch token wasm
         if: ${{ inputs.cli_only != true }}
@@ -203,22 +212,29 @@ jobs:
           # The realm token is ic-tokens, not built from this repo.
           curl -fsSL "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.wasm.gz" \
             -o token_backend.wasm.gz
+          # nft_backend.wasm on that release is uncompressed.
+          curl -fsSL "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm" \
+            -o nft_backend.wasm
+          gzip -kf nft_backend.wasm
 
       - name: Compute release asset checksums
         if: ${{ inputs.cli_only != true }}
         run: |
           echo "# SHA-256 checksums for release assets" > checksums.txt
-          for f in realm_backend.wasm.gz realm_backend.did realm_frontend.tar.gz token_backend.wasm.gz; do
+          for f in realm_backend.wasm.gz realm_backend.did realm_frontend.tar.gz \
+                   marketplace_backend.wasm.gz marketplace_frontend.tar.gz \
+                   token_backend.wasm.gz nft_backend.wasm.gz; do
             [ -f "$f" ] && sha256sum "$f" >> checksums.txt
           done
           cat checksums.txt
-          BUNDLE_HASH=$(python3 -c "import json; print(json.load(open('realm_frontend.manifest.json'))['bundle_sha256'])")
-          echo "# bundle hash of realm_frontend.tar.gz (pin as registry.publish[].sha256)" >> checksums.txt
-          echo "${BUNDLE_HASH}  realm_frontend.tar.gz (bundle)" >> checksums.txt
           python3 - << 'PY' >> checksums.txt
-          import gzip, hashlib, pathlib
+          import gzip, hashlib, json, pathlib
+          print("# bundle hash (pin this on registry.bundles)")
+          for name in ("realm_frontend.tar.gz", "marketplace_frontend.tar.gz"):
+              man = json.load(open(name.replace(".tar.gz", ".manifest.json")))
+              print(f"{man['bundle_sha256']}  {name} (bundle)")
           print("# module sha256 (decompressed wasm; pin this on registry.wasms)")
-          for name in ("realm_backend.wasm.gz", "token_backend.wasm.gz"):
+          for name in ("realm_backend.wasm.gz", "marketplace_backend.wasm.gz", "token_backend.wasm.gz", "nft_backend.wasm.gz"):
               data = gzip.decompress(pathlib.Path(name).read_bytes())
               print(f"{hashlib.sha256(data).hexdigest()}  {name} (module)")
           PY
@@ -226,7 +242,6 @@ jobs:
           FRONTEND_HASH=$(awk '/realm_frontend\.tar\.gz$/ {print $1}' checksums.txt)
           echo "Backend checksum: ${BACKEND_HASH}"
           echo "Frontend tarball checksum: ${FRONTEND_HASH}"
-          echo "Frontend bundle hash: ${BUNDLE_HASH}"
 
       - name: Build and publish CLI to PyPI
         env:
@@ -261,6 +276,10 @@ jobs:
             realm_frontend.tar.gz
             realm_frontend.manifest.json
             token_backend.wasm.gz
+            nft_backend.wasm.gz
+            marketplace_backend.wasm.gz
+            marketplace_frontend.tar.gz
+            marketplace_frontend.manifest.json
             checksums.txt
 
       - name: Create GitHub Release (CLI / PyPI only)
