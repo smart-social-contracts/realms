@@ -197,17 +197,31 @@ jobs:
              -o "$GITHUB_WORKSPACE/realm_frontend.tar.gz" --manifest "$GITHUB_WORKSPACE/realm_frontend.manifest.json")
           echo "✅ Frontend bundle built ($(stat -c%s realm_frontend.tar.gz) bytes)"
 
+      - name: Fetch token wasm
+        if: ${{ inputs.cli_only != true }}
+        run: |
+          # The realm token is ic-tokens, not built from this repo.
+          curl -fsSL "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.wasm.gz" \
+            -o token_backend.wasm.gz
+
       - name: Compute release asset checksums
         if: ${{ inputs.cli_only != true }}
         run: |
           echo "# SHA-256 checksums for release assets" > checksums.txt
-          for f in realm_backend.wasm.gz realm_backend.did realm_frontend.tar.gz; do
+          for f in realm_backend.wasm.gz realm_backend.did realm_frontend.tar.gz token_backend.wasm.gz; do
             [ -f "$f" ] && sha256sum "$f" >> checksums.txt
           done
           cat checksums.txt
           BUNDLE_HASH=$(python3 -c "import json; print(json.load(open('realm_frontend.manifest.json'))['bundle_sha256'])")
           echo "# bundle hash of realm_frontend.tar.gz (pin as registry.publish[].sha256)" >> checksums.txt
           echo "${BUNDLE_HASH}  realm_frontend.tar.gz (bundle)" >> checksums.txt
+          python3 - << 'PY' >> checksums.txt
+          import gzip, hashlib, pathlib
+          print("# module sha256 (decompressed wasm; pin this on registry.wasms)")
+          for name in ("realm_backend.wasm.gz", "token_backend.wasm.gz"):
+              data = gzip.decompress(pathlib.Path(name).read_bytes())
+              print(f"{hashlib.sha256(data).hexdigest()}  {name} (module)")
+          PY
           BACKEND_HASH=$(awk '/realm_backend\.wasm\.gz/ {print $1}' checksums.txt)
           FRONTEND_HASH=$(awk '/realm_frontend\.tar\.gz$/ {print $1}' checksums.txt)
           echo "Backend checksum: ${BACKEND_HASH}"
@@ -246,6 +260,7 @@ jobs:
             realm_backend.did
             realm_frontend.tar.gz
             realm_frontend.manifest.json
+            token_backend.wasm.gz
             checksums.txt
 
       - name: Create GitHub Release (CLI / PyPI only)
