@@ -42,8 +42,18 @@ LOW_THRESHOLD_N = 10
 SCALE_FRACTION = 0.9
 
 
+def _manifest_environment(realm) -> str:
+    """Logical environment from the realm manifest (``staging``, ``production``, …)."""
+    try:
+        from .demo_notice import host_environment
+    except ImportError:
+        from core.demo_notice import host_environment
+
+    return host_environment(realm)
+
+
 def default_threshold_n(network):
-    """Return N (per-quarter capacity) for the given environment."""
+    """Return N (per-quarter capacity) for the given environment name."""
     net = (network or "").strip().lower()
     if net in LOW_THRESHOLD_NETWORKS:
         return LOW_THRESHOLD_N
@@ -252,11 +262,11 @@ def maybe_request_quarter_scale():
         return False  # idempotent: a deploy is already queued/running
 
     populations = quarter_populations(realm)
-    network = getattr(realm, "network", "") or ""
+    environment = _manifest_environment(realm)
     codex_fn = _codex_should_deploy_fn(realm)
     if not resolve_should_scale(
         populations,
-        network,
+        environment,
         codex_fn=codex_fn,
         n_override=quarter_capacity_override(realm),
         realm=realm,

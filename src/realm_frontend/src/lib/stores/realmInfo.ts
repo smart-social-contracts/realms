@@ -213,6 +213,10 @@ const createRealmInfoStore = () => {
 					);
 					const network =
 						(fromFlags?.network as string) || (status?.network as string) || '';
+					const gosEnvironment =
+						(fromFlags?.gos_environment as string) ||
+						(status?.gos_environment as string) ||
+						'';
 					const noticeBodies = (fromFlags?.demo_notice_body ||
 						status?.demo_notice_body ||
 						{}) as DemoNoticeBodies;
@@ -243,12 +247,12 @@ const createRealmInfoStore = () => {
 						testModeDisableMonetaryTokens: resolveDisableMonetaryTokens(
 							(fromFlags?.test_mode_disable_monetary_tokens as boolean | undefined) ??
 								(status?.test_mode_disable_monetary_tokens as boolean | undefined),
-							network
+							gosEnvironment
 						),
 						testModeDemoNotice: resolveDemoNoticeEnabled(
 							(fromFlags?.test_mode_demo_notice as boolean | undefined) ??
 								(status?.test_mode_demo_notice as boolean | undefined),
-							network
+							gosEnvironment
 						),
 						demoNoticeBody: noticeBodies && typeof noticeBodies === 'object' ? noticeBodies : {},
 						network,

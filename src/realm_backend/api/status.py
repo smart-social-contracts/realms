@@ -140,6 +140,7 @@ def get_status() -> "dict[str, Any]":
     test_mode_skip_terms = False
     test_mode_skip_passport_zkproof = False
     realm_network = ""
+    gos_environment = ""
 
     # Which variant this WASM was compiled as. Reported so an operator can tell a
     # production artifact from a test one without trusting the deploy log.
@@ -154,6 +155,9 @@ def get_status() -> "dict[str, Any]":
         if _tm_realm:
             test_mode = bool(getattr(_tm_realm, "test_mode", False))
             realm_network = getattr(_tm_realm, "network", "") or ""
+            from core.setup import get_gos_environment
+
+            gos_environment = get_gos_environment(_tm_realm)
             # Reported through the variant-gated accessor so the frontend never
             # offers a test login that the production canister will not honour.
             from core.runtime_flags import is_ii_bypass_active
@@ -392,6 +396,7 @@ def get_status() -> "dict[str, Any]":
         # enabled. An empty value is treated as production, so surface it here
         # rather than letting a realm sit in that state unnoticed.
         "network": realm_network,
+        "gos_environment": gos_environment,
         "test_mode": test_mode,
         "test_mode_ii_bypass": test_mode_ii_bypass,
         "test_mode_user_self_registration": test_mode_user_self_registration,

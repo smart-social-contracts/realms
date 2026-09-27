@@ -328,3 +328,61 @@ def test_runtime_flags_payload_includes_primary_color(fake_ggg):
     payload = fake_ggg.get_runtime_flags_payload()
     assert payload["success"] is True
     assert payload["primary_color"] == "#ff5500"
+
+
+def test_host_defaults_follow_gos_environment_not_replica(fake_ggg):
+    import json
+
+    _set_realm(
+        name="Demo Realm",
+        network="ic",
+        manifest_data=json.dumps({"setup": {"gos_environment": "staging"}}),
+    )
+    payload = fake_ggg.get_runtime_flags_payload()
+    assert payload["network"] == "ic"
+    assert payload["gos_environment"] == "staging"
+    assert payload["test_mode_disable_monetary_tokens"] is True
+    assert payload["test_mode_demo_notice"] is True
+
+    _set_realm(
+        name="Demo Realm",
+        network="ic",
+        manifest_data=json.dumps({"setup": {"gos_environment": "production"}}),
+    )
+    payload = fake_ggg.get_runtime_flags_payload()
+    assert payload["test_mode_disable_monetary_tokens"] is False
+    assert payload["test_mode_demo_notice"] is False
+
+
+def test_seed_host_defaults_on_first_environment(fake_ggg):
+    import json
+
+    from core.demo_notice import seed_host_defaults_on_first_environment
+
+    realm = _FakeRealm(
+        network="ic",
+        manifest_data=json.dumps({"setup": {"gos_environment": "staging"}}),
+        test_mode_disable_monetary_tokens=False,
+    )
+    seed_host_defaults_on_first_environment(
+        realm, {"disable_monetary_tokens": False}
+    )
+    assert realm.test_mode_disable_monetary_tokens is False
+    assert realm.test_mode_demo_notice is True
+
+    untouched = _FakeRealm(network="ic", manifest_data="{}")
+    seed_host_defaults_on_first_environment(untouched, {})
+    assert not hasattr(untouched, "test_mode_disable_monetary_tokens")
+
+
+def test_quarter_threshold_uses_manifest_environment(fake_ggg):
+    import json
+
+    from core.autoscale import LOW_THRESHOLD_N, _manifest_environment, default_threshold_n
+
+    realm = _FakeRealm(
+        network="ic",
+        manifest_data=json.dumps({"setup": {"gos_environment": "demo"}}),
+    )
+    assert _manifest_environment(realm) == "demo"
+    assert default_threshold_n(_manifest_environment(realm)) == LOW_THRESHOLD_N

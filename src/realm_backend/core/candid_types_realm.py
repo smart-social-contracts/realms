@@ -63,6 +63,7 @@ class StatusRecord(Record):
     background_image_url: text
     file_registry_canister_id: text
     marketplace_canister_id: text
+    gos_environment: text
 
 
 class UserGetRecord(Record):

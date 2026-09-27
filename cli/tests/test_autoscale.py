@@ -24,6 +24,7 @@ if "_cdk" not in sys.modules:
             return cls
 
     _cdk_stub.Async = _Async
+    _cdk_stub.ic = types.SimpleNamespace()
     sys.modules["_cdk"] = _cdk_stub
 
 from ic_python_db import Database  # noqa: E402

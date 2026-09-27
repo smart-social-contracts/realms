@@ -174,30 +174,34 @@ def is_monetary_tokens_disabled(realm=None) -> bool:
     """True when the host UI must gray out ckBTC/ckUSDC/ckEURC/Custom.
 
     Explicit Realm flag wins. If the field was never set (pre-flag backends),
-    staging/demo/test default to disabled.
+    a manifest gos_environment of staging, demo, or test defaults to disabled.
     """
-    from core.demo_notice import default_disable_monetary_tokens, explicit_or_host_default
+    from core.demo_notice import (
+        default_disable_monetary_tokens,
+        explicit_or_host_default,
+        host_environment,
+    )
 
     realm = _realm_or_loaded(realm)
     if realm is None:
         return False
     return explicit_or_host_default(
         getattr(realm, "test_mode_disable_monetary_tokens", None),
-        getattr(realm, "network", ""),
+        host_environment(realm),
         default_disable_monetary_tokens,
     )
 
 
 def is_demo_notice_enabled(realm=None) -> bool:
     """True when join + founder setup must show the configurable demo notice."""
-    from core.demo_notice import default_demo_notice, explicit_or_host_default
+    from core.demo_notice import default_demo_notice, explicit_or_host_default, host_environment
 
     realm = _realm_or_loaded(realm)
     if realm is None:
         return False
     return explicit_or_host_default(
         getattr(realm, "test_mode_demo_notice", None),
-        getattr(realm, "network", ""),
+        host_environment(realm),
         default_demo_notice,
     )
 
@@ -238,6 +242,7 @@ def get_runtime_flags_payload() -> dict:
         "logo_url": str(getattr(realm, "logo_url", "") or ""),
         "background_image_url": str(getattr(realm, "background_image_url", "") or ""),
         "network": str(getattr(realm, "network", "") or ""),
+        "gos_environment": _setup.get_gos_environment(realm),
         # Which variant is running, so a sheet's converged_when can refuse a
         # test build on production (and a production build where the
         # environment expects test flags) without trusting the deploy log.

@@ -43,6 +43,34 @@ def normalize_network(network: str | None) -> str:
     return (network or "").strip().lower()
 
 
+def manifest_environment(realm) -> str:
+    """``gos_environment`` stored on the realm manifest. Empty when unset."""
+    if realm is None:
+        return ""
+    try:
+        manifest = json.loads(getattr(realm, "manifest_data", "") or "{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return ""
+    setup = manifest.get("setup") if isinstance(manifest, dict) else None
+    if not isinstance(setup, dict):
+        return ""
+    return str(setup.get("gos_environment") or "").strip().lower()
+
+
+def host_environment(realm) -> str:
+    """Environment name for host defaults.
+
+    The manifest value wins. When it has never been set, the replica field is
+    the only name older realms stored.
+    """
+    env = manifest_environment(realm)
+    if env:
+        return env
+    if realm is None:
+        return ""
+    return str(getattr(realm, "network", "") or "").strip().lower()
+
+
 def default_disable_monetary_tokens(network: str | None) -> bool:
     return normalize_network(network) in HOST_DISABLE_MONETARY_NETWORKS
 
@@ -60,6 +88,24 @@ def seed_host_flag_defaults(obj: dict, network: str | None = None) -> dict:
     obj.setdefault("test_mode_demo_notice", default_demo_notice(net))
     obj.setdefault("demo_notice_body", "")
     return obj
+
+
+def seed_host_defaults_on_first_environment(realm, incoming_flags: dict | None = None) -> None:
+    """Seed monetary-token and demo-notice defaults from the manifest environment.
+
+    Caller invokes this only when ``gos_environment`` was empty before this
+    configure call. Keys already present in *incoming_flags* stay as set.
+    """
+    environment = manifest_environment(realm)
+    if not environment:
+        return
+    incoming = incoming_flags or {}
+    if "disable_monetary_tokens" not in incoming:
+        realm.test_mode_disable_monetary_tokens = default_disable_monetary_tokens(
+            environment
+        )
+    if "demo_notice_enabled" not in incoming:
+        realm.test_mode_demo_notice = default_demo_notice(environment)
 
 
 def parse_notice_bodies(raw) -> dict[str, str]:

@@ -181,6 +181,7 @@ class StatusRecord(Record):
     realm_logo: text
     realm_description: text
     realm_welcome_image: text
+    gos_environment: text
 
 
 class UserGetRecord(Record):
@@ -2040,10 +2041,11 @@ def _set_canister_config_impl(
         file_registry_canister_id: Optional file_registry canister ID (shared infra)
         marketplace_canister_id: Optional marketplace_backend canister ID (shared infra)
         installed_version: Optional deployed version string (e.g. "0.3.5")
-        network: Optional IC network name (e.g. "test", "staging", "demo", "ic")
+        network: Optional IC replica name (e.g. "ic", "local")
         test_flags_json: Optional JSON with test mode flags, e.g.
             {"test_mode":true,"ii_bypass":true,"user_self_registration":true,...}
-            Rejected on production (network ic/production) unless can_test_mode is set.
+            Rejected unless the manifest gos_environment is a non-production
+            environment, or can_test_mode is set.
         can_test_mode: When True, allows test flags on production networks.
     """
     try:
@@ -2068,34 +2070,7 @@ def _set_canister_config_impl(
         if installed_version:
             realm.installed_version = installed_version
         if network:
-            previous_network = getattr(realm, "network", "") or ""
             realm.network = network
-            # Seed host go-live defaults the first time a staging/demo/test
-            # network is recorded, unless this call already set those flags.
-            incoming_flags = {}
-            if test_flags_json:
-                try:
-                    parsed_incoming = json.loads(test_flags_json)
-                    if isinstance(parsed_incoming, dict):
-                        from core.runtime_flags import normalize_flag_key
-
-                        incoming_flags = {
-                            normalize_flag_key(k): v for k, v in parsed_incoming.items()
-                        }
-                except (TypeError, ValueError):
-                    incoming_flags = {}
-            if not previous_network:
-                from core.demo_notice import (
-                    default_demo_notice,
-                    default_disable_monetary_tokens,
-                )
-
-                if "disable_monetary_tokens" not in incoming_flags:
-                    realm.test_mode_disable_monetary_tokens = (
-                        default_disable_monetary_tokens(network)
-                    )
-                if "demo_notice_enabled" not in incoming_flags:
-                    realm.test_mode_demo_notice = default_demo_notice(network)
 
         if can_test_mode is not None:
             realm.can_test_mode = bool(can_test_mode)
@@ -2109,7 +2084,9 @@ def _set_canister_config_impl(
                 test_flags_allowed,
             )
 
-            effective_network = network or getattr(realm, "network", "") or ""
+            from core.demo_notice import host_environment
+
+            effective_environment = host_environment(realm)
             raw_flags = json.loads(test_flags_json)
             # can_test_mode is the switch that permits test flags on a production
             # network, so it is only settable through the dedicated parameter of
@@ -2125,7 +2102,7 @@ def _set_canister_config_impl(
                 k for k, v in flags.items() if v and is_test_only_flag(k)
             )
             allowed = test_flags_allowed(
-                effective_network, bool(getattr(realm, "can_test_mode", False))
+                effective_environment, bool(getattr(realm, "can_test_mode", False))
             )
             if enabled_test_flags and not allowed:
                 return RealmResponse(
@@ -2134,9 +2111,9 @@ def _set_canister_config_impl(
                         error=(
                             "Test mode flags "
                             + ", ".join(enabled_test_flags)
-                            + " are not permitted on network "
-                            f"'{effective_network or '(unset)'}' unless can_test_mode "
-                            "is set by a controller. Networks allowing test flags: "
+                            + " are not permitted on environment "
+                            f"'{effective_environment or '(unset)'}' unless can_test_mode "
+                            "is set by a controller. Environments allowing test flags: "
                             + ", ".join(NON_PRODUCTION_NETWORKS)
                         )
                     ),
@@ -2371,6 +2348,16 @@ def set_canister_config_json(args: text) -> Async[text]:
             accounting_currency_decimals = resolved["decimals"]
             treasury_token_indexer_id = resolved.get("indexer_canister_id")
 
+        from ggg import Realm
+        from core.setup import get_gos_environment, set_gos_environment
+
+        previous_env = ""
+        pre_realm = Realm.load("1")
+        if pre_realm is not None:
+            previous_env = get_gos_environment(pre_realm)
+            if params.get("gos_environment"):
+                set_gos_environment(pre_realm, params["gos_environment"])
+
         resp = _set_canister_config_impl(
             frontend_canister_id=params.get("frontend_canister_id"),
             token_canister_id=params.get("token_canister_id"),
@@ -2388,7 +2375,6 @@ def set_canister_config_json(args: text) -> Async[text]:
         )
         out = _realm_response_to_json_dict(resp)
         if out.get("success"):
-            from ggg import Realm
             from core.setup import set_creator_principal, set_realm_registry_canister_id
 
             realm = Realm.load("1")
@@ -2399,10 +2385,22 @@ def set_canister_config_json(args: text) -> Async[text]:
                     set_realm_registry_canister_id(
                         realm, params["realm_registry_canister_id"]
                     )
-                if params.get("gos_environment"):
-                    from core.setup import set_gos_environment
+                if not previous_env:
+                    from core.demo_notice import seed_host_defaults_on_first_environment
+                    from core.runtime_flags import normalize_flag_key
 
-                    set_gos_environment(realm, params["gos_environment"])
+                    incoming_flags = {}
+                    if flags:
+                        try:
+                            parsed_incoming = json.loads(flags)
+                            if isinstance(parsed_incoming, dict):
+                                incoming_flags = {
+                                    normalize_flag_key(k): v
+                                    for k, v in parsed_incoming.items()
+                                }
+                        except (TypeError, ValueError):
+                            incoming_flags = {}
+                    seed_host_defaults_on_first_environment(realm, incoming_flags)
         return json.dumps(out)
     except Exception as e:
         logger.error(f"set_canister_config_json error: {e}\n{traceback.format_exc()}")
@@ -3649,6 +3647,7 @@ def get_scale_status() -> text:
         from ggg import Realm
 
         from core.autoscale import (
+            _manifest_environment,
             default_threshold_n,
             quarter_capacity_override,
             quarter_populations,
@@ -3661,24 +3660,24 @@ def get_scale_status() -> text:
         if not realm:
             return json.dumps({"success": False, "error": "Realm not found"})
 
-        network = getattr(realm, "network", "") or ""
+        environment = _manifest_environment(realm)
         pops = quarter_populations(realm)
         # Report the effective N: the manifest override the registration path
         # actually uses, not just the env default (observability must match
         # behavior or operators misread stuck scales).
-        n = quarter_capacity_override(realm) or default_threshold_n(network)
+        n = quarter_capacity_override(realm) or default_threshold_n(environment)
         codex_fn = _codex_should_deploy_fn(realm)
         return json.dumps({
             "success": True,
             "auto_scale_enabled": bool(getattr(realm, "auto_scale_enabled", True)),
             "scale_in_flight": bool(getattr(realm, "scale_in_flight", False)),
             "scale_requested_at": getattr(realm, "scale_requested_at", "") or "",
-            "network": network,
+            "network": getattr(realm, "network", "") or "",
             "n": n,
             "threshold": scale_at(n),
             "populations": pops,
             "should_scale": resolve_should_scale(
-                pops, network, codex_fn=codex_fn, n_override=quarter_capacity_override(realm),
+                pops, environment, codex_fn=codex_fn, n_override=quarter_capacity_override(realm),
                 realm=realm,
             ),
         })
