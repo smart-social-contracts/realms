@@ -157,6 +157,7 @@
       "launch_retry": "重试启动",
       "launch_retrying": "重试中…",
       "launch_complete": "启动完成",
+      "launch_open_dashboard": "继续前往公共仪表板",
       "launching": "启动中…",
       "launch_start": "启动领域",
       "launch_starting": "正在启动…",

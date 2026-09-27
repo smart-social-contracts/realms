@@ -1630,17 +1630,21 @@ def test_setup_launch_retry_drives_configure_token_when_draft_has_pe5t5(monkeypa
     result = _call_setup_launch(setup_api)
     assert result["success"] is True
     launch = result["launch"]
+    assert launch["status"] == "running"
     token_step = next(s for s in launch["steps"] if s["name"] == "configure_token")
-    assert token_step["status"] == "completed"
+    assert token_step["status"] == "pending"
     assert token_step["error"] is None
     assert launch["updated_at"] != stale_updated_at
-    assert settings_err not in (token_step.get("error") or "")
+    assert realm.token_canister_id == ""
+
+    applied = _run_async(setup_api.run_setup_launch_phase(realm, "configure_token"))
+    assert applied["success"] is True
     assert realm.token_canister_id == ck_eurc
     assert realm.accounting_currency == "ckEURC"
 
 
 def test_setup_launch_writes_realm_ledger_when_tick_is_dead(monkeypatch):
-    """Retry applies pe5t5 even if seed/advance are dead; second Launch is not Settings."""
+    """Launch returns immediately. The ledger is applied by the configure_token phase."""
     setup_api = _import_setup_api()
     ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
     stale_updated_at = "1787858624611611294"
@@ -1702,8 +1706,8 @@ def test_setup_launch_writes_realm_ledger_when_tick_is_dead(monkeypatch):
 
     result = _call_setup_launch(setup_api)
     assert result["success"] is True
-    assert realm.token_canister_id == ck_eurc
-    assert realm.accounting_currency == "ckEURC"
+    assert result["launch"]["status"] == "running"
+    assert realm.token_canister_id == ""
     assert result.get("error_code") != "no_treasury_token"
     assert settings_err not in (result.get("error") or "")
 
@@ -1883,8 +1887,8 @@ def test_setup_save_draft_fills_ckeurc_ledger_from_symbol(monkeypatch):
     assert saved["draft"]["token"]["token_canister_id"] == ck_eurc
     assert saved["draft"]["token"]["decimals"] == 6
     assert saved["draft"]["token"]["indexer_canister_id"] == ck_eurc
-    assert realm.token_canister_id == ck_eurc
-    assert realm.accounting_currency == "ckEURC"
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
     assert "Realm Settings" not in (saved.get("error") or "")
 
 
@@ -1913,8 +1917,8 @@ def test_setup_save_draft_coerces_realistic_ckeurc_shapes(monkeypatch, token_pay
     assert saved["draft"]["token"]["token_canister_id"] == ck_eurc
     assert saved["draft"]["token"]["decimals"] == 6
     assert saved["draft"]["token"]["indexer_canister_id"] == ck_eurc
-    assert realm.token_canister_id == ck_eurc
-    assert realm.accounting_currency == "ckEURC"
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
 
 
 @pytest.mark.parametrize(
@@ -2091,8 +2095,8 @@ def test_failed_launch_token_draft_persists_for_configure_token(monkeypatch):
     assert saved["draft"]["token"]["symbol"] == "ckEURC"
     assert "Realm Settings" not in (saved.get("error") or "")
     assert saved.get("error_code") != "no_treasury_token"
-    assert realm.token_canister_id == ck_eurc
-    assert realm.accounting_currency == "ckEURC"
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
 
     draft = setup_core.get_setup_draft(realm)
     assert setup_api._configured_token_canister_id(realm, draft) == ck_eurc
@@ -2105,7 +2109,7 @@ def test_failed_launch_token_draft_persists_for_configure_token(monkeypatch):
 
 
 def test_setup_save_draft_with_pe5t5_writes_realm_token_canister_id(monkeypatch):
-    """save_draft is the leftover-safe path: persist + apply ledger now."""
+    """save_draft stores the ledger on the draft and does not call the token canister."""
     setup_api = _import_setup_api()
     _load_tokens_offline(monkeypatch)
     ck_eurc = "pe5t5-diaaa-aaaar-qahwa-cai"
@@ -2130,15 +2134,14 @@ def test_setup_save_draft_with_pe5t5_writes_realm_token_canister_id(monkeypatch)
         },
     )
     assert saved["success"] is True
-    assert realm.token_canister_id == ck_eurc
-    assert realm.accounting_currency == "ckEURC"
-    assert realm.accounting_currency != "REALMS"
+    assert realm.token_canister_id == ""
+    assert realm.accounting_currency == ""
     assert "Realm Settings" not in (saved.get("error") or "")
     setup_cfg = json.loads(realm.manifest_data)["setup"]
-    assert setup_cfg["token"]["token_canister_id"] == ck_eurc
+    assert setup_cfg["draft"]["token"]["token_canister_id"] == ck_eurc
     after_save = setup_core.get_setup_state_payload()
-    assert after_save["realm_token_canister_id"] == ck_eurc
-    assert after_save["token"]["token_canister_id"] == ck_eurc
+    assert after_save["realm_token_canister_id"] is None
+    assert after_save["draft"]["token"]["token_canister_id"] == ck_eurc
 
 
 def test_fossil_failed_launch_save_draft_apply_does_not_return_settings(monkeypatch):
@@ -2195,8 +2198,7 @@ def test_fossil_failed_launch_save_draft_apply_does_not_return_settings(monkeypa
     assert saved["success"] is True
     assert saved.get("error") != settings_err
     assert "Realm Settings" not in (saved.get("error") or "")
-    assert realm.token_canister_id == ck_eurc
-    assert realm.accounting_currency == "ckEURC"
+    assert realm.token_canister_id == ""
 
     applied = _call_setup_apply_draft_token(setup_api)
     assert applied["success"] is True
@@ -2267,11 +2269,9 @@ def test_apply_draft_token_now_hard_errors_when_symbol_cannot_apply(monkeypatch)
     assert realm.token_canister_id == ""
 
     launched = _call_setup_launch(setup_api)
-    assert launched["success"] is False
-    assert launched["error_code"] == "draft_token_unapplied"
-    assert launched["error"] != _settings_treasury_message()
+    assert launched["success"] is True
+    assert launched["launch"]["status"] == "running"
     assert realm.token_canister_id == ""
-    assert json.loads(realm.manifest_data)["setup"].get("launch") is None
 
 
 def test_draft_realm_saveable_without_treasury_ledger():
@@ -2384,7 +2384,7 @@ def test_main_setup_apply_does_not_import_api_setup():
     save_start = text.index("def setup_save_draft(")
     save_end = text.index("def setup_apply_draft_token()", save_start)
     save_body = text[save_start:save_end]
-    assert "from core.setup_draft_token import apply_persisted_draft_if_present" in save_body
+    assert "apply_persisted_draft_if_present" not in save_body
 
 
 def test_setup_launch_runs_phases_in_order(monkeypatch):

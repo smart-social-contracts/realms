@@ -157,6 +157,7 @@
       "launch_retry": "Retry launch",
       "launch_retrying": "Retrying…",
       "launch_complete": "Launch complete",
+      "launch_open_dashboard": "Continue to the public dashboard",
       "launching": "Launching…",
       "launch_start": "Launch realm",
       "launch_starting": "Starting…",

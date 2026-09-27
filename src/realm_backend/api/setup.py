@@ -23,6 +23,7 @@ from core.setup import (
     get_setup_draft,
     get_setup_state_payload,
     get_launch_state,
+    validate_draft_for_launch,
     is_setup_stage,
     launch_state_for_response,
     _next_pending_launch_step,
@@ -316,14 +317,9 @@ def setup_save_draft(args_json: str) -> Async[str]:
         if persist_err:
             return json.dumps({"success": False, "error": persist_err})
 
-    # Leftover-safe apply: Valencia's setup_save_draft already runs. Write
-    # realm.token_canister_id now so configure_token does not depend on
-    # setup_launch (which leftover candid/UI/auth can swallow).
-    if "token" in params:
-        apply_result = yield from _apply_persisted_draft_token(realm, params.get("token"))
-        if isinstance(apply_result, dict) and not apply_result.get("success"):
-            return json.dumps(apply_result)
-
+    # The treasury ledger is applied by the background launch phase. Doing it
+    # here makes this update slow enough that the sync call certificate can
+    # move to ``done`` and drop the reply before the browser reads it.
     return json.dumps({"success": True, "draft": draft_for_response(draft)})
 
 
@@ -413,7 +409,12 @@ def setup_apply_draft_token() -> Async[str]:
     return json.dumps(result)
 
 
-def setup_launch() -> Async[str]:
+def setup_launch() -> str:
+    """Start background initialization and return immediately.
+
+    Ledger calls and phase work run on the launch timer. This HTTP call only
+    records ``launch.status = running`` so the page can poll.
+    """
     auth_err = require_setup_authorized()
     if auth_err:
         return json.dumps(auth_err)
@@ -422,12 +423,21 @@ def setup_launch() -> Async[str]:
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
 
-    # Founder apply first. seed_recurring_codex_task / advance_setup_launch
-    # may be dead on a non-leftover-free canister; the ledger must still
-    # land on realm.token_canister_id before this call returns.
-    apply_result = yield from _apply_draft_token_now(realm)
-    if isinstance(apply_result, dict) and not apply_result.get("success"):
-        return json.dumps(apply_result)
+    draft = get_setup_draft(realm)
+    codex_err = validate_draft_for_launch(draft)
+    if codex_err:
+        return json.dumps({"success": False, "error": codex_err})
+
+    launch = get_launch_state(realm)
+    resuming = any(
+        step.get("status") == "failed" for step in (launch.get("steps") or [])
+    )
+    token = _token_record(_complete_catalog_token_draft(draft.get("token")))
+    has_token = token is not None and (
+        (token.get("token_canister_id") or "").strip() or (token.get("symbol") or "").strip()
+    )
+    if not resuming and not has_token:
+        return json.dumps(_treasury_token_refused())
 
     err = begin_setup_launch(realm)
     if err:
@@ -444,16 +454,7 @@ def setup_launch() -> Async[str]:
     except Exception as seed_err:
         logger.warning("setup_launch: seed_recurring_codex_task failed: %s", seed_err)
 
-    launch = get_launch_state(realm)
-    step = _next_pending_launch_step(launch)
-    if step and step.get("name") == "configure_token":
-        try:
-            yield from advance_setup_launch()
-        except Exception as tick_err:
-            logger.warning("setup_launch: advance_setup_launch failed: %s", tick_err)
-        realm = _load_realm()
-        launch = get_launch_state(realm)
-    return json.dumps({"success": True, "launch": launch})
+    return json.dumps({"success": True, "launch": get_launch_state(realm)})
 
 
 def _decode_data_url(data_url: str) -> tuple[bytes, str]:

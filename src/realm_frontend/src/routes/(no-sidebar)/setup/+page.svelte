@@ -456,9 +456,6 @@
 			launchState = launch;
 			if (launch.status === 'completed') {
 				stopLaunchPolling();
-				await setupStateStore.refresh();
-				leftSetup = true;
-				void goto('/', { replaceState: true });
 			} else if (launch.status === 'failed') {
 				stopLaunchPolling();
 			}
@@ -480,8 +477,12 @@
 		try {
 			const [state, available] = await Promise.all([fetchSetupState(), listAvailableCodices()]);
 			if (state.status !== 'setup') {
-				leftSetup = true;
-				void goto('/', { replaceState: true });
+				applySetupState(state);
+				launchState = {
+					...(state.launch || { phase: null, steps: [], updated_at: null }),
+					status: 'completed'
+				};
+				currentStep = 'review';
 				return;
 			}
 			if (!state.is_caller_authorized) {
@@ -881,16 +882,6 @@
 					{ refresh: false }
 				);
 			}
-			// Leftover setup_launch can return success:true with the fossil row.
-			// Retry must persist via setup_apply_draft_token and fail at the top
-			// if realm.token_canister_id is still empty.
-			if (!(await applyAndConfirmDraftToken(expectedLedger))) return;
-			if (payload) {
-				const applied = await configureSetupToken(payload);
-				if (!applied.success) {
-					error = applied.error || 'Could not apply treasury ledger';
-				}
-			}
 			const result = await startSetupLaunch();
 			if (!result.success) {
 				error = result.error || 'Could not start launch';
@@ -906,6 +897,11 @@
 		} finally {
 			busy = false;
 		}
+	}
+
+	function goToPublicDashboard() {
+		leftSetup = true;
+		void goto('/', { replaceState: true });
 	}
 
 	function generateBrandingFromIdentity() {
@@ -1206,7 +1202,14 @@
 								{busy ? $_('setup.wizard.launch_retrying') : $_('setup.wizard.launch_retry')}
 							</button>
 						{:else if launchCompleted}
-							<Button color="none" class={primaryButtonClass} disabled>{$_('setup.wizard.launch_complete')}</Button>
+							<button
+								type="button"
+								class="{toolbarNativeClass} {primaryButtonClass}"
+								style={primaryColor ? `background:${primaryColor};border-color:${primaryColor}` : ''}
+								onclick={goToPublicDashboard}
+							>
+								{$_('setup.wizard.launch_open_dashboard')}
+							</button>
 						{:else if launchRunning}
 							<Button color="none" class={primaryButtonClass} disabled>{$_('setup.wizard.launching')}</Button>
 						{:else}

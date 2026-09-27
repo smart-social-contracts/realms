@@ -8450,22 +8450,7 @@ def setup_save_draft(args: text) -> Async[text]:
         result = _save(args)
         if hasattr(result, "send"):
             result = yield from result
-        persist_text = result if isinstance(result, str) else json.dumps(result)
-        try:
-            parsed = json.loads(persist_text)
-        except Exception:
-            parsed = {}
-        if not (isinstance(parsed, dict) and parsed.get("success")):
-            return persist_text
-
-        from core.setup_draft_token import apply_persisted_draft_if_present
-
-        apply_result = apply_persisted_draft_if_present()
-        if hasattr(apply_result, "send"):
-            apply_result = yield from apply_result
-        if isinstance(apply_result, dict) and apply_result.get("success") is False:
-            return json.dumps(apply_result)
-        return persist_text
+        return result if isinstance(result, str) else json.dumps(result)
     except Exception as e:
         logger.error(f"setup_save_draft error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
@@ -8512,7 +8497,7 @@ def get_setup_launch_status() -> text:
 
 @update
 def setup_launch() -> Async[text]:
-    """Validate draft, reset a failed step, and run configure_token if pending."""
+    """Start background initialization. Returns as soon as the launch is marked running."""
     try:
         from api.setup import setup_launch as _launch
 
