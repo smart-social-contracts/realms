@@ -194,7 +194,7 @@ type Icrc1MetadataService = service { icrc1_symbol : () -> (text) query; icrc1_n
 type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (GetCreditsResult) query; get_latest_version : () -> (UpgradeResult) query };
 type _ICRC1IndexerService = service { get_account_transactions : (_GetAccountTransactionsArgs) -> (_GetAccountTransactionsResult) query };
 
-service : {
+service : (text) -> {
   "policy_status" : () -> (text) query;
   "status" : () -> (RealmResponse) query;
   "get_runtime_flags" : () -> (text) query;
