@@ -17,6 +17,8 @@
       "principals": {
         "operator": "2c2o3-dbhre-c7wf6-gqujk-wtusq-bqpyk-cv74a-jz35f-2wnzn-bil5z-2qe",
         "committee": "kpbof-gom7k-b4gsj-sfmka-fvbac-y72nv-sb7f2-b4v4e-4557j-erlzq-2qe",
+        "$comment_operator_code": "Unclaimed access-code slot. Whoever redeems it becomes a conductor commander with full access. The code is not stored in this file.",
+        "operator_code": "sha256:bfefe7081c3ccf6dc36752e7461f4e98d8ceb4ff966a11a61cfdcb6b7b6cc13a",
         "$comment_deployer": "The identity that ran casals up. It is a controller of the governance multisig only.",
         "deployer": "$deployer"
       },
@@ -56,6 +58,10 @@
     "commanders": [
       {
         "principal": "$principal:operator",
+        "permissions": "*"
+      },
+      {
+        "principal": "$principal:operator_code",
         "permissions": "*"
       }
     ],
