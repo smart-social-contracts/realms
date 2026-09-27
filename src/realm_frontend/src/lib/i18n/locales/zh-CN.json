@@ -168,6 +168,7 @@
       "token_help": "使用网络上已有的共享代币，或指向您自己的 ICRC-1 账本。",
       "token_symbol": "代币符号",
       "ledger_canister": "账本容器 ID",
+      "index_canister": "索引容器 ID",
       "branding_title": "品牌",
       "branding_help": "先撰写领域的声音。然后生成标识或上传您自己的。",
       "welcome_message": "欢迎消息",

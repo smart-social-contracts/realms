@@ -1,10 +1,9 @@
 /**
- * Shared treasury tokens a founder may adopt in the setup wizard.
+ * Treasury tokens a founder may adopt in the setup wizard.
  *
- * The catalog — which symbols exist and their ledger / indexer / decimals —
- * comes from the realm backend (`get_setup_state().shared_tokens`), which got
- * it from the installer, which got it from the environment's casals.json. This
- * module holds no canister ids: only the descriptions shown on the cards.
+ * The Realms token ledger depends on the environment and is read from
+ * `fleet-tokens.json` in the Realms GitHub repo. ckBTC and ckUSDC are the
+ * chain-key ledgers: the same principals on every environment.
  */
 
 export interface SharedTokenCatalogEntry {
@@ -39,6 +38,84 @@ const TOKEN_INFO: Record<string, { name: string; description: string }> = {
 };
 
 export const CUSTOM_TOKEN_ID = 'custom';
+
+/** Published map: environment name → Realms token ledger. */
+export const FLEET_TOKENS_URL =
+	'https://raw.githubusercontent.com/smart-social-contracts/realms/main/fleet-tokens.json';
+
+/** Chain-key ledgers. They do not vary by GaaS environment. */
+export const CHAIN_KEY_TOKENS: SharedTokenOption[] = [
+	{
+		id: 'ckBTC',
+		symbol: 'ckBTC',
+		name: 'ckBTC',
+		description: TOKEN_INFO.CKBTC.description,
+		decimals: 8,
+		ledger: 'mxzaz-hqaaa-aaaar-qaada-cai',
+		indexer: 'n5wcd-faaaa-aaaar-qaaea-cai'
+	},
+	{
+		id: 'ckUSDC',
+		symbol: 'ckUSDC',
+		name: 'ckUSDC',
+		description: TOKEN_INFO.CKUSDC.description,
+		decimals: 6,
+		ledger: 'xevnm-gaaaa-aaaar-qafnq-cai',
+		indexer: 'xrs4b-hiaaa-aaaar-qafoa-cai'
+	}
+];
+
+/** Realms token for this environment, then the two chain-key ledgers. */
+export function wizardTokenOptions(
+	defaultToken: SharedTokenOption | null | undefined
+): SharedTokenOption[] {
+	const out: SharedTokenOption[] = [];
+	if (defaultToken?.ledger) out.push(defaultToken);
+	for (const token of CHAIN_KEY_TOKENS) {
+		if (!out.some((item) => item.ledger === token.ledger)) out.push(token);
+	}
+	return out;
+}
+
+export function defaultTokenFromMap(
+	table: unknown,
+	environment: string
+): SharedTokenOption | null {
+	if (!table || typeof table !== 'object') return null;
+	const name = environment.trim().toLowerCase();
+	if (!name || name.startsWith('_')) return null;
+	const entry = (table as Record<string, unknown>)[name];
+	if (!entry || typeof entry !== 'object') return null;
+	const row = entry as Record<string, unknown>;
+	const ledger = String(row.ledger || '').trim();
+	if (!ledger) return null;
+	const symbol = String(row.symbol || 'RLM').trim() || 'RLM';
+	const info = TOKEN_INFO[symbol.toUpperCase()];
+	const indexer = String(row.indexer || '').trim();
+	return {
+		id: symbol,
+		symbol,
+		name: String(row.name || info?.name || symbol),
+		description: info?.description || 'The Realms token for this environment',
+		decimals: typeof row.decimals === 'number' ? row.decimals : 8,
+		ledger,
+		...(indexer ? { indexer } : {})
+	};
+}
+
+export async function fetchDefaultTreasuryToken(environment: string): Promise<SharedTokenOption> {
+	const name = environment.trim().toLowerCase();
+	if (!name) throw new Error('This realm has no environment name');
+	const response = await fetch(FLEET_TOKENS_URL);
+	if (!response.ok) {
+		throw new Error(`Could not load the Realms token map (${response.status})`);
+	}
+	const token = defaultTokenFromMap(await response.json(), name);
+	if (!token) {
+		throw new Error(`No Realms token is published for environment ${name}`);
+	}
+	return token;
+}
 
 /** The wizard's catalog cards, in the backend's order. Empty when the realm has none. */
 export function sharedTokenOptions(
@@ -88,14 +165,15 @@ export function matchSharedToken(
 
 export function tokenDraftFromChoice(
 	choiceId: string,
-	custom: { symbol: string; token_canister_id: string },
+	custom: { symbol: string; token_canister_id: string; indexer_canister_id?: string },
 	options: SharedTokenOption[]
 ): Record<string, string | number> | null {
 	if (choiceId === CUSTOM_TOKEN_ID) {
 		const symbol = custom.symbol.trim();
 		const token_canister_id = custom.token_canister_id.trim();
-		if (!symbol || !token_canister_id) return null;
-		return { symbol, token_canister_id };
+		const indexer_canister_id = (custom.indexer_canister_id || '').trim();
+		if (!symbol || !token_canister_id || !indexer_canister_id) return null;
+		return { symbol, token_canister_id, indexer_canister_id };
 	}
 	const token = sharedTokenById(options, choiceId);
 	if (!token) return null;

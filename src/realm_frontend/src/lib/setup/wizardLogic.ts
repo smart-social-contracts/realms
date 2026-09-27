@@ -2,7 +2,8 @@ import type { SetupState } from './types';
 import {
 	configureTokenPayload,
 	type CatalogTokenDraftInput,
-	sharedTokenOptions
+	sharedTokenOptions,
+	wizardTokenOptions
 } from './sharedTokens';
 
 export type WizardStep = 'welcome' | 'codex' | 'token' | 'branding' | 'languages' | 'review';
@@ -297,7 +298,11 @@ export function founderConfigureTokenFromSetupState(
 ): Record<string, string | number> | null {
 	if (setupState?.draft?.token === null) return null;
 	const token = (setupState?.draft?.token ?? setupState?.token ?? null) as CatalogTokenDraftInput;
-	return configureTokenPayload(token, sharedTokenOptions(setupState?.shared_tokens));
+	const options = [
+		...wizardTokenOptions(null),
+		...sharedTokenOptions(setupState?.shared_tokens)
+	];
+	return configureTokenPayload(token, options);
 }
 
 export function persistedRealmLedger(setupState: SetupState | null | undefined): string {

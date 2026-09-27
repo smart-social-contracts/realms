@@ -41,11 +41,14 @@
 	import {
 		CUSTOM_TOKEN_ID,
 		configureTokenPayload,
+		fetchDefaultTreasuryToken,
 		matchSharedToken,
 		completeCatalogTokenDraft,
-		sharedTokenOptions,
-		tokenDraftFromChoice
+		tokenDraftFromChoice,
+		wizardTokenOptions,
+		type SharedTokenOption
 	} from '$lib/setup/sharedTokens';
+	import { lookupLedgerSymbol } from '$lib/setup/ledgerSymbol';
 	import { fileToCompressedDataUrl, urlToCompressedDataUrl } from '$lib/utils/imageDataUrl';
 	import { setupStateStore } from '$lib/stores/setupState';
 	import {
@@ -73,7 +76,7 @@
 	const steps: { id: WizardStep; labelKey: string; skippable: boolean }[] = [
 		{ id: 'welcome', labelKey: 'setup.wizard.step_welcome', skippable: false },
 		{ id: 'codex', labelKey: 'setup.wizard.step_codex', skippable: false },
-		{ id: 'token', labelKey: 'setup.wizard.step_token', skippable: true },
+		{ id: 'token', labelKey: 'setup.wizard.step_token', skippable: false },
 		{ id: 'branding', labelKey: 'setup.wizard.step_branding', skippable: true },
 		{ id: 'languages', labelKey: 'setup.wizard.step_languages', skippable: false },
 		{ id: 'review', labelKey: 'setup.wizard.step_review', skippable: false }
@@ -91,16 +94,20 @@
 	let busy = $state(false);
 	let error = $state('');
 	let setupState = $state<SetupState | null>(null);
-	// The shared-ledger catalog is the backend's (from casals.json); nothing is baked in here.
-	const tokenOptions = $derived(sharedTokenOptions(setupState?.shared_tokens));
+	let defaultToken = $state<SharedTokenOption | null>(null);
+	let defaultTokenError = $state('');
+	let defaultTokenEnvironment = '';
+	const tokenOptions = $derived(wizardTokenOptions(defaultToken));
 	let launchState = $state<SetupLaunchState | null>(null);
 	let codices = $state<AvailableCodex[]>([]);
 	let selectedCodexId = $state('');
 	let selectedVersion = $state('');
 	let resolvedCodexVersion = $state('');
-	let tokenSymbol = $state('REALMS');
+	let tokenSymbol = $state('');
 	let tokenCanisterId = $state('');
+	let tokenIndexerId = $state('');
 	let tokenChoice = $state('');
+	let symbolLookupTimer: ReturnType<typeof setTimeout> | null = null;
 	let primaryColor = $state('#3b82f6');
 	let logoPreview = $state('');
 	let backgroundPreview = $state('');
@@ -145,8 +152,9 @@
 	const launchIdle = $derived(!launchState || launchState.status === 'idle');
 	const tokenContinueDisabled = $derived(
 		busy ||
+			!tokenChoice ||
 			(tokenChoice === CUSTOM_TOKEN_ID &&
-				(!tokenSymbol.trim() || !tokenCanisterId.trim()))
+				(!tokenSymbol.trim() || !tokenCanisterId.trim() || !tokenIndexerId.trim()))
 	);
 	const summaryCodexPackage = $derived(
 		setupState?.draft?.codex?.package || setupState?.codex?.package || selectedCodexId || ''
@@ -305,6 +313,9 @@
 				if (typeof token.token_canister_id === 'string') {
 					tokenCanisterId = token.token_canister_id;
 				}
+				if (typeof token.indexer_canister_id === 'string') {
+					tokenIndexerId = token.indexer_canister_id;
+				}
 				if (typeof token.id === 'string' && !tokenSymbol) {
 					tokenSymbol = token.id;
 				}
@@ -312,13 +323,9 @@
 					tokenSymbol = token.existing;
 				}
 			}
-			const matched = matchSharedToken(tokenOptions, {
-				symbol: tokenSymbol,
-				token_canister_id: tokenCanisterId
-			});
-			tokenChoice =
-				matched?.id ?? (tokenSymbol || tokenCanisterId ? CUSTOM_TOKEN_ID : tokenOptions[0]?.id ?? CUSTOM_TOKEN_ID);
+			syncTokenChoice();
 		}
+		void loadDefaultTreasury(state.gos_environment || '');
 
 		const branding = state.draft?.branding ?? state.branding;
 		if (branding) {
@@ -619,18 +626,64 @@
 		}
 	}
 
+	function syncTokenChoice() {
+		if (!tokenSymbol && !tokenCanisterId && !tokenIndexerId) return;
+		const matched = matchSharedToken(tokenOptions, {
+			symbol: tokenSymbol,
+			token_canister_id: tokenCanisterId
+		});
+		tokenChoice = matched?.id ?? CUSTOM_TOKEN_ID;
+	}
+
+	async function loadDefaultTreasury(environment: string) {
+		const name = environment.trim().toLowerCase();
+		if (!name || defaultTokenEnvironment === name) return;
+		defaultTokenEnvironment = name;
+		try {
+			defaultToken = await fetchDefaultTreasuryToken(name);
+			defaultTokenError = '';
+		} catch (e) {
+			defaultToken = null;
+			defaultTokenError = e instanceof Error ? e.message : 'Could not load the Realms token';
+		}
+		syncTokenChoice();
+	}
+
+	function scheduleSymbolLookup() {
+		tokenSymbol = '';
+		if (symbolLookupTimer) clearTimeout(symbolLookupTimer);
+		const ledger = tokenCanisterId.trim();
+		if (!ledger.endsWith('-cai')) return;
+		symbolLookupTimer = setTimeout(async () => {
+			try {
+				const symbol = await lookupLedgerSymbol(ledger);
+				if (tokenCanisterId.trim() !== ledger) return;
+				tokenSymbol = symbol;
+				error = '';
+			} catch (e) {
+				if (tokenCanisterId.trim() !== ledger) return;
+				tokenSymbol = '';
+				error = e instanceof Error ? e.message : 'Could not read the ledger symbol';
+			}
+		}, 400);
+	}
+
 	async function handleTokenSave() {
 		const token = completeCatalogTokenDraft(
 			tokenDraftFromChoice(
 				tokenChoice,
-				{ symbol: tokenSymbol, token_canister_id: tokenCanisterId },
+				{
+					symbol: tokenSymbol,
+					token_canister_id: tokenCanisterId,
+					indexer_canister_id: tokenIndexerId
+				},
 				tokenOptions
 			),
 			tokenOptions
 		);
 		const payload = configureTokenPayload(token, tokenOptions);
 		if (!payload) {
-			error = 'Choose a token, or enter a custom symbol and ledger canister';
+			error = 'Choose a token, or enter a ledger and an index canister';
 			return;
 		}
 		busy = true;
@@ -660,25 +713,17 @@
 	function selectTokenChoice(id: string) {
 		if (!isTokenChoiceSelectable(id, $testModeDisableMonetaryTokens)) return;
 		tokenChoice = id;
-		if (id === CUSTOM_TOKEN_ID) return;
+		if (id === CUSTOM_TOKEN_ID) {
+			tokenSymbol = '';
+			tokenCanisterId = '';
+			tokenIndexerId = '';
+			return;
+		}
 		const token = tokenDraftFromChoice(id, { symbol: '', token_canister_id: '' }, tokenOptions);
 		if (!token) return;
 		tokenSymbol = String(token.symbol);
 		tokenCanisterId = String(token.token_canister_id || '');
-	}
-
-	async function handleTokenSkip() {
-		busy = true;
-		error = '';
-		try {
-			const ok = await persistDraft({ step: 'branding', token: null });
-			if (!ok) return;
-			navigateToStep('branding');
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Could not save token draft';
-		} finally {
-			busy = false;
-		}
+		tokenIndexerId = String(token.indexer_canister_id || '');
 	}
 
 	async function handleBrandingSave() {
@@ -813,7 +858,7 @@
 				return;
 			}
 			if (!expectedLedger) {
-				error = 'Could not apply treasury ledger';
+				error = 'Choose a treasury token before launching';
 				return;
 			}
 			const completedToken = completeCatalogTokenDraft(
@@ -929,10 +974,6 @@
 	function skipStep() {
 		const step = steps[stepIndex];
 		if (!step?.skippable) return;
-		if (currentStep === 'token') {
-			void handleTokenSkip();
-			return;
-		}
 		if (currentStep === 'branding') {
 			void handleBrandingSkip();
 		}
@@ -1112,7 +1153,7 @@
 							{$_('setup.wizard.back')}
 						</Button>
 					{/if}
-					{#if currentStep === 'token' || currentStep === 'branding'}
+					{#if currentStep === 'branding'}
 						<Button color="none" class={secondaryButtonClass} disabled={busy} onclick={skipStep}>
 							{$_('setup.wizard.skip')}
 						</Button>
@@ -1300,6 +1341,9 @@
 					<P class="text-gray-600">
 						{$_('setup.wizard.token_help')}
 					</P>
+					{#if defaultTokenError}
+						<P class="text-sm text-red-700">{defaultTokenError}</P>
+					{/if}
 					<TokenChoiceList
 						options={tokenOptions}
 						selectedId={tokenChoice}
@@ -1309,20 +1353,31 @@
 					/>
 					{#if tokenChoice === CUSTOM_TOKEN_ID}
 						<div class="setup-wizard__field">
-							<Label for="token-symbol">{$_('setup.wizard.token_symbol')}</Label>
-							<Input
-								id="token-symbol"
-								bind:value={tokenSymbol}
-								placeholder="MYTOKEN"
-								disabled={$testModeDisableMonetaryTokens}
-							/>
-						</div>
-						<div class="setup-wizard__field">
 							<Label for="token-canister">{$_('setup.wizard.ledger_canister')}</Label>
 							<Input
 								id="token-canister"
 								bind:value={tokenCanisterId}
-								placeholder="Existing ledger canister principal"
+								placeholder="Ledger canister id"
+								disabled={$testModeDisableMonetaryTokens}
+								oninput={scheduleSymbolLookup}
+							/>
+						</div>
+						<div class="setup-wizard__field">
+							<Label for="token-indexer">{$_('setup.wizard.index_canister')}</Label>
+							<Input
+								id="token-indexer"
+								bind:value={tokenIndexerId}
+								placeholder="Index canister id"
+								disabled={$testModeDisableMonetaryTokens}
+							/>
+						</div>
+						<div class="setup-wizard__field">
+							<Label for="token-symbol">{$_('setup.wizard.token_symbol')}</Label>
+							<Input
+								id="token-symbol"
+								value={tokenSymbol}
+								placeholder="Read from the ledger"
+								readonly
 								disabled={$testModeDisableMonetaryTokens}
 							/>
 						</div>

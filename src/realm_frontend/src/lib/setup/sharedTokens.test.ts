@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+	CHAIN_KEY_TOKENS,
 	CUSTOM_TOKEN_ID,
 	completeCatalogTokenDraft,
 	configureTokenPayload,
+	defaultTokenFromMap,
 	matchSharedToken,
 	sharedTokenOptions,
-	tokenDraftFromChoice
+	tokenDraftFromChoice,
+	wizardTokenOptions
 } from './sharedTokens';
 
 // A catalog as get_setup_state().shared_tokens reports it. Fixture ids only —
@@ -70,13 +73,51 @@ describe('sharedTokens', () => {
 		expect(tokenDraftFromChoice('ckEURC', { symbol: '', token_canister_id: '' }, [])).toBeNull();
 	});
 
-	it('requires symbol and canister for a custom token', () => {
+	it('requires a looked-up symbol, ledger, and index for a custom token', () => {
 		expect(
 			tokenDraftFromChoice(CUSTOM_TOKEN_ID, { symbol: 'MINE', token_canister_id: '' }, OPTIONS)
 		).toBeNull();
 		expect(
 			tokenDraftFromChoice(CUSTOM_TOKEN_ID, { symbol: 'MINE', token_canister_id: 'zzzzz-zz' }, OPTIONS)
-		).toEqual({ symbol: 'MINE', token_canister_id: 'zzzzz-zz' });
+		).toBeNull();
+		expect(
+			tokenDraftFromChoice(
+				CUSTOM_TOKEN_ID,
+				{ symbol: '', token_canister_id: 'zzzzz-zz', indexer_canister_id: 'yyyyy-yy' },
+				OPTIONS
+			)
+		).toBeNull();
+		expect(
+			tokenDraftFromChoice(
+				CUSTOM_TOKEN_ID,
+				{ symbol: 'MINE', token_canister_id: 'zzzzz-zz', indexer_canister_id: 'yyyyy-yy' },
+				OPTIONS
+			)
+		).toEqual({
+			symbol: 'MINE',
+			token_canister_id: 'zzzzz-zz',
+			indexer_canister_id: 'yyyyy-yy'
+		});
+	});
+
+	it('offers the environment Realms token plus ckBTC and ckUSDC', () => {
+		const realms = defaultTokenFromMap(
+			{
+				_comment: 'ignored',
+				staging: { symbol: 'RLM', ledger: 'r6dmi-3yaaa-aaaak-qzgka-cai', decimals: 8 }
+			},
+			'Staging'
+		);
+		expect(realms).toMatchObject({
+			id: 'RLM',
+			symbol: 'RLM',
+			ledger: 'r6dmi-3yaaa-aaaak-qzgka-cai'
+		});
+		expect(defaultTokenFromMap({ staging: { ledger: 'aaaaa-aa' } }, 'production')).toBeNull();
+		expect(wizardTokenOptions(realms).map((token) => token.id)).toEqual(['RLM', 'ckBTC', 'ckUSDC']);
+		expect(wizardTokenOptions(null).map((token) => token.ledger)).toEqual(
+			CHAIN_KEY_TOKENS.map((token) => token.ledger)
+		);
 	});
 
 	it('Token Continue persists the catalog ledger for a ckEURC pick', () => {

@@ -168,6 +168,7 @@
       "token_help": "Usa un token compartit ja a la xarxa, o apunta al teu propi llibre major ICRC-1.",
       "token_symbol": "Símbol del token",
       "ledger_canister": "ID del canister del llibre major",
+      "index_canister": "ID del canister d'índex",
       "branding_title": "Imatge de marca",
       "branding_help": "Escriu primer la veu del regne. Després genera un emblema o puja el teu.",
       "welcome_message": "Missatge de benvinguda",

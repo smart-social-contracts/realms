@@ -81,6 +81,8 @@ export interface SetupState {
 	realm_manifesto?: string;
 	realm_welcome_message?: string;
 	realm_token_canister_id?: string | null;
+	/** Logical GaaS environment (`staging`, `production`, …), not the IC network. */
+	gos_environment?: string | null;
 	/** {symbol: {ledger, indexer, decimals}} — the shared ledgers this realm may adopt (from casals.json via the installer). */
 	shared_tokens?: Record<string, { ledger: string; indexer?: string; decimals?: number; name?: string }>;
 }

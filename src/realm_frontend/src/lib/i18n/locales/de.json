@@ -168,6 +168,7 @@
       "token_help": "Verwende einen bereits im Netzwerk vorhandenen Token oder verweise auf dein eigenes ICRC-1-Ledger.",
       "token_symbol": "Token-Symbol",
       "ledger_canister": "Ledger-Canister-ID",
+      "index_canister": "Index-Canister-ID",
       "branding_title": "Branding",
       "branding_help": "Schreibe zuerst die Stimme des Reichs. Dann generiere ein Zeichen oder lade dein eigenes hoch.",
       "welcome_message": "Willkommensnachricht",

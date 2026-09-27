@@ -78,7 +78,7 @@
 		<div class="setup-wizard__codex-card-body">
 			<strong>Custom token</strong>
 			<p class="setup-wizard__codex-description text-sm text-gray-600">
-				Your own ICRC-1 ledger canister.
+				Your own ICRC-1 ledger and its index canister. The symbol is read from the ledger.
 			</p>
 			{#if !selectable(CUSTOM_TOKEN_ID)}
 				<p class="text-xs text-gray-500 mt-1">{unavailable}</p>

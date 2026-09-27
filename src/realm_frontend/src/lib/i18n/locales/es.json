@@ -168,6 +168,7 @@
       "token_help": "Usa un token compartido ya en la red, o apunta a tu propio libro mayor ICRC-1.",
       "token_symbol": "Símbolo del token",
       "ledger_canister": "ID del canister del libro mayor",
+      "index_canister": "ID del canister de índice",
       "branding_title": "Imagen de marca",
       "branding_help": "Escribe primero la voz del reino. Luego genera un emblema o sube el tuyo.",
       "welcome_message": "Mensaje de bienvenida",
