@@ -65,6 +65,17 @@ def get_setup_config(realm) -> dict:
     return dict(_load_manifest(realm).get("setup") or {})
 
 
+def get_gos_environment(realm) -> str:
+    """Logical GaaS environment (``staging``, ``production``, …), not the IC network."""
+    return (get_setup_config(realm).get("gos_environment") or "").strip().lower()
+
+
+def set_gos_environment(realm, name: str) -> None:
+    cleaned = (name or "").strip().lower()
+    if cleaned:
+        update_setup_config(realm, {"gos_environment": cleaned})
+
+
 def update_setup_config(realm, updates: dict) -> dict:
     manifest = _load_manifest(realm)
     setup = dict(manifest.get("setup") or {})

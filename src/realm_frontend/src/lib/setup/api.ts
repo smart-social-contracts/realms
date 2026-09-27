@@ -151,9 +151,23 @@ export async function listAvailableCodices(): Promise<AvailableCodex[]> {
 	const cached = await readCachedCodices(actor);
 	if (cached) return cached;
 
-	// Fire the slow refresh without awaiting — agent-js v3 sync calls may never
-	// settle even though the on-chain update completes and fills the cache.
-	void actor.list_available_codices().catch(() => {});
+	// The update may not settle in the browser even after the canister stores
+	// the catalog. If it does settle with an error, show that instead of polling.
+	const refresh = actor.list_available_codices().catch((error: unknown) => {
+		throw error;
+	});
+	const outcome = await raceWithGrace(refresh, 20_000);
+	if (outcome.settled) {
+		if (outcome.error !== undefined && !isAmbiguousInstallError(outcome.error)) {
+			throw outcome.error;
+		}
+		if (outcome.result !== undefined) {
+			const parsed = parseJson<CodexListEnvelope>(outcome.result);
+			if (parsed && !Array.isArray(parsed) && parsed.success === false) {
+				throw new Error(parsed.error || 'Could not load the codex catalog');
+			}
+		}
+	}
 
 	return pollCachedCodices(actor);
 }

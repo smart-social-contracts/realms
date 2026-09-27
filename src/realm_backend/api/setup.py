@@ -524,7 +524,9 @@ def _launch_phase_install_codex(realm, draft: dict) -> Async[dict]:
     ):
         return {"success": True, "skipped": True, "codex": existing}
 
-    registry_id = (getattr(realm, "file_registry_canister_id", "") or "").strip()
+    from core.fleet_registry import resolve_catalog_registry_id
+
+    registry_id = yield from resolve_catalog_registry_id(realm)
     if not registry_id:
         return {"success": False, "error": "file_registry_canister_id not configured"}
 
@@ -949,7 +951,12 @@ def list_available_codices() -> Async[str]:
     if not realm:
         return json.dumps({"success": False, "error": "Realm not found"})
 
-    registry_id = (getattr(realm, "file_registry_canister_id", "") or "").strip()
+    from core.fleet_registry import resolve_catalog_registry_id
+
+    try:
+        registry_id = yield from resolve_catalog_registry_id(realm)
+    except (ValueError, RuntimeError) as exc:
+        return json.dumps({"success": False, "error": str(exc)})
     if not registry_id:
         return json.dumps(
             {"success": False, "error": "file_registry_canister_id not configured"}
@@ -1069,7 +1076,12 @@ def setup_install_codex(args_json: str) -> Async[str]:
             }
         )
 
-    registry_id = (getattr(realm, "file_registry_canister_id", "") or "").strip()
+    from core.fleet_registry import resolve_catalog_registry_id
+
+    try:
+        registry_id = yield from resolve_catalog_registry_id(realm)
+    except (ValueError, RuntimeError) as exc:
+        return json.dumps({"success": False, "error": str(exc)})
     if not registry_id:
         return json.dumps(
             {"success": False, "error": "file_registry_canister_id not configured"}

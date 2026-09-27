@@ -2399,6 +2399,10 @@ def set_canister_config_json(args: text) -> Async[text]:
                     set_realm_registry_canister_id(
                         realm, params["realm_registry_canister_id"]
                     )
+                if params.get("gos_environment"):
+                    from core.setup import set_gos_environment
+
+                    set_gos_environment(realm, params["gos_environment"])
         return json.dumps(out)
     except Exception as e:
         logger.error(f"set_canister_config_json error: {e}\n{traceback.format_exc()}")
