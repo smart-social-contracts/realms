@@ -217,29 +217,79 @@ jobs:
             -o nft_backend.wasm
           gzip -kf nft_backend.wasm
 
+      # The tag is already in the download URL. The filename carries it too, so a
+      # downloaded copy is identifiable: realm-backend-v0.6.0.wasm.gz. v0.6.0 and
+      # older releases keep the unversioned names they were published with.
+      - name: Stamp the release version on artifact names
+        if: ${{ inputs.cli_only != true }}
+        env:
+          RELEASE_TAG: v${{ steps.bump_version.outputs.NEW_VERSION }}
+        run: |
+          stamp() {
+            local src="$1"
+            local raw="${src%%.*}"
+            local ext="${src#"$raw"}"
+            local stem="${raw//_/-}"
+            local dest="${stem}-${RELEASE_TAG}${ext}"
+            mv "$src" "$dest"
+            echo "$dest"
+          }
+          for src in \
+            realm_backend.wasm.gz \
+            realm_backend.did \
+            realm_frontend.tar.gz \
+            realm_frontend.manifest.json \
+            marketplace_backend.wasm.gz \
+            marketplace_frontend.tar.gz \
+            marketplace_frontend.manifest.json \
+            token_backend.wasm.gz \
+            nft_backend.wasm.gz
+          do
+            stamp "$src"
+          done
+
       - name: Compute release asset checksums
         if: ${{ inputs.cli_only != true }}
+        env:
+          RELEASE_TAG: v${{ steps.bump_version.outputs.NEW_VERSION }}
         run: |
-          echo "# SHA-256 checksums for release assets" > checksums.txt
-          for f in realm_backend.wasm.gz realm_backend.did realm_frontend.tar.gz \
-                   marketplace_backend.wasm.gz marketplace_frontend.tar.gz \
-                   token_backend.wasm.gz nft_backend.wasm.gz; do
-            [ -f "$f" ] && sha256sum "$f" >> checksums.txt
+          stamp() {
+            local src="$1"
+            local raw="${src%%.*}"
+            local ext="${src#"$raw"}"
+            local stem="${raw//_/-}"
+            printf '%s\n' "${stem}-${RELEASE_TAG}${ext}"
+          }
+          CHECKSUMS="checksums-${RELEASE_TAG}.txt"
+          echo "# SHA-256 checksums for release assets" > "$CHECKSUMS"
+          for src in realm_backend.wasm.gz realm_backend.did realm_frontend.tar.gz \
+                     marketplace_backend.wasm.gz marketplace_frontend.tar.gz \
+                     token_backend.wasm.gz nft_backend.wasm.gz; do
+            f="$(stamp "$src")"
+            [ -f "$f" ] && sha256sum "$f" >> "$CHECKSUMS"
           done
-          cat checksums.txt
-          python3 - << 'PY' >> checksums.txt
-          import gzip, hashlib, json, pathlib
+          cat "$CHECKSUMS"
+          RELEASE_TAG="$RELEASE_TAG" python3 - << 'PY' >> "$CHECKSUMS"
+          import gzip, hashlib, json, os, pathlib
+          tag = os.environ["RELEASE_TAG"]
+
+          def stamped(name: str) -> str:
+              stem, _, rest = name.partition(".")
+              return f"{stem.replace('_', '-')}-{tag}.{rest}"
+
           print("# bundle hash (pin this on registry.bundles)")
           for name in ("realm_frontend.tar.gz", "marketplace_frontend.tar.gz"):
-              man = json.load(open(name.replace(".tar.gz", ".manifest.json")))
-              print(f"{man['bundle_sha256']}  {name} (bundle)")
+              published = stamped(name)
+              man = json.load(open(published.replace(".tar.gz", ".manifest.json")))
+              print(f"{man['bundle_sha256']}  {published} (bundle)")
           print("# module sha256 (decompressed wasm; pin this on registry.wasms)")
           for name in ("realm_backend.wasm.gz", "marketplace_backend.wasm.gz", "token_backend.wasm.gz", "nft_backend.wasm.gz"):
-              data = gzip.decompress(pathlib.Path(name).read_bytes())
-              print(f"{hashlib.sha256(data).hexdigest()}  {name} (module)")
+              published = stamped(name)
+              data = gzip.decompress(pathlib.Path(published).read_bytes())
+              print(f"{hashlib.sha256(data).hexdigest()}  {published} (module)")
           PY
-          BACKEND_HASH=$(awk '/realm_backend\.wasm\.gz/ {print $1}' checksums.txt)
-          FRONTEND_HASH=$(awk '/realm_frontend\.tar\.gz$/ {print $1}' checksums.txt)
+          BACKEND_HASH=$(awk -v name="realm-backend-${RELEASE_TAG}.wasm.gz" '$2 == name { print $1 }' "$CHECKSUMS")
+          FRONTEND_HASH=$(awk -v name="realm-frontend-${RELEASE_TAG}.tar.gz" '$2 == name { print $1 }' "$CHECKSUMS")
           echo "Backend checksum: ${BACKEND_HASH}"
           echo "Frontend tarball checksum: ${FRONTEND_HASH}"
 
@@ -271,16 +321,16 @@ jobs:
           body_path: .github/RELEASE_NOTES_NEXT.md
           fail_on_unmatched_files: true
           files: |
-            realm_backend.wasm.gz
-            realm_backend.did
-            realm_frontend.tar.gz
-            realm_frontend.manifest.json
-            token_backend.wasm.gz
-            nft_backend.wasm.gz
-            marketplace_backend.wasm.gz
-            marketplace_frontend.tar.gz
-            marketplace_frontend.manifest.json
-            checksums.txt
+            realm-backend-v${{ steps.bump_version.outputs.NEW_VERSION }}.wasm.gz
+            realm-backend-v${{ steps.bump_version.outputs.NEW_VERSION }}.did
+            realm-frontend-v${{ steps.bump_version.outputs.NEW_VERSION }}.tar.gz
+            realm-frontend-v${{ steps.bump_version.outputs.NEW_VERSION }}.manifest.json
+            token-backend-v${{ steps.bump_version.outputs.NEW_VERSION }}.wasm.gz
+            nft-backend-v${{ steps.bump_version.outputs.NEW_VERSION }}.wasm.gz
+            marketplace-backend-v${{ steps.bump_version.outputs.NEW_VERSION }}.wasm.gz
+            marketplace-frontend-v${{ steps.bump_version.outputs.NEW_VERSION }}.tar.gz
+            marketplace-frontend-v${{ steps.bump_version.outputs.NEW_VERSION }}.manifest.json
+            checksums-v${{ steps.bump_version.outputs.NEW_VERSION }}.txt
 
       - name: Create GitHub Release (CLI / PyPI only)
         if: ${{ inputs.cli_only == true }}
