@@ -53,6 +53,8 @@ describe('mountSandboxedExtension', () => {
 		expect(ctor).toHaveBeenCalled();
 		expect(ctor.mock.calls[0]?.[0].callAsync).toBe(callAsync);
 		expect(ctor.mock.calls[0]?.[0].callSync).toBe(callSync);
+		const iframe = container.querySelector('iframe');
+		expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts allow-modals');
 		mounted.unmount();
 	});
 });

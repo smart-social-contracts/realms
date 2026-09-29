@@ -140,7 +140,9 @@ export async function mountExtension(
  * Mount a sandboxed extension inside an iframe and bind the postMessage bridge.
  *
  * The iframe loads `/ext/{id}/{version}/frontend/dist/index.html` with
- * `sandbox="allow-scripts"` (opaque origin). Returns `{ unmount, ready }` where
+ * `sandbox="allow-scripts allow-modals"` (opaque origin). `allow-modals` is
+ * required so the extension can show `confirm` / `prompt`; without it those
+ * calls return immediately and the click does nothing. Returns `{ unmount, ready }` where
  * `ready` resolves after hello_ack or rejects on hello_nack (e.g. sdk_version mismatch).
  * On handshake failure the iframe is torn down before `ready` rejects.
  */
@@ -153,7 +155,7 @@ export async function mountSandboxedExtension(
   const ver = version;
 
   const iframe = document.createElement('iframe');
-  iframe.setAttribute('sandbox', 'allow-scripts');
+  iframe.setAttribute('sandbox', 'allow-scripts allow-modals');
   iframe.setAttribute('referrerpolicy', 'no-referrer');
   iframe.setAttribute('title', `Extension ${extId}`);
   iframe.src = `/ext/${extId}/${ver}/frontend/dist/index.html`;
