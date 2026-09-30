@@ -48,7 +48,6 @@
 	export let extensionId: string;
 
 	const FULL_BLEED_EXTENSIONS = new Set(['codex_viewer', 'zone_selector', 'land_registry']);
-	const PANE_BLEED_EXTENSIONS = new Set(['public_dashboard']);
 
 	let mountPoint: HTMLDivElement | undefined;
 	let status: 'loading' | 'ready' | 'error' | 'access_denied' | 'sdk_mismatch' = 'loading';
@@ -392,9 +391,7 @@
 
 	$: extensionHostClass = FULL_BLEED_EXTENSIONS.has(extensionId)
 		? 'extension-host-fullbleed'
-		: PANE_BLEED_EXTENSIONS.has(extensionId)
-			? 'w-full min-w-0'
-			: 'p-4';
+		: 'w-full min-w-0';
 
 	let lastLoadedId: string | undefined;
 	$: if (browser && extensionId && extensionId !== lastLoadedId && mountPoint) {
@@ -414,9 +411,9 @@
 	});
 </script>
 
-<div class={extensionHostClass}>
+<div class="{extensionHostClass} {status === 'loading' ? 'extension-host-loading' : ''}">
 	{#if status === 'loading'}
-		<div class="flex items-center gap-2 text-gray-500">
+		<div class="extension-loading flex items-center justify-center gap-2 text-gray-500" role="status">
 			<svg
 				class="animate-spin h-5 w-5 text-gray-400"
 				xmlns="http://www.w3.org/2000/svg"
@@ -482,6 +479,21 @@
 
 
 <style>
+	.extension-host-loading {
+		position: relative;
+		min-height: 16rem;
+	}
+
+	.extension-host-fullbleed.extension-host-loading {
+		min-height: 0;
+	}
+
+	.extension-loading {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+	}
+
 	.extension-host-fullbleed {
 		flex: 1;
 		height: 100%;

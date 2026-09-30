@@ -187,8 +187,6 @@
 
 	$: isPaneBleedExtension = $page.url.pathname.includes('/extensions/public_dashboard');
 
-	$: isEdgeToEdgeExtension = isFullBleedExtension || isPaneBleedExtension;
-
 	$: mobileDrawerOpen =
 		browser && !drawerHidden && typeof window !== 'undefined' && window.innerWidth < 1024;
 
@@ -266,20 +264,23 @@
 			<DelegationBanner />
 
 			<div
-				class="{isFullBleedExtension
-					? 'flex min-h-0 flex-1 flex-col overflow-hidden px-0'
-					: isPaneBleedExtension
-						? 'px-0'
-						: 'px-4 lg:px-6'}"
+				class="{isFullBleedExtension ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : ''}"
 			>
-				{#if !isEdgeToEdgeExtension}
+				<div class="shrink-0 px-4 lg:px-6">
 					<PageBreadcrumb />
-				{/if}
-
-				<slot />
-				{#if !isFullBleedExtension}
-					<Footer />
-				{/if}
+				</div>
+				<div
+					class="{isFullBleedExtension
+						? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+						: isPaneBleedExtension
+							? ''
+							: 'px-4 lg:px-6'}"
+				>
+					<slot />
+					{#if !isFullBleedExtension}
+						<Footer />
+					{/if}
+				</div>
 			</div>
 		</div>
 	</div>

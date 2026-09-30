@@ -12,7 +12,7 @@
 </script>
 
 {#if showBreadcrumb}
-	<div class="mb-6 flex items-center gap-1.5 px-4 pt-4 lg:px-0 lg:pt-4">
+	<div class="mb-6 flex items-center gap-1.5 pt-4">
 		<Breadcrumb class="mb-0">
 			{#each segments as segment, index}
 				<BreadcrumbItem href={index < segments.length - 1 ? segment.href : undefined}>
