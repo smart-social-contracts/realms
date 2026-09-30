@@ -18,6 +18,7 @@
     "built_on_ic": "Auf dem Internet Computer gebaut",
     "github": "GitHub",
     "casals": "Casals",
+    "contact": "Kontakt",
     "build": "Realms GOS {version} ({commit})"
   },
   "kind": {
@@ -234,6 +235,11 @@
     "coming_soon_close": "Verstanden",
     "languages": "Unterstützte Sprachen"
   },
+  "account": {
+    "coming_soon_badge": "Bald",
+    "coming_soon_title": "Demnächst verfügbar",
+    "coming_soon_body": "Du kannst dich umsehen. Kaufen, Hochladen und Entwicklerwerkzeuge sind noch nicht offen."
+  },
   "purchases": {
     "title": "Meine Käufe",
     "subtitle": "Alles, was du über diesen Marketplace installiert hast.",
@@ -327,7 +333,7 @@
     "hero": {
       "title": "Das Governance-Betriebssystem",
       "subtitle1": "• Starten Sie eine vollständige öffentliche Verwaltung in Minuten",
-      "subtitle2": "• Prüfbar. Manipulationssicher. KI-gestützt",
+      "subtitle2": "• Prüfbar. Manipulationssicher. Kosteneffizient",
       "subtitle3": "• Entwickelt, um Korruption und Ineffizienzen zu beseitigen",
       "tryDemo": "Demo Ausprobieren",
       "requestInvite": "Einladungscode Anfordern",

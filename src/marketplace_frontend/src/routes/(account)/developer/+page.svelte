@@ -2,7 +2,7 @@
 import VerifiedBadge from "$lib/components/VerifiedBadge.svelte";
 import Spinner from "$lib/components/Spinner.svelte";
 import { isAuthenticated, principalStore } from "$lib/auth";
-import { CONFIG } from "$lib/config";
+import { ACCOUNT_ALPHA, CONFIG } from "$lib/config";
 import { marketplaceClient } from "$lib/marketplace-client";
 import { formatTimeAgo, formatCount, formatPriceUsd } from "$lib/format";
 let loading = false;
@@ -35,7 +35,7 @@ async function load(_authed) {
   }
 }
 async function buyLicense() {
-  if (buyingLicense || !$principalStore) return;
+  if (ACCOUNT_ALPHA || buyingLicense || !$principalStore) return;
   buyingLicense = true;
   licenseError = "";
   try {
@@ -64,6 +64,7 @@ async function buyLicense() {
   }
 }
 async function requestAuditFor(kind, id) {
+  if (ACCOUNT_ALPHA) return;
   try {
     await marketplaceClient.requestAudit(kind, id);
     await load(true);
@@ -72,6 +73,7 @@ async function requestAuditFor(kind, id) {
   }
 }
 async function delist(kind, id) {
+  if (ACCOUNT_ALPHA) return;
   if (!confirm($_("developer.delist_confirm", { values: { kind, id } }))) return;
   try {
     if (kind === "ext") await marketplaceClient.delistExtension(id);

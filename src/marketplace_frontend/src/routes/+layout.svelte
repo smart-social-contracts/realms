@@ -9,6 +9,7 @@ import { bootstrapAuth, isAuthenticated, login, logout, principalStore } from "$
 import { invalidateActor, marketplace } from "$lib/canisters";
 import { shortPrincipal } from "$lib/format";
 import { resolveCasalsUrlLive } from "$lib/config";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "$lib/contact";
 
 let casalsUrl = "";
 $: isHome = $page.url.pathname === "/";
@@ -234,6 +235,15 @@ $: routeIsActive = (path) => {
           <img src="/images/casals-logo.png" alt="" width="28" height="28" />
         </a>
       {/if}
+      <a
+        class="social mail"
+        id="contact"
+        href={CONTACT_MAILTO}
+        aria-label="{$_('footer.contact')} {CONTACT_EMAIL}"
+        title={CONTACT_EMAIL}
+      >
+        <i class="ti ti-mail" aria-hidden="true"></i>
+      </a>
     </div>
     <div class="build-line">{$_('footer.open_source')}</div>
     <div class="build-meta">{$_('footer.build', { values: { version: __BUILD_VERSION__, commit: __BUILD_COMMIT__ } })}</div>
@@ -243,6 +253,19 @@ $: routeIsActive = (path) => {
     </a>
   </div>
 </footer>
+
+<a
+  class="brain-mark"
+  href="/"
+  aria-label="Realms"
+>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path>
+    <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"></path>
+    <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path>
+    <path d="M12 21v-3"></path>
+  </svg>
+</a>
 {:else}
 <div class="loading-screen"><div class="spinner"></div></div>
 {/if}
@@ -546,6 +569,33 @@ $: routeIsActive = (path) => {
     display: block;
     object-fit: contain;
   }
+  .footer-card .social.mail .ti {
+    font-size: 28px;
+    line-height: 1;
+  }
+  .brain-mark {
+    position: fixed;
+    z-index: 45;
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.45);
+    text-decoration: none;
+  }
+  .brain-mark svg {
+    width: 1.35rem;
+    height: 1.35rem;
+    display: block;
+  }
+  .brain-mark:hover { color: var(--text); background: var(--surface); }
   .footer-card .build-line {
     font-size: 0.75rem;
     color: var(--text-faint);

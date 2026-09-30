@@ -1,11 +1,10 @@
 <script lang="ts">
 import { _, json } from "svelte-i18n";
 import CapitolBackdrop from "$lib/components/CapitolBackdrop.svelte";
-import AboutExplainer from "$lib/components/AboutExplainer.svelte";
+import { CONTACT_MAILTO } from "$lib/contact";
 
 const DEMO_URL = "https://demo.gos.earth";
 const INVITE_URL = "https://tally.so/r/GxQ8QL";
-const CONTACT_MAIL = "mailto:contact@realmsgos.org";
 const DOCS_URL = "https://github.com/smart-social-contracts/realms/tree/main/docs";
 
 const FEATURES = [
@@ -46,14 +45,11 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
     <div class="about-hero-inner">
       <h1>{$_("about.hero.title")}</h1>
       <p class="alpha">{$_("about.hero.alphaBadge")}</p>
-      <AboutExplainer demoUrl={DEMO_URL} docsUrl={DOCS_URL} contactHref={CONTACT_MAIL} />
     </div>
   </header>
 
   <div class="about-body">
-    <details class="overview">
-      <summary>{$_("about.explainer.writtenOverview")}</summary>
-
+    <div class="overview">
       <section class="block" aria-labelledby="mission-title">
         <h2 id="mission-title">{$_("about.mission.title")}</h2>
         <p class="prose">{@html $_("about.mission.description")}</p>
@@ -131,7 +127,7 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
             <strong>{$_("about.getStarted.demo.title")}</strong>
             <span>{$_("about.getStarted.demo.description")}</span>
           </a>
-          <a href={CONTACT_MAIL}>
+          <a href={CONTACT_MAILTO}>
             <strong>{$_("about.getStarted.contact.title")}</strong>
             <span>{$_("about.getStarted.contact.description")}</span>
           </a>
@@ -144,7 +140,7 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
           <a href={INVITE_URL} target="_blank" rel="noreferrer">{$_("about.hero.requestInvite")}</a>
         </p>
       </section>
-    </details>
+    </div>
   </div>
 </article>
 
@@ -153,11 +149,9 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
   .about-hero {
     position: relative;
     overflow: hidden;
-    height: calc(100dvh - 60px);
-    min-height: 32rem;
     display: flex;
     flex-direction: column;
-    padding: 4.5rem 1.5rem 1.25rem;
+    padding: 4.5rem 1.5rem 2.5rem;
   }
   .about-hero-bg {
     position: absolute;
@@ -190,14 +184,13 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
     text-wrap: balance;
   }
   .alpha {
-    margin: 0 0 1.5rem;
+    margin: 0;
     font-size: 0.8rem;
     font-weight: 500;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-faint);
   }
-  .about-hero :global(.explainer) { flex: 1; min-height: 22rem; }
 
   .about-body {
     max-width: 52rem;
@@ -207,12 +200,6 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
   .overview {
     border-top: 1px solid var(--border);
     padding: 1.25rem 0 0;
-  }
-  .overview summary {
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text);
   }
   .block h2,
   .audience-col h2 {
@@ -334,7 +321,7 @@ $: govBenefits = (Array.isArray($json("about.forInstitutions.governments.benefit
   }
 
   @media (max-width: 760px) {
-    .about-hero { padding: 4rem 1.25rem 1rem; height: calc(100dvh - 52px); }
+    .about-hero { padding: 4rem 1.25rem 2rem; }
     .principles, .defs, .audience, .start-row { grid-template-columns: 1fr; }
     .audience { gap: 2.25rem; }
   }

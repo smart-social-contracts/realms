@@ -28,6 +28,7 @@ describe("marketplace about copy", () => {
       assert.equal(loc.landing.badge_env, undefined);
       assert.equal(loc.landing.badge_version, undefined);
       assert.ok(loc.nav.about);
+      assert.ok(loc.footer.contact);
       assert.ok(loc.footer.build.includes("{version}"));
       assert.equal(loc.about.product_name, "Realms GOS");
       assert.ok(loc.about.hero.title);
@@ -46,6 +47,21 @@ describe("marketplace about copy", () => {
       assert.ok(loc.about.explainer.suggestions.try);
     });
   }
+
+  it("publishes contact@realmsgos.org on the home page, about page, and footer", () => {
+    const contact = readFileSync(join(here, "contact.ts"), "utf-8");
+    assert.match(contact, /contact@realmsgos\.org/);
+    const layout = readFileSync(join(here, "../routes/+layout.svelte"), "utf-8");
+    const about = readFileSync(join(here, "../routes/about/+page.svelte"), "utf-8");
+    const home = readFileSync(join(here, "../routes/+page.svelte"), "utf-8");
+    assert.match(layout, /CONTACT_MAILTO/);
+    assert.match(layout, /id="contact"/);
+    assert.match(layout, /ti-mail/);
+    assert.match(layout, /social casals/);
+    assert.equal(about.includes("AboutExplainer"), false);
+    assert.equal(home.includes("CONTACT_MAILTO"), false);
+    assert.equal(layout.includes("support@realmsgos.org"), false);
+  });
 
   it("English home CTA is Launch your realm", () => {
     assert.equal(loadLocale("en.json").landing.cta_launch, "Launch your realm");

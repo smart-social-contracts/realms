@@ -18,6 +18,7 @@
     "built_on_ic": "基于 Internet Computer 构建",
     "github": "GitHub",
     "casals": "Casals",
+    "contact": "联系",
     "build": "Realms GOS {version} ({commit})"
   },
   "kind": {
@@ -234,6 +235,11 @@
     "coming_soon_close": "知道了",
     "languages": "支持的语言"
   },
+  "account": {
+    "coming_soon_badge": "即将推出",
+    "coming_soon_title": "即将推出",
+    "coming_soon_body": "可以先看看。购买、上传和开发者工具尚未开放。"
+  },
   "purchases": {
     "title": "我的购买",
     "subtitle": "你通过此市场安装的所有内容。",
@@ -327,7 +333,7 @@
     "hero": {
       "title": "治理操作系统",
       "subtitle1": "• 几分钟内启动完整的公共管理系统",
-      "subtitle2": "• 可审计。防篡改。AI驱动",
+      "subtitle2": "• 可审计。防篡改。高性价比",
       "subtitle3": "• 旨在消除腐败和低效",
       "tryDemo": "试用演示",
       "requestInvite": "申请邀请码",

@@ -1,3 +1,5 @@
+import { accountPagesAlpha } from './accountAlpha.ts';
+
 // Build-time + runtime configuration for the marketplace frontend.
 //
 // Values are injected by Vite at build time from the dfx-generated
@@ -95,6 +97,12 @@ export const CONFIG = {
   portal_url: pick('VITE_PORTAL_URL'),
   realms_version: pick('VITE_REALMS_VERSION'),
 };
+
+/** Account pages stay visible but inert. On for staging/demo/test unless overridden. */
+export const ACCOUNT_ALPHA: boolean = accountPagesAlpha({
+  accountAlpha: pick('VITE_ACCOUNT_ALPHA'),
+  envName: pick('VITE_ENV_NAME'),
+});
 
 // --- TEST_MODE umbrella and sub-flags ---
 // Activation: URL param (?testmode=1), sessionStorage, or VITE_TEST_MODE env var.

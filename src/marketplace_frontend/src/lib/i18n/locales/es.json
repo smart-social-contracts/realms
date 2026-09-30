@@ -18,6 +18,7 @@
     "built_on_ic": "Construido sobre Internet Computer",
     "github": "GitHub",
     "casals": "Casals",
+    "contact": "Contacto",
     "build": "Realms GOS {version} ({commit})"
   },
   "kind": {
@@ -234,6 +235,11 @@
     "coming_soon_close": "Entendido",
     "languages": "Idiomas compatibles"
   },
+  "account": {
+    "coming_soon_badge": "Pronto",
+    "coming_soon_title": "Próximamente",
+    "coming_soon_body": "Puedes mirar. Comprar, subir y las herramientas de desarrollador aún no están abiertas."
+  },
   "purchases": {
     "title": "Mis compras",
     "subtitle": "Todo lo que has instalado a través de este marketplace.",
@@ -327,7 +333,7 @@
     "hero": {
       "title": "El Sistema Operativo de Gobernanza",
       "subtitle1": "• Lanza una administración pública completa en minutos",
-      "subtitle2": "• Auditable. A prueba de manipulación. Impulsado por IA",
+      "subtitle2": "• Auditable. A prueba de manipulación. Eficiente",
       "subtitle3": "• Diseñado para eliminar la corrupción y las ineficiencias",
       "tryDemo": "Probar Demo",
       "requestInvite": "Solicitar Código de Invitación",
