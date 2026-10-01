@@ -23,6 +23,7 @@ let pendingFocusPush: { source: string; uri: string; label?: string } | null | u
 let pendingAssistantOpen: boolean = false;
 let pendingUiReady: boolean = false;
 let pendingPortalLogin: { returnPath: string } | null = null;
+let pendingPortalLogout = false;
 let uiReadySent: boolean = false;
 let sessionIdentity: Ed25519KeyIdentity | null = null;
 let delegationIdentity: DelegationIdentity | null = null;
@@ -170,6 +171,49 @@ function scheduleRefresh() {
   }, delay);
 }
 
+function clearPortalDelegation() {
+  delegationIdentity = null;
+  delegationExpiresAt = null;
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+/**
+ * Ask the portal to drop its Internet Identity session, then clear the
+ * delegation held in this iframe. Resolves when the portal confirms, or
+ * after a short wait if the bridge never answers.
+ */
+export function requestPortalLogout(): Promise<void> {
+  clearPortalDelegation();
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve();
+      return;
+    }
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.removeEventListener('portal:logout', done);
+      resolve();
+    };
+    const timer = setTimeout(done, 8000);
+    window.addEventListener('portal:logout', done);
+    if (!isEmbeddedInPortal()) {
+      done();
+      return;
+    }
+    if (!port) {
+      pendingPortalLogout = true;
+      return;
+    }
+    post({ type: 'auth:logout' });
+  });
+}
+
 function requestDelegation(interactive = false) {
   if (!port) {
     pendingDelegationRequest = true;
@@ -247,6 +291,10 @@ export function initPortalBridge() {
       const queued = pendingPortalLogin;
       pendingPortalLogin = null;
       post({ type: 'auth:open-login', payload: queued });
+    }
+    if (pendingPortalLogout) {
+      pendingPortalLogout = false;
+      post({ type: 'auth:logout' });
     }
   };
 

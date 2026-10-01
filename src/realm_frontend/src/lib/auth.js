@@ -435,6 +435,13 @@ export async function logout() {
     console.log('[TEST MODE] Logged out');
     return;
   }
+  // The portal keeps the Internet Identity session. Clearing only this
+  // iframe makes the next silent probe sign the visitor straight back in.
+  if (isEmbeddedInPortal()) {
+    const { requestPortalLogout } = await import('$lib/portal-bridge.ts');
+    await requestPortalLogout();
+    return;
+  }
   const client = await initializeAuthClient();
   await client.logout();
 }
