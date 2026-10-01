@@ -104,3 +104,41 @@ export function resolvePortalNavSyncHref(
   const qs = nextParams.toString();
   return `${target.pathname}${qs ? `?${qs}` : ''}${target.hash}`;
 }
+
+const PORTAL_LOGIN_STRIP_PARAMS = ['portal', 'slug', 'shell'];
+
+/**
+ * In-realm path to resume after the portal login page.
+ * Sign-in from anywhere else returns to `/join`. An in-progress `/join`
+ * keeps its query (invite, quarter) and drops iframe-only params.
+ */
+export function portalLoginReturnPath(pathname: string, search = ''): string {
+  const path =
+    pathname === '/join' || pathname.startsWith('/join/') ? pathname || '/join' : '/join';
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  for (const key of PORTAL_LOGIN_STRIP_PARAMS) params.delete(key);
+  const qs = params.toString();
+  return `${path}${qs ? `?${qs}` : ''}`;
+}
+
+/**
+ * Portal login page for a realm. `origin` is the portal origin
+ * (`https://staging.gos.earth`). `returnPath` is an in-realm path such as
+ * `/join` or `/join?invite=abc`.
+ */
+export function portalLoginHref({
+  origin,
+  slug,
+  returnPath = '/join',
+}: {
+  origin: string;
+  slug: string;
+  returnPath?: string;
+}): string {
+  const base = origin.replace(/\/+$/, '');
+  const realmSlug = slug.trim();
+  const safePath =
+    returnPath.startsWith('/') && !returnPath.startsWith('//') ? returnPath : '/join';
+  const returnTo = `/r/${encodeURIComponent(realmSlug)}${safePath === '/' ? '' : safePath}`;
+  return `${base}/join?returnTo=${encodeURIComponent(returnTo)}`;
+}

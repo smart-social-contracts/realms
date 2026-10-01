@@ -1,6 +1,7 @@
 <!-- src/lib/components/AuthButton.svelte -->
 <script>
 	import { login, logout, restoreAuthSession, resetAuthSessionRestore } from '$lib/auth';
+	import { isEmbeddedInPortal, redirectToPortalLogin } from '$lib/portal-bridge.ts';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
 	import { loadUserProfiles, resetProfileState, applyUserGetRecord, userProfiles, userDepartments, hasJoined } from '$lib/stores/profiles';
 	import { formatProfileValues, formatDepartmentValues } from '$lib/utils/membershipLabels';
@@ -282,7 +283,13 @@
 	</div>
 {:else}
 	<button
-		on:click={() => goto('/join')}
+		on:click={() => {
+			if (isEmbeddedInPortal()) {
+				redirectToPortalLogin('/join');
+				return;
+			}
+			goto('/join');
+		}}
 		class="group inline-flex items-center gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-500 hover:text-gray-700"
 		title={$_('common.sign_in', { default: 'Sign in' })}
 		aria-label={$_('common.sign_in', { default: 'Sign in' })}

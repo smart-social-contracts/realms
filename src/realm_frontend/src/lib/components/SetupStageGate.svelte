@@ -113,7 +113,8 @@
 		await restoreAuthSession();
 
 		if (isEmbeddedInPortal() && !get(isAuthenticated)) {
-			await waitForPortalDelegation({ timeoutMs: 15_000 });
+			// Reuse a session the portal already has. Do not ask the visitor to sign in.
+			await waitForPortalDelegation({ timeoutMs: 15_000, interactive: false });
 			resetAuthSessionRestore();
 			await restoreAuthSession();
 		}

@@ -120,11 +120,16 @@ function _createPortalAuthClientMock() {
     getIdentity: () => getPortalDelegationIdentity(),
     logout: async () => {},
     login: async () => {
-      const { waitForPortalDelegation, requestAuthRefresh } = await import(
+      const { getPortalDelegationIdentity, redirectToPortalLogin } = await import(
         '$lib/portal-bridge.ts'
       );
-      requestAuthRefresh();
-      return waitForPortalDelegation();
+      const existing = getPortalDelegationIdentity();
+      if (existing) return existing;
+      const { portalLoginReturnPath } = await import('$lib/portal-redirect-path.ts');
+      redirectToPortalLogin(
+        portalLoginReturnPath(window.location.pathname, window.location.search)
+      );
+      return new Promise(() => {});
     }
   };
 }
@@ -352,13 +357,16 @@ export async function login({ random = false, identityIndex = null, preferTestMo
       }
     }
     if (!identity) {
-      const { waitForPortalDelegation, requestAuthRefresh } = await import(
-        '$lib/portal-bridge.ts'
+      const { redirectToPortalLogin } = await import('$lib/portal-bridge.ts');
+      const { portalLoginReturnPath } = await import('$lib/portal-redirect-path.ts');
+      // Internet Identity opens on the portal origin. Leave this iframe for
+      // the portal login page; it returns here with a session (issue #409).
+      const started = redirectToPortalLogin(
+        portalLoginReturnPath(window.location.pathname, window.location.search)
       );
-      requestAuthRefresh();
-      // Generous timeout: a first-time visitor must complete the II flow on
-      // the portal origin (the host shows its sign-in overlay meanwhile).
-      identity = await waitForPortalDelegation({ timeoutMs: 300_000 });
+      if (started) return new Promise(() => {});
+      console.warn('[portal] No portal login URL — user must sign in on the portal origin');
+      return { identity: null, principal: null };
     }
     if (identity) {
       authClient = _createPortalAuthClientMock();

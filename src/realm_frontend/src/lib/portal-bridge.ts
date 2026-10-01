@@ -2,6 +2,7 @@
  * Federation portal iframe bridge (realm frontend side).
  */
 import { DelegationIdentity, DelegationChain, Ed25519KeyIdentity } from '@dfinity/identity';
+import { portalLoginHref } from '$lib/portal-redirect-path.ts';
 
 const BRIDGE_VERSION = '1';
 const PORTAL_SESSION_KEY = 'realms:portal-embed';
@@ -12,6 +13,7 @@ let portalConfig: {
   frontendCanisterId?: string;
   env?: string;
   path?: string;
+  origin?: string;
 } | null = null;
 /** Last embedded path the portal host reported (`/extensions/…`, `/join`, …). */
 let portalHostEmbeddedPath: string | null = null;
@@ -20,6 +22,7 @@ let pendingNavPush: { path: string; replace: boolean } | null = null;
 let pendingFocusPush: { source: string; uri: string; label?: string } | null | undefined = undefined;
 let pendingAssistantOpen: boolean = false;
 let pendingUiReady: boolean = false;
+let pendingPortalLogin: { returnPath: string } | null = null;
 let uiReadySent: boolean = false;
 let sessionIdentity: Ed25519KeyIdentity | null = null;
 let delegationIdentity: DelegationIdentity | null = null;
@@ -92,8 +95,8 @@ function onPortMessage(event: MessageEvent) {
       window.dispatchEvent(new CustomEvent('portal:logout'));
       break;
     case 'auth:pending':
-      // Host has no session yet; it is showing its own sign-in UI. Not fatal —
-      // the delegation will arrive after the user signs in on the portal.
+      // Host has no session. A user who clicked Sign in has already been sent
+      // to the portal login page; this reply is only for a silent probe.
       window.dispatchEvent(
         new CustomEvent('portal:auth-pending', { detail: { error: msg.error || '' } })
       );
@@ -240,6 +243,11 @@ export function initPortalBridge() {
       pendingUiReady = false;
       post({ type: 'ui:ready' });
     }
+    if (pendingPortalLogin) {
+      const queued = pendingPortalLogin;
+      pendingPortalLogin = null;
+      post({ type: 'auth:open-login', payload: queued });
+    }
   };
 
   window.addEventListener('message', onWindowMessage);
@@ -350,9 +358,39 @@ export function reportResize(height: number) {
 }
 
 export function requestAuthRefresh() {
-  // User-initiated (login click / session restore after user action): the
-  // host may respond by showing its sign-in overlay.
+  // User-initiated session refresh. Does not open a sign-in card; a click
+  // that needs Internet Identity uses redirectToPortalLogin.
   requestDelegation(true);
+}
+
+/**
+ * Leave the realm iframe for the portal login page.
+ * Assigning `location.href` is allowed across origins. Calling `.assign`
+ * throws SecurityError. The portal message is a second path to the same page.
+ * Returns true when a navigation was started or queued.
+ */
+export function redirectToPortalLogin(returnPath = '/join'): boolean {
+  if (typeof window === 'undefined' || !isEmbeddedInPortal()) return false;
+  const safePath = returnPath.startsWith('/') && !returnPath.startsWith('//') ? returnPath : '/join';
+  const origin = (portalConfig?.origin || '').replace(/\/+$/, '');
+  const slug = (
+    portalConfig?.slug || new URLSearchParams(window.location.search).get('slug') || ''
+  ).trim();
+  if (origin && slug && window.top && window.top !== window) {
+    const href = portalLoginHref({ origin, slug, returnPath: safePath });
+    try {
+      window.top.location.href = href;
+    } catch {
+      // The portal message below still moves the top window.
+    }
+  }
+  const payload = { returnPath: safePath };
+  if (!port) {
+    pendingPortalLogin = payload;
+    return true;
+  }
+  post({ type: 'auth:open-login', payload });
+  return true;
 }
 
 export function requestSilentAuthProbe() {
@@ -366,14 +404,15 @@ export function requestSilentAuthProbe() {
 /**
  * Wait for the portal host to deliver a scoped II delegation.
  *
- * `portal:auth-pending` (host has no session yet and is showing its own
- * sign-in UI) does NOT settle the promise — the user may take minutes to
- * complete the II flow on the portal origin, so we keep listening until a
- * delegation arrives, a hard `portal:auth-error` fires, or the timeout hits.
- * @param {{ timeoutMs?: number }} [opts]
+ * `portal:auth-pending` (host has no session) does NOT settle the promise.
+ * `interactive: false` only probes for a session the portal already has.
+ * @param {{ timeoutMs?: number, interactive?: boolean }} [opts]
  * @returns {Promise<DelegationIdentity | null>}
  */
-export function waitForPortalDelegation({ timeoutMs = 300_000 } = {}) {
+export function waitForPortalDelegation({
+  timeoutMs = 300_000,
+  interactive = true
+}: { timeoutMs?: number; interactive?: boolean } = {}) {
   const existing = getPortalDelegationIdentity();
   if (existing) return Promise.resolve(existing);
 
@@ -402,6 +441,7 @@ export function waitForPortalDelegation({ timeoutMs = 300_000 } = {}) {
     const timer = setTimeout(() => finish(null), timeoutMs);
     window.addEventListener('portal:auth', onAuth);
     window.addEventListener('portal:auth-error', onAuthError);
-    requestAuthRefresh();
+    if (interactive) requestAuthRefresh();
+    else requestSilentAuthProbe();
   });
 }

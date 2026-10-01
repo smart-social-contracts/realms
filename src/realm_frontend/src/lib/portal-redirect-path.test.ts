@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   normalizePortalRedirectPath,
+  portalLoginHref,
+  portalLoginReturnPath,
   portalSharePathFromUrl,
   resolvePortalNavSyncHref,
   shouldPortalEnterPush,
@@ -138,5 +140,42 @@ describe('portalSharePathFromUrl', () => {
         hash: '',
       }),
     ).toBe('/extensions/import_export?ti=1');
+  });
+});
+
+describe('portalLoginReturnPath', () => {
+  it('sends a public page back to /join', () => {
+    expect(
+      portalLoginReturnPath('/extensions/public_dashboard', '?portal=1&slug=staging-realmsgos-11'),
+    ).toBe('/join');
+  });
+
+  it('keeps an invite already on /join and drops iframe params', () => {
+    expect(portalLoginReturnPath('/join', '?portal=1&slug=x&invite=abc')).toBe('/join?invite=abc');
+  });
+});
+
+describe('portalLoginHref', () => {
+  it('builds the portal login page with a realm return path', () => {
+    expect(
+      portalLoginHref({
+        origin: 'https://staging.gos.earth',
+        slug: 'staging-realmsgos-11',
+        returnPath: '/join',
+      }),
+    ).toBe(
+      'https://staging.gos.earth/join?returnTo=' +
+        encodeURIComponent('/r/staging-realmsgos-11/join'),
+    );
+  });
+
+  it('rejects a protocol-relative return path', () => {
+    expect(
+      portalLoginHref({
+        origin: 'https://staging.gos.earth/',
+        slug: 'agora',
+        returnPath: '//evil.example',
+      }),
+    ).toBe('https://staging.gos.earth/join?returnTo=' + encodeURIComponent('/r/agora/join'));
   });
 });
