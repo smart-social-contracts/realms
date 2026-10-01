@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  consumePortalSigningOut,
+  markPortalSigningOut,
   normalizePortalRedirectPath,
   portalLoginHref,
   portalLoginReturnPath,
@@ -177,5 +179,21 @@ describe('portalLoginHref', () => {
         returnPath: '//evil.example',
       }),
     ).toBe('https://staging.gos.earth/join?returnTo=' + encodeURIComponent('/r/agora/join'));
+  });
+});
+
+describe('consumePortalSigningOut', () => {
+  it('is true only for the page load after logout', () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+      removeItem: (key: string) => store.delete(key),
+    });
+    expect(consumePortalSigningOut()).toBe(false);
+    markPortalSigningOut();
+    expect(consumePortalSigningOut()).toBe(true);
+    expect(consumePortalSigningOut()).toBe(false);
+    vi.unstubAllGlobals();
   });
 });

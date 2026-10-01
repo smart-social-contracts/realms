@@ -106,6 +106,29 @@ export function resolvePortalNavSyncHref(
 }
 
 const PORTAL_LOGIN_STRIP_PARAMS = ['portal', 'slug', 'shell'];
+const SIGNING_OUT_KEY = 'realms:signing_out';
+
+/** Remember that the next /join paint is a sign-out, not a sign-in handoff. */
+export function markPortalSigningOut(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(SIGNING_OUT_KEY, '1');
+  } catch {
+    // private mode
+  }
+}
+
+/** Read and clear the sign-out flag. True only for the page load after logout. */
+export function consumePortalSigningOut(): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  try {
+    const signingOut = sessionStorage.getItem(SIGNING_OUT_KEY) === '1';
+    sessionStorage.removeItem(SIGNING_OUT_KEY);
+    return signingOut;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * In-realm path to resume after the portal login page.

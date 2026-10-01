@@ -1,10 +1,12 @@
 <script>
   import { Button, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import { get } from 'svelte/store';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, logout, restoreAuthSession, resetAuthSessionRestore } from '$lib/auth';
   import { isEmbeddedInPortal, portalNavPush } from '$lib/portal-bridge.ts';
+  import { consumePortalSigningOut } from '$lib/portal-redirect-path.ts';
   import { backend, backendReady, initBackendWithIdentity, setActiveQuarter, createQuarterActor, asJoinSafeActor } from '$lib/canisters.js';
   import { loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
@@ -50,6 +52,14 @@
   let agreement = false;
   let error = '';
   let loading = false;
+  // Returning from the portal, the session arrives a moment after this page
+  // paints. Hold the sign-in form until that handoff settles.
+  let awaitingPortalSession = browser && isEmbeddedInPortal();
+  let portalHandoffIsSignOut = browser && consumePortalSigningOut();
+
+  function releasePortalHandoff() {
+    awaitingPortalSession = false;
+  }
   let realmName = 'Realm';
   let inviteCode = '';
   let inviteProfile = '';
@@ -270,8 +280,17 @@
 
   onMount(() => {
     let onPortalAuth;
+    let onPortalPending;
     let onPortalAuthError;
+    let handoffTimer;
     let disposed = false;
+    // The portal answers the first probe during hydration, before the awaits
+    // below finish. Listen now so a "no session" reply is not missed.
+    if (awaitingPortalSession) {
+      onPortalPending = () => releasePortalHandoff();
+      window.addEventListener('portal:auth-pending', onPortalPending);
+      handoffTimer = setTimeout(releasePortalHandoff, 8000);
+    }
     let authUnsub = () => {};
     let profilesUnsub = () => {};
 
@@ -313,6 +332,7 @@
       }
 
       if ($testModeIIBypass) {
+        releasePortalHandoff();
         await logout();
         isAuthenticated.set(false);
         principal.set('');
@@ -338,15 +358,20 @@
         };
         onPortalAuthError = (event) => {
           loading = false;
+          releasePortalHandoff();
           console.warn('[portal] delegation unavailable:', event?.detail?.error);
         };
         window.addEventListener('portal:auth', onPortalAuth);
         window.addEventListener('portal:auth-error', onPortalAuthError);
+      } else {
+        releasePortalHandoff();
       }
     })();
 
     return () => {
       disposed = true;
+      if (handoffTimer) clearTimeout(handoffTimer);
+      if (onPortalPending) window.removeEventListener('portal:auth-pending', onPortalPending);
       authUnsub();
       profilesUnsub();
       if (onPortalAuth) window.removeEventListener('portal:auth', onPortalAuth);
@@ -795,7 +820,19 @@
       {/if}
 
       <!-- Step: Auth -->
-      {#if currentStep === 'auth'}
+      {#if currentStep === 'auth' && awaitingPortalSession}
+        <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100" role="status" aria-live="polite">
+          <div class="text-center py-6">
+            <div class="flex justify-center mb-6">
+              <Spinner size="8" color="gray" />
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">
+              {portalHandoffIsSignOut ? $_('join.signing_out') : $_('join.signing_in')}
+            </h2>
+            <p class="text-gray-500">{$_('join.signing_in_hint')}</p>
+          </div>
+        </div>
+      {:else if currentStep === 'auth'}
         <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <div class="text-center mb-8">
             <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

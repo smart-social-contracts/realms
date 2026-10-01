@@ -2,6 +2,7 @@
 <script>
 	import { login, logout, restoreAuthSession, resetAuthSessionRestore } from '$lib/auth';
 	import { isEmbeddedInPortal, redirectToPortalLogin } from '$lib/portal-bridge.ts';
+	import { markPortalSigningOut } from '$lib/portal-redirect-path.ts';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
 	import { loadUserProfiles, resetProfileState, applyUserGetRecord, userProfiles, userDepartments, hasJoined } from '$lib/stores/profiles';
 	import { formatProfileValues, formatDepartmentValues } from '$lib/utils/membershipLabels';
@@ -99,6 +100,7 @@
 
 		console.log('Principal after logout:', principalText);
 		showDropdown = false;
+		markPortalSigningOut();
 		goto('/join');
 	}
 
